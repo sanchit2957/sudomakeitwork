@@ -14,9 +14,10 @@ type DashboardLayoutProps = {
   navItems: WorkspaceNavItem[];
   workspace: string;
   roleLabel: string;
+  desktopSidebar?: "collapsible" | "fixed";
 };
 
-export default function DashboardLayout({ children, navItems, workspace, roleLabel }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, navItems, workspace, roleLabel, desktopSidebar = "collapsible" }: DashboardLayoutProps) {
   const { loading, user, logout } = useAuth();
   const [location, setLocation] = useLocation();
 
@@ -35,14 +36,14 @@ export default function DashboardLayout({ children, navItems, workspace, roleLab
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="icon" className="border-r border-r-border bg-[#f7fbf9]">
+      <Sidebar collapsible={desktopSidebar === "fixed" ? "none" : "icon"} className="border-r border-r-border bg-[#f7fbf9]">
         <SidebarHeader className="p-4">
           <div className="flex items-center gap-1">
             <button onClick={() => setLocation("/")} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 text-left hover:bg-secondary/70 group-data-[collapsible=icon]:justify-center">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"><span className="font-mono text-sm font-bold">S</span></span>
               <span className="group-data-[collapsible=icon]:hidden"><span className="block text-sm font-extrabold tracking-tight">sudo MakeItWork</span><span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Assam emergency network</span></span>
             </button>
-            <SidebarTrigger className="hidden h-9 w-9 shrink-0 md:inline-flex group-data-[collapsible=icon]:hidden" />
+            <SidebarTrigger className={cn("hidden h-9 w-9 shrink-0 md:inline-flex group-data-[collapsible=icon]:hidden", desktopSidebar === "fixed" && "md:hidden")} />
           </div>
         </SidebarHeader>
         <SidebarContent className="px-3">

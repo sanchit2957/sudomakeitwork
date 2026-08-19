@@ -9,10 +9,14 @@ describe("DashboardLayout sidebar styling", () => {
     expect(source).not.toContain("rounded-2xl bg-secondary/70 p-2 group-data-[collapsible=icon]:bg-transparent");
   });
 
-  it("keeps desktop navigation available as an icon rail with an in-sidebar expand control", () => {
-    const source = readFileSync(new URL("../client/src/components/DashboardLayout.tsx", import.meta.url), "utf8");
+  it("allows Command Centre to request a permanently expanded desktop sidebar", () => {
+    const layout = readFileSync(new URL("../client/src/components/DashboardLayout.tsx", import.meta.url), "utf8");
+    const command = readFileSync(new URL("../client/src/pages/Command.tsx", import.meta.url), "utf8");
+    const sidebar = readFileSync(new URL("../client/src/components/ui/sidebar.tsx", import.meta.url), "utf8");
 
-    expect(source).toContain('<Sidebar collapsible="icon" className="border-r border-r-border bg-[#f7fbf9]">');
-    expect(source).toContain('SidebarTrigger className="hidden h-9 w-9 shrink-0 md:inline-flex group-data-[collapsible=icon]:hidden"');
+    expect(layout).toContain('desktopSidebar?: "collapsible" | "fixed"');
+    expect(layout).toContain('collapsible={desktopSidebar === "fixed" ? "none" : "icon"}');
+    expect(command).toContain('desktopSidebar="fixed"');
+    expect(sidebar.indexOf("if (isMobile)")).toBeLessThan(sidebar.indexOf('if (collapsible === "none")'));
   });
 });
