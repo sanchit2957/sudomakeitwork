@@ -68,3 +68,4 @@
 - [x] Assign the test-only SOS and verify rapid mission/status reconciliation between administrator and responder views after the cache-policy fix.
 - [x] Add automated coverage for the administrator rescuer-registration approval mutation, beyond call-sign policy validation.
 - [x] Replace remaining legacy Riverguard references in release documentation with sudo MakeItWork.
+- [x] Verify and preserve an opaque DashboardLayout side panel; do not apply transparency.

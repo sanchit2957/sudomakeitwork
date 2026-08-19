@@ -52,7 +52,7 @@ export default function DashboardLayout({ children, navItems, workspace, roleLab
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-4">
-          <div className="rounded-2xl bg-secondary/70 p-2 group-data-[collapsible=icon]:bg-transparent">
+          <div className="rounded-2xl bg-[#e9f2ee] p-2 group-data-[collapsible=icon]:bg-[#e9f2ee]">
             <div className="flex items-center gap-2.5"><Avatar className="h-9 w-9 border border-border"><AvatarFallback className="bg-white text-xs font-bold text-primary">{user.name?.slice(0, 1).toUpperCase() || "U"}</AvatarFallback></Avatar><div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><p className="truncate text-sm font-bold">{user.name || "Authorized user"}</p><p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{roleLabel}</p></div></div>
             <button onClick={logout} className="mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-white hover:text-destructive group-data-[collapsible=icon]:hidden"><LogOut className="h-3.5 w-3.5" /> Sign out</button>
           </div>
