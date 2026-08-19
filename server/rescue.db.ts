@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import {
   auditLogs,
   floodZones,
+  hospitals,
   incidentEvents,
   incidents,
   missions,
@@ -133,11 +134,12 @@ export async function listNotificationFeed(recipientId: number) {
 
 export async function getMapLayers(includeOperational: boolean) {
   const db = await database();
-  const [shelterRows, zoneRows] = await Promise.all([
+  const [shelterRows, hospitalRows, zoneRows] = await Promise.all([
     db.select().from(shelters).orderBy(shelters.name),
+    db.select().from(hospitals).orderBy(hospitals.name),
     db.select().from(floodZones).where(eq(floodZones.active, "yes")).orderBy(desc(floodZones.updatedAt)),
   ]);
-  if (!includeOperational) return { shelters: shelterRows, floodZones: zoneRows, incidents: [], rescuers: [] };
+  if (!includeOperational) return { shelters: shelterRows, hospitals: hospitalRows, floodZones: zoneRows, incidents: [], rescuers: [] };
   const [incidentRows, rescuerRows] = await Promise.all([
     db.select().from(incidents).where(inArray(incidents.status, ["pending", "dispatched"])),
     db
@@ -146,7 +148,12 @@ export async function getMapLayers(includeOperational: boolean) {
       .innerJoin(users, eq(rescueProfiles.userId, users.id))
       .where(and(eq(users.role, "rescuer"), inArray(rescueProfiles.availability, ["available", "on_mission"]))),
   ]);
-  return { shelters: shelterRows, floodZones: zoneRows, incidents: incidentRows, rescuers: rescuerRows };
+  return { shelters: shelterRows, hospitals: hospitalRows, floodZones: zoneRows, incidents: incidentRows, rescuers: rescuerRows };
+}
+
+export async function listHospitals() {
+  const db = await database();
+  return db.select().from(hospitals).orderBy(hospitals.name);
 }
 
 export async function getAnalytics() {

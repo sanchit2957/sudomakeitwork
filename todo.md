@@ -38,3 +38,15 @@
 - [x] Perform a consented test-only shelter creation and edit, confirm persistence, then remove the test record.
 - [x] Verify the responder in-app Alerts fallback receives and displays an operational notification while browser PushManager registration is unavailable.
 - [x] Save the release checkpoint after all outstanding verification evidence is captured.
+- [x] Make public role-entry controls stable so Command centre, Rescuer access, and SOS actions do not appear inconsistently after page load.
+- [x] Rebrand the application name, browser title, and workspace identity as sudo MakeItWork.
+- [x] Redesign the victim journey for panic conditions with image-led, minimal-decision SOS actions and clearer current-status cues.
+- [x] Add a distinct hospital and medical-resource operations panel with capacity, bed availability, key supply levels, status, and mapped location.
+- [x] Implement a client-side offline SOS outbox that queues a victim report locally and submits it automatically once the device reconnects.
+- [x] Explain the exact offline guarantee and remaining limitation: a report can be queued offline but cannot reach the control panel until a network connection returns.
+- [x] Add automated coverage and responsive verification for the new role-entry, resource, and offline-queue behaviors.
+- [x] Save a checkpoint for the sudo MakeItWork emergency-readiness update.
+- [x] Redesign the victim SOS status tracker with large visual state cues that match the panic-mode report flow.
+- [x] Add explicit regression coverage for stable role-entry controls and the offline reconnect flush behavior.
+- [x] Verify the hospital resource route at a responsive viewport and record its protected-route state.
+- [x] Save the final sudo MakeItWork checkpoint after the remaining status and verification updates.

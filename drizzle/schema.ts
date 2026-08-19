@@ -121,6 +121,29 @@ export const shelters = mysqlTable(
   table => [index("shelters_status_idx").on(table.status)],
 );
 
+export const hospitals = mysqlTable(
+  "hospitals",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    name: varchar("name", { length: 180 }).notNull(),
+    address: varchar("address", { length: 360 }).notNull(),
+    contactPhone: varchar("contactPhone", { length: 32 }),
+    latitude: double("latitude").notNull(),
+    longitude: double("longitude").notNull(),
+    totalEmergencyBeds: int("totalEmergencyBeds").default(0).notNull(),
+    availableEmergencyBeds: int("availableEmergencyBeds").default(0).notNull(),
+    totalIcuBeds: int("totalIcuBeds").default(0).notNull(),
+    availableIcuBeds: int("availableIcuBeds").default(0).notNull(),
+    oxygenCylinderCount: int("oxygenCylinderCount").default(0).notNull(),
+    bloodUnitCount: int("bloodUnitCount").default(0).notNull(),
+    ambulanceCount: int("ambulanceCount").default(0).notNull(),
+    status: mysqlEnum("status", ["open", "limited", "critical", "closed"]).default("open").notNull(),
+    updatedBy: int("updatedBy").references(() => users.id),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("hospitals_status_idx").on(table.status)],
+);
+
 export const floodZones = mysqlTable(
   "floodZones",
   {

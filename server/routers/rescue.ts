@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { z } from "zod";
-import { floodZones, guestEmergencyRateLimits, incidents, missions, notifications, pushSubscriptions, rescueProfiles, shelters, users } from "../../drizzle/schema";
+import { floodZones, guestEmergencyRateLimits, hospitals, incidents, missions, notifications, pushSubscriptions, rescueProfiles, shelters, users } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { adminProcedure, operationalProcedure, protectedProcedure, publicProcedure, rescuerProcedure, router } from "../_core/trpc";
@@ -15,6 +15,7 @@ import {
   getIncidentById,
   getIncidentTimeline,
   getMapLayers,
+  listHospitals,
   getMissionForRescuer,
   getRescuerProfile,
   getRescuerRoster,
@@ -27,12 +28,29 @@ import {
 } from "../rescue.db";
 import { storagePut } from "../storage";
 import { getGuestSosRateLimitDecision, isAllowedMissionTransition } from "../rescue.policy";
+import { hasValidHospitalCapacity } from "../hospital.policy";
 import { sendRescuerPush } from "../push";
 
 const incidentCode = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
 const severitySchema = z.enum(["critical", "high", "medium", "low"]);
 const missionStatusSchema = z.enum(["pending", "dispatched", "resolved"]);
+const hospitalStatusSchema = z.enum(["open", "limited", "critical", "closed"]);
 const pointSchema = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
+const hospitalInput = z.object({
+  name: z.string().trim().min(2).max(180),
+  address: z.string().trim().min(3).max(360),
+  contactPhone: z.string().trim().max(32).optional(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  totalEmergencyBeds: z.number().int().min(0).max(1_000_000),
+  availableEmergencyBeds: z.number().int().min(0).max(1_000_000),
+  totalIcuBeds: z.number().int().min(0).max(1_000_000),
+  availableIcuBeds: z.number().int().min(0).max(1_000_000),
+  oxygenCylinderCount: z.number().int().min(0).max(1_000_000),
+  bloodUnitCount: z.number().int().min(0).max(1_000_000),
+  ambulanceCount: z.number().int().min(0).max(1_000_000),
+  status: hospitalStatusSchema,
+});
 
 async function database() {
   const db = await getDb();
@@ -163,6 +181,7 @@ export const rescueRouter = router({
     incidents: adminProcedure.input(z.object({ status: missionStatusSchema.optional() }).optional()).query(({ input }) => listIncidents(input?.status)),
     analytics: adminProcedure.query(() => getAnalytics()),
     mapLayers: operationalProcedure.query(({ ctx }) => getMapLayers(ctx.user.role !== "user")),
+    hospitals: adminProcedure.query(() => listHospitals()),
     rescueRoster: adminProcedure.query(() => getRescuerRoster()),
     availableUsers: adminProcedure.query(async () => {
       const db = await database();
@@ -212,6 +231,22 @@ export const rescueRouter = router({
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Shelter not found." });
       await db.update(shelters).set({ name: input.name, address: input.address, latitude: input.latitude, longitude: input.longitude, capacity: input.capacity, occupancy: input.occupancy, status: input.status }).where(eq(shelters.id, input.id));
       await writeAudit(ctx.user.id, "shelter.update", "shelter", input.id, input.name);
+      return { success: true };
+    }),
+    addHospital: adminProcedure.input(hospitalInput).mutation(async ({ input, ctx }) => {
+      if (!hasValidHospitalCapacity(input.totalEmergencyBeds, input.availableEmergencyBeds, input.totalIcuBeds, input.availableIcuBeds)) throw new TRPCError({ code: "BAD_REQUEST", message: "Available beds cannot exceed the declared hospital capacity." });
+      const db = await database();
+      const result = await db.insert(hospitals).values({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id });
+      await writeAudit(ctx.user.id, "hospital.create", "hospital", Number(result[0].insertId), input.name);
+      return { id: Number(result[0].insertId) };
+    }),
+    updateHospital: adminProcedure.input(hospitalInput.extend({ id: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
+      if (!hasValidHospitalCapacity(input.totalEmergencyBeds, input.availableEmergencyBeds, input.totalIcuBeds, input.availableIcuBeds)) throw new TRPCError({ code: "BAD_REQUEST", message: "Available beds cannot exceed the declared hospital capacity." });
+      const db = await database();
+      const existing = (await db.select().from(hospitals).where(eq(hospitals.id, input.id)).limit(1))[0];
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Hospital not found." });
+      await db.update(hospitals).set({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id }).where(eq(hospitals.id, input.id));
+      await writeAudit(ctx.user.id, "hospital.update", "hospital", input.id, input.name);
       return { success: true };
     }),
     addFloodZone: adminProcedure.input(z.object({ name: z.string().trim().min(2).max(180), severity: severitySchema, points: z.array(pointSchema).min(3).max(200) })).mutation(async ({ input, ctx }) => {
