@@ -188,7 +188,10 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+          className={cn(
+            "w-(--sidebar-width) border-r border-[#b8dcd2] bg-[#f7fbf9] p-0 text-[#173d37] shadow-2xl [&>button]:hidden",
+            className
+          )}
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -731,4 +734,3 @@ export {
   SidebarTrigger,
   useSidebar
 };
-

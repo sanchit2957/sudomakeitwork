@@ -69,3 +69,4 @@
 - [x] Add automated coverage for the administrator rescuer-registration approval mutation, beyond call-sign policy validation.
 - [x] Replace remaining legacy Riverguard references in release documentation with sudo MakeItWork.
 - [x] Verify and preserve an opaque DashboardLayout side panel; do not apply transparency.
+- [x] Make the mobile Rescuer workspace sidebar opaque and high-contrast so navigation tabs and controls remain clearly visible.

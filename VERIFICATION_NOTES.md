@@ -37,3 +37,9 @@ The approved temporary account successfully entered `/responder` as **TEST-RESQ*
 After restoring the actual database-authorized administrator identity, `/command` displayed `SOS-SZ65GD3U` as **dispatched**, assigned to **TEST-RESQ**, and labelled **Responder en route**. This completed the live administrator → responder → administrator propagation check after the cache-policy fix.
 
 All temporary verification records were then deleted in a single database transaction: the test SOS, mission, incident events, notifications, test rescuer profile, registration request, audit entries, subscriptions, and temporary user. A zero-count integrity query confirmed that no test record remained. The temporary development-only session routes and local session-helper artifacts were removed before the final validation pass.
+
+## Mobile Rescuer sidebar visibility
+
+The authenticated Rescuer workspace was checked at a 375px mobile viewport with its navigation drawer open. The drawer displayed an opaque light background, a visible border and shadow, high-contrast identity area, all three navigation tabs (**My missions**, **Field map**, and **Alerts**), and the responder footer with **Sign out**. The app content was visibly dimmed behind the drawer rather than bleeding through it. The temporary inspection state used for this visual check was removed before validation.
+
+The final 375px capture was reviewed directly after the inspection helper had established the open drawer state. It confirmed that the opaque surface, divider border, active-tab contrast, secondary tab labels, and responder footer remain readable without background-content bleed-through.
