@@ -1,0 +1,40 @@
+# Project TODO
+
+- [x] Define operational roles, authorization boundaries, incident workflow states, and domain vocabulary.
+- [x] Extend the database schema for rescue profiles, SOS incidents, mission assignments, shelters, flood zones, audit records, notifications, and incident events.
+- [x] Apply the database migration and implement typed query helpers.
+- [x] Build protected role-aware backend procedures for SOS reporting, assignment, status progression, availability, shelters, map layers, analytics, and notifications.
+- [x] Enforce the mission workflow: Pending → Dispatched → Resolved, including role and transition checks.
+- [x] Implement secure victim SOS reporting with geolocation/manual location, severity, people count, and optional evidence upload support.
+- [x] Implement separate victim, rescuer, and administrator navigation and role-specific views.
+- [x] Design a mobile-first Victim Emergency App with simple SOS controls and live rescue status tracking.
+- [x] Design a Rescuer Operations Panel with availability settings, assigned missions, and mission-status actions.
+- [x] Design an Administrator Command Center with operational metrics, search/filterable incident feed, assignment actions, and map management.
+- [x] Integrate the provided map component for responsive SOS, rescuer, flood-zone, and shelter layers with click-through details and a manual-coordinate fallback.
+- [x] Add real-time-friendly refresh patterns and owner/rescuer notification delivery for assignments and high-priority SOS events.
+- [x] Create live analytics for incident totals, resolved cases, active rescuers, and average response time.
+- [x] Add meaningful Vitest coverage for authentication, rescuer authorization, Web Push configuration, and workflow/rate-limit enforcement.
+- [x] Verify desktop and mobile presentation, build health, and critical user flows.
+- [x] Save a release checkpoint and provide the completed project to the user.
+- [x] Restrict notification read actions to their authenticated recipient and record relevant access changes.
+- [x] Add durable guest-SOS rate limiting while retaining the supported guest emergency path.
+- [x] Provide a map-assisted manual-location flow that turns a selected map point into SOS coordinates.
+- [x] Allow administrators to update existing shelter details and map coordinates after creation.
+- [x] Add standards-based background web push delivery for rescuer assignment and nearby high-priority SOS alerts.
+- [x] Verify rescuer and administrator workspaces on desktop and mobile, including role gates and navigation states.
+- [x] Exercise the SOS-to-resolution workflow, shelter editing controls, live analytics refresh, and in-app browser push fallback end to end.
+- [x] Improve blocked role messaging so administrators and rescuers are directed to sign out and use the separately authorized account for the requested workspace.
+- [x] Resolve the OAuth redirect URI issue by directing external-account sign-in through the hosted HTTPS preview instead of unsupported local `127.0.0.1` previews.
+- [x] Prevent sign-in synchronization from overwriting a database-authorized rescuer role with an administrator role on refresh.
+- [x] Distinguish browser notification permission from a successfully stored Web Push subscription, and surface subscription failures clearly.
+- [x] Confirm the responder configuration responds without exposing private VAPID credentials; validate the configured P-256 VAPID pair.
+- [x] Provide an explicit responder recovery path when the browser’s own PushManager key store fails despite valid service configuration.
+- [x] Add an in-app reset that clears the site’s existing service-worker and Push subscription state before retrying registration.
+- [x] Ensure the responder alert setup control renders independent retry actions after an automatic registration reset or failed setup attempt.
+- [x] Remove stale pending-mutation dependencies from the responder alert retry control after reset completion.
+- [x] Complete one consolidated browser-push recovery pass and document the remaining device-specific PushManager limitation rather than repeating retries.
+- [x] Document the verified browser-local PushManager registration limitation and the in-app alert fallback in the release notes.
+- [x] Verify administrator and responder workspace navigation and role-gate presentation at a mobile viewport.
+- [x] Perform a consented test-only shelter creation and edit, confirm persistence, then remove the test record.
+- [x] Verify the responder in-app Alerts fallback receives and displays an operational notification while browser PushManager registration is unavailable.
+- [x] Save the release checkpoint after all outstanding verification evidence is captured.

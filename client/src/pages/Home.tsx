@@ -1,33 +1,17 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+import { ArrowRight, HeartHandshake, MapPinned, ShieldCheck, Siren, TentTree } from "lucide-react";
+import { useLocation } from "wouter";
 
-/**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Workflow, Frontend Best Practices, Design Guide and Common Pitfalls
- */
 export default function Home() {
-  // The useAuth hook provides authentication state.
-  // To implement login/logout, call logout(), or start login from an event
-  // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
-  // startLogin() during render (no href={startLogin()}) — it mints a one-time
-  // nonce cookie and must run only at the moment of navigation.
-  let { user, loading, error, isAuthenticated, logout } = useAuth();
-
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
-      </main>
-    </div>
-  );
+  const [, setLocation] = useLocation();
+  return <div className="min-h-screen overflow-hidden app-grid">
+    <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 md:px-8"><button onClick={() => setLocation("/")} className="flex items-center gap-3 text-left"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20"><span className="font-mono font-medium">R</span></span><span><span className="block font-extrabold tracking-tight">Riverguard</span><span className="block font-mono text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Assam response network</span></span></button><nav className="hidden items-center gap-6 text-sm font-bold text-muted-foreground md:flex"><button onClick={() => setLocation("/track")} className="hover:text-primary">Track SOS</button><button onClick={() => setLocation("/responder")} className="hover:text-primary">Rescuer access</button><button onClick={() => setLocation("/command")} className="hover:text-primary">Command centre</button></nav><Button onClick={() => setLocation("/emergency")} className="rounded-xl bg-[#c94b45] px-4 text-white shadow-lg shadow-[#c94b45]/20 hover:bg-[#b9423d]"><Siren className="mr-2 h-4 w-4" /> Need help</Button></header>
+    <main className="relative mx-auto max-w-7xl px-5 pb-16 pt-12 md:px-8 md:pt-20"><span className="river-line left-[-8%] top-44 h-5 w-[78%] opacity-55" /><span className="river-line right-[-15%] top-64 h-8 w-[72%] opacity-40" />
+      <section className="relative grid items-end gap-12 lg:grid-cols-[1.14fr_0.86fr]"><div className="rise-in"><div className="inline-flex items-center gap-2 rounded-full border border-[#99ccbd] bg-[#edfbf5] px-3 py-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-[#277a69]"><span className="h-1.5 w-1.5 rounded-full bg-[#2fa77f]" /> Assam · emergency coordination</div><h1 className="mt-6 max-w-3xl text-5xl font-extrabold leading-[0.98] tracking-[-0.055em] text-[#173d37] sm:text-6xl md:text-7xl">When the water rises,<br/><span className="text-[#277b6b]">help finds a way.</span></h1><p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground md:text-lg">A calm, reliable response space for people seeking safety, field teams coordinating rescue, and operators making every decision count.</p><div className="mt-9 flex flex-col gap-3 sm:flex-row"><Button size="lg" onClick={() => setLocation("/emergency")} className="h-14 rounded-2xl bg-[#c94b45] px-6 text-base font-extrabold text-white shadow-xl shadow-[#c94b45]/20 hover:bg-[#b9423d]"><Siren className="mr-2 h-5 w-5" /> I need urgent help</Button><Button size="lg" variant="outline" onClick={() => setLocation("/track")} className="h-14 rounded-2xl border-[#92c9bb] bg-white/70 px-6 text-base font-bold text-primary hover:bg-[#eaf7f2]">Track an SOS <ArrowRight className="ml-2 h-4 w-4" /></Button></div><p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">GPS optional · manual map pin supported · photo evidence optional</p></div>
+        <div className="rise-in relative rounded-[2rem] border border-white/70 bg-[#174e46] p-5 text-white shadow-[0_32px_90px_-35px_rgb(20_78_70/0.8)] [animation-delay:100ms]"><div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[#48a690]/25 blur-3xl" /><div className="relative"><div className="flex items-center justify-between border-b border-white/15 pb-4"><span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#b1dbd1]">Your next clear action</span><ShieldCheck className="h-5 w-5 text-[#9bdbc8]" /></div><div className="grid gap-3 py-5"><button onClick={() => setLocation("/emergency")} className="group flex items-center gap-4 rounded-2xl bg-white p-4 text-left text-[#174e46] transition hover:-translate-y-0.5"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#fbe9e7] text-[#c94b45]"><Siren className="h-5 w-5" /></span><span className="flex-1"><span className="block text-sm font-extrabold">Report an emergency</span><span className="block text-xs text-[#608077]">Create a traceable SOS request</span></span><ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></button><button onClick={() => setLocation("/track")} className="group flex items-center gap-4 rounded-2xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#287464] text-[#e2fff5]"><MapPinned className="h-5 w-5" /></span><span className="flex-1"><span className="block text-sm font-extrabold">Check rescue status</span><span className="block text-xs text-[#b1dbd1]">Use your private SOS reference</span></span><ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></button></div><div className="flex items-center gap-2 rounded-xl bg-[#123f38] p-3 text-xs text-[#b9ddd5]"><HeartHandshake className="h-4 w-4 shrink-0 text-[#8fd8c5]" /> Stay safe and follow local emergency instructions while a mission is being coordinated.</div></div></div>
+      </section>
+      <section className="mt-20 grid gap-4 md:grid-cols-3"><Feature icon={Siren} number="01" title="Victim emergency app" text="Large, focused controls for SOS reporting, map pin selection, and rescue-status tracking." /><Feature icon={MapPinned} number="02" title="Field operations" text="A role-specific workspace for teams to accept assignments, share availability, and progress missions." /><Feature icon={TentTree} number="03" title="Command coordination" text="A live operational view for assignment, map layers, incidents, shelters, and accountability." /></section>
+    </main>
+  </div>;
 }
+function Feature({ icon: Icon, number, title, text }: { icon: typeof Siren; number: string; title: string; text: string }) { return <article className="rounded-2xl border bg-white/80 p-5 shadow-sm"><div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><Icon className="h-5 w-5" /></span><span className="font-mono text-xs text-[#75a399]">{number}</span></div><h2 className="mt-5 font-extrabold tracking-tight">{title}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p></article>; }
