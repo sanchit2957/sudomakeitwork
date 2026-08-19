@@ -43,3 +43,7 @@ All temporary verification records were then deleted in a single database transa
 The authenticated Rescuer workspace was checked at a 375px mobile viewport with its navigation drawer open. The drawer displayed an opaque light background, a visible border and shadow, high-contrast identity area, all three navigation tabs (**My missions**, **Field map**, and **Alerts**), and the responder footer with **Sign out**. The app content was visibly dimmed behind the drawer rather than bleeding through it. The temporary inspection state used for this visual check was removed before validation.
 
 The final 375px capture was reviewed directly after the inspection helper had established the open drawer state. It confirmed that the opaque surface, divider border, active-tab contrast, secondary tab labels, and responder footer remain readable without background-content bleed-through.
+
+## Desktop workspace sidebar availability
+
+The desktop workspace layout was checked at 1280px after changing the sidebar to icon-collapsible mode. The opaque sidebar remained visible with its navigation entries, responder footer, and an in-sidebar expand/collapse control. The same shared layout is used by the Administrator Command Centre, where **Rescuer requests** remains an accessible desktop navigation item.

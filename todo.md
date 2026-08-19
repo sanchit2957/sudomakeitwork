@@ -70,3 +70,4 @@
 - [x] Replace remaining legacy Riverguard references in release documentation with sudo MakeItWork.
 - [x] Verify and preserve an opaque DashboardLayout side panel; do not apply transparency.
 - [x] Make the mobile Rescuer workspace sidebar opaque and high-contrast so navigation tabs and controls remain clearly visible.
+- [x] Restore a visible desktop Admin Command Centre sidebar with an accessible Rescuer requests approval entry.
