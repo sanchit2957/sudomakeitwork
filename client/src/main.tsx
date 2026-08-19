@@ -74,6 +74,12 @@ const trpcClient = trpc.createClient({
         return globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
+          cache: "no-store",
+          headers: {
+            ...(init?.headers ?? {}),
+            "Cache-Control": "no-cache, no-store, max-age=0",
+            Pragma: "no-cache",
+          },
         });
       },
     }),

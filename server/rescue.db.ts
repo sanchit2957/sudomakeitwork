@@ -8,6 +8,7 @@ import {
   missions,
   notifications,
   rescueProfiles,
+  rescuerRegistrationRequests,
   shelters,
   users,
 } from "../drizzle/schema";
@@ -121,6 +122,15 @@ export async function getRescuerRoster() {
 export async function getRescuerProfile(userId: number) {
   const db = await database();
   return (await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1))[0];
+}
+
+export async function listRescuerRegistrationRequests() {
+  const db = await database();
+  return db
+    .select({ request: rescuerRegistrationRequests, user: users })
+    .from(rescuerRegistrationRequests)
+    .innerJoin(users, eq(rescuerRegistrationRequests.userId, users.id))
+    .orderBy(desc(rescuerRegistrationRequests.createdAt));
 }
 
 export async function listNotificationFeed(recipientId: number) {

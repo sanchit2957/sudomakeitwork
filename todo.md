@@ -50,3 +50,21 @@
 - [x] Add explicit regression coverage for stable role-entry controls and the offline reconnect flush behavior.
 - [x] Verify the hospital resource route at a responsive viewport and record its protected-route state.
 - [x] Save the final sudo MakeItWork checkpoint after the remaining status and verification updates.
+- [x] Diagnose and remove delayed or intermittent SOS, mission-assignment, and responder-status synchronization across operational views.
+- [x] Add immediate cache reconciliation and visible mutation feedback for SOS creation, assignment, status changes, and availability updates.
+- [x] Add a rescuer self-registration request flow with administrator review and approval in the Command Centre.
+- [x] Add a rescuer registration entry point in the field workspace and stable links to the Hospitals & critical resources panel in Command Centre.
+- [x] Add automated tests and cross-role verification for synchronization and rescuer approval workflows.
+- [x] Save a checkpoint for the synchronization and registration reliability update.
+- [x] Replace the remaining legacy Riverguard wording in responder alert messaging with sudo MakeItWork.
+- [x] Verify a consented test SOS appears in Command Centre promptly and that assignment plus responder status updates propagate across roles without waiting for stale data.
+- [x] Add automated coverage for optimistic mission and availability cache reconciliation and for administrator approval of a rescuer request.
+- [x] Verify the full rescuer-request lifecycle: submit as a standard account, approve in Command Centre, then unlock the responder workspace.
+- [x] Replace every remaining Riverguard label in responder push diagnostics with sudo MakeItWork.
+- [x] Save the final synchronization and registration reliability checkpoint after these end-to-end checks.
+- [x] Prevent intermediary and browser caching of live tRPC operational queries so newly created SOS and assignments cannot render stale responses, including the offline service worker cache.
+- [x] Create a temporary, explicitly test-only standard account and rescuer registration request for end-to-end verification.
+- [x] Approve the test-only request, verify its rescuer role transition and responder workspace access, then remove all temporary account and request records.
+- [x] Assign the test-only SOS and verify rapid mission/status reconciliation between administrator and responder views after the cache-policy fix.
+- [x] Add automated coverage for the administrator rescuer-registration approval mutation, beyond call-sign policy validation.
+- [x] Replace remaining legacy Riverguard references in release documentation with sudo MakeItWork.

@@ -1,4 +1,4 @@
-const CACHE = "sudo-makeitwork-shell-v2";
+const CACHE = "sudo-makeitwork-offline-shell-v2";
 const APP_SHELL = ["/", "/emergency", "/track"];
 
 self.addEventListener("install", event => {
@@ -6,16 +6,25 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then(keys => Promise.all(keys.filter(key => key.startsWith("rescue-offline-shell-") || key.startsWith("sudo-makeitwork-offline-shell-")).filter(key => key !== CACHE).map(key => caches.delete(key))))
+      .then(() => self.clients.claim()),
+  );
 });
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  // Operational tRPC calls must always reach the server. Caching them causes
+  // the Command Centre and responder workspace to render old SOS and mission data.
+  if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return;
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request).then(response => { const clone = response.clone(); void caches.open(CACHE).then(cache => cache.put(event.request, clone)); return response; }).catch(async () => (await caches.match(event.request)) || (await caches.match("/"))));
     return;
   }
-  if (new URL(event.request.url).origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) return;
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => { const clone = response.clone(); void caches.open(CACHE).then(cache => cache.put(event.request, clone)); return response; })));
 });
 

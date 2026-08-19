@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { z } from "zod";
-import { floodZones, guestEmergencyRateLimits, hospitals, incidents, missions, notifications, pushSubscriptions, rescueProfiles, shelters, users } from "../../drizzle/schema";
+import { floodZones, guestEmergencyRateLimits, hospitals, incidents, missions, notifications, pushSubscriptions, rescueProfiles, rescuerRegistrationRequests, shelters, users } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { adminProcedure, operationalProcedure, protectedProcedure, publicProcedure, rescuerProcedure, router } from "../_core/trpc";
@@ -16,6 +16,7 @@ import {
   getIncidentTimeline,
   getMapLayers,
   listHospitals,
+  listRescuerRegistrationRequests,
   getMissionForRescuer,
   getRescuerProfile,
   getRescuerRoster,
@@ -29,6 +30,7 @@ import {
 import { storagePut } from "../storage";
 import { getGuestSosRateLimitDecision, isAllowedMissionTransition } from "../rescue.policy";
 import { hasValidHospitalCapacity } from "../hospital.policy";
+import { canRequestRescuerRegistration, requiresCallSign } from "../registration.policy";
 import { sendRescuerPush } from "../push";
 
 const incidentCode = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
@@ -182,6 +184,7 @@ export const rescueRouter = router({
     analytics: adminProcedure.query(() => getAnalytics()),
     mapLayers: operationalProcedure.query(({ ctx }) => getMapLayers(ctx.user.role !== "user")),
     hospitals: adminProcedure.query(() => listHospitals()),
+    rescuerRegistrationRequests: adminProcedure.query(() => listRescuerRegistrationRequests()),
     rescueRoster: adminProcedure.query(() => getRescuerRoster()),
     availableUsers: adminProcedure.query(async () => {
       const db = await database();
@@ -197,6 +200,23 @@ export const rescueRouter = router({
       if (existing) await db.update(rescueProfiles).set({ callSign: input.callSign, phone: input.phone ?? null }).where(eq(rescueProfiles.userId, input.userId));
       else await db.insert(rescueProfiles).values({ userId: input.userId, callSign: input.callSign, phone: input.phone ?? null, availability: "available" });
       await writeAudit(ctx.user.id, "rescuer.promote", "user", input.userId, `Assigned call sign ${input.callSign}`);
+      return { success: true };
+    }),
+    reviewRescuerRegistration: adminProcedure.input(z.object({ requestId: z.number().int().positive(), decision: z.enum(["approved", "rejected"]), callSign: z.string().trim().min(2).max(96).optional(), reviewNote: z.string().trim().max(1000).optional() })).mutation(async ({ input, ctx }) => {
+      if (!requiresCallSign(input.decision, input.callSign)) throw new TRPCError({ code: "BAD_REQUEST", message: "A field call sign is required to approve a rescuer." });
+      const db = await database();
+      const request = (await db.select().from(rescuerRegistrationRequests).where(eq(rescuerRegistrationRequests.id, input.requestId)).limit(1))[0];
+      if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Registration request not found." });
+      if (request.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "This registration request has already been reviewed." });
+      const reviewedAt = new Date();
+      await db.update(rescuerRegistrationRequests).set({ status: input.decision, reviewedBy: ctx.user.id, reviewedAt, reviewNote: input.reviewNote ?? null }).where(eq(rescuerRegistrationRequests.id, request.id));
+      if (input.decision === "approved") {
+        await db.update(users).set({ role: "rescuer" }).where(eq(users.id, request.userId));
+        const existing = await getRescuerProfile(request.userId);
+        if (existing) await db.update(rescueProfiles).set({ callSign: input.callSign!, phone: request.phone ?? null, availability: "available" }).where(eq(rescueProfiles.userId, request.userId));
+        else await db.insert(rescueProfiles).values({ userId: request.userId, callSign: input.callSign!, phone: request.phone ?? null, availability: "available" });
+      }
+      await writeAudit(ctx.user.id, `rescuerRegistration.${input.decision}`, "rescuerRegistration", request.id, input.callSign ?? input.reviewNote ?? null);
       return { success: true };
     }),
     assignMission: adminProcedure.input(z.object({ incidentId: z.number().int().positive(), rescuerId: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
@@ -258,6 +278,16 @@ export const rescueRouter = router({
   }),
 
   rescuer: router({
+    requestRegistration: protectedProcedure.input(z.object({ phone: z.string().trim().max(32).optional(), note: z.string().trim().max(1000).optional() })).mutation(async ({ input, ctx }) => {
+      if (!canRequestRescuerRegistration(ctx.user.role)) throw new TRPCError({ code: "BAD_REQUEST", message: ctx.user.role === "rescuer" ? "This account is already an authorized rescuer." : "Administrator accounts cannot request rescuer access." });
+      const db = await database();
+      const existing = (await db.select().from(rescuerRegistrationRequests).where(eq(rescuerRegistrationRequests.userId, ctx.user.id)).limit(1))[0];
+      if (existing?.status === "pending") throw new TRPCError({ code: "CONFLICT", message: "Your rescuer registration is already awaiting administrator review." });
+      if (existing) await db.update(rescuerRegistrationRequests).set({ phone: input.phone ?? null, note: input.note ?? null, status: "pending", reviewedBy: null, reviewedAt: null, reviewNote: null }).where(eq(rescuerRegistrationRequests.id, existing.id));
+      else await db.insert(rescuerRegistrationRequests).values({ userId: ctx.user.id, phone: input.phone ?? null, note: input.note ?? null, status: "pending" });
+      await writeAudit(ctx.user.id, "rescuerRegistration.request", "rescuerRegistration", existing?.id, input.note ?? null);
+      return { success: true };
+    }),
     profile: rescuerProcedure.query(({ ctx }) => getRescuerProfile(ctx.user.id)),
     missions: rescuerProcedure.query(({ ctx }) => listMissionsForRescuer(ctx.user.id)),
     notifications: rescuerProcedure.query(async ({ ctx }) => ({ items: await listNotificationFeed(ctx.user.id), unread: await unreadNotificationCount(ctx.user.id) })),

@@ -7,3 +7,33 @@ The hosted administrator session was checked at `/command/hospitals`. The live p
 ## Responsive victim experience
 
 The public safety hub and panic-mode SOS flow were checked at a 375px phone viewport. The four role-entry actions remained visible, and the SOS screen showed three image-led emergency choices, location sharing, people count controls, optional details, offline-state explanation, and a prominent SOS action.
+
+## Synchronization and discoverability update
+
+The hosted administrator Command Centre was checked after the reliability update. Its persistent navigation now includes **Hospitals & resources** and **Rescuer requests**, while the operations board includes a separate prominent **Hospitals & critical resources** action. The live browser console reported no client-side errors during this check.
+
+The hosted **Rescuer registration requests** route was also verified in an administrator session. It displayed the review workflow and an accurate empty state when no applications were pending.
+
+After the live refresh interval elapsed, the administrator request queue remained responsive and continued to render its stable no-pending-applications state.
+
+## Test-only synchronization scenario
+
+For user-authorized end-to-end verification, a temporary SOS was prepared through the public emergency form with the unmistakable location label **TEST ONLY – sync verification point**, coordinates 26.14450, 91.73620, and notes stating that no emergency exists. This record will be removed after the synchronization check.
+
+The temporary SOS was submitted successfully through the live app and received tracking code `SOS-SZ65GD3U` with an initial **pending** status.
+
+During the Command Centre verification, the database held `SOS-SZ65GD3U` while the browser displayed an older incident-feed snapshot. Investigation identified that the offline service worker was applying cache-first handling to same-origin `/api/trpc` GET requests. The service worker was updated to bypass every `/api/*` request, old cache generations are deleted on activation, and the tRPC response/request path now explicitly uses `no-store`/`no-cache` headers. A fresh service-worker activation and cross-role verification is required before closing this test.
+
+After activating the new `sudo-makeitwork-offline-shell-v2` cache generation and revisiting `/command`, the Command Centre incident feed displayed `SOS-SZ65GD3U` as **pending** with the **TEST ONLY – sync verification point** location. The live feed total also reconciled to six incidents, including both pending cases. This confirms that the stale-read path was eliminated for the test SOS.
+
+The administrator then selected the explicitly test-only responder `TEST-RESQ` and assigned `SOS-SZ65GD3U` through the Command Centre. The interface immediately reconciled to show **Assigned: TEST-RESQ** for the test incident. The responder-facing mission/status transition still requires verification before test data is removed.
+
+For the final responder-side test, a short-lived development-only session was issued by an administrator-gated route for the approved temporary account only. It was held in browser session storage through the app’s existing preview authentication fallback; no production route or real account was used.
+
+The approved temporary account successfully entered `/responder` as **TEST-RESQ**. Its responder workspace displayed the assigned `SOS-SZ65GD3U` mission as **pending** with the test-only location and the **Mark dispatched** action, demonstrating that approval unlocks the field workspace and that the assignment propagated to the responder view.
+
+`TEST-RESQ` then used the responder action to mark `SOS-SZ65GD3U` **dispatched**; the responder panel immediately changed its state and action to **Mark resolved**. The first attempt to switch the sandbox back to the command account did not establish a usable administrator identity, so the administrator-side view still requires a corrected session handoff before the final status check.
+
+After restoring the actual database-authorized administrator identity, `/command` displayed `SOS-SZ65GD3U` as **dispatched**, assigned to **TEST-RESQ**, and labelled **Responder en route**. This completed the live administrator → responder → administrator propagation check after the cache-policy fix.
+
+All temporary verification records were then deleted in a single database transaction: the test SOS, mission, incident events, notifications, test rescuer profile, registration request, audit entries, subscriptions, and temporary user. A zero-count integrity query confirmed that no test record remained. The temporary development-only session routes and local session-helper artifacts were removed before the final validation pass.

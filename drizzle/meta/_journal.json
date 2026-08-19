@@ -36,6 +36,13 @@
       "when": 1787175545402,
       "tag": "0004_unique_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1787177053640,
+      "tag": "0005_fixed_microchip",
+      "breakpoints": true
     }
   ]
 }

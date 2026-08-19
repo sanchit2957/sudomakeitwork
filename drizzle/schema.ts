@@ -39,6 +39,23 @@ export const rescueProfiles = mysqlTable(
   table => [uniqueIndex("rescueProfiles_userId_unique").on(table.userId)],
 );
 
+export const rescuerRegistrationRequests = mysqlTable(
+  "rescuerRegistrationRequests",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    phone: varchar("phone", { length: 32 }),
+    note: text("note"),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+    reviewedBy: int("reviewedBy").references(() => users.id),
+    reviewNote: text("reviewNote"),
+    reviewedAt: timestamp("reviewedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("rescuerRegistrationRequests_userId_unique").on(table.userId), index("rescuerRegistrationRequests_status_createdAt_idx").on(table.status, table.createdAt)],
+);
+
 export const incidents = mysqlTable(
   "incidents",
   {
