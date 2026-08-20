@@ -16,6 +16,11 @@ export const localeOptions: Array<{ code: Locale; label: string; nativeLabel: st
 ];
 
 const storageKey = "sudo-makeitwork-language";
+const originalText = new WeakMap<Text, string>();
+const originalAttributes = new WeakMap<Element, Map<string, string>>();
+const universalTerms: Record<string, Partial<Record<Locale, string>>> = {
+  "general.new": { en: "NEW", as: "নতুন", hi: "नया", bn: "নতুন", or: "ନୂତନ", mr: "नवीन", gu: "નવું", ta: "புதியது", te: "కొత్త", kn: "ಹೊಸ" },
+};
 
 export const messages: Record<Locale, Record<string, string>> = {
   en: {
@@ -129,6 +134,17 @@ export const messages: Record<Locale, Record<string, string>> = {
     "responder.completed": "Completed",
     "responder.assignmentAlerts": "Assignment alerts",
     "responder.enableAlerts": "Enable browser alerts",
+    "responder.profilePending": "Rescuer profile pending",
+    "responder.readinessCopy": "Updates stay live while this workspace is open. Set availability before deploying and share GPS only when safe.",
+    "responder.mapTitle": "See active conditions in your response area.",
+    "responder.people": "people",
+    "responder.priority": "priority",
+    "responder.noMission": "No mission has been assigned to this account. Keep your availability current so dispatchers can find you.",
+    "responder.alertCopy": "Register this device to receive mission assignments and nearby priority SOS alerts even when sudo MakeItWork is not open.",
+    "responder.retryAlerts": "Retry browser alert registration",
+    "responder.missionAlerts": "Mission alerts",
+    "responder.operationalNotifications": "Operational notifications",
+    "responder.noAlerts": "No current alerts. Mission notifications will appear here.",
     "command.workspace": "Administrator command centre",
     "command.role": "Emergency coordination",
     "command.operations": "Operations board",
@@ -151,6 +167,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "dashboard.signIn": "Sign in to open",
     "dashboard.continue": "Continue securely",
     "dashboard.signOut": "Sign out",
+    "dashboard.liveWorkspace": "Live operations workspace",
   },
   as: {
     "language.label": "ভাষা",
@@ -263,6 +280,17 @@ export const messages: Record<Locale, Record<string, string>> = {
     "responder.completed": "সম্পূৰ্ণ",
     "responder.assignmentAlerts": "দায়িত্ব সতৰ্কবাণী",
     "responder.enableAlerts": "ব্ৰাউজাৰ সতৰ্কবাণী সক্ৰিয় কৰক",
+    "responder.profilePending": "উদ্ধাৰকৰ্মীৰ প্ৰফাইল অপেক্ষাৰত",
+    "responder.readinessCopy": "এই কৰ্মক্ষেত্ৰ খোলা থাকিলে আপডেট লাইভ থাকে। মোতায়েনৰ আগতে উপলব্ধতা ঠিক কৰক আৰু নিৰাপদ হ’লেহে GPS শ্বেয়াৰ কৰক।",
+    "responder.mapTitle": "আপোনাৰ সঁহাৰি অঞ্চলৰ সক্ৰিয় অৱস্থা চাওক।",
+    "responder.people": "লোক",
+    "responder.priority": "অগ্ৰাধিকাৰ",
+    "responder.noMission": "এই একাউণ্টত কোনো অভিযান নিযুক্ত কৰা হোৱা নাই। ডিছপেচাৰে আপোনাক বিচাৰি পাবলৈ আপোনাৰ উপলব্ধতা সঠিক ৰাখক।",
+    "responder.alertCopy": "sudo MakeItWork খোলা নাথাকিলেও অভিযান দায়িত্ব আৰু ওচৰৰ অগ্ৰাধিকাৰ SOS সতৰ্কবাণী পাবলৈ এই ডিভাইচ পঞ্জীয়ন কৰক।",
+    "responder.retryAlerts": "ব্ৰাউজাৰ সতৰ্কবাণী পঞ্জীয়ন পুনৰ চেষ্টা কৰক",
+    "responder.missionAlerts": "অভিযান সতৰ্কবাণী",
+    "responder.operationalNotifications": "কাৰ্যকৰী অধিসূচনা",
+    "responder.noAlerts": "বৰ্তমান কোনো সতৰ্কবাণী নাই। অভিযান অধিসূচনা ইয়াত দেখা যাব।",
     "command.workspace": "প্ৰশাসক কমাণ্ড কেন্দ্ৰ",
     "command.role": "জৰুৰী সমন্বয়",
     "command.operations": "কাৰ্যকলাপ ফলক",
@@ -285,6 +313,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "dashboard.signIn": "খোলিবলৈ ছাইন ইন কৰক",
     "dashboard.continue": "সুৰক্ষিতভাৱে আগবাঢ়ক",
     "dashboard.signOut": "ছাইন আউট",
+    "dashboard.liveWorkspace": "লাইভ কাৰ্যকলাপ কৰ্মক্ষেত্ৰ",
   },
   hi: {
     "language.label": "भाषा",
@@ -397,6 +426,17 @@ export const messages: Record<Locale, Record<string, string>> = {
     "responder.completed": "पूर्ण",
     "responder.assignmentAlerts": "असाइनमेंट अलर्ट",
     "responder.enableAlerts": "ब्राउज़र अलर्ट सक्रिय करें",
+    "responder.profilePending": "रिस्पॉन्डर प्रोफ़ाइल लंबित",
+    "responder.readinessCopy": "यह कार्यक्षेत्र खुला रहने पर अपडेट लाइव रहते हैं। रवाना होने से पहले उपलब्धता सेट करें और सुरक्षित होने पर ही GPS साझा करें।",
+    "responder.mapTitle": "अपने प्रतिक्रिया क्षेत्र की सक्रिय स्थितियाँ देखें।",
+    "responder.people": "लोग",
+    "responder.priority": "प्राथमिकता",
+    "responder.noMission": "इस खाते को कोई मिशन नहीं दिया गया है। डिस्पैचर आपको ढूंढ सकें इसलिए उपलब्धता अद्यतन रखें।",
+    "responder.alertCopy": "sudo MakeItWork खुला न होने पर भी मिशन असाइनमेंट और निकटवर्ती प्राथमिक SOS अलर्ट पाने के लिए इस डिवाइस को पंजीकृत करें।",
+    "responder.retryAlerts": "ब्राउज़र अलर्ट पंजीकरण फिर से आज़माएँ",
+    "responder.missionAlerts": "मिशन अलर्ट",
+    "responder.operationalNotifications": "संचालन सूचनाएँ",
+    "responder.noAlerts": "कोई मौजूदा अलर्ट नहीं है। मिशन सूचनाएँ यहाँ दिखाई देंगी।",
     "command.workspace": "प्रशासक कमांड केंद्र",
     "command.role": "आपात समन्वय",
     "command.operations": "ऑपरेशन बोर्ड",
@@ -419,6 +459,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "dashboard.signIn": "खोलने के लिए साइन इन करें",
     "dashboard.continue": "सुरक्षित रूप से जारी रखें",
     "dashboard.signOut": "साइन आउट",
+    "dashboard.liveWorkspace": "लाइव संचालन कार्यक्षेत्र",
   },
   bn: {
     "language.label": "ভাষা", "brand.network": "অসম জরুরি নেটওয়ার্ক", "general.safetyHub": "নিরাপত্তা কেন্দ্র", "general.connected": "সংযুক্ত", "general.offline": "অফলাইন মোড", "general.live": "লাইভ", "general.sos": "SOS",
@@ -458,7 +499,9 @@ export const messages: Record<Locale, Record<string, string>> = {
     "emergency.help": "அவசர உதவி", "emergency.choose": "என்ன நடக்கிறது என்பதைத் தேர்ந்தெடுக்கவும்.", "emergency.pictureHint": "பொருந்தும் படத்தைத் தேர்ந்தெடுக்கவும். விவரங்களை பின்னர் வழங்கலாம்.", "emergency.flood": "வெள்ளம் / நீர்", "emergency.medical": "மருத்துவ உதவி", "emergency.shelter": "பாதுகாப்பான இடம் வேண்டும்", "emergency.stepLocation": "படி 2", "emergency.shareLocation": "உங்கள் இருப்பிடத்தைப் பகிரவும்", "emergency.gpsHint": "பாதுகாப்பாக இருந்தால் மட்டுமே GPS பயன்படுத்தவும். கீழே அடையாள இடம் சேர்க்கலாம்.", "emergency.shareMyLocation": "என் இருப்பிடத்தைப் பகிரவும்", "emergency.locationMissing": "இருப்பிடம் இன்னும் பகிரப்படவில்லை", "emergency.stepPeople": "படி 3", "emergency.people": "எத்தனை பேர்?", "emergency.moreDetails": "மேலும் விவரங்கள் (விருப்பமானது)", "emergency.send": "இப்போது SOS அனுப்பவும்", "emergency.saveOffline": "சிக்னல் திரும்பும் வரை SOS சேமிக்கவும்",
     "track.private": "தனிப்பட்ட SOS", "track.heading": "என் மீட்பு எங்கே?", "track.see": "பார்க்கவும்", "track.pending": "உங்கள் SOS கட்டுப்பாட்டு குழுவிடம் உள்ளது", "track.dispatched": "மீட்புக் குழு அனுப்பப்படுகிறது", "track.resolved": "குழு இந்தப் பணியை முடித்துள்ளது",
     "responder.workspace": "மீட்புப் பணியாளர் பணியிடம்", "responder.role": "கள மீட்புப் பணியாளர்", "responder.missions": "என் பணிகள்", "responder.map": "கள வரைபடம்", "responder.alerts": "எச்சரிக்கைகள்", "responder.available": "கிடைக்கும்", "responder.onMission": "பணியில்", "responder.offDuty": "பணிக்கு வெளியே",
+    "responder.readiness": "கள தயார் நிலை", "responder.profilePending": "மீட்பாளரின் சுயவிவரம் நிலுவையில்", "responder.readinessCopy": "இந்த பணியிடம் திறந்திருக்கும்போது புதுப்பிப்புகள் நேரலையில் இருக்கும். புறப்படுவதற்கு முன் கிடைக்கும் நிலையை அமைத்து, பாதுகாப்பாக இருந்தால் மட்டுமே GPS பகிரவும்.", "responder.mapTitle": "உங்கள் பதில் பகுதியில் செயல்பாட்டிலுள்ள நிலைமைகளைப் பார்க்கவும்.", "responder.updating": "புதுப்பிக்கப்படுகிறது…", "responder.board": "என் பணி பலகை", "responder.boardTitle": "ஒவ்வொரு பணியையும் தேவையான வரிசையில் முடிக்கவும்.", "responder.dispatched": "அனுப்பியதாக குறிக்க", "responder.resolved": "தீர்வடைந்ததாக குறிக்க", "responder.completed": "முடிந்தது", "responder.people": "பேர்", "responder.priority": "முன்னுரிமை", "responder.noMission": "இந்த கணக்கிற்கு எந்தப் பணியும் ஒதுக்கப்படவில்லை. அனுப்புநர்கள் உங்களை கண்டுபிடிக்க, கிடைக்கும் நிலையைப் புதுப்பித்து வைத்திருங்கள்.", "responder.assignmentAlerts": "ஒதுக்கீட்டு அறிவிப்புகள்", "responder.enableAlerts": "உலாவி அறிவிப்புகளை இயக்கவும்", "responder.alertCopy": "sudo MakeItWork திறக்கப்படாதபோதும் பணி ஒதுக்கீடுகள் மற்றும் அருகிலுள்ள முன்னுரிமை SOS அறிவிப்புகளைப் பெற இந்தச் சாதனத்தைப் பதிவு செய்யவும்.", "responder.retryAlerts": "உலாவி அறிவிப்பு பதிவை மீண்டும் முயற்சிக்கவும்", "responder.missionAlerts": "பணி அறிவிப்புகள்", "responder.operationalNotifications": "செயல்பாட்டு அறிவிப்புகள்", "responder.noAlerts": "தற்போது அறிவிப்புகள் இல்லை. பணி அறிவிப்புகள் இங்கே காணப்படும்.",
     "command.workspace": "நிர்வாக கட்டளை மையம்", "command.role": "அவசர ஒருங்கிணைப்பு", "command.operations": "செயல்பாட்டு பலகை", "command.map": "நேரலை வரைபடம்", "command.shelters": "தங்குமிடங்கள்", "command.hospitals": "மருத்துவமனைகள் மற்றும் வளங்கள்", "command.requests": "மீட்புப் பணியாளர் கோரிக்கைகள்", "command.team": "குழு பட்டியல்", "dashboard.signOut": "வெளியேறு",
+    "dashboard.liveWorkspace": "நேரடி செயல்பாட்டு பணியிடம்",
   },
   te: {
     "language.label": "భాష", "brand.network": "అస్సాం అత్యవసర నెట్‌వర్క్", "general.safetyHub": "భద్రతా కేంద్రం", "general.connected": "కనెక్ట్ అయింది", "general.offline": "ఆఫ్‌లైన్ మోడ్", "general.live": "లైవ్", "general.sos": "SOS",
@@ -482,8 +525,8 @@ export function resolveLocale(value: string | null | undefined): Locale {
   return localeOptions.some(option => option.code === value) ? value as Locale : "en";
 }
 
-export function translate(locale: Locale, key: string, values?: Record<string, string | number>): string {
-  const template = messages[locale][key] || messages.en[key] || key;
+export function translate(locale: Locale, key: string, values?: Record<string, string | number>, operationalTerms?: Partial<Record<Locale, Record<string, string>>>): string {
+  const template = operationalTerms?.[locale]?.[key] || messages[locale][key] || universalTerms[key]?.[locale] || messages.en[key] || key;
   return values ? Object.entries(values).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), template) : template;
 }
 
@@ -499,13 +542,56 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const browser = typeof navigator === "undefined" ? "en" : navigator.language.slice(0, 2);
     return resolveLocale(browser);
   });
+  const [operationalTerms, setOperationalTerms] = useState<Partial<Record<Locale, Record<string, string>>>>({});
+
+  useEffect(() => {
+    void fetch("/manus-storage/operational-language-pack_86163712.json")
+      .then(response => response.ok ? response.json() : {})
+      .then((data: Partial<Record<Locale, Record<string, string>>>) => setOperationalTerms(data))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(storageKey, locale);
     document.documentElement.lang = locale;
   }, [locale]);
 
-  const t = useCallback((key: string, values?: Record<string, string | number>) => translate(locale, key, values), [locale]);
+  useEffect(() => {
+    const terms = operationalTerms[locale];
+    if (!terms || !Object.keys(terms).length) return;
+    const applyText = (node: Text) => {
+      const parent = node.parentElement;
+      if (!parent || parent.closest("script, style, [contenteditable=true], [data-no-operational-translation]")) return;
+      const source = originalText.get(node) ?? node.nodeValue ?? "";
+      originalText.set(node, source);
+      const translated = terms[source];
+      if (translated && node.nodeValue !== translated) node.nodeValue = translated;
+    };
+    const applyElement = (element: Element) => {
+      if (element.closest("[data-no-operational-translation]")) return;
+      const attributes = originalAttributes.get(element) ?? new Map<string, string>();
+      for (const name of ["placeholder", "title", "aria-label"]) {
+        const value = attributes.get(name) ?? element.getAttribute(name);
+        if (!value) continue;
+        attributes.set(name, value);
+        if (terms[value]) element.setAttribute(name, terms[value]);
+      }
+      originalAttributes.set(element, attributes);
+    };
+    const applyTree = (root: Node) => {
+      if (root.nodeType === Node.TEXT_NODE) applyText(root as Text);
+      if (root.nodeType === Node.ELEMENT_NODE) applyElement(root as Element);
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+      let node: Node | null;
+      while ((node = walker.nextNode())) node.nodeType === Node.TEXT_NODE ? applyText(node as Text) : applyElement(node as Element);
+    };
+    applyTree(document.body);
+    const observer = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(applyTree)));
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [locale, operationalTerms]);
+
+  const t = useCallback((key: string, values?: Record<string, string | number>) => translate(locale, key, values, operationalTerms), [locale, operationalTerms]);
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, t]);
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

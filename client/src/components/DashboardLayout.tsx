@@ -67,7 +67,7 @@ export default function DashboardLayout({ children, navItems, workspace, roleLab
       </Sidebar>
       <SidebarInset className="min-h-screen bg-background">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/70 bg-background/85 px-4 backdrop-blur md:px-7">
-          <div className="flex items-center gap-3"><SidebarTrigger className="md:hidden"><Menu className="h-4 w-4" /></SidebarTrigger><div><p className="text-sm font-extrabold tracking-tight">{workspace}</p><p className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Live operations workspace</p></div></div>
+          <div className="flex items-center gap-3"><SidebarTrigger className="md:hidden"><Menu className="h-4 w-4" /></SidebarTrigger><div><p className="text-sm font-extrabold tracking-tight">{workspace}</p><p className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">{t("dashboard.liveWorkspace")}</p></div></div>
           <div className="flex items-center gap-2"><LanguageSelector compact /><div className="flex items-center gap-2 rounded-full bg-[#d9f1e7] px-3 py-1.5 text-xs font-bold text-[#176154]"><span className="h-2 w-2 rounded-full bg-[#1c9b75]" /> {t("general.live")}</div></div>
         </header>
         <main className="p-4 md:p-7">{children}</main>

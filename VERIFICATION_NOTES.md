@@ -51,3 +51,11 @@ The desktop workspace layout was checked at 1280px after changing the sidebar to
 ## Multilingual emergency workflow
 
 The platform language selector now offers English, Assamese, Hindi, Bengali, Odia, Marathi, Gujarati, Tamil, Telugu, and Kannada. A direct Tamil (`?lang=ta`) mobile check confirmed that the public safety-hub headline, emergency choice cards, quick-access navigation, GPS instruction, SOS action, and offline reassurance render in Tamil script without layout overlap. Operational IDs, incident content, coordinates, and other entered data are intentionally left unchanged.
+
+The authenticated Tamil Rescuer workspace was also checked at 375px. Its workspace header, readiness state, availability controls, mission controls, assignment alert guidance, and selector remained visible without clipping. The Tamil protected Command Centre entry state was checked at 1280px: its language selector and translated controls remained legible, while access stayed correctly restricted to the administrator role.
+
+The completed operational language pack now covers static Rescuer and Command Centre labels for availability, missions, alerts, registration, metrics, resource management, shelter and hospital forms, incident states, assignments, rescuer approvals, and protected-role access. It is loaded independently from incident records, preserving SOS codes, names, entered notes, coordinates, and all other operational data exactly as recorded. Final TypeScript validation passed and the regression suite completed with 34 tests passing.
+
+The final pack was expanded to include operational helper copy, placeholders, resource and stock labels, readiness states, action labels, empty states, browser-alert recovery guidance, and role-gate interpolation. It safely translates only static rendered text and presentation attributes; input values, incident records, private tracking codes, and user-entered information are excluded from alteration.
+
+Final authenticated-content preview checks rendered the Tamil Command Centre hospital and shelter forms at desktop width. The screens showed translated fixed-sidebar navigation, form headings, field labels, placeholders, state controls, helper text, empty state, and map-fallback guidance without clipping. The temporary preview-only role bypass used for this visual check was removed before the final validation run.
