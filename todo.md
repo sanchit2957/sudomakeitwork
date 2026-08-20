@@ -72,3 +72,8 @@
 - [x] Make the mobile Rescuer workspace sidebar opaque and high-contrast so navigation tabs and controls remain clearly visible.
 - [x] Restore a visible desktop Admin Command Centre sidebar with an accessible Rescuer requests approval entry.
 - [x] Give the desktop Command Centre a permanently expanded full left sidebar with every Admin navigation item visible.
+- [x] Add a persistent selector for ten high-use Indian languages across public, rescuer, and Admin pages: English, Assamese, Hindi, Bengali, Odia, Marathi, Gujarati, Tamil, Telugu, and Kannada.
+- [ ] Translate priority emergency, tracking, responder, and Command Centre interface text for the supported languages without changing operational codes or entered incident data.
+- [x] Add automated coverage for locale selection, translation fallback, and persisted language preference.
+- [ ] Verify multilingual layout readability at desktop and mobile breakpoints, then save the multilingual release checkpoint.
+- [ ] Translate remaining visible Rescuer and Command Centre action labels, alerts, forms, status text, and empty states for every supported locale.

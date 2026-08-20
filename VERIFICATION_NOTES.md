@@ -47,3 +47,7 @@ The final 375px capture was reviewed directly after the inspection helper had es
 ## Desktop workspace sidebar availability
 
 The desktop workspace layout was checked at 1280px after changing the sidebar to icon-collapsible mode. The opaque sidebar remained visible with its navigation entries, responder footer, and an in-sidebar expand/collapse control. The same shared layout is used by the Administrator Command Centre, where **Rescuer requests** remains an accessible desktop navigation item.
+
+## Multilingual emergency workflow
+
+The platform language selector now offers English, Assamese, Hindi, Bengali, Odia, Marathi, Gujarati, Tamil, Telugu, and Kannada. A direct Tamil (`?lang=ta`) mobile check confirmed that the public safety-hub headline, emergency choice cards, quick-access navigation, GPS instruction, SOS action, and offline reassurance render in Tamil script without layout overlap. Operational IDs, incident content, coordinates, and other entered data are intentionally left unchanged.
