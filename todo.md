@@ -80,3 +80,10 @@
 - [x] Translate all remaining visible Command Centre UI strings for every supported locale, including metrics, hospital/shelter/request/team forms, placeholders, approval/rejection text, assignment controls, helper copy, and empty states.
 - [x] Translate protected-access, rescuer-registration, and browser-alert setup/recovery text for all ten supported languages.
 - [x] Add direct tests for localized Rescuer mission controls and Command Centre approval/assignment labels in every supported locale.
+- [x] Add a rescuer-managed profile with an optional photo and rescuer-provided contact number for assignment-only visibility.
+- [x] Add consent-based active-mission location sharing with a visible sharing state and automatic stop outside an active assignment.
+- [x] Return an assigned rescuer's safe profile and fresh last-known location only to the matching SOS tracking code.
+- [x] Add a victim-facing assigned-rescuer card with photo, phone action, live-location status, and map display.
+- [x] Add authorization and UI regression coverage for profile exposure and active-mission location sharing.
+- [x] Add direct rescuer-role authorization regression tests for profile, contact-sharing, and live-location mutations.
+- [x] Add UI regression assertions for the Rescuer profile card and victim assigned-rescuer live-location states.

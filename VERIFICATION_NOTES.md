@@ -59,3 +59,11 @@ The completed operational language pack now covers static Rescuer and Command Ce
 The final pack was expanded to include operational helper copy, placeholders, resource and stock labels, readiness states, action labels, empty states, browser-alert recovery guidance, and role-gate interpolation. It safely translates only static rendered text and presentation attributes; input values, incident records, private tracking codes, and user-entered information are excluded from alteration.
 
 Final authenticated-content preview checks rendered the Tamil Command Centre hospital and shelter forms at desktop width. The screens showed translated fixed-sidebar navigation, form headings, field labels, placeholders, state controls, helper text, empty state, and map-fallback guidance without clipping. The temporary preview-only role bypass used for this visual check was removed before the final validation run.
+
+## Assigned rescuer profile and location sharing
+
+The SOS tracking contract now exposes a rescuer only when the matching mission is active. The exposed payload is limited to call sign, optional photo, optional phone number when the rescuer has explicitly enabled contact sharing, and an opted-in location only when the latest update is less than two minutes old. Location updates are accepted only from the assigned rescuer while location sharing is enabled; resolving the mission automatically stops sharing and clears saved coordinates.
+
+The public tracking screen was checked at a 375px viewport after the new card and map components were added. Its reference-entry and status layout remained responsive without clipping or console-visible build errors. The new responder policy tests cover fresh-location disclosure, contact consent, stale-location suppression, and the active-mission requirement.
+
+A final 375px Tamil tracking-page capture also retained its readable mobile header, language selector, SOS reference input, and status action without overlap. Rendered regression coverage additionally verifies the Rescuer profile contact/share controls, active versus disabled location-sharing controls, victim phone visibility, and the live, paused, and not-started location states.

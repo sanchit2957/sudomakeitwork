@@ -43,6 +43,13 @@
       "when": 1787177053640,
       "tag": "0005_fixed_microchip",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787222451634,
+      "tag": "0006_medical_marvel_zombies",
+      "breakpoints": true
     }
   ]
 }

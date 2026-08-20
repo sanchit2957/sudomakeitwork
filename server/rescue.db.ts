@@ -67,6 +67,19 @@ export async function getIncidentTimeline(incidentId: number) {
     .orderBy(desc(incidentEvents.createdAt));
 }
 
+export async function getActiveAssignedRescuerForIncident(incidentId: number) {
+  const db = await database();
+  return (
+    await db
+      .select({ user: users, profile: rescueProfiles })
+      .from(missions)
+      .innerJoin(users, eq(missions.rescuerId, users.id))
+      .innerJoin(rescueProfiles, eq(users.id, rescueProfiles.userId))
+      .where(and(eq(missions.incidentId, incidentId), inArray(missions.status, ["pending", "dispatched"])))
+      .limit(1)
+  )[0];
+}
+
 export async function listIncidents(status?: "pending" | "dispatched" | "resolved") {
   const db = await database();
   const rows = await db

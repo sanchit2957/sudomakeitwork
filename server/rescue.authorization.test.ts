@@ -22,4 +22,11 @@ describe("rescuer authorization", () => {
     const caller = appRouter.createCaller(contextFor("rescuer"));
     await expect(caller.rescue.rescuer.pushConfig()).resolves.toMatchObject({ enabled: expect.any(Boolean) });
   });
+
+  it("rejects an ordinary user from rescuer profile, sharing-consent, and live-location mutations", async () => {
+    const caller = appRouter.createCaller(contextFor("user"));
+    await expect(caller.rescue.rescuer.updateProfile({ phone: "+919999999999" })).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });
+    await expect(caller.rescue.rescuer.setLocationSharing({ enabled: true })).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });
+    await expect(caller.rescue.rescuer.updateLiveLocation({ latitude: 26.1445, longitude: 91.7362 })).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });
+  });
 });

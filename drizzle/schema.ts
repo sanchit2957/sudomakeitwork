@@ -29,11 +29,16 @@ export const rescueProfiles = mysqlTable(
     userId: int("userId").notNull().references(() => users.id),
     callSign: varchar("callSign", { length: 96 }).notNull(),
     phone: varchar("phone", { length: 32 }),
+    photoKey: varchar("photoKey", { length: 512 }),
+    photoUrl: varchar("photoUrl", { length: 1024 }),
+    contactSharing: mysqlEnum("contactSharing", ["yes", "no"]).default("no").notNull(),
+    locationSharing: mysqlEnum("locationSharing", ["yes", "no"]).default("no").notNull(),
     availability: mysqlEnum("availability", ["available", "on_mission", "off_duty"])
       .default("available")
       .notNull(),
     lastLatitude: double("lastLatitude"),
     lastLongitude: double("lastLongitude"),
+    locationUpdatedAt: timestamp("locationUpdatedAt"),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => [uniqueIndex("rescueProfiles_userId_unique").on(table.userId)],
