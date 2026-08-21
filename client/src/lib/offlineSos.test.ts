@@ -24,4 +24,14 @@ describe("offline SOS outbox", () => {
     await flushOfflineSos(async () => { throw new Error("offline"); });
     expect(readOfflineSosOutbox()).toHaveLength(1);
   });
+
+  it("preserves a short voice note for later SOS delivery", async () => {
+    const voicePayload = { ...payload, voiceNoteDataUrl: "data:audio/webm;base64,dGVzdA==", voiceNoteDurationSeconds: 12 };
+    queueOfflineSos(voicePayload);
+    await flushOfflineSos(async queued => {
+      expect(queued.voiceNoteDataUrl).toBe(voicePayload.voiceNoteDataUrl);
+      expect(queued.voiceNoteDurationSeconds).toBe(12);
+      return { publicCode: "SOS-VOICE1" };
+    });
+  });
 });

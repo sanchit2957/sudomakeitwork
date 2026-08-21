@@ -67,3 +67,11 @@ The SOS tracking contract now exposes a rescuer only when the matching mission i
 The public tracking screen was checked at a 375px viewport after the new card and map components were added. Its reference-entry and status layout remained responsive without clipping or console-visible build errors. The new responder policy tests cover fresh-location disclosure, contact consent, stale-location suppression, and the active-mission requirement.
 
 A final 375px Tamil tracking-page capture also retained its readable mobile header, language selector, SOS reference input, and status action without overlap. Rendered regression coverage additionally verifies the Rescuer profile contact/share controls, active versus disabled location-sharing controls, victim phone visibility, and the live, paused, and not-started location states.
+
+## Two-app redesign and Victim App safety flow
+
+The public routes now form a dedicated Victim App: a language-aware, phone-first home screen with a large SOS control, online/offline status, browser voice-note capture, GPS-aware location preview, a source-labelled weather/flood panel, and a four-icon navigation bar for SOS, Tracking, Safety, and More. The flood panel obtains current forecast values from the public Open-Meteo model endpoint; it does not invent a river level and clearly states when an official gauge is not integrated.
+
+The SOS report schema now stores a short voice note securely in object storage, and the offline outbox carries that note until it can be delivered. The tracker contains the existing active-assignment responder profile, consented phone action, freshness-limited location map, and a short, authenticated victim-to-rescuer message channel. The matching Rescuer workspace exposes the linked response thread.
+
+The protected Operations App now has distinct routes for Government Command (`/command`), Medical Operations (`/medical`), and field response (`/responder`). Medical staff can be authorized only by an administrator after they have signed in; their scope is limited to hospital resources and the operations map. A desktop role-gate check confirmed that a rescuer cannot enter Medical Operations and receives clear account guidance. Mobile screenshots confirmed the Victim App layout at 375px, including explicit-English URL locale precedence.

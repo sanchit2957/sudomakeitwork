@@ -1,4 +1,4 @@
-export function canRequestRescuerRegistration(role: "user" | "rescuer" | "admin") {
+export function canRequestRescuerRegistration(role: "user" | "rescuer" | "medical" | "admin") {
   return role === "user";
 }
 

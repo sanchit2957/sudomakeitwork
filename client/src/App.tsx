@@ -8,7 +8,10 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Command from "./pages/Command";
 import Emergency from "./pages/Emergency";
 import Home from "./pages/Home";
+import Medical from "./pages/Medical";
+import More from "./pages/More";
 import Responder from "./pages/Responder";
+import Safety from "./pages/Safety";
 import Track from "./pages/Track";
 
 function Router() {
@@ -18,6 +21,10 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path={"/emergency"} component={Emergency} />
       <Route path={"/track"} component={Track} />
+      <Route path={"/safety"} component={Safety} />
+      <Route path={"/more"} component={More} />
+      <Route path={"/medical/:rest*"} component={Medical} />
+      <Route path={"/medical"} component={Medical} />
       <Route path={"/responder/:rest*"} component={Responder} />
       <Route path={"/responder"} component={Responder} />
       <Route path={"/command/:rest*"} component={Command} />

@@ -3,6 +3,7 @@ import {
   auditLogs,
   floodZones,
   hospitals,
+  incidentMessages,
   incidentEvents,
   incidents,
   missions,
@@ -65,6 +66,11 @@ export async function getIncidentTimeline(incidentId: number) {
     .from(incidentEvents)
     .where(eq(incidentEvents.incidentId, incidentId))
     .orderBy(desc(incidentEvents.createdAt));
+}
+
+export async function getIncidentMessages(incidentId: number) {
+  const db = await database();
+  return db.select().from(incidentMessages).where(eq(incidentMessages.incidentId, incidentId)).orderBy(incidentMessages.createdAt);
 }
 
 export async function getActiveAssignedRescuerForIncident(incidentId: number) {

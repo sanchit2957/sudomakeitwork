@@ -1,0 +1,15 @@
+import LanguageSelector from "@/components/LanguageSelector";
+import { VictimNavigation } from "@/pages/Home";
+import { AlertTriangle, ArrowRight, Droplets, HeartPulse, Home as HomeIcon, PhoneCall, ShieldCheck } from "lucide-react";
+import { useLocation } from "wouter";
+
+const guides = [
+  { image: "/manus-storage/panic-flood-rescue_a9f5b532.png", icon: Droplets, title: "Move to higher ground", copy: "Avoid floodwater and electric lines." },
+  { image: "/manus-storage/panic-medical-help_96aa56f9.png", icon: HeartPulse, title: "Keep medicines close", copy: "Carry essential medicines and water." },
+  { image: "/manus-storage/panic-evacuation_199e3c5d.png", icon: HomeIcon, title: "Leave early if told", copy: "Use a verified shelter route." },
+];
+
+export default function Safety() {
+  const [, setLocation] = useLocation();
+  return <div className="min-h-screen bg-[#f6f8f7]"><main className="mx-auto min-h-screen max-w-lg bg-[#fcfdfd] px-5 pb-28 pt-6 md:my-6 md:min-h-[850px] md:rounded-[2.75rem] md:border"><header className="flex items-start justify-between"><button onClick={() => setLocation("/")} className="flex items-center gap-2 text-left"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#174e46] text-white"><ShieldCheck className="h-5 w-5" /></span><span><span className="block text-lg font-black tracking-[-.05em]">Safety</span><span className="block text-[10px] font-bold text-[#6b8780]">Visual emergency steps</span></span></button><LanguageSelector compact /></header><section className="mt-7 rounded-[1.8rem] bg-[#174e46] p-5 text-white"><AlertTriangle className="h-7 w-7 text-[#ffcabf]" /><h1 className="mt-4 text-3xl font-black tracking-[-.06em]">Stay safe.<br/>Move early.</h1><p className="mt-3 text-sm leading-6 text-[#c7e1da]">Simple steps for floods, medical needs, and evacuation.</p><a href="tel:112" className="mt-5 inline-flex items-center rounded-xl bg-[#fff2ef] px-4 py-3 text-sm font-black text-[#c14544]"><PhoneCall className="mr-2 h-4 w-4" /> Call emergency help</a></section><section className="mt-5 grid gap-4">{guides.map(({ image, icon: Icon, title, copy }) => <article key={title} className="flex items-center gap-4 rounded-[1.55rem] bg-white p-3 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035]"><img src={image} alt="" className="h-20 w-20 rounded-2xl bg-[#eff7f4] object-contain p-2" /><div className="min-w-0 flex-1"><span className="grid h-7 w-7 place-items-center rounded-lg bg-[#e7f6ef] text-[#237563]"><Icon className="h-4 w-4" /></span><h2 className="mt-2 text-sm font-black">{title}</h2><p className="mt-1 text-xs text-[#6e8780]">{copy}</p></div><ArrowRight className="h-4 w-4 text-[#96aaa4]" /></article>)}</section><section className="mt-5 rounded-[1.55rem] border border-[#f1d4c8] bg-[#fff9f6] p-4"><p className="text-sm font-black text-[#9f413f]">Avoid dangerous water</p><p className="mt-1 text-xs leading-5 text-[#885854]">Do not walk or drive through moving water. Keep away from fallen wires and unstable banks.</p></section></main><VictimNavigation current="safety" /></div>;
+}

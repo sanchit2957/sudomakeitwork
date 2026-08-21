@@ -49,5 +49,6 @@ describe("platform language support", () => {
     expect(source).toContain('document.documentElement.lang = locale');
     expect(source).toContain('/manus-storage/operational-language-pack_86163712.json');
     expect(source).toContain('data-no-operational-translation');
+    expect(source).toContain('localeOptions.some(option => option.code === requested)');
   });
 });

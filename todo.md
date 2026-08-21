@@ -87,3 +87,12 @@
 - [x] Add authorization and UI regression coverage for profile exposure and active-mission location sharing.
 - [x] Add direct rescuer-role authorization regression tests for profile, contact-sharing, and live-location mutations.
 - [x] Add UI regression assertions for the Rescuer profile card and victim assigned-rescuer live-location states.
+- [x] Separate the route experience into a public Victim App and a protected Operations App for government, hospital/medical staff, and rescuers.
+- [x] Redesign the Victim App home with a brand header, language selector, giant SOS action, clear network status, voice-note capture, current-location map preview, and visual flood/weather indicators.
+- [x] Add a low-text bottom navigation for Victim Home, SOS Tracking, Safety guidance, and More/profile/support.
+- [x] Enhance victim SOS tracking with an image-led responder card, live responder location, call action, and a safe in-app contact path.
+- [x] Add visual Safety and More screens for emergency precautions, preparedness, profile, support, and app information.
+- [x] Preserve and clarify the shared sign-in restrictions across the protected Operations App, including government/admin, hospital/medical, and rescuer access.
+- [x] Add data contracts and UI states for weather/flood conditions with honest source and availability messaging.
+- [x] Add regression coverage and responsive verification for the redesigned public and protected app shells.
+- [x] Match the Victim App visual hierarchy to the supplied reference: phone-first white canvas, oversized red SOS disc, compact green connection badge, rounded white utility cards, map preview, flood card, and four-icon bottom navigation.

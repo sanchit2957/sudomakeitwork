@@ -12,6 +12,10 @@ const queryClient = new QueryClient();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    if (import.meta.env.DEV) {
+      void navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(registrations.map(registration => registration.unregister())));
+      return;
+    }
     void navigator.serviceWorker.register("/sw.js").catch(() => {
       // The SOS flow remains usable online if an older browser cannot install the offline shell.
     });

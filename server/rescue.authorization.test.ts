@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
-function contextFor(role: "user" | "rescuer" | "admin"): TrpcContext {
+function contextFor(role: "user" | "rescuer" | "medical" | "admin"): TrpcContext {
   const now = new Date();
   return {
     user: { id: 9, openId: `test-${role}`, name: "Test account", email: null, loginMethod: "test", role, createdAt: now, updatedAt: now, lastSignedIn: now },
@@ -28,5 +28,11 @@ describe("rescuer authorization", () => {
     await expect(caller.rescue.rescuer.updateProfile({ phone: "+919999999999" })).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });
     await expect(caller.rescue.rescuer.setLocationSharing({ enabled: true })).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });
     await expect(caller.rescue.rescuer.updateLiveLocation({ latitude: 26.1445, longitude: 91.7362 })).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });
+  });
+
+  it("rejects medical staff from field-rescuer controls", async () => {
+    const caller = appRouter.createCaller(contextFor("medical"));
+    await expect(caller.rescue.rescuer.pushConfig()).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });
+    await expect(caller.rescue.rescuer.setLocationSharing({ enabled: true })).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });
   });
 });

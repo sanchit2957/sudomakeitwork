@@ -8,6 +8,8 @@ export type OfflineSosPayload = {
   peopleAffected: number;
   notes?: string;
   evidenceDataUrl?: string;
+  voiceNoteDataUrl?: string;
+  voiceNoteDurationSeconds?: number;
   guestKey: string;
 };
 

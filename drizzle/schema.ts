@@ -16,7 +16,7 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "rescuer", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "rescuer", "medical", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -78,6 +78,9 @@ export const incidents = mysqlTable(
     notes: text("notes"),
     evidenceKey: varchar("evidenceKey", { length: 512 }),
     evidenceUrl: varchar("evidenceUrl", { length: 1024 }),
+    voiceNoteKey: varchar("voiceNoteKey", { length: 512 }),
+    voiceNoteUrl: varchar("voiceNoteUrl", { length: 1024 }),
+    voiceNoteDurationSeconds: int("voiceNoteDurationSeconds"),
     status: mysqlEnum("status", ["pending", "dispatched", "resolved"]).default("pending").notNull(),
     assignedRescuerId: int("assignedRescuerId").references(() => users.id),
     dispatchedAt: timestamp("dispatchedAt"),
@@ -90,6 +93,19 @@ export const incidents = mysqlTable(
     index("incidents_status_createdAt_idx").on(table.status, table.createdAt),
     index("incidents_assignedRescuerId_status_idx").on(table.assignedRescuerId, table.status),
   ],
+);
+
+export const incidentMessages = mysqlTable(
+  "incidentMessages",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    incidentId: int("incidentId").notNull().references(() => incidents.id),
+    authorType: mysqlEnum("authorType", ["victim", "rescuer", "operations"]).notNull(),
+    authorId: int("authorId").references(() => users.id),
+    message: text("message").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("incidentMessages_incidentId_createdAt_idx").on(table.incidentId, table.createdAt)],
 );
 
 export const missions = mysqlTable(

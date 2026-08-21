@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { flushOfflineSos, queueOfflineSos, readOfflineSosOutbox, type OfflineSosPayload } from "@/lib/offlineSos";
+import { clearSosVoiceNote, readSosVoiceNote } from "@/lib/sosVoiceNote";
 import { trpc } from "@/lib/trpc";
 import { AlertCircle, ArrowLeft, Check, ChevronDown, Crosshair, ImagePlus, LocateFixed, MapPin, Minus, Plus, Radio, Siren, UsersRound, Wifi, WifiOff } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
@@ -34,6 +35,7 @@ export default function Emergency() {
   const [notes, setNotes] = useState("");
   const [evidenceDataUrl, setEvidenceDataUrl] = useState<string>();
   const [fileName, setFileName] = useState("");
+  const [voiceNote] = useState(() => readSosVoiceNote());
   const [guestKey, setGuestKey] = useState("");
   const [notice, setNotice] = useState("");
   const [online, setOnline] = useState(() => navigator.onLine);
@@ -107,6 +109,8 @@ export default function Emergency() {
     peopleAffected,
     notes: notes.trim() || undefined,
     evidenceDataUrl,
+    voiceNoteDataUrl: voiceNote?.dataUrl,
+    voiceNoteDurationSeconds: voiceNote?.durationSeconds,
     guestKey,
   });
   const submit = async () => {
@@ -115,6 +119,7 @@ export default function Emergency() {
     if (!navigator.onLine) { const pending = queueOfflineSos(next); setOutboxCount(pending); setNotice(t("emergency.savedOffline")); return; }
     try {
       const result = await createSos.mutateAsync(next);
+      clearSosVoiceNote();
       setLocation(`/track?code=${result.publicCode}`);
     } catch (error) {
       if (!navigator.onLine || /network|fetch/i.test(error instanceof Error ? error.message : "")) {

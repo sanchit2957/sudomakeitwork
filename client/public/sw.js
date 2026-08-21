@@ -1,5 +1,5 @@
-const CACHE = "sudo-makeitwork-offline-shell-v2";
-const APP_SHELL = ["/", "/emergency", "/track"];
+const CACHE = "sudo-makeitwork-offline-shell-v3";
+const APP_SHELL = ["/", "/emergency", "/track", "/safety", "/more"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -25,7 +25,7 @@ self.addEventListener("fetch", event => {
     return;
   }
   if (url.origin !== self.location.origin) return;
-  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => { const clone = response.clone(); void caches.open(CACHE).then(cache => cache.put(event.request, clone)); return response; })));
+  event.respondWith(fetch(event.request).then(response => { const clone = response.clone(); void caches.open(CACHE).then(cache => cache.put(event.request, clone)); return response; }).catch(() => caches.match(event.request)));
 });
 
 self.addEventListener("push", event => {

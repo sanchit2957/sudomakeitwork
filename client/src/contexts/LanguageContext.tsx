@@ -536,7 +536,7 @@ const LanguageContext = createContext<LanguageContextValue | undefined>(undefine
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocale] = useState<Locale>(() => {
     const requested = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("lang");
-    if (requested && resolveLocale(requested) !== "en") return resolveLocale(requested);
+    if (requested && localeOptions.some(option => option.code === requested)) return requested as Locale;
     const stored = typeof window === "undefined" ? null : localStorage.getItem(storageKey);
     if (stored) return resolveLocale(stored);
     const browser = typeof navigator === "undefined" ? "en" : navigator.language.slice(0, 2);

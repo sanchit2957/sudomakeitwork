@@ -3,14 +3,15 @@ import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { z } from "zod";
-import { floodZones, guestEmergencyRateLimits, hospitals, incidents, missions, notifications, pushSubscriptions, rescueProfiles, rescuerRegistrationRequests, shelters, users } from "../../drizzle/schema";
+import { floodZones, guestEmergencyRateLimits, hospitals, incidentMessages, incidents, missions, notifications, pushSubscriptions, rescueProfiles, rescuerRegistrationRequests, shelters, users } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { notifyOwner } from "../_core/notification";
-import { adminProcedure, operationalProcedure, protectedProcedure, publicProcedure, rescuerProcedure, router } from "../_core/trpc";
+import { adminProcedure, medicalOperationsProcedure, operationalProcedure, protectedProcedure, publicProcedure, rescuerProcedure, router } from "../_core/trpc";
 import {
   addIncidentEvent,
   getActiveAssignedRescuerForIncident,
   getAnalytics,
+  getIncidentMessages,
   getAvailableRescuersNear,
   getIncidentByCode,
   getIncidentById,
@@ -80,6 +81,17 @@ function readProfilePhoto(dataUrl?: string | null) {
   return image;
 }
 
+function readVoiceNote(dataUrl?: string, durationSeconds?: number) {
+  if (!dataUrl) return null;
+  const matched = /^data:(audio\/(?:webm|ogg|mp4));base64,([A-Za-z0-9+/=\s]+)$/.exec(dataUrl);
+  if (!matched) throw new TRPCError({ code: "BAD_REQUEST", message: "Voice notes must be recorded as WebM, OGG, or M4A audio." });
+  const bytes = Buffer.from(matched[2].replace(/\s/g, ""), "base64");
+  if (bytes.byteLength > 3_000_000) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Voice notes must be 3 MB or smaller." });
+  if (!durationSeconds || durationSeconds < 1 || durationSeconds > 120) throw new TRPCError({ code: "BAD_REQUEST", message: "Voice notes must be between 1 second and 2 minutes." });
+  const extension = matched[1] === "audio/ogg" ? "ogg" : matched[1] === "audio/mp4" ? "m4a" : "webm";
+  return { bytes, contentType: matched[1], extension, durationSeconds };
+}
+
 async function emitIncidentAlerts(incidentId: number, publicCode: string, locationLabel: string, severity: "critical" | "high" | "medium" | "low", latitude: number, longitude: number) {
   if (severity !== "critical" && severity !== "high") return;
   const db = await database();
@@ -129,6 +141,30 @@ async function enforceGuestSosRateLimit(guestKey: string) {
 
 export const rescueRouter = router({
   emergency: router({
+    conditions: publicProcedure.input(z.object({ latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional() }).optional()).query(async ({ input }) => {
+      const latitude = input?.latitude ?? 26.1445;
+      const longitude = input?.longitude ?? 91.7362;
+      const db = await database();
+      const activeZones = await db.select({ id: floodZones.id, severity: floodZones.severity }).from(floodZones).where(eq(floodZones.active, "yes"));
+      try {
+        const endpoint = new URL("https://api.open-meteo.com/v1/forecast");
+        endpoint.searchParams.set("latitude", String(latitude));
+        endpoint.searchParams.set("longitude", String(longitude));
+        endpoint.searchParams.set("current", "temperature_2m,precipitation,weather_code,wind_speed_10m");
+        endpoint.searchParams.set("daily", "precipitation_probability_max,precipitation_sum,weather_code");
+        endpoint.searchParams.set("forecast_days", "1");
+        endpoint.searchParams.set("timezone", "auto");
+        const response = await fetch(endpoint, { signal: AbortSignal.timeout(8_000), headers: { accept: "application/json" } });
+        if (!response.ok) throw new Error(`Weather source responded ${response.status}`);
+        const weather = await response.json() as { current?: { temperature_2m?: number; precipitation?: number; weather_code?: number; wind_speed_10m?: number }; daily?: { precipitation_probability_max?: number[]; precipitation_sum?: number[] } };
+        const rainChance = weather.daily?.precipitation_probability_max?.[0] ?? null;
+        const rainAmount = weather.daily?.precipitation_sum?.[0] ?? null;
+        const risk = rainChance !== null && (rainChance >= 80 || (rainAmount ?? 0) >= 40) ? "high" : rainChance !== null && (rainChance >= 50 || (rainAmount ?? 0) >= 15) ? "elevated" : "normal";
+        return { available: true, source: "Open-Meteo weather model", updatedAt: new Date(), risk, activeFloodZones: activeZones.length, current: { temperatureC: weather.current?.temperature_2m ?? null, precipitationMm: weather.current?.precipitation ?? null, windKmh: weather.current?.wind_speed_10m ?? null, weatherCode: weather.current?.weather_code ?? null }, forecast: { rainChance, rainAmountMm: rainAmount }, river: { available: false as const } };
+      } catch {
+        return { available: false, source: "Weather source unavailable", updatedAt: new Date(), risk: "unknown" as const, activeFloodZones: activeZones.length, current: { temperatureC: null, precipitationMm: null, windKmh: null, weatherCode: null }, forecast: { rainChance: null, rainAmountMm: null }, river: { available: false as const } };
+      }
+    }),
     create: publicProcedure
       .input(z.object({
         contactName: z.string().trim().max(160).optional(),
@@ -140,6 +176,8 @@ export const rescueRouter = router({
         peopleAffected: z.number().int().min(1).max(500),
         notes: z.string().trim().max(2000).optional(),
         evidenceDataUrl: z.string().max(2_100_000).optional(),
+        voiceNoteDataUrl: z.string().max(4_200_000).optional(),
+        voiceNoteDurationSeconds: z.number().int().min(1).max(120).optional(),
         guestKey: z.string().regex(/^[A-Za-z0-9_-]{24,160}$/).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -148,8 +186,11 @@ export const rescueRouter = router({
         if (!ctx.user && input.guestKey) await enforceGuestSosRateLimit(input.guestKey);
         const publicCode = `SOS-${incidentCode()}`;
         const evidence = readEvidence(input.evidenceDataUrl);
+        const voiceNote = readVoiceNote(input.voiceNoteDataUrl, input.voiceNoteDurationSeconds);
         let uploadedEvidence: { key: string; url: string } | null = null;
+        let uploadedVoiceNote: { key: string; url: string } | null = null;
         if (evidence) uploadedEvidence = await storagePut(`incidents/${publicCode}/evidence.${evidence.extension}`, evidence.bytes, evidence.contentType);
+        if (voiceNote) uploadedVoiceNote = await storagePut(`incidents/${publicCode}/voice-note.${voiceNote.extension}`, voiceNote.bytes, voiceNote.contentType);
         const result = await db.insert(incidents).values({
           publicCode,
           reporterId: ctx.user?.id ?? null,
@@ -163,6 +204,9 @@ export const rescueRouter = router({
           notes: input.notes ?? null,
           evidenceKey: uploadedEvidence?.key ?? null,
           evidenceUrl: uploadedEvidence?.url ?? null,
+          voiceNoteKey: uploadedVoiceNote?.key ?? null,
+          voiceNoteUrl: uploadedVoiceNote?.url ?? null,
+          voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
           status: "pending",
         });
         const incidentId = Number(result[0].insertId);
@@ -188,6 +232,20 @@ export const rescueRouter = router({
         assignedRescuer: !assigned || !profile ? null : presentAssignedRescuerToVictim({ ...profile, name: assigned.user.name }),
       };
     }),
+    chatByCode: publicProcedure.input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) })).query(async ({ input }) => {
+      const incident = await getIncidentByCode(input.publicCode);
+      if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
+      return getIncidentMessages(incident.id);
+    }),
+    sendChat: protectedProcedure.input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/), message: z.string().trim().min(1).max(500) })).mutation(async ({ input, ctx }) => {
+      const incident = await getIncidentByCode(input.publicCode);
+      if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
+      if (incident.reporterId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Only the SOS reporter can send a victim message." });
+      if (incident.status === "resolved") throw new TRPCError({ code: "BAD_REQUEST", message: "This SOS has already been resolved." });
+      const db = await database();
+      const result = await db.insert(incidentMessages).values({ incidentId: incident.id, authorType: "victim", authorId: ctx.user.id, message: input.message });
+      return { id: Number(result[0].insertId) };
+    }),
     mine: protectedProcedure.query(({ ctx }) => listIncidentsForReporter(ctx.user.id)),
   }),
 
@@ -195,7 +253,7 @@ export const rescueRouter = router({
     incidents: adminProcedure.input(z.object({ status: missionStatusSchema.optional() }).optional()).query(({ input }) => listIncidents(input?.status)),
     analytics: adminProcedure.query(() => getAnalytics()),
     mapLayers: operationalProcedure.query(({ ctx }) => getMapLayers(ctx.user.role !== "user")),
-    hospitals: adminProcedure.query(() => listHospitals()),
+    hospitals: medicalOperationsProcedure.query(() => listHospitals()),
     rescuerRegistrationRequests: adminProcedure.query(() => listRescuerRegistrationRequests()),
     rescueRoster: adminProcedure.query(() => getRescuerRoster()),
     availableUsers: adminProcedure.query(async () => {
@@ -212,6 +270,15 @@ export const rescueRouter = router({
       if (existing) await db.update(rescueProfiles).set({ callSign: input.callSign, phone: input.phone ?? null }).where(eq(rescueProfiles.userId, input.userId));
       else await db.insert(rescueProfiles).values({ userId: input.userId, callSign: input.callSign, phone: input.phone ?? null, availability: "available" });
       await writeAudit(ctx.user.id, "rescuer.promote", "user", input.userId, `Assigned call sign ${input.callSign}`);
+      return { success: true };
+    }),
+    promoteMedical: adminProcedure.input(z.object({ userId: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
+      const db = await database();
+      const target = (await db.select().from(users).where(eq(users.id, input.userId)).limit(1))[0];
+      if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "User not found." });
+      if (target.role !== "user") throw new TRPCError({ code: "BAD_REQUEST", message: "Only a standard signed-in user can be authorized as medical staff." });
+      await db.update(users).set({ role: "medical" }).where(eq(users.id, input.userId));
+      await writeAudit(ctx.user.id, "medical.promote", "user", input.userId, "Authorized medical operations access");
       return { success: true };
     }),
     reviewRescuerRegistration: adminProcedure.input(z.object({ requestId: z.number().int().positive(), decision: z.enum(["approved", "rejected"]), callSign: z.string().trim().min(2).max(96).optional(), reviewNote: z.string().trim().max(1000).optional() })).mutation(async ({ input, ctx }) => {
@@ -265,14 +332,14 @@ export const rescueRouter = router({
       await writeAudit(ctx.user.id, "shelter.update", "shelter", input.id, input.name);
       return { success: true };
     }),
-    addHospital: adminProcedure.input(hospitalInput).mutation(async ({ input, ctx }) => {
+    addHospital: medicalOperationsProcedure.input(hospitalInput).mutation(async ({ input, ctx }) => {
       if (!hasValidHospitalCapacity(input.totalEmergencyBeds, input.availableEmergencyBeds, input.totalIcuBeds, input.availableIcuBeds)) throw new TRPCError({ code: "BAD_REQUEST", message: "Available beds cannot exceed the declared hospital capacity." });
       const db = await database();
       const result = await db.insert(hospitals).values({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id });
       await writeAudit(ctx.user.id, "hospital.create", "hospital", Number(result[0].insertId), input.name);
       return { id: Number(result[0].insertId) };
     }),
-    updateHospital: adminProcedure.input(hospitalInput.extend({ id: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
+    updateHospital: medicalOperationsProcedure.input(hospitalInput.extend({ id: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
       if (!hasValidHospitalCapacity(input.totalEmergencyBeds, input.availableEmergencyBeds, input.totalIcuBeds, input.availableIcuBeds)) throw new TRPCError({ code: "BAD_REQUEST", message: "Available beds cannot exceed the declared hospital capacity." });
       const db = await database();
       const existing = (await db.select().from(hospitals).where(eq(hospitals.id, input.id)).limit(1))[0];
@@ -291,7 +358,7 @@ export const rescueRouter = router({
 
   rescuer: router({
     requestRegistration: protectedProcedure.input(z.object({ phone: z.string().trim().max(32).optional(), note: z.string().trim().max(1000).optional() })).mutation(async ({ input, ctx }) => {
-      if (!canRequestRescuerRegistration(ctx.user.role)) throw new TRPCError({ code: "BAD_REQUEST", message: ctx.user.role === "rescuer" ? "This account is already an authorized rescuer." : "Administrator accounts cannot request rescuer access." });
+      if (!canRequestRescuerRegistration(ctx.user.role)) throw new TRPCError({ code: "BAD_REQUEST", message: ctx.user.role === "rescuer" ? "This account is already an authorized rescuer." : ctx.user.role === "medical" ? "Medical staff accounts cannot request field-rescuer access." : "Administrator accounts cannot request rescuer access." });
       const db = await database();
       const existing = (await db.select().from(rescuerRegistrationRequests).where(eq(rescuerRegistrationRequests.userId, ctx.user.id)).limit(1))[0];
       if (existing?.status === "pending") throw new TRPCError({ code: "CONFLICT", message: "Your rescuer registration is already awaiting administrator review." });
@@ -301,6 +368,19 @@ export const rescueRouter = router({
       return { success: true };
     }),
     profile: rescuerProcedure.query(({ ctx }) => getRescuerProfile(ctx.user.id)),
+    missionMessages: rescuerProcedure.input(z.object({ missionId: z.number().int().positive() })).query(async ({ input, ctx }) => {
+      const mission = await getMissionForRescuer(input.missionId, ctx.user.id);
+      if (!mission) throw new TRPCError({ code: "FORBIDDEN", message: "This mission is not assigned to your account." });
+      return getIncidentMessages(mission.incidentId);
+    }),
+    sendMissionMessage: rescuerProcedure.input(z.object({ missionId: z.number().int().positive(), message: z.string().trim().min(1).max(500) })).mutation(async ({ input, ctx }) => {
+      const mission = await getMissionForRescuer(input.missionId, ctx.user.id);
+      if (!mission) throw new TRPCError({ code: "FORBIDDEN", message: "This mission is not assigned to your account." });
+      if (mission.status === "resolved") throw new TRPCError({ code: "BAD_REQUEST", message: "This mission has already been resolved." });
+      const db = await database();
+      const result = await db.insert(incidentMessages).values({ incidentId: mission.incidentId, authorType: "rescuer", authorId: ctx.user.id, message: input.message });
+      return { id: Number(result[0].insertId) };
+    }),
     updateProfile: rescuerProcedure.input(z.object({
       phone: z.string().trim().max(32).nullable().optional(),
       contactSharing: z.enum(["yes", "no"]).optional(),
