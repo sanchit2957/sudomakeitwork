@@ -246,12 +246,14 @@ export const rescueRouter = router({
         publicCode: incident.publicCode,
         status: incident.status,
         locationLabel: incident.locationLabel,
+        latitude: incident.latitude,
+        longitude: incident.longitude,
         severity: incident.severity,
         createdAt: incident.createdAt,
         dispatchedAt: incident.dispatchedAt,
         resolvedAt: incident.resolvedAt,
         events,
-        assignedRescuer: !assigned || !profile ? null : presentAssignedRescuerToVictim({ ...profile, name: assigned.user.name }),
+        assignedRescuer: !assigned || !profile ? null : { ...presentAssignedRescuerToVictim({ ...profile, name: assigned.user.name }), destination: { latitude: incident.latitude, longitude: incident.longitude } },
       };
     }),
     myDetailsByCode: protectedProcedure.input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) })).query(async ({ input, ctx }) => {

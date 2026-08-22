@@ -180,3 +180,6 @@
 - [x] Audit current manual responder location-sharing controls, active-mission data flow, and disclosure safeguards.
 - [x] Automatically publish an assigned rescuer’s location every five seconds only during their active mission, ending it automatically on resolution.
 - [x] Remove the manual active-mission sharing control, add clear automatic-sharing state, regression coverage, cross-role validation, and a checkpoint.
+- [x] Audit assigned-rescuer location and SOS destination data for safe matched-case routing and ETA calculation.
+- [x] Add a live Google Maps route line and ETA from assigned rescuer to the matching SOS location, refreshing with automatic location updates.
+- [x] Add mobile routing states, privacy and rendering regressions, visual validation, and a checkpoint.

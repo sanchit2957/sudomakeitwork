@@ -8,11 +8,11 @@ import { startLogin } from "@/const";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { VictimNavigation } from "@/pages/Home";
 import { trpc } from "@/lib/trpc";
-import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, MapPin, MessageCircle, Phone, Radio, Search, Send, ShieldCheck, Siren, UserRound, UsersRound } from "lucide-react";
-import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, MapPin, MessageCircle, Navigation, Phone, Radio, Search, Send, ShieldCheck, Siren, UserRound, UsersRound } from "lucide-react";
+import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
-type AssignedRescuer = { callSign: string; name: string | null; photoUrl: string | null; phone: string | null; locationStatus: "live" | "paused" | "off"; location: { latitude: number; longitude: number; updatedAt: Date } | null };
+type AssignedRescuer = { callSign: string; name: string | null; photoUrl: string | null; phone: string | null; locationStatus: "live" | "paused" | "off"; location: { latitude: number; longitude: number; updatedAt: Date } | null; destination?: { latitude: number; longitude: number } };
 
 export default function Track() {
   const [, setLocation] = useLocation();
@@ -51,6 +51,45 @@ export function IncidentChat({ publicCode, active }: { publicCode: string; activ
   return <section className="mt-4 rounded-2xl border border-[#d8e8e2] bg-[#fbfefd] p-3"><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-[#e7f6ef] text-primary"><MessageCircle className="h-4 w-4" /></span><div><h2 className="text-sm font-black">{t("Message your rescue team")}</h2><p className="text-[10px] font-semibold text-[#708981]">{active ? t("Use short, useful updates") : t("This SOS is resolved")}</p></div></div><div className="mt-3 max-h-36 space-y-2 overflow-y-auto pr-1">{messages.data?.length ? messages.data.map(item => <div key={item.id} className={`max-w-[88%] rounded-2xl px-3 py-2 text-xs leading-5 ${item.authorType === "victim" ? "ml-auto bg-[#174e46] text-white" : "bg-[#eef7f4] text-[#24564b]"}`}><span className="block text-[9px] font-black uppercase tracking-wide opacity-70">{item.authorType === "rescuer" ? t("Rescuer") : item.authorType === "operations" ? t("Operations") : t("You")}</span>{item.message}</div>) : <p className="rounded-xl bg-[#f3f7f5] px-3 py-2 text-xs text-[#748a83]">{t("Your assigned rescue team will see messages here.")}</p>}</div>{active && (user ? <div className="mt-3 flex gap-2"><Input value={message} onChange={event => setMessage(event.target.value)} maxLength={500} placeholder={t("Type a short update")} className="h-10 bg-white text-xs" /><Button disabled={!message.trim() || send.isPending} onClick={() => send.mutate({ publicCode, message: message.trim() })} className="h-10 w-10 shrink-0 rounded-xl bg-[#174e46] p-0"><Send className="h-4 w-4" /></Button></div> : <button onClick={() => startLogin()} className="mt-3 w-full rounded-xl bg-[#174e46] px-3 py-2.5 text-xs font-black text-white">{t("Sign in to send a message")}</button>)}{send.error && <p className="mt-2 text-[10px] font-bold text-destructive">{send.error.message}</p>}</section>;
 }
 
-export function AssignedRescuerCard({ rescuer }: { rescuer: AssignedRescuer }) { const { t } = useLanguage(); return <section className="mt-6 overflow-hidden rounded-2xl border border-[#b8ded4] bg-[#f8fcfa]"><div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3"><div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#d9f3e8] text-primary">{rescuer.photoUrl ? <img src={rescuer.photoUrl} alt="" className="h-full w-full object-cover" /> : <UserRound className="h-6 w-6" />}</div><div><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">{t("Your assigned rescuer")}</p><h2 className="mt-1 text-lg font-extrabold text-[#173d37]">{rescuer.callSign}</h2>{rescuer.name && <p className="text-sm text-muted-foreground">{rescuer.name}</p>}</div></div>{rescuer.phone ? <a href={`tel:${rescuer.phone}`} className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-extrabold text-primary-foreground"><Phone className="mr-2 h-4 w-4" /> {t("Call rescuer")}</a> : <span className="rounded-xl border bg-white px-3 py-2 text-xs font-semibold text-muted-foreground">{t("Contact is shared when the responder enables it")}</span>}</div><div className="border-t border-[#cbe8df] bg-white/70 p-4"><div className="flex items-center gap-2"><Radio className={`h-4 w-4 ${rescuer.locationStatus === "live" ? "animate-pulse text-primary" : "text-muted-foreground"}`} /><p className="text-sm font-extrabold text-[#173d37]">{rescuer.locationStatus === "live" ? "Live rescuer location · updating every 5 seconds" : rescuer.locationStatus === "paused" ? "Waiting for the next automatic location update" : "Location sharing starts automatically after assignment"}</p></div>{rescuer.location ? <><p className="mt-1 text-xs leading-5 text-muted-foreground">{t("This position is visible only while the assigned mission is active.")}</p><LiveRescuerMap latitude={rescuer.location.latitude} longitude={rescuer.location.longitude} /></> : <p className="mt-1 text-xs leading-5 text-muted-foreground">The rescuer’s position begins updating automatically when their assigned mission is active.</p>}</div></section>; }
+export function AssignedRescuerCard({ rescuer }: { rescuer: AssignedRescuer }) { const { t } = useLanguage(); return <section className="mt-6 overflow-hidden rounded-2xl border border-[#b8ded4] bg-[#f8fcfa]"><div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3"><div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#d9f3e8] text-primary">{rescuer.photoUrl ? <img src={rescuer.photoUrl} alt="" className="h-full w-full object-cover" /> : <UserRound className="h-6 w-6" />}</div><div><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">{t("Your assigned rescuer")}</p><h2 className="mt-1 text-lg font-extrabold text-[#173d37]">{rescuer.callSign}</h2>{rescuer.name && <p className="text-sm text-muted-foreground">{rescuer.name}</p>}</div></div>{rescuer.phone ? <a href={`tel:${rescuer.phone}`} className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-extrabold text-primary-foreground"><Phone className="mr-2 h-4 w-4" /> {t("Call rescuer")}</a> : <span className="rounded-xl border bg-white px-3 py-2 text-xs font-semibold text-muted-foreground">{t("Contact is shared when the responder enables it")}</span>}</div><div className="border-t border-[#cbe8df] bg-white/70 p-4"><div className="flex items-center gap-2"><Radio className={`h-4 w-4 ${rescuer.locationStatus === "live" ? "animate-pulse text-primary" : "text-muted-foreground"}`} /><p className="text-sm font-extrabold text-[#173d37]">{rescuer.locationStatus === "live" ? "Live rescuer location · updating every 5 seconds" : rescuer.locationStatus === "paused" ? "Waiting for the next automatic location update" : "Location sharing starts automatically after assignment"}</p></div>{rescuer.location ? <><p className="mt-1 text-xs leading-5 text-muted-foreground">{t("This position is visible only while the assigned mission is active.")}</p><LiveRescuerMap latitude={rescuer.location.latitude} longitude={rescuer.location.longitude} destination={rescuer.destination} /></> : <p className="mt-1 text-xs leading-5 text-muted-foreground">The rescuer’s position begins updating automatically when their assigned mission is active.</p>}</div></section>; }
 
-function LiveRescuerMap({ latitude, longitude }: { latitude: number; longitude: number }) { const mapRef = useRef<google.maps.Map | null>(null); const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null); const position = { lat: latitude, lng: longitude }; const placeMarker = (map: google.maps.Map) => { mapRef.current = map; map.setCenter(position); map.setZoom(15); markerRef.current = new window.google!.maps.marker.AdvancedMarkerElement({ map, position, title: "Assigned rescuer" }); }; useEffect(() => { if (!mapRef.current || !markerRef.current) return; mapRef.current.setCenter(position); markerRef.current.position = position; }, [latitude, longitude]); return <MapView className="mt-3 h-60 overflow-hidden rounded-xl" initialCenter={position} initialZoom={15} onMapReady={placeMarker} />; }
+function LiveRescuerMap({ latitude, longitude, destination }: { latitude: number; longitude: number; destination?: { latitude: number; longitude: number } }) {
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const rescuerMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const destinationMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const [routeSummary, setRouteSummary] = useState<string | null>(null);
+  const rescuerPosition = { lat: latitude, lng: longitude };
+  const sosPosition = destination ? { lat: destination.latitude, lng: destination.longitude } : null;
+  const drawRoute = useCallback((map: google.maps.Map) => {
+    if (!sosPosition || !window.google?.maps) { setRouteSummary(null); return; }
+    const maps = window.google.maps;
+    directionsRendererRef.current ??= new maps.DirectionsRenderer({ map, suppressMarkers: true, polylineOptions: { strokeColor: "#d23f43", strokeOpacity: 0.9, strokeWeight: 5 } });
+    directionsRendererRef.current.setMap(map);
+    new maps.DirectionsService().route({ origin: rescuerPosition, destination: sosPosition, travelMode: maps.TravelMode.DRIVING }, (result, status) => {
+      const leg = result?.routes?.[0]?.legs?.[0];
+      if (status !== "OK" || !result || !leg) { directionsRendererRef.current?.setMap(null); directionsRendererRef.current = null; setRouteSummary("Route estimate is temporarily unavailable."); return; }
+      directionsRendererRef.current?.setDirections(result);
+      map.fitBounds(result.routes[0].bounds);
+      setRouteSummary(`${leg.duration?.text || "ETA unavailable"} · ${leg.distance?.text || "Route calculated"}`);
+    });
+  }, [rescuerPosition.lat, rescuerPosition.lng, sosPosition?.lat, sosPosition?.lng]);
+  const placeMarkers = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+    map.setCenter(rescuerPosition);
+    map.setZoom(15);
+    rescuerMarkerRef.current = new window.google!.maps.marker.AdvancedMarkerElement({ map, position: rescuerPosition, title: "Assigned rescuer" });
+    if (sosPosition) destinationMarkerRef.current = new window.google!.maps.marker.AdvancedMarkerElement({ map, position: sosPosition, title: "Your SOS location" });
+    drawRoute(map);
+  }, [drawRoute, rescuerPosition.lat, rescuerPosition.lng, sosPosition?.lat, sosPosition?.lng]);
+  useEffect(() => {
+    if (!mapRef.current || !rescuerMarkerRef.current) return;
+    rescuerMarkerRef.current.position = rescuerPosition;
+    if (sosPosition) {
+      if (destinationMarkerRef.current) destinationMarkerRef.current.position = sosPosition;
+      else destinationMarkerRef.current = new window.google!.maps.marker.AdvancedMarkerElement({ map: mapRef.current, position: sosPosition, title: "Your SOS location" });
+    }
+    drawRoute(mapRef.current);
+  }, [drawRoute, rescuerPosition.lat, rescuerPosition.lng, sosPosition?.lat, sosPosition?.lng]);
+  return <><MapView className="mt-3 h-60 overflow-hidden rounded-xl" initialCenter={rescuerPosition} initialZoom={15} onMapReady={placeMarkers} />{routeSummary && <p className="mt-2 flex items-center gap-2 rounded-xl bg-[#fff5f3] px-3 py-2 text-xs font-bold text-[#a43f3d]"><Navigation className="h-4 w-4" />Live route · ETA {routeSummary}</p>}</>;
+}
