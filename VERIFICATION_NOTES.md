@@ -130,3 +130,7 @@ The global appearance control was rendered beside the language selector on the V
 Activating the shared control changed its accessible action to **Switch to light theme** and transitioned the rendered Victim home to dark mode. The outer page, header, SOS region, voice-note card, map framing, conditions panel, statistic tiles, forecast card surfaces, and bottom navigation all retained readable contrast in the dark palette.
 
 The selected dark theme persisted on navigation to the Government Command access portal. Its role-specific secure-access card, assistance text, actions, grid background, language selector, and theme control all rendered with readable contrast, confirming the global setting applies beyond the Victim App.
+
+## Official Assam river-gauge integration
+
+The public conditions contract now retrieves the official Assam Department River Water Level Telemetry dataset published through the National Water Data Portal. It selects the nearest station, calculates a rising/falling/steady trend from prior readings at that station, links to the official source, and includes station/timestamp context. A 48-hour freshness threshold prevents stale data from being presented as live. Live browser verification connected to the source and showed the returned 3 June 2026 reading as unavailable because it was 1,920 hours old, while retaining official attribution. Parser and UI regressions cover nearest-station selection, trend calculation, stale-data rejection, and source-link rendering. TypeScript passes and all **33** Vitest files / **74** tests pass.

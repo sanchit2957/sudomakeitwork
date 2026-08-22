@@ -6,6 +6,7 @@ import { z } from "zod";
 import { floodZones, guestEmergencyRateLimits, hospitals, incidentMessages, incidents, missions, notifications, pushSubscriptions, rescueProfiles, rescuerRegistrationRequests, safetyAssistanceRequests, shelters, users } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { notifyOwner } from "../_core/notification";
+import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
 import { adminProcedure, medicalOperationsProcedure, operationalProcedure, protectedProcedure, publicProcedure, rescuerProcedure, router } from "../_core/trpc";
 import {
   addIncidentEvent,
@@ -148,6 +149,7 @@ export const rescueRouter = router({
       const longitude = input?.longitude ?? 91.7362;
       const db = await database();
       const activeZones = await db.select({ id: floodZones.id, severity: floodZones.severity }).from(floodZones).where(eq(floodZones.active, "yes"));
+      const river = await getOfficialAssamRiverGauge(latitude, longitude);
       try {
         const endpoint = new URL("https://api.open-meteo.com/v1/forecast");
         endpoint.searchParams.set("latitude", String(latitude));
@@ -167,9 +169,9 @@ export const rescueRouter = router({
         const dailyRows = (daily?.time || []).map((date, index) => ({ date, temperatureHighC: daily?.temperature_2m_max?.[index] ?? null, temperatureLowC: daily?.temperature_2m_min?.[index] ?? null, rainChance: daily?.precipitation_probability_max?.[index] ?? null, rainMm: daily?.precipitation_sum?.[index] ?? null, windKmh: daily?.wind_speed_10m_max?.[index] ?? null, weatherCode: daily?.weather_code?.[index] ?? null }));
         const forecastDays = dailyRows.slice(-7);
         const trendDays = dailyRows.slice(0, Math.max(0, dailyRows.length - 7)).slice(-7);
-        return { available: true, source: "Open-Meteo weather model", updatedAt: new Date(), risk, activeFloodZones: activeZones.length, current: { temperatureC: weather.current?.temperature_2m ?? null, precipitationMm: weather.current?.precipitation ?? null, windKmh: weather.current?.wind_speed_10m ?? null, weatherCode: weather.current?.weather_code ?? null }, forecast: { rainChance, rainAmountMm: rainAmount, days: forecastDays }, trend: { source: "Modelled daily weather history", days: trendDays }, river: { available: false as const, levelMetres: null, trend: null, updatedAt: null, message: "No official river-gauge feed is connected yet." } };
+        return { available: true, source: "Open-Meteo weather model", updatedAt: new Date(), risk, activeFloodZones: activeZones.length, current: { temperatureC: weather.current?.temperature_2m ?? null, precipitationMm: weather.current?.precipitation ?? null, windKmh: weather.current?.wind_speed_10m ?? null, weatherCode: weather.current?.weather_code ?? null }, forecast: { rainChance, rainAmountMm: rainAmount, days: forecastDays }, trend: { source: "Modelled daily weather history", days: trendDays }, river };
       } catch {
-        return { available: false, source: "Weather source unavailable", updatedAt: new Date(), risk: "unknown" as const, activeFloodZones: activeZones.length, current: { temperatureC: null, precipitationMm: null, windKmh: null, weatherCode: null }, forecast: { rainChance: null, rainAmountMm: null }, river: { available: false as const } };
+        return { available: false, source: "Weather source unavailable", updatedAt: new Date(), risk: "unknown" as const, activeFloodZones: activeZones.length, current: { temperatureC: null, precipitationMm: null, windKmh: null, weatherCode: null }, forecast: { rainChance: null, rainAmountMm: null }, river };
       }
     }),
     create: protectedProcedure

@@ -148,9 +148,9 @@
 - [x] Verify the revised SOS control at the mobile breakpoint and save a checkpoint.
 - [x] Permanently clear all SOS incidents and their dependent missions, events, messages, and notifications after user confirmation.
 - [x] Verify all SOS operational queues are empty after the confirmed data purge.
-- [ ] Identify an official accessible Assam river-gauge source with clear licensing, timestamp, and station context.
-- [ ] Integrate real river-gauge level and trend data with source attribution and an honest unavailable state.
-- [ ] Add regression coverage and verify live river-gauge presentation before saving a checkpoint.
+- [x] Identify an official accessible Assam river-gauge source with clear licensing, timestamp, and station context.
+- [x] Integrate real river-gauge level and trend data with source attribution and an honest unavailable state.
+- [x] Add regression coverage and verify live river-gauge presentation before saving a checkpoint.
 - [x] Add a persistent light/dark theme control beside the language selector across Victim and Operations experiences.
 - [x] Apply accessible light and dark surfaces to all page shells and shared workspace components.
 - [x] Add theme persistence regressions, visually verify both modes, and save a checkpoint.
