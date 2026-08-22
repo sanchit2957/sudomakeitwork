@@ -165,3 +165,6 @@
 - [x] Diagnose why selected languages are not applying or persisting across the Victim and Operations interfaces.
 - [x] Repair language-selector state, route persistence, and translation lookup coverage for supported Indian languages.
 - [x] Add regression coverage, verify browser language switching across routes, and save a checkpoint for the multilingual repair.
+- [x] Audit the current Safety tab and its medical, assistance-request, and Operations handoff workflows for the highest-impact next improvements.
+- [x] Develop prioritized panic-first Safety guidance, resource discovery, and assistance-request improvements without weakening existing role controls.
+- [x] Add regression coverage, validate the improved Safety experience, and save a checkpoint.

@@ -3,12 +3,16 @@ import { VictimNavigation } from "@/pages/Home";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { AlertTriangle, Apple, BedDouble, ChevronRight, Cross, HeartPulse, Home as HomeIcon, MapPin, PhoneCall, ShieldCheck, ShieldQuestion, UsersRound } from "lucide-react";
+import { AlertTriangle, Apple, BedDouble, ChevronRight, HeartPulse, Home as HomeIcon, MapPin, PhoneCall, ShieldCheck, ShieldQuestion, Smartphone, TentTree, UsersRound, Waves } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
 type Category = "shelter" | "food" | "medical" | "protection";
 type Position = { latitude: number; longitude: number } | null;
+type PositionState = "finding" | "ready" | "unavailable";
+
+const readinessStorageKey = "sudo-makeitwork-safety-readiness";
+
 const choices: Array<{ id: Category; label: string; icon: typeof HomeIcon; tone: string; title: string; copy: string }> = [
   { id: "shelter", label: "Shelter", icon: HomeIcon, tone: "bg-[#e7f6ef] text-[#197654]", title: "Safe shelter", copy: "Verified dry, higher-ground locations." },
   { id: "food", label: "Food", icon: Apple, tone: "bg-[#fff4dd] text-[#9d6a16]", title: "Food and water", copy: "Request relief supplies or a meal point." },
@@ -16,25 +20,121 @@ const choices: Array<{ id: Category; label: string; icon: typeof HomeIcon; tone:
   { id: "protection", label: "Safety", icon: ShieldQuestion, tone: "bg-[#f1ecfb] text-[#7251a3]", title: "Safety support", copy: "Escort, protection, or other safety support." },
 ];
 
-export default function Safety() {
-  const [, setLocation] = useLocation(); const { user, loading } = useAuth(); const [active, setActive] = useState<Category>("medical"); const [people, setPeople] = useState(1); const [details, setDetails] = useState(""); const [position, setPosition] = useState<Position>(null); const [notice, setNotice] = useState(""); const resources = trpc.rescue.safety.resources.useQuery(undefined, { refetchInterval: 30_000, refetchOnWindowFocus: true }); const conditions = trpc.rescue.emergency.conditions.useQuery(position ? { latitude: position.latitude, longitude: position.longitude } : {}, { refetchInterval: 15 * 60_000, refetchOnWindowFocus: true }); const mine = trpc.rescue.safety.mine.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 10_000 }); const utils = trpc.useUtils(); const request = trpc.rescue.safety.createRequest.useMutation({ onSuccess: () => { setNotice("Safety request shared with the response team."); setDetails(""); void utils.rescue.safety.mine.invalidate(); } });
-  useEffect(() => { if (!navigator.geolocation) return; navigator.geolocation.getCurrentPosition(point => setPosition({ latitude: point.coords.latitude, longitude: point.coords.longitude }), () => undefined, { enableHighAccuracy: true, timeout: 8_000, maximumAge: 60_000 }); }, []);
-  const choice = choices.find(item => item.id === active)!; const nearby = useMemo(() => active === "shelter" ? (resources.data?.shelters || []).map(item => ({ id: item.id, name: item.name, meta: `${item.capacity - item.occupancy}/${item.capacity} places available · ${item.address}`, distance: 0 })) : active === "medical" ? (resources.data?.hospitals || []).map(item => { const distance = position ? Math.hypot((item.latitude - position.latitude) * 111, (item.longitude - position.longitude) * 111 * Math.cos(position.latitude * Math.PI / 180)) : Number.POSITIVE_INFINITY; const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "Not recorded"; return { id: item.id, name: item.name, distance, meta: `ER ${item.availableEmergencyBeds}/${item.totalEmergencyBeds} · ICU ${item.availableIcuBeds}/${item.totalIcuBeds} · O₂ ${item.oxygenCylinderCount} · Blood ${item.bloodUnitCount} · Ambulance ${item.ambulanceCount} · Updated ${updated} · ${item.address}` }; }).sort((a, b) => a.distance - b.distance) : [], [active, resources.data, position]);
-  const sendRequest = () => { if (loading) return; if (!user) { startLogin(); return; } if (!position) { setNotice("Allow your location before sending a safety request."); return; } request.mutate({ category: active, peopleAffected: people, details: details.trim() || undefined, latitude: position.latitude, longitude: position.longitude }); };
-  return <div className="victim-page min-h-screen bg-[#f6f8f7]"><main className="victim-main mx-auto min-h-screen max-w-lg bg-[#fcfdfd] px-5 pb-28 pt-6 md:my-6 md:min-h-[850px] md:rounded-[2.75rem] md:border"><header className="flex items-start justify-between"><button onClick={() => setLocation("/")} className="flex items-center gap-2 text-left"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#174e46] text-white"><ShieldCheck className="h-5 w-5" /></span><span><span className="block text-lg font-black tracking-[-.05em]">Safety</span><span className="block text-[10px] font-bold text-[#6b8780]">Prepare, find support, act early</span></span></button><LanguageSelector compact /></header>
-    <section className="mt-6 rounded-[1.8rem] bg-[#174e46] p-5 text-white"><div className="flex gap-4"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10"><ShieldCheck className="h-6 w-6 text-[#d3eee6]" /></span><div><h1 className="text-xl font-black tracking-[-.04em]">Stay safe, stay informed</h1><p className="mt-2 text-sm leading-6 text-[#c7e1da]">Use verified support where possible. If there is immediate danger, send an SOS instead.</p></div></div><div className="mt-5 grid grid-cols-2 gap-2"><a href="tel:112" className="inline-flex items-center justify-center rounded-xl bg-[#fff2ef] px-3 py-3 text-xs font-black text-[#c14544]"><PhoneCall className="mr-2 h-4 w-4" /> Call 112</a><button onClick={() => setLocation("/")} className="inline-flex items-center justify-center rounded-xl bg-white px-3 py-3 text-xs font-black text-[#174e46]"><AlertTriangle className="mr-2 h-4 w-4 text-[#df3e43]" /> Rapid SOS</button></div></section>
-    <SafetyConditionsCard conditions={conditions.data} loading={conditions.isLoading} />
-    <p className="mt-6 font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#779087]">What do you need?</p><section className="mt-3 grid grid-cols-4 gap-2">{choices.map(item => { const Icon = item.icon; const selected = item.id === active; return <button key={item.id} onClick={() => { setActive(item.id); setPeople(1); setNotice(""); }} className={`grid place-items-center gap-1 rounded-2xl border px-1 py-3 text-[10px] font-black transition active:scale-95 ${selected ? "border-[#277b6b] bg-[#eaf7f2] text-[#18715c]" : "border-[#e7ece9] bg-white text-[#69817a]"}`}><span className={`grid h-8 w-8 place-items-center rounded-full ${selected ? "bg-white" : "bg-[#f6f8f7]"}`}><Icon className="h-4 w-4" /></span>{item.label}</button>; })}</section>
-    <section className="mt-4 rounded-[1.55rem] border border-[#e7ece9] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.06)]"><div className="flex items-start gap-3"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${choice.tone}`}><choice.icon className="h-5 w-5" /></span><div><h2 className="text-base font-black">{choice.title}</h2><p className="mt-1 text-xs leading-5 text-[#708881]">{choice.copy}</p></div></div>{nearby.length ? <div className="mt-4 divide-y divide-[#e9efec]">{nearby.map(item => <div key={item.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="text-sm font-extrabold text-[#183e37]">{item.name}</p><p className="mt-1 text-[11px] leading-4 text-[#748b84]">{item.meta}</p></div><ChevronRight className="h-4 w-4 shrink-0 text-[#8ca29b]" /></div>)}</div> : <div className="mt-4 rounded-xl bg-[#f5f8f7] p-3 text-xs leading-5 text-[#6c847c]">No verified nearby entries are currently listed for this type. You can still send a request to the operations team.</div>}
-      <div className="mt-4 border-t border-[#e8efec] pt-4"><p className="text-xs font-bold text-[#58746c]">People needing support</p><div className="mt-2 flex items-center gap-3"><button onClick={() => setPeople(value => Math.max(1, value - 1))} className="grid h-9 w-9 place-items-center rounded-full border bg-white text-lg font-black">−</button><output className="grid h-9 min-w-10 place-items-center rounded-xl bg-[#edf7f4] text-sm font-black text-primary">{people}</output><button onClick={() => setPeople(value => Math.min(500, value + 1))} className="grid h-9 w-9 place-items-center rounded-full border bg-white text-lg font-black">+</button></div><textarea value={details} onChange={event => setDetails(event.target.value)} maxLength={1000} placeholder="Optional: urgent needs, accessibility, medicine, or family details" className="mt-3 min-h-22 w-full rounded-xl border border-[#dfe9e5] bg-[#f8fbfa] p-3 text-xs outline-none focus:border-[#277b6b]" /><button onClick={sendRequest} disabled={request.isPending} className="mt-3 flex w-full items-center justify-center rounded-xl bg-[#174e46] px-4 py-3 text-sm font-black text-white disabled:opacity-70"><MapPin className="mr-2 h-4 w-4" />{request.isPending ? "Sharing request…" : user ? "Share safety request" : "Sign in to share request"}</button><p className="mt-2 text-center text-[10px] leading-4 text-[#839890]">Location is shared only with the authorized team handling this request.</p>{notice && <p className="mt-3 rounded-xl bg-[#edf7f4] p-3 text-xs font-bold text-[#237560]">{notice}</p>}{request.error && <p className="mt-3 text-xs font-bold text-destructive">{request.error.message}</p>}</div></section>
-    {mine.data?.length ? <section className="mt-5 rounded-[1.55rem] border bg-white p-4"><p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-primary">My safety requests</p><div className="mt-3 grid gap-2">{mine.data.slice(0, 3).map(item => <div key={item.id} className="flex items-center justify-between rounded-xl bg-[#f6f9f8] px-3 py-2.5"><span className="text-xs font-extrabold capitalize text-[#284f46]">{item.category} · {item.peopleAffected} {item.peopleAffected === 1 ? "person" : "people"}</span><span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${item.status === "new" ? "bg-[#fff3df] text-[#9b6819]" : item.status === "acknowledged" ? "bg-[#e8f3ff] text-[#28639b]" : "bg-[#e7f6ef] text-[#197654]"}`}>{item.status}</span></div>)}</div></section> : null}
-    <section className="mt-5 rounded-[1.55rem] border border-[#f1d4c8] bg-[#fff9f6] p-4"><div className="flex gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#b9423d]" /><div><p className="text-sm font-black text-[#9f413f]">Flood safety now</p><ul className="mt-2 space-y-1.5 text-xs leading-5 text-[#885854]"><li>Move to higher ground before water rises.</li><li>Do not walk or drive through moving water.</li><li>Keep medicines, drinking water, and phone power ready.</li><li>Stay away from fallen wires and unstable banks.</li></ul></div></div></section></main><VictimNavigation current="safety" /></div>;
+const readinessItems = [
+  { id: "higher-ground", icon: TentTree, title: "Higher ground", copy: "Move early if water is rising." },
+  { id: "essential-pack", icon: BedDouble, title: "Essentials ready", copy: "Keep water, medicine, and ID together." },
+  { id: "phone-ready", icon: Smartphone, title: "Phone ready", copy: "Keep power and emergency contacts available." },
+] as const;
+
+function kilometresBetween(a: Position, latitude: number, longitude: number) {
+  if (!a) return null;
+  return Math.hypot((latitude - a.latitude) * 111, (longitude - a.longitude) * 111 * Math.cos(a.latitude * Math.PI / 180));
 }
 
-type SafetyConditions = { available: boolean; source: string; risk: string; forecast: { rainChance: number | null; rainAmountMm: number | null } };
+function SafetyReadiness() {
+  const [completed, setCompleted] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(readinessStorageKey);
+      return saved ? JSON.parse(saved) as string[] : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(readinessStorageKey, JSON.stringify(completed)); } catch { /* The Safety plan remains usable for this session. */ }
+  }, [completed]);
+
+  const toggle = (id: string) => setCompleted(previous => previous.includes(id) ? previous.filter(item => item !== id) : [...previous, id]);
+  return <section aria-labelledby="safety-readiness-heading" className="mt-5 rounded-[1.55rem] border border-[#cfe4dc] bg-[#f7fcfa] p-4">
+    <div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#277b6b]">Safety plan</p><h2 id="safety-readiness-heading" className="mt-1 text-base font-black">Three things to check now</h2></div><span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-[#277b6b]">{completed.length}/3 ready</span></div>
+    <div className="mt-3 grid gap-2">{readinessItems.map(({ id, icon: Icon, title, copy }) => {
+      const done = completed.includes(id);
+      return <button key={id} type="button" aria-pressed={done} onClick={() => toggle(id)} className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition active:scale-[.99] ${done ? "border-[#79bdaa] bg-[#e6f6ef]" : "border-[#e1ece8] bg-white"}`}><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${done ? "bg-[#277b6b] text-white" : "bg-[#edf7f4] text-[#277b6b]"}`}><Icon className="h-4 w-4" /></span><span className="min-w-0"><span className="block text-xs font-black">{title}</span><span className="mt-0.5 block text-[11px] leading-4 text-[#627c73]">{copy}</span></span><span className={`ml-auto grid h-5 w-5 place-items-center rounded-full border text-[11px] font-black ${done ? "border-[#277b6b] bg-[#277b6b] text-white" : "border-[#b7d5cb] text-transparent"}`}>✓</span></button>;
+    })}</div>
+    <p className="mt-3 text-[10px] leading-4 text-[#728a82]">This checklist stays only on this device. It does not notify response teams.</p>
+  </section>;
+}
+
+export default function Safety() {
+  const [, setLocation] = useLocation();
+  const { user, loading } = useAuth();
+  const [active, setActive] = useState<Category>("medical");
+  const [people, setPeople] = useState(1);
+  const [details, setDetails] = useState("");
+  const [position, setPosition] = useState<Position>(null);
+  const [positionState, setPositionState] = useState<PositionState>("finding");
+  const [notice, setNotice] = useState("");
+  const resources = trpc.rescue.safety.resources.useQuery(undefined, { refetchInterval: 30_000, refetchOnWindowFocus: true });
+  const conditions = trpc.rescue.emergency.conditions.useQuery(position ? { latitude: position.latitude, longitude: position.longitude } : {}, { refetchInterval: 15 * 60_000, refetchOnWindowFocus: true });
+  const mine = trpc.rescue.safety.mine.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 10_000 });
+  const utils = trpc.useUtils();
+  const request = trpc.rescue.safety.createRequest.useMutation({
+    onSuccess: () => {
+      setNotice("Safety request shared with the response team.");
+      setDetails("");
+      void utils.rescue.safety.mine.invalidate();
+    },
+  });
+
+  const requestPosition = () => {
+    if (!navigator.geolocation) {
+      setPositionState("unavailable");
+      setNotice("This device cannot provide location. Use Rapid SOS only when location can be shared.");
+      return;
+    }
+    setPositionState("finding");
+    navigator.geolocation.getCurrentPosition(
+      point => { setPosition({ latitude: point.coords.latitude, longitude: point.coords.longitude }); setPositionState("ready"); },
+      () => { setPositionState("unavailable"); setNotice("Allow location to find verified nearby support and share a safety request."); },
+      { enableHighAccuracy: true, timeout: 8_000, maximumAge: 60_000 },
+    );
+  };
+
+  useEffect(() => { requestPosition(); }, []);
+
+  const choice = choices.find(item => item.id === active)!;
+  const nearby = useMemo(() => {
+    if (active === "shelter") return (resources.data?.shelters || []).map(item => ({ id: item.id, name: item.name, distance: kilometresBetween(position, item.latitude, item.longitude), meta: `${item.capacity - item.occupancy}/${item.capacity} places available · ${item.address}` })).sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+    if (active === "medical") return (resources.data?.hospitals || []).map(item => ({ id: item.id, name: item.name, distance: kilometresBetween(position, item.latitude, item.longitude), meta: `ER ${item.availableEmergencyBeds}/${item.totalEmergencyBeds} · ICU ${item.availableIcuBeds}/${item.totalIcuBeds} · O₂ ${item.oxygenCylinderCount} · Blood ${item.bloodUnitCount} · Ambulance ${item.ambulanceCount} · Updated ${item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "Not recorded"} · ${item.address}` })).sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+    return [];
+  }, [active, resources.data, position]);
+
+  const sendRequest = () => {
+    if (loading) return;
+    if (!user) { startLogin(); return; }
+    if (!position) { setNotice("Allow your location before sending a safety request."); requestPosition(); return; }
+    request.mutate({ category: active, peopleAffected: people, details: details.trim() || undefined, latitude: position.latitude, longitude: position.longitude });
+  };
+
+  const locationCopy = positionState === "ready" ? "Location ready · nearby resources are ordered by distance." : positionState === "finding" ? "Finding your location for nearby verified support…" : "Location is needed to order nearby resources and share a request.";
+
+  return <div className="victim-page min-h-screen bg-[#f6f8f7]"><main className="victim-main mx-auto min-h-screen max-w-lg bg-[#fcfdfd] px-5 pb-28 pt-6 md:my-6 md:min-h-[850px] md:rounded-[2.75rem] md:border">
+    <header className="flex items-start justify-between"><button onClick={() => setLocation("/")} className="flex items-center gap-2 text-left"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#174e46] text-white"><ShieldCheck className="h-5 w-5" /></span><span><span className="block text-lg font-black tracking-[-.05em]">Safety</span><span className="block text-[10px] font-bold text-[#6b8780]">Prepare, find support, act early</span></span></button><LanguageSelector compact /></header>
+    <section className="mt-6 rounded-[1.8rem] bg-[#174e46] p-5 text-white"><div className="flex gap-4"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10"><ShieldCheck className="h-6 w-6 text-[#d3eee6]" /></span><div><h1 className="text-xl font-black tracking-[-.04em]">Stay safe, stay informed</h1><p className="mt-2 text-sm leading-6 text-[#c7e1da]">Use verified support where possible. If there is immediate danger, send an SOS instead.</p></div></div><div className="mt-5 grid grid-cols-2 gap-2"><a href="tel:112" className="inline-flex items-center justify-center rounded-xl bg-[#fff2ef] px-3 py-3 text-xs font-black text-[#c14544]"><PhoneCall className="mr-2 h-4 w-4" />Call 112</a><button onClick={() => setLocation("/")} className="inline-flex items-center justify-center rounded-xl bg-white px-3 py-3 text-xs font-black text-[#174e46]"><AlertTriangle className="mr-2 h-4 w-4 text-[#df3e43]" />Rapid SOS</button></div></section>
+    <SafetyConditionsCard conditions={conditions.data} loading={conditions.isLoading} />
+    <SafetyReadiness />
+    <section className="mt-5 rounded-[1.55rem] border border-[#d7e8e2] bg-[#f7fcfa] p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#277b6b]">Verified support</p><h2 className="mt-1 text-base font-black">Find help or share a need</h2><p className="mt-1 text-xs leading-5 text-[#638078]">{locationCopy}</p></div><button type="button" onClick={requestPosition} className="shrink-0 rounded-xl border border-[#b7d8ce] bg-white px-3 py-2 text-[10px] font-black text-[#277b6b] active:scale-95">{positionState === "ready" ? "Refresh location" : "Use location"}</button></div></section>
+    <p className="mt-5 font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#779087]">What do you need?</p><section className="mt-3 grid grid-cols-4 gap-2">{choices.map(item => { const Icon = item.icon; const selected = item.id === active; return <button key={item.id} onClick={() => { setActive(item.id); setPeople(1); setNotice(""); }} className={`grid place-items-center gap-1 rounded-2xl border px-1 py-3 text-[10px] font-black transition active:scale-95 ${selected ? "border-[#277b6b] bg-[#eaf7f2] text-[#18715c]" : "border-[#e7ece9] bg-white text-[#69817a]"}`}><span className={`grid h-8 w-8 place-items-center rounded-full ${selected ? "bg-white" : "bg-[#f6f8f7]"}`}><Icon className="h-4 w-4" /></span>{item.label}</button>; })}</section>
+    <section className="mt-4 rounded-[1.55rem] border border-[#e7ece9] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.06)]"><div className="flex items-start gap-3"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${choice.tone}`}><choice.icon className="h-5 w-5" /></span><div><h2 className="text-base font-black">{choice.title}</h2><p className="mt-1 text-xs leading-5 text-[#708881]">{choice.copy}</p></div></div>{nearby.length ? <div className="mt-4 divide-y divide-[#e9efec]">{nearby.map(item => <div key={item.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="text-sm font-extrabold text-[#183e37]">{item.name}</p><p className="mt-1 text-[11px] leading-4 text-[#748b84]">{item.distance !== null ? `${item.distance.toFixed(1)} km away · ` : ""}{item.meta}</p></div><ChevronRight className="h-4 w-4 shrink-0 text-[#8ca29b]" /></div>)}</div> : <div className="mt-4 rounded-xl bg-[#f5f8f7] p-3 text-xs leading-5 text-[#6c847c]">No verified nearby entries are currently listed for this type. You can still send a request to the operations team.</div>}
+      <div className="mt-4 border-t border-[#e8efec] pt-4"><p className="text-xs font-bold text-[#58746c]">People needing support</p><div className="mt-2 flex items-center gap-3"><button onClick={() => setPeople(value => Math.max(1, value - 1))} className="grid h-9 w-9 place-items-center rounded-full border bg-white text-lg font-black">−</button><output className="grid h-9 min-w-10 place-items-center rounded-xl bg-[#edf7f4] text-sm font-black text-primary">{people}</output><button onClick={() => setPeople(value => Math.min(500, value + 1))} className="grid h-9 w-9 place-items-center rounded-full border bg-white text-lg font-black">+</button></div><textarea value={details} onChange={event => setDetails(event.target.value)} maxLength={1000} placeholder="Optional: urgent needs, accessibility, medicine, or family details" className="mt-3 min-h-22 w-full rounded-xl border border-[#dfe9e5] bg-[#f8fbfa] p-3 text-xs outline-none focus:border-[#277b6b]" /><button onClick={sendRequest} disabled={request.isPending} className="mt-3 flex w-full items-center justify-center rounded-xl bg-[#174e46] px-4 py-3 text-sm font-black text-white disabled:opacity-70"><MapPin className="mr-2 h-4 w-4" />{request.isPending ? "Sharing request…" : user ? "Share safety request" : "Sign in to share request"}</button><p className="mt-2 text-center text-[10px] leading-4 text-[#839890]">Location is shared only with the authorized team handling this request.</p>{notice && <p className="mt-3 rounded-xl bg-[#edf7f4] p-3 text-xs font-bold text-[#237560]">{notice}</p>}{request.error && <p className="mt-3 text-xs font-bold text-destructive">{request.error.message}</p>}</div></section>
+    {mine.data?.length ? <section className="mt-5 rounded-[1.55rem] border bg-white p-4"><p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-primary">My safety requests</p><div className="mt-3 grid gap-2">{mine.data.slice(0, 3).map(item => <div key={item.id} className="flex items-center justify-between rounded-xl bg-[#f6f9f8] px-3 py-2.5"><span className="text-xs font-extrabold capitalize text-[#284f46]">{item.category} · {item.peopleAffected} {item.peopleAffected === 1 ? "person" : "people"}</span><span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${item.status === "new" ? "bg-[#fff3df] text-[#9b6819]" : item.status === "acknowledged" ? "bg-[#e8f3ff] text-[#28639b]" : "bg-[#e7f6ef] text-[#197654]"}`}>{item.status}</span></div>)}</div></section> : null}
+    <section className="mt-5 rounded-[1.55rem] border border-[#f1d4c8] bg-[#fff9f6] p-4"><div className="flex gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#b9423d]" /><div><p className="text-sm font-black text-[#9f413f]">Flood safety now</p><div className="mt-3 grid gap-2 sm:grid-cols-3"><SafetyTip icon={TentTree} title="Move higher" copy="Leave low ground before water rises." /><SafetyTip icon={Waves} title="Avoid water" copy="Never walk or drive through moving water." /><SafetyTip icon={Smartphone} title="Keep contact" copy="Charge your phone and keep emergency numbers ready." /></div></div></div></section>
+  </main><VictimNavigation current="safety" /></div>;
+}
+
+function SafetyTip({ icon: Icon, title, copy }: { icon: typeof TentTree; title: string; copy: string }) {
+  return <div className="rounded-xl bg-white/75 p-3"><Icon className="h-4 w-4 text-[#b9423d]" /><p className="mt-2 text-xs font-black text-[#9f413f]">{title}</p><p className="mt-1 text-[10px] leading-4 text-[#885854]">{copy}</p></div>;
+}
+
+type RiverConditions = { available: boolean; levelMetres: number | null; trend: "rising" | "falling" | "steady" | null; stationName: string | null; updatedAt: Date | string | null; sourceName: string | null; sourceUrl: string | null; message: string | null };
+type SafetyConditions = { available: boolean; source: string; risk: string; forecast: { rainChance: number | null; rainAmountMm: number | null }; river?: RiverConditions | null };
+
 export function SafetyConditionsCard({ conditions, loading }: { conditions?: SafetyConditions; loading: boolean }) {
   const title = loading ? "Checking conditions" : conditions?.available ? conditions.risk === "high" ? "High rainfall risk" : conditions.risk === "elevated" ? "Elevated rainfall risk" : "Current model conditions" : "Weather source unavailable";
   const tone = conditions?.risk === "high" ? "bg-[#fff0ee] text-[#b83f43]" : conditions?.risk === "elevated" ? "bg-[#fff4df] text-[#9a681d]" : "bg-[#e7f6ef] text-[#197654]";
   const detail = conditions?.available ? `${conditions.forecast.rainChance ?? "—"}% chance of rain today${conditions.forecast.rainAmountMm !== null ? ` · ${conditions.forecast.rainAmountMm} mm forecast` : ""}. ${conditions.risk === "high" ? "Avoid low-lying routes and move early if local authorities advise." : "Keep monitoring local authority alerts before travelling."}` : "Live weather information is temporarily unavailable. Follow official local authority warnings and do not rely on this screen alone.";
-  return <section className="mt-4 rounded-[1.55rem] border border-[#e7ece9] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.06)]"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-primary">Local alert</p><h2 className="mt-1 text-base font-black">{title}</h2></div><span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${tone}`}>{conditions?.risk || "loading"}</span></div><p className="mt-2 text-xs leading-5 text-[#6c847c]">{detail}</p><p className="mt-3 rounded-xl bg-[#f4f8f6] px-3 py-2 text-[10px] leading-4 text-[#6f8780]">{conditions?.source || "Weather model loading"} · No official river gauge is linked yet.</p></section>;
+  const river = conditions?.river;
+  const riverCopy = river?.available && river.levelMetres !== null ? `${river.stationName || "Official river gauge"} · ${river.levelMetres.toFixed(2)} m${river.trend ? ` · ${river.trend}` : ""}` : river?.message || "Official river-gauge data is temporarily unavailable.";
+  return <section className="mt-4 rounded-[1.55rem] border border-[#e7ece9] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.06)]"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-primary">Local alert</p><h2 className="mt-1 text-base font-black">{title}</h2></div><span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${tone}`}>{conditions?.risk || "loading"}</span></div><p className="mt-2 text-xs leading-5 text-[#6c847c]">{detail}</p><div className="mt-3 rounded-xl bg-[#f4f8f6] px-3 py-2 text-[10px] leading-4 text-[#6f8780]"><span>{riverCopy}</span>{river?.sourceUrl ? <a href={river.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 block font-bold text-[#277b6b] underline underline-offset-2">{river.sourceName || "Official source"}{river.updatedAt ? ` · observed ${new Date(river.updatedAt).toLocaleString()}` : ""}</a> : <span> · {conditions?.source || "Weather model loading"}</span>}</div></section>;
 }
