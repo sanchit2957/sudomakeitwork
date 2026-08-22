@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { z } from "zod";
-import { floodZones, guestEmergencyRateLimits, hospitals, incidentMessages, incidents, missions, notifications, pushSubscriptions, rescueProfiles, rescuerRegistrationRequests, shelters, users } from "../../drizzle/schema";
+import { floodZones, guestEmergencyRateLimits, hospitals, incidentMessages, incidents, missions, notifications, pushSubscriptions, rescueProfiles, rescuerRegistrationRequests, safetyAssistanceRequests, shelters, users } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { adminProcedure, medicalOperationsProcedure, operationalProcedure, protectedProcedure, publicProcedure, rescuerProcedure, router } from "../_core/trpc";
@@ -34,6 +34,7 @@ import { getGuestSosRateLimitDecision, isAllowedMissionTransition } from "../res
 import { hasValidHospitalCapacity } from "../hospital.policy";
 import { canRequestRescuerRegistration, requiresCallSign } from "../registration.policy";
 import { mayShareLiveMissionLocation, presentAssignedRescuerToVictim } from "../rescuer-profile.policy";
+import { canHandleSafetyAssistance, canTransitionSafetyAssistance, isSafetyRequestOwnedBy, visibleSafetyCategoriesForRole } from "../safety-assistance.policy";
 import { sendRescuerPush } from "../push";
 
 const incidentCode = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
@@ -165,25 +166,23 @@ export const rescueRouter = router({
         return { available: false, source: "Weather source unavailable", updatedAt: new Date(), risk: "unknown" as const, activeFloodZones: activeZones.length, current: { temperatureC: null, precipitationMm: null, windKmh: null, weatherCode: null }, forecast: { rainChance: null, rainAmountMm: null }, river: { available: false as const } };
       }
     }),
-    create: publicProcedure
+    create: protectedProcedure
       .input(z.object({
         contactName: z.string().trim().max(160).optional(),
         locationLabel: z.string().trim().min(3).max(360),
         latitude: z.number().min(-90).max(90),
         longitude: z.number().min(-180).max(180),
         emergencyType: z.enum(["flood", "medical", "trapped", "evacuation", "other"]),
+        helpNeeds: z.string().trim().max(1000).optional(),
         severity: severitySchema,
         peopleAffected: z.number().int().min(1).max(500),
         notes: z.string().trim().max(2000).optional(),
         evidenceDataUrl: z.string().max(2_100_000).optional(),
         voiceNoteDataUrl: z.string().max(4_200_000).optional(),
         voiceNoteDurationSeconds: z.number().int().min(1).max(120).optional(),
-        guestKey: z.string().regex(/^[A-Za-z0-9_-]{24,160}$/).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const db = await database();
-        if (!ctx.user && !input.guestKey) throw new TRPCError({ code: "BAD_REQUEST", message: "Guest emergency mode requires a device key." });
-        if (!ctx.user && input.guestKey) await enforceGuestSosRateLimit(input.guestKey);
         const publicCode = `SOS-${incidentCode()}`;
         const evidence = readEvidence(input.evidenceDataUrl);
         const voiceNote = readVoiceNote(input.voiceNoteDataUrl, input.voiceNoteDurationSeconds);
@@ -193,12 +192,13 @@ export const rescueRouter = router({
         if (voiceNote) uploadedVoiceNote = await storagePut(`incidents/${publicCode}/voice-note.${voiceNote.extension}`, voiceNote.bytes, voiceNote.contentType);
         const result = await db.insert(incidents).values({
           publicCode,
-          reporterId: ctx.user?.id ?? null,
+          reporterId: ctx.user.id,
           contactName: input.contactName ?? null,
           locationLabel: input.locationLabel,
           latitude: input.latitude,
           longitude: input.longitude,
           emergencyType: input.emergencyType,
+          helpNeeds: input.helpNeeds ?? null,
           severity: input.severity,
           peopleAffected: input.peopleAffected,
           notes: input.notes ?? null,
@@ -210,8 +210,8 @@ export const rescueRouter = router({
           status: "pending",
         });
         const incidentId = Number(result[0].insertId);
-        await addIncidentEvent(incidentId, ctx.user?.id ?? null, "sos_created", "SOS received", "Awaiting dispatch from the emergency operations team.");
-        await writeAudit(ctx.user?.id ?? null, "incident.create", "incident", incidentId, `Created ${publicCode}`);
+        await addIncidentEvent(incidentId, ctx.user.id, "sos_created", "SOS received", "Awaiting dispatch from the emergency operations team.");
+        await writeAudit(ctx.user.id, "incident.create", "incident", incidentId, `Created ${publicCode}`);
         await emitIncidentAlerts(incidentId, publicCode, input.locationLabel, input.severity, input.latitude, input.longitude);
         return { incidentId, publicCode, status: "pending" as const };
       }),
@@ -232,6 +232,23 @@ export const rescueRouter = router({
         assignedRescuer: !assigned || !profile ? null : presentAssignedRescuerToVictim({ ...profile, name: assigned.user.name }),
       };
     }),
+    myDetailsByCode: protectedProcedure.input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) })).query(async ({ input, ctx }) => {
+      const incident = await getIncidentByCode(input.publicCode);
+      if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
+      if (incident.reporterId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Only the SOS reporter can view these request details." });
+      return { publicCode: incident.publicCode, status: incident.status, peopleAffected: incident.peopleAffected, emergencyType: incident.emergencyType, helpNeeds: incident.helpNeeds, notes: incident.notes, contactName: incident.contactName };
+    }),
+    updateMyDetails: protectedProcedure.input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/), peopleAffected: z.number().int().min(1).max(500), emergencyType: z.enum(["flood", "medical", "trapped", "evacuation", "other"]), helpNeeds: z.string().trim().max(1000).optional(), notes: z.string().trim().max(2000).optional(), contactName: z.string().trim().max(160).optional() })).mutation(async ({ input, ctx }) => {
+      const incident = await getIncidentByCode(input.publicCode);
+      if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
+      if (incident.reporterId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Only the SOS reporter can update this request." });
+      if (incident.status === "resolved") throw new TRPCError({ code: "BAD_REQUEST", message: "This SOS has already been resolved." });
+      const db = await database();
+      await db.update(incidents).set({ peopleAffected: input.peopleAffected, emergencyType: input.emergencyType, helpNeeds: input.helpNeeds || null, notes: input.notes || null, contactName: input.contactName || null }).where(eq(incidents.id, incident.id));
+      await addIncidentEvent(incident.id, ctx.user.id, "victim_details_updated", "Victim updated request details", "People count, help needs, or notes were added after SOS activation.");
+      await writeAudit(ctx.user.id, "incident.update_details", "incident", incident.id, `Updated post-alert details for ${incident.publicCode}`);
+      return { success: true };
+    }),
     chatByCode: publicProcedure.input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) })).query(async ({ input }) => {
       const incident = await getIncidentByCode(input.publicCode);
       if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
@@ -247,6 +264,45 @@ export const rescueRouter = router({
       return { id: Number(result[0].insertId) };
     }),
     mine: protectedProcedure.query(({ ctx }) => listIncidentsForReporter(ctx.user.id)),
+  }),
+
+  safety: router({
+    resources: publicProcedure.query(async () => {
+      const db = await database();
+      const [shelterRows, hospitalRows] = await Promise.all([
+        db.select({ id: shelters.id, name: shelters.name, address: shelters.address, latitude: shelters.latitude, longitude: shelters.longitude, capacity: shelters.capacity, occupancy: shelters.occupancy, status: shelters.status }).from(shelters).where(and(eq(shelters.status, "open"))),
+        db.select({ id: hospitals.id, name: hospitals.name, address: hospitals.address, latitude: hospitals.latitude, longitude: hospitals.longitude, availableEmergencyBeds: hospitals.availableEmergencyBeds, availableIcuBeds: hospitals.availableIcuBeds, status: hospitals.status }).from(hospitals).where(and(eq(hospitals.status, "open"))),
+      ]);
+      return { shelters: shelterRows, hospitals: hospitalRows };
+    }),
+    createRequest: protectedProcedure.input(z.object({ category: z.enum(["shelter", "food", "medical", "protection"]), peopleAffected: z.number().int().min(1).max(500), details: z.string().trim().max(1000).optional(), latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) })).mutation(async ({ input, ctx }) => {
+      const db = await database();
+      const result = await db.insert(safetyAssistanceRequests).values({ requesterId: ctx.user.id, category: input.category, peopleAffected: input.peopleAffected, details: input.details || null, latitude: input.latitude, longitude: input.longitude });
+      const requestId = Number(result[0].insertId);
+      await writeAudit(ctx.user.id, "safety.request.create", "safetyAssistanceRequest", requestId, `Requested ${input.category} assistance`);
+      return { id: requestId, status: "new" as const };
+    }),
+    mine: protectedProcedure.query(async ({ ctx }) => {
+      const db = await database();
+      const rows = await db.select().from(safetyAssistanceRequests).where(eq(safetyAssistanceRequests.requesterId, ctx.user.id)).orderBy(desc(safetyAssistanceRequests.createdAt));
+      return rows.filter(row => isSafetyRequestOwnedBy(row.requesterId, ctx.user.id));
+    }),
+    queue: operationalProcedure.query(async ({ ctx }) => {
+      const db = await database();
+      const categories = ctx.user.role === "user" ? [] : visibleSafetyCategoriesForRole(ctx.user.role);
+      const where = categories.length === 1 ? and(eq(safetyAssistanceRequests.category, categories[0])) : undefined;
+      return db.select({ id: safetyAssistanceRequests.id, category: safetyAssistanceRequests.category, peopleAffected: safetyAssistanceRequests.peopleAffected, details: safetyAssistanceRequests.details, latitude: safetyAssistanceRequests.latitude, longitude: safetyAssistanceRequests.longitude, status: safetyAssistanceRequests.status, createdAt: safetyAssistanceRequests.createdAt, requesterName: users.name }).from(safetyAssistanceRequests).leftJoin(users, eq(safetyAssistanceRequests.requesterId, users.id)).where(where).orderBy(desc(safetyAssistanceRequests.createdAt));
+    }),
+    updateStatus: operationalProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["acknowledged", "resolved"]) })).mutation(async ({ input, ctx }) => {
+      const db = await database();
+      const request = (await db.select().from(safetyAssistanceRequests).where(eq(safetyAssistanceRequests.id, input.id)).limit(1))[0];
+      if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Safety assistance request not found." });
+      if (ctx.user.role === "user" || !canHandleSafetyAssistance(ctx.user.role, request.category)) throw new TRPCError({ code: "FORBIDDEN", message: "This account cannot update that safety assistance request." });
+      if (!canTransitionSafetyAssistance(request.status, input.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "Safety assistance requests must be acknowledged before they can be resolved." });
+      await db.update(safetyAssistanceRequests).set({ status: input.status, reviewedBy: ctx.user.id, reviewedAt: new Date() }).where(eq(safetyAssistanceRequests.id, input.id));
+      await writeAudit(ctx.user.id, "safety.request.update", "safetyAssistanceRequest", input.id, `Marked ${input.status}`);
+      return { success: true };
+    }),
   }),
 
   operations: router({

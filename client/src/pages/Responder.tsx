@@ -2,13 +2,14 @@ import { RoleGate } from "@/components/RoleGate";
 import DashboardLayout, { type WorkspaceNavItem } from "@/components/DashboardLayout";
 import LanguageSelector from "@/components/LanguageSelector";
 import OperationsMap from "@/components/OperationsMap";
+import { SafetyAssistanceQueue } from "@/components/SafetyAssistanceQueue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { reconcileAvailability, reconcileMissionStatus } from "@/lib/operationalSync";
-import { Bell, Camera, CheckCircle2, ClipboardList, ClipboardPenLine, LocateFixed, MapPinned, MessageCircle, Navigation, Phone, Radio, Send, UserRoundCheck } from "lucide-react";
+import { Bell, Camera, CheckCircle2, ClipboardList, ClipboardPenLine, LocateFixed, MapPinned, MessageCircle, Navigation, Phone, Radio, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import React, { ChangeEvent, useEffect, useState } from "react";
@@ -28,6 +29,7 @@ function ResponderWorkspace() {
   const nav: WorkspaceNavItem[] = [
     { label: t("responder.missions"), path: "/responder", icon: ClipboardList },
     { label: t("responder.map"), path: "/responder/map", icon: MapPinned },
+    { label: "Safety requests", path: "/responder/safety", icon: ShieldCheck },
     { label: t("responder.alerts"), path: "/responder/alerts", icon: Bell },
   ];
   const utils = trpc.useUtils();
@@ -140,6 +142,7 @@ function ResponderWorkspace() {
 
   return <DashboardLayout navItems={nav} workspace={t("responder.workspace")} roleLabel={t("responder.role")}><div className="space-y-6">
     {location === "/responder/map" ? <section><PageHeading eyebrow={t("responder.map")} title={t("responder.mapTitle")} /><OperationsMap layers={layers.data} /></section>
+      : location === "/responder/safety" ? <SafetyAssistanceQueue title="Safety assistance requests" description="Review shelter, food, medical, and protection needs shared by people who are not reporting immediate SOS danger. Acknowledge only when you or the command team can begin a response." guidance={["Check current weather, flood-zone, and route conditions on the Operations Map before travelling.", "Use the SOS mission board for immediate danger; do not replace an active SOS assignment with a safety request.", "Acknowledge only after confirming a safe response route, team capacity, or command handoff."]} />
       : location === "/responder/alerts" ? <AlertsView items={alerts.data?.items ?? []} onRead={id => markRead.mutate({ notificationId: id })} />
           : <><section className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]"><div className="rounded-3xl bg-[#174e46] p-6 text-white shadow-[0_20px_60px_-30px_rgb(21_78_70/0.75)]"><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b1dbd1]">{t("responder.readiness")}</p><h1 className="mt-2 text-2xl font-extrabold tracking-tight">{profile.data?.callSign || t("responder.profilePending")}</h1><p className="mt-2 max-w-lg text-sm leading-6 text-[#c2e1d9]">{t("responder.readinessCopy")}</p><div className="mt-5 flex flex-wrap gap-2">{([['available',t('responder.available')],['on_mission',t('responder.onMission')],['off_duty',t('responder.offDuty')]] as const).map(([value, label]) => <button key={value} onClick={() => withCurrentLocation(value)} disabled={setAvailability.isPending || !profile.data} className={`rounded-xl px-4 py-2.5 text-sm font-extrabold transition ${profile.data?.availability === value ? 'bg-white text-[#174e46]' : 'bg-white/10 text-[#d8eee8] hover:bg-white/20'}`}>{setAvailability.isPending ? t("responder.updating") : label}</button>)}</div></div><AlertSetup unread={alerts.data?.unread ?? 0} state={pushState} detail={pushDetail} disabled={subscribePush.isPending || pushState === "subscribed"} onEnable={enableAlerts} /></section><ResponderProfileCard profile={profile.data ?? null} hasActiveMission={hasActiveMission} saving={updateProfile.isPending || setLocationSharing.isPending} onSave={input => updateProfile.mutate(input)} onLocationSharing={enabled => setLocationSharing.mutate({ enabled })} /><section><PageHeading eyebrow={t("responder.board")} title={t("responder.boardTitle")} /><div className="grid gap-3">{missions.data?.length ? missions.data.map(({ mission, incident }) => <article key={mission.id} className="grid gap-4 rounded-2xl border bg-white p-5 shadow-sm md:grid-cols-[1fr_auto]"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs font-medium text-primary">{incident.publicCode}</span><StatusBadge status={mission.status} /></div><h2 className="mt-2 text-lg font-extrabold">{incident.locationLabel}</h2><p className="mt-1 text-sm text-muted-foreground">{incident.peopleAffected} {t("responder.people")} · {incident.emergencyType} · <strong className={incident.severity === "critical" ? "text-destructive" : ""}>{incident.severity}</strong> {t("responder.priority")}</p>{mission.notes && <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">{mission.notes}</p>}</div><div className="flex items-center md:justify-end">{mission.status === "resolved" ? <span className="flex items-center gap-2 text-sm font-bold text-[#19755f]"><CheckCircle2 className="h-5 w-5" /> {t("responder.completed")}</span> : <Button disabled={updateMission.isPending} onClick={() => updateMission.mutate({ missionId: mission.id, status: mission.status === "pending" ? "dispatched" : "resolved" })} className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">{updateMission.isPending ? t("responder.updating") : mission.status === "pending" ? <><Navigation className="mr-2 h-4 w-4" /> {t("responder.dispatched")}</> : <><CheckCircle2 className="mr-2 h-4 w-4" /> {t("responder.resolved")}</>}</Button>}</div></article>) : <Empty text={t("responder.noMission")} />}</div></section></>}
   <ResponderMissionChat missions={missions.data ?? []} /></div></DashboardLayout>;

@@ -96,3 +96,22 @@
 - [x] Add data contracts and UI states for weather/flood conditions with honest source and availability messaging.
 - [x] Add regression coverage and responsive verification for the redesigned public and protected app shells.
 - [x] Match the Victim App visual hierarchy to the supplied reference: phone-first white canvas, oversized red SOS disc, compact green connection badge, rounded white utility cards, map preview, flood card, and four-icon bottom navigation.
+- [ ] Require a signed-in victim account before the public SOS action can initiate an emergency report.
+- [ ] Replace the multi-step SOS entry flow with a location-first rapid SOS that creates the alert immediately and redirects to its tracking view.
+- [ ] Preserve an honest failure state when GPS permission or connectivity prevents immediate SOS creation, without silently sending a location-less alert.
+- [ ] Add a protected current-request editor where the reporting victim can add people count, help needs, and optional details after the alert is active.
+- [ ] Review the attached interface code and apply only its relevant, safe visual or interaction patterns to the rapid SOS and tracking experience.
+- [ ] Add direct authorization and UI regressions for rapid-SOS login gating, creation, redirect, and post-alert editing.
+- [x] Review the attached Safety prototype and incorporate its relevant interaction patterns into the Victim App Safety page.
+- [x] Redesign Safety around actionable flood guidance, emergency contacts, preparedness, local alerts, and clear escalation actions.
+- [x] Connect Safety actions to authenticated rapid SOS, current conditions, and an auditable safety-assistance signal for operations.
+- [x] Add Government Command visibility and triage for safety-assistance signals without mixing them with confirmed SOS incidents.
+- [x] Add Medical and Rescuer workspace views for actionable safety guidance, emergency preparedness, and relevant assistance signals.
+- [x] Add authorization, safety-signal workflow, and responsive UI regression coverage across victim and operations roles.
+- [x] Add an honest live/local alerts and current-condition section to Safety using the existing weather and flood-condition contract.
+- [x] Add compact safety-preparedness guidance to Medical and Rescuer safety workspaces alongside their request queues.
+- [x] Add automated workflow coverage for safety-request ownership, operational status transitions, medical queue filtering, and rendered Safety UI states.
+- [x] Add a direct backend regression for medical-only safety queue filtering and broader government/field queue visibility.
+- [x] Add a direct regression for requester-owned Safety request views versus operations-only queue access.
+- [x] Add a router-level safety queue regression with mocked request rows for medical, government, and field callers.
+- [x] Add a router-level requester-view regression with mocked request rows for victim and operations callers.

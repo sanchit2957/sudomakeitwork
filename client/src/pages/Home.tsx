@@ -3,8 +3,11 @@ import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { blobToDataUrl, clearSosVoiceNote, readSosVoiceNote, saveSosVoiceNote, type SosVoiceNoteDraft } from "@/lib/sosVoiceNote";
+import { queueOfflineSos } from "@/lib/offlineSos";
 import { trpc } from "@/lib/trpc";
-import { CloudRain, MapPin, Mic, MoreHorizontal, Navigation, PhoneCall, ShieldCheck, Siren, Square, ThermometerSun, Waves, Wifi, WifiOff } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { startLogin } from "@/const";
+import { CloudRain, MapPin, Mic, MoreHorizontal, Navigation, PhoneCall, Radio, ShieldCheck, Siren, Square, ThermometerSun, Waves, Wifi, WifiOff } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -14,10 +17,14 @@ const guwahati: Point = { latitude: 26.1445, longitude: 91.7362 };
 export default function Home() {
   const [, setLocation] = useLocation();
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
   const [online, setOnline] = useState(() => navigator.onLine);
   const [position, setPosition] = useState<Point | null>(null);
   const [locationStatus, setLocationStatus] = useState<"finding" | "ready" | "unavailable">("finding");
+  const [rapidStatus, setRapidStatus] = useState<"idle" | "locating" | "sending" | "queued" | "error">("idle");
+  const [rapidNotice, setRapidNotice] = useState("");
   const conditions = trpc.rescue.emergency.conditions.useQuery(position ? { latitude: position.latitude, longitude: position.longitude } : {}, { refetchInterval: 15 * 60_000, refetchOnWindowFocus: true });
+  const createSos = trpc.rescue.emergency.create.useMutation();
 
   useEffect(() => {
     const sync = () => setOnline(navigator.onLine);
@@ -31,11 +38,37 @@ export default function Home() {
     return () => { window.removeEventListener("online", sync); window.removeEventListener("offline", sync); };
   }, []);
 
+  const startRapidSos = () => {
+    if (authLoading) return;
+    if (!user) { startLogin(); return; }
+    if (!navigator.geolocation) { setRapidStatus("error"); setRapidNotice(t("Location is required to send SOS. This device cannot provide location.")); return; }
+    setRapidStatus("locating"); setRapidNotice(t("Allow location to send SOS immediately."));
+    navigator.geolocation.getCurrentPosition(async result => {
+      const latitude = result.coords.latitude; const longitude = result.coords.longitude;
+      setPosition({ latitude, longitude }); setLocationStatus("ready");
+      const voiceNote = readSosVoiceNote();
+      const payload = { contactName: user.name || undefined, locationLabel: t("GPS location captured from this phone"), latitude, longitude, emergencyType: "flood" as const, severity: "high" as const, peopleAffected: 1, voiceNoteDataUrl: voiceNote?.dataUrl, voiceNoteDurationSeconds: voiceNote?.durationSeconds };
+      if (!navigator.onLine) {
+        const guestKey = localStorage.getItem("sudo-makeitwork-guest-key") || crypto.randomUUID().replaceAll("-", "");
+        localStorage.setItem("sudo-makeitwork-guest-key", guestKey);
+        queueOfflineSos({ ...payload, guestKey }); setRapidStatus("queued"); setRapidNotice(t("SOS is saved on this phone and will send automatically when connection returns.")); return;
+      }
+      try {
+        setRapidStatus("sending");
+        const created = await createSos.mutateAsync(payload);
+        clearSosVoiceNote();
+        setLocation(`/track?code=${created.publicCode}`);
+      } catch {
+        setRapidStatus("error"); setRapidNotice(t("SOS could not be sent. Check connection and try again."));
+      }
+    }, () => { setRapidStatus("error"); setRapidNotice(t("Location permission is needed before SOS can be sent.")); }, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 });
+  };
+
   const activePoint = position || guwahati;
   return <div className="min-h-screen bg-[#f6f8f7] text-[#142c2b]"><main className="relative mx-auto min-h-screen max-w-lg overflow-hidden bg-[#fcfdfd] px-5 pb-28 pt-6 shadow-2xl shadow-[#113c35]/10 md:my-6 md:min-h-[850px] md:rounded-[2.75rem] md:border">
     <header className="flex items-start justify-between gap-3"><button onClick={() => setLocation("/")} className="text-left"><span className="block text-2xl font-black tracking-[-0.06em]">sudo <span className="text-[#da3e42]">MakeItWork</span></span><span className="mt-1 block font-mono text-[9px] font-bold uppercase tracking-[0.17em] text-[#63817b]">Assam safety companion</span></button><div className="flex flex-col items-end gap-2"><LanguageSelector compact /><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ${online ? "bg-[#dff6e7] text-[#197b55]" : "bg-[#fff1dd] text-[#9b6519]"}`}>{online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}{online ? t("Connected") : t("Offline")}</span></div></header>
 
-    <section className="mt-6 flex flex-col items-center"><button onClick={() => setLocation("/emergency")} aria-label={t("Send SOS")} className="group grid h-44 w-44 place-items-center rounded-full bg-[#df3e43] text-white shadow-[0_20px_0_#b72f35,0_28px_48px_rgba(213,55,60,.34)] transition active:translate-y-2 active:shadow-[0_12px_0_#b72f35,0_18px_28px_rgba(213,55,60,.28)]"><span className="grid place-items-center"><Siren className="mb-1 h-7 w-7" /><span className="text-5xl font-black tracking-[-0.08em]">SOS</span><span className="mt-1 text-xs font-bold">{t("Tap for immediate help")}</span></span></button><p className="mt-6 flex items-center gap-2 rounded-full bg-[#fff3ef] px-3 py-1.5 text-[11px] font-bold text-[#a43d3e]"><Waves className="h-3.5 w-3.5" />{t("Use this only for an emergency")}</p></section>
+    <section className="mt-6 flex flex-col items-center"><button onClick={startRapidSos} disabled={authLoading || rapidStatus === "locating" || rapidStatus === "sending"} aria-label={t("Send SOS")} className="group grid h-44 w-44 place-items-center rounded-full bg-[#df3e43] text-white shadow-[0_20px_0_#b72f35,0_28px_48px_rgba(213,55,60,.34)] transition active:translate-y-2 active:shadow-[0_12px_0_#b72f35,0_18px_28px_rgba(213,55,60,.28)] disabled:cursor-wait disabled:opacity-80"><span className="grid place-items-center">{rapidStatus === "locating" || rapidStatus === "sending" ? <Radio className="mb-2 h-8 w-8 animate-pulse" /> : <Siren className="mb-1 h-7 w-7" />}<span className="text-5xl font-black tracking-[-0.08em]">SOS</span><span className="mt-1 text-xs font-bold">{rapidStatus === "locating" ? t("Getting location") : rapidStatus === "sending" ? t("Sending SOS") : user ? t("Tap for immediate help") : t("Sign in to activate")}</span></span></button><p className="mt-6 flex items-center gap-2 rounded-full bg-[#fff3ef] px-3 py-1.5 text-[11px] font-bold text-[#a43d3e]"><Waves className="h-3.5 w-3.5" />{t("Use this only for an emergency")}</p>{rapidNotice && <p role="status" className={`mt-3 max-w-xs text-center text-xs font-semibold leading-5 ${rapidStatus === "error" ? "text-[#b73f43]" : "text-[#38675d]"}`}>{rapidNotice}</p>}</section>
 
     <VoiceNoteCard />
     <LocationPreview point={activePoint} state={locationStatus} />

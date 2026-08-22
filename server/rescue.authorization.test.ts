@@ -12,7 +12,23 @@ function contextFor(role: "user" | "rescuer" | "medical" | "admin"): TrpcContext
   };
 }
 
+function anonymousContext(): TrpcContext {
+  return { user: null, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] };
+}
+
 describe("rescuer authorization", () => {
+  it("requires sign-in before a rapid SOS can be created", async () => {
+    const caller = appRouter.createCaller(anonymousContext());
+    await expect(caller.rescue.emergency.create({ locationLabel: "Verified location", latitude: 26.1445, longitude: 91.7362, emergencyType: "flood", severity: "high", peopleAffected: 1 })).rejects.toMatchObject<Partial<TRPCError>>({ code: "UNAUTHORIZED" });
+  });
+
+  it("requires sign-in for a safety-assistance request and operations access for its response queue", async () => {
+    const anonymous = appRouter.createCaller(anonymousContext());
+    await expect(anonymous.rescue.safety.createRequest({ category: "medical", peopleAffected: 1, latitude: 26.1445, longitude: 91.7362 })).rejects.toMatchObject<Partial<TRPCError>>({ code: "UNAUTHORIZED" });
+    const victim = appRouter.createCaller(contextFor("user"));
+    await expect(victim.rescue.safety.queue()).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });
+  });
+
   it("rejects an ordinary user from responder-only configuration", async () => {
     const caller = appRouter.createCaller(contextFor("user"));
     await expect(caller.rescue.rescuer.pushConfig()).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });

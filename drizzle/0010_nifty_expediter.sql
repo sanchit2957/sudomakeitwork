@@ -1,0 +1,1 @@
+ALTER TABLE `incidents` ADD `helpNeeds` text;

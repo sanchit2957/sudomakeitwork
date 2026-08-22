@@ -73,6 +73,7 @@ export const incidents = mysqlTable(
     longitude: double("longitude").notNull(),
     emergencyType: mysqlEnum("emergencyType", ["flood", "medical", "trapped", "evacuation", "other"])
       .notNull(),
+    helpNeeds: text("helpNeeds"),
     severity: mysqlEnum("severity", ["critical", "high", "medium", "low"]).default("medium").notNull(),
     peopleAffected: int("peopleAffected").default(1).notNull(),
     notes: text("notes"),
@@ -140,6 +141,25 @@ export const incidentEvents = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => [index("incidentEvents_incidentId_createdAt_idx").on(table.incidentId, table.createdAt)],
+);
+
+export const safetyAssistanceRequests = mysqlTable(
+  "safetyAssistanceRequests",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requesterId: int("requesterId").notNull().references(() => users.id),
+    category: mysqlEnum("category", ["shelter", "food", "medical", "protection"]).notNull(),
+    peopleAffected: int("peopleAffected").default(1).notNull(),
+    details: text("details"),
+    latitude: double("latitude").notNull(),
+    longitude: double("longitude").notNull(),
+    status: mysqlEnum("status", ["new", "acknowledged", "resolved"]).default("new").notNull(),
+    reviewedBy: int("reviewedBy").references(() => users.id),
+    reviewedAt: timestamp("reviewedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("safetyAssistanceRequests_status_createdAt_idx").on(table.status, table.createdAt), index("safetyAssistanceRequests_category_status_idx").on(table.category, table.status)],
 );
 
 export const shelters = mysqlTable(
