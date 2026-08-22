@@ -3,7 +3,8 @@ import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { blobToDataUrl, clearSosVoiceNote, readSosVoiceNote, saveSosVoiceNote, type SosVoiceNoteDraft } from "@/lib/sosVoiceNote";
-import { queueOfflineSos } from "@/lib/offlineSos";
+import { flushOfflineSos, queueOfflineSos } from "@/lib/offlineSos";
+import { createAndRedirectAfterRapidSos, redirectAfterRapidSos } from "@/lib/rapidSos";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
@@ -38,6 +39,18 @@ export default function Home() {
     return () => { window.removeEventListener("online", sync); window.removeEventListener("offline", sync); };
   }, []);
 
+  useEffect(() => {
+    if (!online || !user) return;
+    void flushOfflineSos(payload => createSos.mutateAsync(payload)).then(result => {
+      const deliveredCode = result.delivered[0];
+      if (!deliveredCode) return;
+      clearSosVoiceNote();
+      setRapidStatus("idle");
+      setRapidNotice("");
+      redirectAfterRapidSos(deliveredCode, setLocation);
+    });
+  }, [online, user?.id]);
+
   const startRapidSos = () => {
     if (authLoading) return;
     if (!user) { startLogin(); return; }
@@ -55,9 +68,8 @@ export default function Home() {
       }
       try {
         setRapidStatus("sending");
-        const created = await createSos.mutateAsync(payload);
+        await createAndRedirectAfterRapidSos({ payload, createSos: createSos.mutateAsync, navigate: setLocation });
         clearSosVoiceNote();
-        setLocation(`/track?code=${created.publicCode}`);
       } catch {
         setRapidStatus("error"); setRapidNotice(t("SOS could not be sent. Check connection and try again."));
       }
@@ -74,6 +86,11 @@ export default function Home() {
     <LocationPreview point={activePoint} state={locationStatus} />
     <FloodConditions conditions={conditions.data} loading={conditions.isLoading} />
   </main><VictimNavigation current="home" /></div>;
+}
+
+export function RapidSosControl({ authenticated, authLoading, status, notice, onActivate }: { authenticated: boolean; authLoading: boolean; status: "idle" | "locating" | "sending" | "queued" | "error"; notice: string; onActivate: () => void }) {
+  const { t } = useLanguage();
+  return <section className="mt-6 flex flex-col items-center"><button onClick={onActivate} disabled={authLoading || status === "locating" || status === "sending"} aria-label={t("Send SOS")} className="group grid h-44 w-44 place-items-center rounded-full bg-[#df3e43] text-white"><span className="grid place-items-center">{status === "locating" || status === "sending" ? <Radio className="mb-2 h-8 w-8 animate-pulse" /> : <Siren className="mb-1 h-7 w-7" />}<span className="text-5xl font-black tracking-[-0.08em]">SOS</span><span className="mt-1 text-xs font-bold">{status === "locating" ? t("Getting location") : status === "sending" ? t("Sending SOS") : authenticated ? t("Tap for immediate help") : t("Sign in to activate")}</span></span></button><p className="mt-6 flex items-center gap-2 rounded-full bg-[#fff3ef] px-3 py-1.5 text-[11px] font-bold text-[#a43d3e]"><Waves className="h-3.5 w-3.5" />{t("Use this only for an emergency")}</p>{notice && <p role="status" className={`mt-3 max-w-xs text-center text-xs font-semibold leading-5 ${status === "error" ? "text-[#b73f43]" : "text-[#38675d]"}`}>{notice}</p>}</section>;
 }
 
 function VoiceNoteCard() {

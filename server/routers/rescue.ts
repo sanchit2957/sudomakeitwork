@@ -33,6 +33,7 @@ import { storagePut } from "../storage";
 import { getGuestSosRateLimitDecision, isAllowedMissionTransition } from "../rescue.policy";
 import { hasValidHospitalCapacity } from "../hospital.policy";
 import { canRequestRescuerRegistration, requiresCallSign } from "../registration.policy";
+import { mayEditPostAlertDetails } from "../post-alert-details.policy";
 import { mayShareLiveMissionLocation, presentAssignedRescuerToVictim } from "../rescuer-profile.policy";
 import { canHandleSafetyAssistance, canTransitionSafetyAssistance, isSafetyRequestOwnedBy, visibleSafetyCategoriesForRole } from "../safety-assistance.policy";
 import { sendRescuerPush } from "../push";
@@ -235,14 +236,13 @@ export const rescueRouter = router({
     myDetailsByCode: protectedProcedure.input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) })).query(async ({ input, ctx }) => {
       const incident = await getIncidentByCode(input.publicCode);
       if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
-      if (incident.reporterId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Only the SOS reporter can view these request details." });
+      if (!mayEditPostAlertDetails(incident.reporterId, ctx.user.id, incident.status)) throw new TRPCError({ code: incident.reporterId !== ctx.user.id ? "FORBIDDEN" : "BAD_REQUEST", message: incident.reporterId !== ctx.user.id ? "Only the SOS reporter can view these request details." : "This SOS has already been resolved." });
       return { publicCode: incident.publicCode, status: incident.status, peopleAffected: incident.peopleAffected, emergencyType: incident.emergencyType, helpNeeds: incident.helpNeeds, notes: incident.notes, contactName: incident.contactName };
     }),
     updateMyDetails: protectedProcedure.input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/), peopleAffected: z.number().int().min(1).max(500), emergencyType: z.enum(["flood", "medical", "trapped", "evacuation", "other"]), helpNeeds: z.string().trim().max(1000).optional(), notes: z.string().trim().max(2000).optional(), contactName: z.string().trim().max(160).optional() })).mutation(async ({ input, ctx }) => {
       const incident = await getIncidentByCode(input.publicCode);
       if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
-      if (incident.reporterId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Only the SOS reporter can update this request." });
-      if (incident.status === "resolved") throw new TRPCError({ code: "BAD_REQUEST", message: "This SOS has already been resolved." });
+      if (!mayEditPostAlertDetails(incident.reporterId, ctx.user.id, incident.status)) throw new TRPCError({ code: incident.reporterId !== ctx.user.id ? "FORBIDDEN" : "BAD_REQUEST", message: incident.reporterId !== ctx.user.id ? "Only the SOS reporter can update this request." : "This SOS has already been resolved." });
       const db = await database();
       await db.update(incidents).set({ peopleAffected: input.peopleAffected, emergencyType: input.emergencyType, helpNeeds: input.helpNeeds || null, notes: input.notes || null, contactName: input.contactName || null }).where(eq(incidents.id, incident.id));
       await addIncidentEvent(incident.id, ctx.user.id, "victim_details_updated", "Victim updated request details", "People count, help needs, or notes were added after SOS activation.");

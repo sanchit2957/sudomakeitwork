@@ -96,12 +96,17 @@
 - [x] Add data contracts and UI states for weather/flood conditions with honest source and availability messaging.
 - [x] Add regression coverage and responsive verification for the redesigned public and protected app shells.
 - [x] Match the Victim App visual hierarchy to the supplied reference: phone-first white canvas, oversized red SOS disc, compact green connection badge, rounded white utility cards, map preview, flood card, and four-icon bottom navigation.
-- [ ] Require a signed-in victim account before the public SOS action can initiate an emergency report.
-- [ ] Replace the multi-step SOS entry flow with a location-first rapid SOS that creates the alert immediately and redirects to its tracking view.
-- [ ] Preserve an honest failure state when GPS permission or connectivity prevents immediate SOS creation, without silently sending a location-less alert.
-- [ ] Add a protected current-request editor where the reporting victim can add people count, help needs, and optional details after the alert is active.
-- [ ] Review the attached interface code and apply only its relevant, safe visual or interaction patterns to the rapid SOS and tracking experience.
-- [ ] Add direct authorization and UI regressions for rapid-SOS login gating, creation, redirect, and post-alert editing.
+- [x] Require a signed-in victim account before the public SOS action can initiate an emergency report.
+- [x] Replace the multi-step SOS entry flow with a location-first rapid SOS that creates the alert immediately and redirects to its tracking view.
+- [x] Preserve an honest failure state when GPS permission or connectivity prevents immediate SOS creation, without silently sending a location-less alert.
+- [x] Add a protected current-request editor where the reporting victim can add people count, help needs, and optional details after the alert is active.
+- [x] Review the attached interface code and apply only its relevant, safe visual or interaction patterns to the rapid SOS and tracking experience.
+- [x] Add direct authorization and UI regressions for rapid-SOS login gating, creation, redirect, and post-alert editing.
+- [x] Add a direct Home UI regression for rapid-SOS login gating and visible GPS-permission failure messaging.
+- [x] Add a direct rapid-SOS mutation regression for successful creation redirecting to the private tracking code.
+- [x] Add router-level regressions for reporter-only post-alert details on active versus resolved SOS records.
+- [x] Add a direct rapid-SOS success-path regression that mocks successful SOS creation and verifies the Home rapid-SOS flow navigates to the private tracking code after the mutation resolves.
+- [x] Add a true Home interaction regression that mocks authenticated location capture and successful SOS mutation before asserting tracking navigation.
 - [x] Review the attached Safety prototype and incorporate its relevant interaction patterns into the Victim App Safety page.
 - [x] Redesign Safety around actionable flood guidance, emergency contacts, preparedness, local alerts, and clear escalation actions.
 - [x] Connect Safety actions to authenticated rapid SOS, current conditions, and an auditable safety-assistance signal for operations.
