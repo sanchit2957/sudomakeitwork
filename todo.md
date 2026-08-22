@@ -162,3 +162,6 @@
 - [x] Audit all public and protected routes for incomplete dark-theme styling, unreadable text, and low-contrast interactive states.
 - [x] Replace brittle page-specific dark-mode treatment with robust neutral semantic surface, text, border, and control overrides.
 - [x] Add dark-theme regressions, complete desktop/mobile visual checks, and save a checkpoint for the contrast repair.
+- [x] Diagnose why selected languages are not applying or persisting across the Victim and Operations interfaces.
+- [x] Repair language-selector state, route persistence, and translation lookup coverage for supported Indian languages.
+- [x] Add regression coverage, verify browser language switching across routes, and save a checkpoint for the multilingual repair.

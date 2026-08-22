@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { currentInterfaceTerms } from "./currentInterfaceTerms";
 
 export type Locale = "en" | "as" | "hi" | "bn" | "or" | "mr" | "gu" | "ta" | "te" | "kn";
 
@@ -526,7 +527,7 @@ export function resolveLocale(value: string | null | undefined): Locale {
 }
 
 export function translate(locale: Locale, key: string, values?: Record<string, string | number>, operationalTerms?: Partial<Record<Locale, Record<string, string>>>): string {
-  const template = operationalTerms?.[locale]?.[key] || messages[locale][key] || universalTerms[key]?.[locale] || messages.en[key] || key;
+  const template = operationalTerms?.[locale]?.[key] || currentInterfaceTerms[locale][key] || messages[locale][key] || universalTerms[key]?.[locale] || messages.en[key] || key;
   return values ? Object.entries(values).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), template) : template;
 }
 
@@ -534,7 +535,7 @@ type LanguageContextValue = { locale: Locale; setLocale: (locale: Locale) => voi
 const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocale] = useState<Locale>(() => {
+  const [locale, setLocaleState] = useState<Locale>(() => {
     const requested = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("lang");
     if (requested && localeOptions.some(option => option.code === requested)) return requested as Locale;
     const stored = typeof window === "undefined" ? null : localStorage.getItem(storageKey);
@@ -543,6 +544,15 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return resolveLocale(browser);
   });
   const [operationalTerms, setOperationalTerms] = useState<Partial<Record<Locale, Record<string, string>>>>({});
+
+  const setLocale = useCallback((nextLocale: Locale) => {
+    const next = resolveLocale(nextLocale);
+    setLocaleState(next);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", next);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
   useEffect(() => {
     void fetch("/manus-storage/operational-language-pack_86163712.json")
@@ -557,7 +567,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, [locale]);
 
   useEffect(() => {
-    const terms = operationalTerms[locale];
+    const terms = { ...currentInterfaceTerms[locale], ...operationalTerms[locale] };
     if (!terms || !Object.keys(terms).length) return;
     const applyText = (node: Text) => {
       const parent = node.parentElement;

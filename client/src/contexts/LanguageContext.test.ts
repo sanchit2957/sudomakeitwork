@@ -28,6 +28,16 @@ describe("platform language support", () => {
     }
   });
 
+  it("translates the current panic-first interface and shared navigation in every supported locale", () => {
+    for (const { code } of localeOptions.filter(option => option.code !== "en")) {
+      expect(translate(code, "Sign in to activate")).not.toBe("Sign in to activate");
+      expect(translate(code, "Record voice note")).not.toBe("Record voice note");
+      expect(translate(code, "Your rescue flow")).not.toBe("Your rescue flow");
+      expect(translate(code, "Track")).not.toBe("Track");
+      expect(translate(code, "Switch to dark theme")).not.toBe("Switch to dark theme");
+    }
+  });
+
   it("resolves managed mission and Command Centre approval labels for every supported locale", () => {
     const operationalTerms = Object.fromEntries(localeOptions.map(({ code }) => [code, {
       "Mark dispatched": `${code}-dispatch`,
@@ -47,6 +57,7 @@ describe("platform language support", () => {
     const source = readFileSync(new URL("./LanguageContext.tsx", import.meta.url), "utf8");
     expect(source).toContain('localStorage.setItem(storageKey, locale)');
     expect(source).toContain('document.documentElement.lang = locale');
+    expect(source).toContain('url.searchParams.set("lang", next)');
     expect(source).toContain('/manus-storage/operational-language-pack_86163712.json');
     expect(source).toContain('data-no-operational-translation');
     expect(source).toContain('localeOptions.some(option => option.code === requested)');
