@@ -13,6 +13,7 @@ import More from "./pages/More";
 import Responder from "./pages/Responder";
 import Safety from "./pages/Safety";
 import Track from "./pages/Track";
+import TrackFlow from "./pages/TrackFlow";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -20,7 +21,7 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path={"/emergency"} component={Emergency} />
-      <Route path={"/track"} component={Track} />
+      <Route path={"/track"} component={TrackFlow} />
       <Route path={"/safety"} component={Safety} />
       <Route path={"/more"} component={More} />
       <Route path={"/medical/:rest*"} component={Medical} />

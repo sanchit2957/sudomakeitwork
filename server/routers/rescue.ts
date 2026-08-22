@@ -85,7 +85,7 @@ function readProfilePhoto(dataUrl?: string | null) {
 
 function readVoiceNote(dataUrl?: string, durationSeconds?: number) {
   if (!dataUrl) return null;
-  const matched = /^data:(audio\/(?:webm|ogg|mp4));base64,([A-Za-z0-9+/=\s]+)$/.exec(dataUrl);
+  const matched = /^data:(audio\/(?:webm|ogg|mp4))(?:;codecs=[A-Za-z0-9._-]+)?;base64,([A-Za-z0-9+/=\s]+)$/.exec(dataUrl);
   if (!matched) throw new TRPCError({ code: "BAD_REQUEST", message: "Voice notes must be recorded as WebM, OGG, or M4A audio." });
   const bytes = Buffer.from(matched[2].replace(/\s/g, ""), "base64");
   if (bytes.byteLength > 3_000_000) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Voice notes must be 3 MB or smaller." });
@@ -153,16 +153,21 @@ export const rescueRouter = router({
         endpoint.searchParams.set("latitude", String(latitude));
         endpoint.searchParams.set("longitude", String(longitude));
         endpoint.searchParams.set("current", "temperature_2m,precipitation,weather_code,wind_speed_10m");
-        endpoint.searchParams.set("daily", "precipitation_probability_max,precipitation_sum,weather_code");
-        endpoint.searchParams.set("forecast_days", "1");
+        endpoint.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,weather_code,wind_speed_10m_max");
+        endpoint.searchParams.set("past_days", "7");
+        endpoint.searchParams.set("forecast_days", "7");
         endpoint.searchParams.set("timezone", "auto");
         const response = await fetch(endpoint, { signal: AbortSignal.timeout(8_000), headers: { accept: "application/json" } });
         if (!response.ok) throw new Error(`Weather source responded ${response.status}`);
-        const weather = await response.json() as { current?: { temperature_2m?: number; precipitation?: number; weather_code?: number; wind_speed_10m?: number }; daily?: { precipitation_probability_max?: number[]; precipitation_sum?: number[] } };
+        const weather = await response.json() as { current?: { temperature_2m?: number; precipitation?: number; weather_code?: number; wind_speed_10m?: number }; daily?: { time?: string[]; temperature_2m_max?: number[]; temperature_2m_min?: number[]; precipitation_probability_max?: number[]; precipitation_sum?: number[]; weather_code?: number[]; wind_speed_10m_max?: number[] } };
         const rainChance = weather.daily?.precipitation_probability_max?.[0] ?? null;
         const rainAmount = weather.daily?.precipitation_sum?.[0] ?? null;
         const risk = rainChance !== null && (rainChance >= 80 || (rainAmount ?? 0) >= 40) ? "high" : rainChance !== null && (rainChance >= 50 || (rainAmount ?? 0) >= 15) ? "elevated" : "normal";
-        return { available: true, source: "Open-Meteo weather model", updatedAt: new Date(), risk, activeFloodZones: activeZones.length, current: { temperatureC: weather.current?.temperature_2m ?? null, precipitationMm: weather.current?.precipitation ?? null, windKmh: weather.current?.wind_speed_10m ?? null, weatherCode: weather.current?.weather_code ?? null }, forecast: { rainChance, rainAmountMm: rainAmount }, river: { available: false as const } };
+        const daily = weather.daily;
+        const dailyRows = (daily?.time || []).map((date, index) => ({ date, temperatureHighC: daily?.temperature_2m_max?.[index] ?? null, temperatureLowC: daily?.temperature_2m_min?.[index] ?? null, rainChance: daily?.precipitation_probability_max?.[index] ?? null, rainMm: daily?.precipitation_sum?.[index] ?? null, windKmh: daily?.wind_speed_10m_max?.[index] ?? null, weatherCode: daily?.weather_code?.[index] ?? null }));
+        const forecastDays = dailyRows.slice(-7);
+        const trendDays = dailyRows.slice(0, Math.max(0, dailyRows.length - 7)).slice(-7);
+        return { available: true, source: "Open-Meteo weather model", updatedAt: new Date(), risk, activeFloodZones: activeZones.length, current: { temperatureC: weather.current?.temperature_2m ?? null, precipitationMm: weather.current?.precipitation ?? null, windKmh: weather.current?.wind_speed_10m ?? null, weatherCode: weather.current?.weather_code ?? null }, forecast: { rainChance, rainAmountMm: rainAmount, days: forecastDays }, trend: { source: "Modelled daily weather history", days: trendDays }, river: { available: false as const, levelMetres: null, trend: null, updatedAt: null, message: "No official river-gauge feed is connected yet." } };
       } catch {
         return { available: false, source: "Weather source unavailable", updatedAt: new Date(), risk: "unknown" as const, activeFloodZones: activeZones.length, current: { temperatureC: null, precipitationMm: null, windKmh: null, weatherCode: null }, forecast: { rainChance: null, rainAmountMm: null }, river: { available: false as const } };
       }
@@ -271,7 +276,7 @@ export const rescueRouter = router({
       const db = await database();
       const [shelterRows, hospitalRows] = await Promise.all([
         db.select({ id: shelters.id, name: shelters.name, address: shelters.address, latitude: shelters.latitude, longitude: shelters.longitude, capacity: shelters.capacity, occupancy: shelters.occupancy, status: shelters.status }).from(shelters).where(and(eq(shelters.status, "open"))),
-        db.select({ id: hospitals.id, name: hospitals.name, address: hospitals.address, latitude: hospitals.latitude, longitude: hospitals.longitude, availableEmergencyBeds: hospitals.availableEmergencyBeds, availableIcuBeds: hospitals.availableIcuBeds, status: hospitals.status }).from(hospitals).where(and(eq(hospitals.status, "open"))),
+        db.select({ id: hospitals.id, name: hospitals.name, address: hospitals.address, latitude: hospitals.latitude, longitude: hospitals.longitude, totalEmergencyBeds: hospitals.totalEmergencyBeds, availableEmergencyBeds: hospitals.availableEmergencyBeds, totalIcuBeds: hospitals.totalIcuBeds, availableIcuBeds: hospitals.availableIcuBeds, oxygenCylinderCount: hospitals.oxygenCylinderCount, bloodUnitCount: hospitals.bloodUnitCount, ambulanceCount: hospitals.ambulanceCount, status: hospitals.status, updatedAt: hospitals.updatedAt }).from(hospitals).where(and(eq(hospitals.status, "open"))),
       ]);
       return { shelters: shelterRows, hospitals: hospitalRows };
     }),

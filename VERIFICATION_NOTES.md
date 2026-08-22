@@ -107,3 +107,18 @@ Post-change mobile checks were completed at 375px. The Victim map preview retain
 The device reported coordinates outside Assam, which explained why the prior state-boundary release blocked the current-location weather query and made the preview appear not to refresh. At the user’s request, the Assam geofence is now temporarily disabled across the platform: shared map camera restriction, Operations boundary overlay and filters, map-click filtering, resource filtering, and all server-side Assam coordinate rejections have been removed. The preserved boundary module remains available for a future re-enable.
 
 The shared map now recentres and adjusts zoom whenever its `initialCenter` changes; the Victim preview additionally remounts its map when a newly acquired device coordinate arrives. Direct browser-style coverage verifies that an unrestricted map constructor receives no geographic restriction, that it recentres to a refreshed coordinate, and that the rapid SOS flow accepts an out-of-Assam device position during this temporary configuration. TypeScript validation and all **28** Vitest files / **68** tests passed.
+
+## Ongoing SOS, weather, and tracking upgrade
+
+At 375px, the SOS control displays as a fixed circular control with no clipping, while the refreshed Track entry shows the saved-on-device, code-free rescue-flow empty state and direct return-to-SOS action. The Home viewport remains intentionally compact; the richer conditions card continues below the initial map preview and is covered by a dedicated interaction regression for its river transparency, seven-day forecast, and expandable trend graph.
+
+## Deferred Email OTP activation
+
+The requested removal of remote Google entry from protected Admin, Medical, and Rescuer login flows was assessed against a real Email OTP path. The free Resend transactional tier permits 100 emails per day and 3,000 per month, but requires a domain the operator owns and verifies before it can send production messages.[1] [2] The operator confirmed that no such domain is currently available and chose not to use a paid delivery dependency.
+
+Accordingly, the platform retains the current provider-backed secure sign-in rather than displaying an OTP form that cannot deliver a code. Unauthenticated protected routes now present clearly separated Government Command, Medical Operations, and Rescuer secure-access portals; their underlying authorization restrictions are unchanged. Email OTP can be enabled later by adding a verified domain, `RESEND_API_KEY`, and `OTP_EMAIL_FROM` without changing role authorization policy.
+
+[1]: https://resend.com/docs/knowledge-base/account-quotas-and-limits
+[2]: https://resend.com/docs/dashboard/domains/introduction
+
+Final 375px full-page verification showed the circular SOS control, rainfall/wind readings, transparent unavailable river level, clickable seven-day trend entry, and seven-day forecast rendering without overflow. Safety opened directly on Medical support and showed the verified-empty-resource state rather than fabricated hospitals. Track opened as a code-free rescue-flow view with the saved-on-device empty state until a real SOS is created.

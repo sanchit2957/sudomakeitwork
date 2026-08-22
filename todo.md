@@ -132,3 +132,15 @@
 - [x] Add regression coverage, verify the corrected location preview, and save a checkpoint.
 - [x] Temporarily disable Assam-only map camera restrictions, location filters, and server-side coordinate rejections.
 - [x] Verify the map preview accepts the device’s current location again and save a checkpoint for this temporary configuration.
+- [x] Restore a consistently circular SOS control and remove the post-recording voice-note connectivity glitch.
+- [x] Extend local conditions with transparent river-status messaging, rainfall in millimetres, wind speed, a seven-day trend visual, and weather forecast.
+- [x] Replace tracking-code-led Victim tracking entry with a persistent visual rescue-flow experience and automatic assigned-rescuer details.
+- [x] Show nearby hospitals by default in Safety with current capacity, resource availability, and last-updated time sourced from Medical Operations updates.
+- [x] Assess separate Admin, Medical, and Rescuer authentication entry designs while preserving secure account authorization; adopted role-specific secure-access portals.
+- [x] Add regression coverage, responsive verification, and a checkpoint for the complete experience upgrade.
+- [x] Defer user-selectable Email OTP or Phone OTP pages because the operator has no domain available for verified production email delivery.
+- [x] Defer real Email OTP delivery and verification without retaining remote Google sign-in interfaces until a verifiable sender domain is available.
+- [x] Defer Email OTP-only implementation; Phone OTP remains out of scope by user choice.
+- [x] Assess the no-cost Email OTP tier; its required owned-and-verified sender domain is not currently available.
+- [x] Retain the current secure provider-backed sign-in behind separate Admin, Medical, and Rescuer access portals until Email OTP can be verified with an owned domain.
+- [x] Document that Email OTP remains deferred pending a verifiable sending domain and Resend credentials.
