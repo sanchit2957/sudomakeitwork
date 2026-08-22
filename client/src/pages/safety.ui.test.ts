@@ -33,6 +33,8 @@ describe("Safety local alert UI", () => {
     expect(source).toContain("foodSupplyStatus");
     expect(source).toContain("medicineSupplyStatus");
     expect(source).toContain("No verified hospital listed nearby");
+    expect(source).toContain("https://www.google.com/maps/dir/?api=1&destination=${hospital.latitude},${hospital.longitude}");
+    expect(source).toContain("Open Google Maps directions to ${hospital.name}");
     expect(source.indexOf("<VerifiedMedicalCare")).toBeLessThan(source.indexOf("<SafetyConditionsCard"));
     expect(source).not.toContain("Safety plan");
     expect(source).not.toContain("Three things to check now");

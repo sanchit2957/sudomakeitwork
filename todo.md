@@ -174,3 +174,4 @@
 - [x] Add authorization and UI regressions, verify public/approved-staff flows, and save a checkpoint for the hospital-resource release.
 - [x] Move verified nearby medical care above local alerts and remove the device-only Safety Plan checklist.
 - [x] Update Safety regressions, visually verify the simplified mobile layout, and save a checkpoint.
+- [x] Add an accessible Google Maps directions action beside each verified hospital name in Safety, with regression and mobile verification.
