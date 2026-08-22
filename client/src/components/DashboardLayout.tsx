@@ -39,7 +39,7 @@ export default function DashboardLayout({ children, navItems, workspace, roleLab
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible={desktopSidebar === "fixed" ? "none" : "icon"} className="border-r border-r-border bg-[#f7fbf9] dark:bg-[#102521]">
+      <Sidebar collapsible={desktopSidebar === "fixed" ? "none" : "icon"} className="border-r border-r-border bg-[#f7fbf9] dark:bg-[#101011]">
         <SidebarHeader className="p-4">
           <div className="flex items-center gap-1">
             <button onClick={() => setLocation("/")} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 text-left hover:bg-secondary/70 group-data-[collapsible=icon]:justify-center">
@@ -59,16 +59,16 @@ export default function DashboardLayout({ children, navItems, workspace, roleLab
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-4">
-          <div className="rounded-2xl bg-[#e9f2ee] p-2 group-data-[collapsible=icon]:bg-[#e9f2ee] dark:bg-[#1a3932] dark:group-data-[collapsible=icon]:bg-[#1a3932]">
-            <div className="flex items-center gap-2.5"><Avatar className="h-9 w-9 border border-border"><AvatarFallback className="bg-white text-xs font-bold text-primary dark:bg-[#264a41]">{user.name?.slice(0, 1).toUpperCase() || "U"}</AvatarFallback></Avatar><div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><p className="truncate text-sm font-bold">{user.name || "Authorized user"}</p><p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{roleLabel}</p></div></div>
-            <button onClick={logout} className="mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-white hover:text-destructive dark:hover:bg-[#264a41] group-data-[collapsible=icon]:hidden"><LogOut className="h-3.5 w-3.5" /> {t("dashboard.signOut")}</button>
+          <div className="rounded-2xl bg-[#e9f2ee] p-2 group-data-[collapsible=icon]:bg-[#e9f2ee] dark:bg-[#1b1b1d] dark:group-data-[collapsible=icon]:bg-[#1b1b1d]">
+            <div className="flex items-center gap-2.5"><Avatar className="h-9 w-9 border border-border"><AvatarFallback className="bg-white text-xs font-bold text-primary dark:bg-[#29292d]">{user.name?.slice(0, 1).toUpperCase() || "U"}</AvatarFallback></Avatar><div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><p className="truncate text-sm font-bold">{user.name || "Authorized user"}</p><p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{roleLabel}</p></div></div>
+            <button onClick={logout} className="mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-white hover:text-destructive dark:hover:bg-[#29292d] group-data-[collapsible=icon]:hidden"><LogOut className="h-3.5 w-3.5" /> {t("dashboard.signOut")}</button>
           </div>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset className="min-h-screen bg-background">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/70 bg-background/85 px-4 backdrop-blur md:px-7">
           <div className="flex items-center gap-3"><SidebarTrigger className="md:hidden"><Menu className="h-4 w-4" /></SidebarTrigger><div><p className="text-sm font-extrabold tracking-tight">{workspace}</p><p className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">{t("dashboard.liveWorkspace")}</p></div></div>
-          <div className="flex items-center gap-2"><LanguageSelector compact /><div className="flex items-center gap-2 rounded-full bg-[#d9f1e7] px-3 py-1.5 text-xs font-bold text-[#176154] dark:bg-[#1b493e] dark:text-[#bce9da]"><span className="h-2 w-2 rounded-full bg-[#43c69c]" /> {t("general.live")}</div></div>
+          <div className="flex items-center gap-2"><LanguageSelector compact /><div className="flex items-center gap-2 rounded-full bg-[#d9f1e7] px-3 py-1.5 text-xs font-bold text-[#176154] dark:bg-[#242426] dark:text-[#e4e4e7]"><span className="h-2 w-2 rounded-full bg-[#43c69c]" /> {t("general.live")}</div></div>
         </header>
         <main className="workspace-surface p-4 md:p-7">{children}</main>
       </SidebarInset>

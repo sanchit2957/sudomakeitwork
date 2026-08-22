@@ -154,3 +154,5 @@
 - [x] Add a persistent light/dark theme control beside the language selector across Victim and Operations experiences.
 - [x] Apply accessible light and dark surfaces to all page shells and shared workspace components.
 - [x] Add theme persistence regressions, visually verify both modes, and save a checkpoint.
+- [x] Replace green-tinted dark-mode surfaces with a true black and charcoal palette across Victim and Operations experiences.
+- [x] Verify contrast and consistency of the corrected black dark theme, then save a checkpoint.

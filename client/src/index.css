@@ -53,23 +53,23 @@
 }
 
 .dark {
-  --background: oklch(0.16 0.025 166);
-  --foreground: oklch(0.94 0.018 164);
-  --card: oklch(0.21 0.028 166);
-  --card-foreground: oklch(0.94 0.018 164);
-  --popover: oklch(0.22 0.03 166);
-  --popover-foreground: oklch(0.94 0.018 164);
-  --primary: oklch(0.77 0.1 168);
-  --primary-foreground: oklch(0.16 0.025 166);
-  --secondary: oklch(0.28 0.04 166);
-  --secondary-foreground: oklch(0.91 0.025 164);
-  --muted: oklch(0.26 0.024 166);
-  --muted-foreground: oklch(0.72 0.025 166);
-  --accent: oklch(0.34 0.07 166);
-  --accent-foreground: oklch(0.95 0.014 164);
+  --background: oklch(0.09 0 0);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.15 0 0);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.17 0 0);
+  --popover-foreground: oklch(0.95 0 0);
+  --primary: oklch(0.79 0.08 168);
+  --primary-foreground: oklch(0.1 0 0);
+  --secondary: oklch(0.21 0 0);
+  --secondary-foreground: oklch(0.92 0 0);
+  --muted: oklch(0.19 0 0);
+  --muted-foreground: oklch(0.71 0 0);
+  --accent: oklch(0.28 0 0);
+  --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.72 0.15 28);
-  --border: oklch(0.34 0.03 166);
-  --input: oklch(0.34 0.03 166);
+  --border: oklch(0.3 0 0);
+  --input: oklch(0.3 0 0);
   --ring: oklch(0.77 0.1 168);
   color-scheme: dark;
 }
@@ -77,15 +77,15 @@
 * { border-color: var(--border); }
 html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; background: var(--background); color: var(--foreground); }
-.dark .app-grid { background-image: linear-gradient(to right, rgb(165 232 213 / 0.06) 1px, transparent 1px), linear-gradient(to bottom, rgb(165 232 213 / 0.06) 1px, transparent 1px); }
-.dark .victim-page { background: #081b18; color: #e6f5ef; }
-.dark .victim-main { background: #102622; color: #e6f5ef; }
-.dark .workspace-surface [class~="bg-white"] { background-color: #17332d !important; }
-.dark .workspace-surface [class~="bg-card"] { background-color: #17332d !important; }
-.dark .workspace-surface [class~="text-black"] { color: #e6f5ef !important; }
-.dark main.bg-\[\#fcfdfd\] { background-color: #102622 !important; color: #e6f5ef; }
-.dark div.bg-\[\#f6f8f7\] { background-color: #081b18 !important; }
-.dark nav[aria-label="Victim App navigation"] { border-color: #2a5148; background-color: rgb(18 45 39 / 0.95); }
+.dark .app-grid { background-image: linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px), linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px); }
+.dark .victim-page { background: #050505; color: #f4f4f5; }
+.dark .victim-main { background: #101011; color: #f4f4f5; }
+.dark .workspace-surface [class~="bg-white"] { background-color: #1a1a1c !important; }
+.dark .workspace-surface [class~="bg-card"] { background-color: #1a1a1c !important; }
+.dark .workspace-surface [class~="text-black"] { color: #f4f4f5 !important; }
+.dark main.bg-\[\#fcfdfd\] { background-color: #101011 !important; color: #f4f4f5; }
+.dark div.bg-\[\#f6f8f7\] { background-color: #050505 !important; }
+.dark nav[aria-label="Victim App navigation"] { border-color: #303034; background-color: rgb(16 16 17 / 0.95); }
 button, input, select, textarea { font: inherit; }
 
 .app-grid {
