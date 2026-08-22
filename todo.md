@@ -156,3 +156,6 @@
 - [x] Add theme persistence regressions, visually verify both modes, and save a checkpoint.
 - [x] Replace green-tinted dark-mode surfaces with a true black and charcoal palette across Victim and Operations experiences.
 - [x] Verify contrast and consistency of the corrected black dark theme, then save a checkpoint.
+- [x] Investigate the stale official river-gauge feed and identify a current authoritative Assam source or endpoint.
+- [x] Implement source-attributed current gauge retrieval with regression coverage while retaining truthful stale-data safeguards.
+- [x] Verify the public gauge presentation, then save a checkpoint for the repair.
