@@ -8,6 +8,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Command from "./pages/Command";
 import Emergency from "./pages/Emergency";
 import Home from "./pages/Home";
+import HospitalRegistration from "./pages/HospitalRegistration";
 import Medical from "./pages/Medical";
 import More from "./pages/More";
 import Responder from "./pages/Responder";
@@ -24,6 +25,7 @@ function Router() {
       <Route path={"/track"} component={TrackFlow} />
       <Route path={"/safety"} component={Safety} />
       <Route path={"/more"} component={More} />
+      <Route path={"/hospital/register"} component={HospitalRegistration} />
       <Route path={"/medical/:rest*"} component={Medical} />
       <Route path={"/medical"} component={Medical} />
       <Route path={"/responder/:rest*"} component={Responder} />

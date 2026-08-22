@@ -195,11 +195,49 @@ export const hospitals = mysqlTable(
     oxygenCylinderCount: int("oxygenCylinderCount").default(0).notNull(),
     bloodUnitCount: int("bloodUnitCount").default(0).notNull(),
     ambulanceCount: int("ambulanceCount").default(0).notNull(),
+    foodSupplyStatus: mysqlEnum("foodSupplyStatus", ["available", "limited", "critical", "unavailable"]).default("available").notNull(),
+    medicineSupplyStatus: mysqlEnum("medicineSupplyStatus", ["available", "limited", "critical", "unavailable"]).default("available").notNull(),
+    waterSupplyStatus: mysqlEnum("waterSupplyStatus", ["available", "limited", "critical", "unavailable"]).default("available").notNull(),
+    powerBackupStatus: mysqlEnum("powerBackupStatus", ["available", "limited", "critical", "unavailable"]).default("available").notNull(),
     status: mysqlEnum("status", ["open", "limited", "critical", "closed"]).default("open").notNull(),
     updatedBy: int("updatedBy").references(() => users.id),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => [index("hospitals_status_idx").on(table.status)],
+);
+
+export const hospitalRegistrationRequests = mysqlTable(
+  "hospitalRegistrationRequests",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    hospitalName: varchar("hospitalName", { length: 180 }).notNull(),
+    address: varchar("address", { length: 360 }).notNull(),
+    contactPhone: varchar("contactPhone", { length: 32 }).notNull(),
+    latitude: double("latitude").notNull(),
+    longitude: double("longitude").notNull(),
+    note: text("note"),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+    reviewedBy: int("reviewedBy").references(() => users.id),
+    reviewNote: text("reviewNote"),
+    reviewedAt: timestamp("reviewedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("hospitalRegistrationRequests_userId_unique").on(table.userId), index("hospitalRegistrationRequests_status_createdAt_idx").on(table.status, table.createdAt)],
+);
+
+export const hospitalStaffProfiles = mysqlTable(
+  "hospitalStaffProfiles",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    hospitalId: int("hospitalId").notNull().references(() => hospitals.id),
+    designation: varchar("designation", { length: 120 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("hospitalStaffProfiles_userId_unique").on(table.userId), index("hospitalStaffProfiles_hospitalId_idx").on(table.hospitalId)],
 );
 
 export const floodZones = mysqlTable(

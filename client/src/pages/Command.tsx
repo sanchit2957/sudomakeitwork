@@ -15,9 +15,10 @@ import { useLocation } from "wouter";
 
 type StatusFilter = "all" | "pending" | "dispatched" | "resolved";
 type ShelterForm = { id?: number; name: string; address: string; latitude: string; longitude: string; capacity: string; occupancy: string; status: "open" | "limited" | "closed" };
-type HospitalForm = { id?: number; name: string; address: string; contactPhone: string; latitude: string; longitude: string; totalEmergencyBeds: string; availableEmergencyBeds: string; totalIcuBeds: string; availableIcuBeds: string; oxygenCylinderCount: string; bloodUnitCount: string; ambulanceCount: string; status: "open" | "limited" | "critical" | "closed" };
+type SupplyStatus = "available" | "limited" | "critical" | "unavailable";
+type HospitalForm = { id?: number; name: string; address: string; contactPhone: string; latitude: string; longitude: string; totalEmergencyBeds: string; availableEmergencyBeds: string; totalIcuBeds: string; availableIcuBeds: string; oxygenCylinderCount: string; bloodUnitCount: string; ambulanceCount: string; foodSupplyStatus?: SupplyStatus; medicineSupplyStatus?: SupplyStatus; waterSupplyStatus?: SupplyStatus; powerBackupStatus?: SupplyStatus; status: "open" | "limited" | "critical" | "closed" };
 const blankShelter = (): ShelterForm => ({ name: "", address: "", latitude: "", longitude: "", capacity: "", occupancy: "", status: "open" });
-const blankHospital = (): HospitalForm => ({ name: "", address: "", contactPhone: "", latitude: "", longitude: "", totalEmergencyBeds: "", availableEmergencyBeds: "", totalIcuBeds: "", availableIcuBeds: "", oxygenCylinderCount: "", bloodUnitCount: "", ambulanceCount: "", status: "open" });
+const blankHospital = (): HospitalForm => ({ name: "", address: "", contactPhone: "", latitude: "", longitude: "", totalEmergencyBeds: "", availableEmergencyBeds: "", totalIcuBeds: "", availableIcuBeds: "", oxygenCylinderCount: "", bloodUnitCount: "", ambulanceCount: "", foodSupplyStatus: "available", medicineSupplyStatus: "available", waterSupplyStatus: "available", powerBackupStatus: "available", status: "open" });
 
 export default function Command() { return <RoleGate roles={["admin"]}><CommandWorkspace /></RoleGate>; }
 function CommandWorkspace() {

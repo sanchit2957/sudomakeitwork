@@ -168,3 +168,7 @@
 - [x] Audit the current Safety tab and its medical, assistance-request, and Operations handoff workflows for the highest-impact next improvements.
 - [x] Develop prioritized panic-first Safety guidance, resource discovery, and assistance-request improvements without weakening existing role controls.
 - [x] Add regression coverage, validate the improved Safety experience, and save a checkpoint.
+- [x] Audit existing hospital registration approval, staff dashboard authorization, resource fields, and Safety-tab data presentation.
+- [x] Extend approved hospital staff workflows for real-time beds, ICU, food, medical supply, transport, and service-status updates.
+- [x] Replace Safety’s “What do you need?” section with senior-friendly large nearby-hospital cards and clear visual resource status.
+- [x] Add authorization and UI regressions, verify public/approved-staff flows, and save a checkpoint for the hospital-resource release.

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { z } from "zod";
-import { floodZones, guestEmergencyRateLimits, hospitals, incidentMessages, incidents, missions, notifications, pushSubscriptions, rescueProfiles, rescuerRegistrationRequests, safetyAssistanceRequests, shelters, users } from "../../drizzle/schema";
+import { floodZones, guestEmergencyRateLimits, hospitalRegistrationRequests, hospitalStaffProfiles, hospitals, incidentMessages, incidents, missions, notifications, pushSubscriptions, rescueProfiles, rescuerRegistrationRequests, safetyAssistanceRequests, shelters, users } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
@@ -33,6 +33,7 @@ import {
 import { storagePut } from "../storage";
 import { getGuestSosRateLimitDecision, isAllowedMissionTransition } from "../rescue.policy";
 import { hasValidHospitalCapacity } from "../hospital.policy";
+import { canEditHospitalResources, canRequestHospitalRegistration } from "../hospital-registration.policy";
 import { canRequestRescuerRegistration, requiresCallSign } from "../registration.policy";
 import { mayEditPostAlertDetails } from "../post-alert-details.policy";
 import { mayShareLiveMissionLocation, presentAssignedRescuerToVictim } from "../rescuer-profile.policy";
@@ -43,6 +44,7 @@ const incidentCode = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
 const severitySchema = z.enum(["critical", "high", "medium", "low"]);
 const missionStatusSchema = z.enum(["pending", "dispatched", "resolved"]);
 const hospitalStatusSchema = z.enum(["open", "limited", "critical", "closed"]);
+const supplyStatusSchema = z.enum(["available", "limited", "critical", "unavailable"]);
 const pointSchema = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
 const hospitalInput = z.object({
   name: z.string().trim().min(2).max(180),
@@ -57,7 +59,19 @@ const hospitalInput = z.object({
   oxygenCylinderCount: z.number().int().min(0).max(1_000_000),
   bloodUnitCount: z.number().int().min(0).max(1_000_000),
   ambulanceCount: z.number().int().min(0).max(1_000_000),
+  foodSupplyStatus: supplyStatusSchema.default("available"),
+  medicineSupplyStatus: supplyStatusSchema.default("available"),
+  waterSupplyStatus: supplyStatusSchema.default("available"),
+  powerBackupStatus: supplyStatusSchema.default("available"),
   status: hospitalStatusSchema,
+});
+const hospitalRegistrationInput = z.object({
+  hospitalName: z.string().trim().min(2).max(180),
+  address: z.string().trim().min(3).max(360),
+  contactPhone: z.string().trim().min(5).max(32),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  note: z.string().trim().max(1000).optional(),
 });
 
 async function database() {
@@ -278,7 +292,7 @@ export const rescueRouter = router({
       const db = await database();
       const [shelterRows, hospitalRows] = await Promise.all([
         db.select({ id: shelters.id, name: shelters.name, address: shelters.address, latitude: shelters.latitude, longitude: shelters.longitude, capacity: shelters.capacity, occupancy: shelters.occupancy, status: shelters.status }).from(shelters).where(and(eq(shelters.status, "open"))),
-        db.select({ id: hospitals.id, name: hospitals.name, address: hospitals.address, latitude: hospitals.latitude, longitude: hospitals.longitude, totalEmergencyBeds: hospitals.totalEmergencyBeds, availableEmergencyBeds: hospitals.availableEmergencyBeds, totalIcuBeds: hospitals.totalIcuBeds, availableIcuBeds: hospitals.availableIcuBeds, oxygenCylinderCount: hospitals.oxygenCylinderCount, bloodUnitCount: hospitals.bloodUnitCount, ambulanceCount: hospitals.ambulanceCount, status: hospitals.status, updatedAt: hospitals.updatedAt }).from(hospitals).where(and(eq(hospitals.status, "open"))),
+        db.select({ id: hospitals.id, name: hospitals.name, address: hospitals.address, contactPhone: hospitals.contactPhone, latitude: hospitals.latitude, longitude: hospitals.longitude, totalEmergencyBeds: hospitals.totalEmergencyBeds, availableEmergencyBeds: hospitals.availableEmergencyBeds, totalIcuBeds: hospitals.totalIcuBeds, availableIcuBeds: hospitals.availableIcuBeds, oxygenCylinderCount: hospitals.oxygenCylinderCount, bloodUnitCount: hospitals.bloodUnitCount, ambulanceCount: hospitals.ambulanceCount, foodSupplyStatus: hospitals.foodSupplyStatus, medicineSupplyStatus: hospitals.medicineSupplyStatus, waterSupplyStatus: hospitals.waterSupplyStatus, powerBackupStatus: hospitals.powerBackupStatus, status: hospitals.status, updatedAt: hospitals.updatedAt }).from(hospitals).where(and(eq(hospitals.status, "open"))),
       ]);
       return { shelters: shelterRows, hospitals: hospitalRows };
     }),
@@ -312,11 +326,45 @@ export const rescueRouter = router({
     }),
   }),
 
+  hospital: router({
+    requestRegistration: protectedProcedure.input(hospitalRegistrationInput).mutation(async ({ input, ctx }) => {
+      if (!canRequestHospitalRegistration(ctx.user.role)) throw new TRPCError({ code: "BAD_REQUEST", message: ctx.user.role === "medical" ? "This account is already authorized as hospital staff." : "Only a standard signed-in account can submit a hospital registration request." });
+      const db = await database();
+      const existing = (await db.select().from(hospitalRegistrationRequests).where(eq(hospitalRegistrationRequests.userId, ctx.user.id)).limit(1))[0];
+      if (existing?.status === "pending") throw new TRPCError({ code: "CONFLICT", message: "This hospital registration is already awaiting administrator review." });
+      if (existing) await db.update(hospitalRegistrationRequests).set({ ...input, note: input.note ?? null, status: "pending", reviewedBy: null, reviewedAt: null, reviewNote: null }).where(eq(hospitalRegistrationRequests.id, existing.id));
+      else await db.insert(hospitalRegistrationRequests).values({ userId: ctx.user.id, ...input, note: input.note ?? null, status: "pending" });
+      await writeAudit(ctx.user.id, "hospitalRegistration.request", "hospitalRegistration", existing?.id, input.hospitalName);
+      return { status: "pending" as const };
+    }),
+    mine: protectedProcedure.query(async ({ ctx }) => {
+      const db = await database();
+      return (await db.select().from(hospitalRegistrationRequests).where(eq(hospitalRegistrationRequests.userId, ctx.user.id)).limit(1))[0] ?? null;
+    }),
+  }),
+
   operations: router({
     incidents: adminProcedure.input(z.object({ status: missionStatusSchema.optional() }).optional()).query(({ input }) => listIncidents(input?.status)),
     analytics: adminProcedure.query(() => getAnalytics()),
     mapLayers: operationalProcedure.query(({ ctx }) => getMapLayers(ctx.user.role !== "user")),
-    hospitals: medicalOperationsProcedure.query(() => listHospitals()),
+    hospitals: medicalOperationsProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role === "admin") return listHospitals();
+      const db = await database();
+      const profile = (await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1))[0];
+      if (!profile) return [];
+      return db.select().from(hospitals).where(eq(hospitals.id, profile.hospitalId));
+    }),
+    myHospital: medicalOperationsProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role === "admin") return null;
+      const db = await database();
+      const profile = (await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1))[0];
+      if (!profile) return null;
+      return (await db.select().from(hospitals).where(eq(hospitals.id, profile.hospitalId)).limit(1))[0] ?? null;
+    }),
+    hospitalRegistrationRequests: adminProcedure.query(async () => {
+      const db = await database();
+      return db.select({ request: hospitalRegistrationRequests, user: { id: users.id, name: users.name, email: users.email } }).from(hospitalRegistrationRequests).leftJoin(users, eq(hospitalRegistrationRequests.userId, users.id)).orderBy(desc(hospitalRegistrationRequests.createdAt));
+    }),
     rescuerRegistrationRequests: adminProcedure.query(() => listRescuerRegistrationRequests()),
     rescueRoster: adminProcedure.query(() => getRescuerRoster()),
     availableUsers: adminProcedure.query(async () => {
@@ -343,6 +391,26 @@ export const rescueRouter = router({
       await db.update(users).set({ role: "medical" }).where(eq(users.id, input.userId));
       await writeAudit(ctx.user.id, "medical.promote", "user", input.userId, "Authorized medical operations access");
       return { success: true };
+    }),
+    reviewHospitalRegistration: adminProcedure.input(z.object({ requestId: z.number().int().positive(), decision: z.enum(["approved", "rejected"]), reviewNote: z.string().trim().max(1000).optional(), designation: z.string().trim().max(120).optional() })).mutation(async ({ input, ctx }) => {
+      const db = await database();
+      const request = (await db.select().from(hospitalRegistrationRequests).where(eq(hospitalRegistrationRequests.id, input.requestId)).limit(1))[0];
+      if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Hospital registration request not found." });
+      if (request.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "This hospital registration has already been reviewed." });
+      const target = (await db.select().from(users).where(eq(users.id, request.userId)).limit(1))[0];
+      if (!target || target.role !== "user") throw new TRPCError({ code: "BAD_REQUEST", message: "The requesting account is no longer eligible for hospital staff authorization." });
+      const reviewedAt = new Date();
+      await db.update(hospitalRegistrationRequests).set({ status: input.decision, reviewedBy: ctx.user.id, reviewedAt, reviewNote: input.reviewNote ?? null }).where(eq(hospitalRegistrationRequests.id, request.id));
+      if (input.decision === "approved") {
+        const created = await db.insert(hospitals).values({ name: request.hospitalName, address: request.address, contactPhone: request.contactPhone, latitude: request.latitude, longitude: request.longitude, totalEmergencyBeds: 0, availableEmergencyBeds: 0, totalIcuBeds: 0, availableIcuBeds: 0, oxygenCylinderCount: 0, bloodUnitCount: 0, ambulanceCount: 0, foodSupplyStatus: "limited", medicineSupplyStatus: "limited", waterSupplyStatus: "limited", powerBackupStatus: "limited", status: "limited", updatedBy: request.userId });
+        const hospitalId = Number(created[0].insertId);
+        await db.update(users).set({ role: "medical" }).where(eq(users.id, request.userId));
+        await db.insert(hospitalStaffProfiles).values({ userId: request.userId, hospitalId, designation: input.designation ?? null });
+        await writeAudit(ctx.user.id, "hospitalRegistration.approved", "hospitalRegistration", request.id, `Created hospital ${hospitalId}`);
+        return { success: true, hospitalId };
+      }
+      await writeAudit(ctx.user.id, "hospitalRegistration.rejected", "hospitalRegistration", request.id, input.reviewNote ?? null);
+      return { success: true, hospitalId: null };
     }),
     reviewRescuerRegistration: adminProcedure.input(z.object({ requestId: z.number().int().positive(), decision: z.enum(["approved", "rejected"]), callSign: z.string().trim().min(2).max(96).optional(), reviewNote: z.string().trim().max(1000).optional() })).mutation(async ({ input, ctx }) => {
       if (!requiresCallSign(input.decision, input.callSign)) throw new TRPCError({ code: "BAD_REQUEST", message: "A field call sign is required to approve a rescuer." });
@@ -395,20 +463,32 @@ export const rescueRouter = router({
       await writeAudit(ctx.user.id, "shelter.update", "shelter", input.id, input.name);
       return { success: true };
     }),
-    addHospital: medicalOperationsProcedure.input(hospitalInput).mutation(async ({ input, ctx }) => {
+    addHospital: adminProcedure.input(hospitalInput).mutation(async ({ input, ctx }) => {
       if (!hasValidHospitalCapacity(input.totalEmergencyBeds, input.availableEmergencyBeds, input.totalIcuBeds, input.availableIcuBeds)) throw new TRPCError({ code: "BAD_REQUEST", message: "Available beds cannot exceed the declared hospital capacity." });
       const db = await database();
       const result = await db.insert(hospitals).values({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id });
       await writeAudit(ctx.user.id, "hospital.create", "hospital", Number(result[0].insertId), input.name);
       return { id: Number(result[0].insertId) };
     }),
-    updateHospital: medicalOperationsProcedure.input(hospitalInput.extend({ id: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
+    updateHospital: adminProcedure.input(hospitalInput.extend({ id: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
       if (!hasValidHospitalCapacity(input.totalEmergencyBeds, input.availableEmergencyBeds, input.totalIcuBeds, input.availableIcuBeds)) throw new TRPCError({ code: "BAD_REQUEST", message: "Available beds cannot exceed the declared hospital capacity." });
       const db = await database();
       const existing = (await db.select().from(hospitals).where(eq(hospitals.id, input.id)).limit(1))[0];
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Hospital not found." });
       await db.update(hospitals).set({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id }).where(eq(hospitals.id, input.id));
       await writeAudit(ctx.user.id, "hospital.update", "hospital", input.id, input.name);
+      return { success: true };
+    }),
+    updateMyHospitalResources: medicalOperationsProcedure.input(z.object({ id: z.number().int().positive(), availableEmergencyBeds: z.number().int().min(0).max(1_000_000), availableIcuBeds: z.number().int().min(0).max(1_000_000), oxygenCylinderCount: z.number().int().min(0).max(1_000_000), bloodUnitCount: z.number().int().min(0).max(1_000_000), ambulanceCount: z.number().int().min(0).max(1_000_000), foodSupplyStatus: supplyStatusSchema, medicineSupplyStatus: supplyStatusSchema, waterSupplyStatus: supplyStatusSchema, powerBackupStatus: supplyStatusSchema, status: hospitalStatusSchema })).mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== "medical") throw new TRPCError({ code: "FORBIDDEN", message: "Only an approved hospital staff account can publish live hospital resources." });
+      const db = await database();
+      const existing = (await db.select().from(hospitals).where(eq(hospitals.id, input.id)).limit(1))[0];
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Hospital not found." });
+      const profile = (await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1))[0];
+      if (!canEditHospitalResources(ctx.user.role, profile?.hospitalId, input.id)) throw new TRPCError({ code: "FORBIDDEN", message: "Hospital staff can update only their approved hospital." });
+      if (!hasValidHospitalCapacity(existing.totalEmergencyBeds, input.availableEmergencyBeds, existing.totalIcuBeds, input.availableIcuBeds)) throw new TRPCError({ code: "BAD_REQUEST", message: "Available beds cannot exceed the approved hospital capacity." });
+      await db.update(hospitals).set({ ...input, updatedBy: ctx.user.id }).where(eq(hospitals.id, input.id));
+      await writeAudit(ctx.user.id, "hospital.resources.update", "hospital", input.id, "Published live hospital resource update");
       return { success: true };
     }),
     addFloodZone: adminProcedure.input(z.object({ name: z.string().trim().min(2).max(180), severity: severitySchema, points: z.array(pointSchema).min(3).max(200) })).mutation(async ({ input, ctx }) => {
