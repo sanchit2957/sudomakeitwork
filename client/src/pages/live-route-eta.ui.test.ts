@@ -5,7 +5,9 @@ describe("live rescuer route and ETA tracking", () => {
   it("renders Google Maps driving directions, a route line, ETA, and an honest unavailable state", () => {
     const track = readFileSync(new URL("./Track.tsx", import.meta.url), "utf8");
     expect(track).toContain("new maps.DirectionsService().route");
-    expect(track).toContain("new maps.DirectionsRenderer");
+    expect(track).toContain("new maps.Polyline");
+    expect(track).toContain('strokeColor: "#d23f43"');
+    expect(track).toContain("strokeWeight: 7");
     expect(track).toContain("travelMode: maps.TravelMode.DRIVING");
     expect(track).toContain("Live route · ETA");
     expect(track).toContain("Route estimate is temporarily unavailable.");

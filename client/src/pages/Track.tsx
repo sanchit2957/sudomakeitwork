@@ -57,19 +57,19 @@ function LiveRescuerMap({ latitude, longitude, destination }: { latitude: number
   const mapRef = useRef<google.maps.Map | null>(null);
   const rescuerMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const destinationMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
-  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const routePolylineRef = useRef<google.maps.Polyline | null>(null);
   const [routeSummary, setRouteSummary] = useState<string | null>(null);
   const rescuerPosition = { lat: latitude, lng: longitude };
   const sosPosition = destination ? { lat: destination.latitude, lng: destination.longitude } : null;
   const drawRoute = useCallback((map: google.maps.Map) => {
     if (!sosPosition || !window.google?.maps) { setRouteSummary(null); return; }
     const maps = window.google.maps;
-    directionsRendererRef.current ??= new maps.DirectionsRenderer({ map, suppressMarkers: true, polylineOptions: { strokeColor: "#d23f43", strokeOpacity: 0.9, strokeWeight: 5 } });
-    directionsRendererRef.current.setMap(map);
     new maps.DirectionsService().route({ origin: rescuerPosition, destination: sosPosition, travelMode: maps.TravelMode.DRIVING }, (result, status) => {
       const leg = result?.routes?.[0]?.legs?.[0];
-      if (status !== "OK" || !result || !leg) { directionsRendererRef.current?.setMap(null); directionsRendererRef.current = null; setRouteSummary("Route estimate is temporarily unavailable."); return; }
-      directionsRendererRef.current?.setDirections(result);
+      const path = result?.routes?.[0]?.overview_path;
+      if (status !== "OK" || !result || !leg || !path?.length) { routePolylineRef.current?.setMap(null); routePolylineRef.current = null; setRouteSummary("Route estimate is temporarily unavailable."); return; }
+      routePolylineRef.current?.setMap(null);
+      routePolylineRef.current = new maps.Polyline({ map, path, strokeColor: "#d23f43", strokeOpacity: 1, strokeWeight: 7, geodesic: true, zIndex: 100 });
       map.fitBounds(result.routes[0].bounds);
       setRouteSummary(`${leg.duration?.text || "ETA unavailable"} · ${leg.distance?.text || "Route calculated"}`);
     });

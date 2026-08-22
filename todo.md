@@ -183,3 +183,5 @@
 - [x] Audit assigned-rescuer location and SOS destination data for safe matched-case routing and ETA calculation.
 - [x] Add a live Google Maps route line and ETA from assigned rescuer to the matching SOS location, refreshing with automatic location updates.
 - [x] Add mobile routing states, privacy and rendering regressions, visual validation, and a checkpoint.
+- [x] Diagnose why the assigned-rescuer map shows ETA without drawing the rescuer-to-user route line.
+- [x] Render a robust visible route polyline and route-end markers, then add regression and mobile validation coverage.
