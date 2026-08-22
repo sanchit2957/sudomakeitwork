@@ -159,3 +159,6 @@
 - [x] Investigate the stale official river-gauge feed and identify a current authoritative Assam source or endpoint.
 - [x] Implement source-attributed current gauge retrieval with regression coverage while retaining truthful stale-data safeguards.
 - [x] Verify the public gauge presentation, then save a checkpoint for the repair.
+- [x] Audit all public and protected routes for incomplete dark-theme styling, unreadable text, and low-contrast interactive states.
+- [x] Replace brittle page-specific dark-mode treatment with robust neutral semantic surface, text, border, and control overrides.
+- [x] Add dark-theme regressions, complete desktop/mobile visual checks, and save a checkpoint for the contrast repair.

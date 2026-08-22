@@ -54,7 +54,7 @@ export default function DashboardLayout({ children, navItems, workspace, roleLab
           <SidebarMenu>
             {navItems.map(item => {
               const active = location === item.path;
-              return <SidebarMenuItem key={item.path}><SidebarMenuButton isActive={active} onClick={() => setLocation(item.path)} tooltip={item.label} className={cn("h-11 rounded-xl", active && "bg-[#d8f1e8] text-[#155c50]")}><item.icon className="h-4 w-4" /><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>;
+              return <SidebarMenuItem key={item.path}><SidebarMenuButton isActive={active} onClick={() => setLocation(item.path)} tooltip={item.label} className={cn("h-11 rounded-xl", active && "bg-[#d8f1e8] text-[#155c50] dark:bg-[#28282d] dark:text-[#f4f4f5]")}><item.icon className="h-4 w-4" /><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>;
             })}
           </SidebarMenu>
         </SidebarContent>

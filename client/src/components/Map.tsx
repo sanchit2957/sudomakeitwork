@@ -167,5 +167,5 @@ export function MapView({
     map.current.setZoom(initialZoom);
   }, [initialCenter.lat, initialCenter.lng, initialZoom]);
 
-  return <div ref={mapContainer} className={cn("relative w-full h-[500px]", className)}>{loadError && <div className="absolute inset-0 grid place-items-center bg-[#deebe7] p-6 text-center"><div><p className="font-semibold text-[#1d5148]">Map service is temporarily unavailable.</p><p className="mt-1 text-sm text-[#54736c]">Enter latitude and longitude manually, then submit the location with a clear nearby landmark.</p></div></div>}</div>;
+  return <div ref={mapContainer} className={cn("relative w-full h-[500px]", className)}>{loadError && <div className="absolute inset-0 grid place-items-center bg-[#deebe7] p-6 text-center dark:bg-[#202023]"><div><p className="font-semibold text-[#1d5148] dark:text-[#f4f4f5]">Map service is temporarily unavailable.</p><p className="mt-1 text-sm text-[#54736c] dark:text-[#c4c4cc]">Enter latitude and longitude manually, then submit the location with a clear nearby landmark.</p></div></div>}</div>;
 }

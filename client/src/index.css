@@ -79,13 +79,41 @@ html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; background: var(--background); color: var(--foreground); }
 .dark .app-grid { background-image: linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px), linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px); }
 .dark .victim-page { background: #050505; color: #f4f4f5; }
-.dark .victim-main { background: #101011; color: #f4f4f5; }
-.dark .workspace-surface [class~="bg-white"] { background-color: #1a1a1c !important; }
-.dark .workspace-surface [class~="bg-card"] { background-color: #1a1a1c !important; }
+.dark .victim-main { background: #101011; color: #f4f4f5; border-color: #303034; }
+.dark .victim-page :is([class~="bg-white"], [class~="bg-card"], [class*="bg-white/90"], [class*="bg-white/95"]),
+.dark .workspace-surface :is([class~="bg-white"], [class~="bg-card"], [class*="bg-white/90"], [class*="bg-white/95"]) { background-color: #1a1a1c !important; }
+.dark .victim-page :is([class*="bg-[#f"], [class*="bg-[#e"], [class*="bg-[#d"]),
+.dark .workspace-surface :is([class*="bg-[#f"], [class*="bg-[#e"], [class*="bg-[#d"]) { background-color: #242426 !important; }
+.dark .victim-page [class*="bg-[#174e46]"],
+.dark .workspace-surface [class*="bg-[#174e46]"] { background-color: #202023 !important; }
+.dark .victim-page button[class*="bg-[#174e46]"],
+.dark .workspace-surface button[class*="bg-[#174e46]"] { background-color: #34343a !important; box-shadow: inset 0 0 0 1px #4a4a51; }
+.dark .victim-page [class*="border-[#"],
+.dark .workspace-surface [class*="border-[#"] { border-color: #3a3a40 !important; }
+.dark .victim-page [class*="text-[#"],
+.dark .workspace-surface [class*="text-[#"] { color: #e4e4e7 !important; }
+.dark .victim-page :is(input, textarea, select),
+.dark .workspace-surface :is(input, textarea, select) { background-color: #161618 !important; color: #f4f4f5 !important; border-color: #46464e !important; }
+.dark .victim-page :is(input, textarea)::placeholder,
+.dark .workspace-surface :is(input, textarea)::placeholder { color: #a1a1aa !important; }
+.dark .victim-page [class*="text-[#c14544]"],
+.dark .victim-page [class*="text-[#df3e43]"],
+.dark .victim-page [class*="text-[#b9423d]"],
+.dark .victim-page [class*="text-[#9f413f]"] { color: #fca5a5 !important; }
+.dark .victim-page [class*="text-[#9d6a16]"],
+.dark .victim-page [class*="text-[#9a681d]"],
+.dark .workspace-surface [class*="text-[#9a681d]"] { color: #fcd34d !important; }
+.dark .victim-page [class*="text-[#197654]"],
+.dark .victim-page [class*="text-[#237563]"],
+.dark .workspace-surface [class*="text-[#197654]"] { color: #6ee7b7 !important; }
+.dark .victim-page [class*="text-[#285d9b]"],
+.dark .workspace-surface [class*="text-[#255c7d]"] { color: #93c5fd !important; }
+.dark .victim-page [class*="text-[#7251a3]"] { color: #c4b5fd !important; }
 .dark .workspace-surface [class~="text-black"] { color: #f4f4f5 !important; }
 .dark main.bg-\[\#fcfdfd\] { background-color: #101011 !important; color: #f4f4f5; }
 .dark div.bg-\[\#f6f8f7\] { background-color: #050505 !important; }
 .dark nav[aria-label="Victim App navigation"] { border-color: #303034; background-color: rgb(16 16 17 / 0.95); }
+.dark :is(button, a, input, select, textarea):focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
 button, input, select, textarea { font: inherit; }
 
 .app-grid {
