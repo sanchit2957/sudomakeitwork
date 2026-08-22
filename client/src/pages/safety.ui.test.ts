@@ -26,16 +26,17 @@ describe("Safety local alert UI", () => {
     expect(markup).toContain('href="https://ffs.india-water.gov.in/"');
   });
 
-  it("keeps a device-local readiness plan and a senior-friendly nearby-hospital path in the Safety workflow", () => {
+  it("prioritizes senior-friendly nearby hospitals above local alerts without restoring the removed checklist", () => {
     const source = readFileSync(new URL("./Safety.tsx", import.meta.url), "utf8");
-    expect(source).toContain('const readinessStorageKey = "sudo-makeitwork-safety-readiness"');
-    expect(source).toContain("Three things to check now");
-    expect(source).toContain("This checklist stays only on this device. It does not notify response teams.");
     expect(source).toContain("Nearby hospitals");
     expect(source).toContain("Nearest verified hospital shown first");
     expect(source).toContain("foodSupplyStatus");
     expect(source).toContain("medicineSupplyStatus");
     expect(source).toContain("No verified hospital listed nearby");
+    expect(source.indexOf("<VerifiedMedicalCare")).toBeLessThan(source.indexOf("<SafetyConditionsCard"));
+    expect(source).not.toContain("Safety plan");
+    expect(source).not.toContain("Three things to check now");
+    expect(source).not.toContain("sudo-makeitwork-safety-readiness");
     expect(source).not.toContain("What do you need?");
   });
 });
