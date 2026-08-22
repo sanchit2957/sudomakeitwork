@@ -175,3 +175,5 @@
 - [x] Move verified nearby medical care above local alerts and remove the device-only Safety Plan checklist.
 - [x] Update Safety regressions, visually verify the simplified mobile layout, and save a checkpoint.
 - [x] Add an accessible Google Maps directions action beside each verified hospital name in Safety, with regression and mobile verification.
+- [x] Add a clearly visible SOS tracking/case number to Track without changing the rest of the page.
+- [x] Add regression coverage, verify the minimal Track-page addition, and save a checkpoint.
