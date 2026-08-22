@@ -61,6 +61,12 @@ function LiveRescuerMap({ latitude, longitude, destination }: { latitude: number
   const [routeSummary, setRouteSummary] = useState<string | null>(null);
   const rescuerPosition = { lat: latitude, lng: longitude };
   const sosPosition = destination ? { lat: destination.latitude, lng: destination.longitude } : null;
+  const createEndpointPin = useCallback((kind: "user" | "rescuer") => {
+    const { PinElement } = window.google!.maps.marker;
+    return kind === "user"
+      ? new PinElement({ background: "#1a73e8", borderColor: "#ffffff", scale: 1.15 })
+      : new PinElement({ background: "#d23f43", borderColor: "#ffffff", glyph: "R", glyphColor: "#ffffff", scale: 1.15 });
+  }, []);
   const drawRoute = useCallback((map: google.maps.Map) => {
     if (!sosPosition || !window.google?.maps) { setRouteSummary(null); return; }
     const maps = window.google.maps;
@@ -78,18 +84,18 @@ function LiveRescuerMap({ latitude, longitude, destination }: { latitude: number
     mapRef.current = map;
     map.setCenter(rescuerPosition);
     map.setZoom(15);
-    rescuerMarkerRef.current = new window.google!.maps.marker.AdvancedMarkerElement({ map, position: rescuerPosition, title: "Assigned rescuer" });
-    if (sosPosition) destinationMarkerRef.current = new window.google!.maps.marker.AdvancedMarkerElement({ map, position: sosPosition, title: "Your SOS location" });
+    rescuerMarkerRef.current = new window.google!.maps.marker.AdvancedMarkerElement({ map, position: rescuerPosition, title: "Assigned rescuer", content: createEndpointPin("rescuer").element });
+    if (sosPosition) destinationMarkerRef.current = new window.google!.maps.marker.AdvancedMarkerElement({ map, position: sosPosition, title: "Your SOS location", content: createEndpointPin("user").element });
     drawRoute(map);
-  }, [drawRoute, rescuerPosition.lat, rescuerPosition.lng, sosPosition?.lat, sosPosition?.lng]);
+  }, [createEndpointPin, drawRoute, rescuerPosition.lat, rescuerPosition.lng, sosPosition?.lat, sosPosition?.lng]);
   useEffect(() => {
     if (!mapRef.current || !rescuerMarkerRef.current) return;
     rescuerMarkerRef.current.position = rescuerPosition;
     if (sosPosition) {
       if (destinationMarkerRef.current) destinationMarkerRef.current.position = sosPosition;
-      else destinationMarkerRef.current = new window.google!.maps.marker.AdvancedMarkerElement({ map: mapRef.current, position: sosPosition, title: "Your SOS location" });
+      else destinationMarkerRef.current = new window.google!.maps.marker.AdvancedMarkerElement({ map: mapRef.current, position: sosPosition, title: "Your SOS location", content: createEndpointPin("user").element });
     }
     drawRoute(mapRef.current);
-  }, [drawRoute, rescuerPosition.lat, rescuerPosition.lng, sosPosition?.lat, sosPosition?.lng]);
+  }, [createEndpointPin, drawRoute, rescuerPosition.lat, rescuerPosition.lng, sosPosition?.lat, sosPosition?.lng]);
   return <><MapView className="mt-3 h-60 overflow-hidden rounded-xl" initialCenter={rescuerPosition} initialZoom={15} onMapReady={placeMarkers} />{routeSummary && <p className="mt-2 flex items-center gap-2 rounded-xl bg-[#fff5f3] px-3 py-2 text-xs font-bold text-[#a43f3d]"><Navigation className="h-4 w-4" />Live route · ETA {routeSummary}</p>}</>;
 }

@@ -185,3 +185,5 @@
 - [x] Add mobile routing states, privacy and rendering regressions, visual validation, and a checkpoint.
 - [x] Diagnose why the assigned-rescuer map shows ETA without drawing the rescuer-to-user route line.
 - [x] Render a robust visible route polyline and route-end markers, then add regression and mobile validation coverage.
+- [x] Differentiate active-route endpoints: show the SOS user with a familiar blue location pin and the assigned responder with a dedicated rescuer marker.
+- [x] Add marker-distinction regression coverage, validate the responsive map treatment, and save a checkpoint.

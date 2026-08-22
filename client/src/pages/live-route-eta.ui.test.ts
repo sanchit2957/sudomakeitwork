@@ -8,6 +8,11 @@ describe("live rescuer route and ETA tracking", () => {
     expect(track).toContain("new maps.Polyline");
     expect(track).toContain('strokeColor: "#d23f43"');
     expect(track).toContain("strokeWeight: 7");
+    expect(track).toContain("new PinElement");
+    expect(track).toContain('background: "#1a73e8"');
+    expect(track).toContain('glyph: "R"');
+    expect(track).toContain('title: "Your SOS location"');
+    expect(track).toContain('title: "Assigned rescuer"');
     expect(track).toContain("travelMode: maps.TravelMode.DRIVING");
     expect(track).toContain("Live route · ETA");
     expect(track).toContain("Route estimate is temporarily unavailable.");
