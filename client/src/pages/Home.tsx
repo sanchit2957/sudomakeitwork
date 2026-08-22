@@ -70,8 +70,9 @@ export default function Home() {
         setRapidStatus("sending");
         await createAndRedirectAfterRapidSos({ payload, createSos: createSos.mutateAsync, navigate: setLocation });
         clearSosVoiceNote();
-      } catch {
-        setRapidStatus("error"); setRapidNotice(t("SOS could not be sent. Check connection and try again."));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        setRapidStatus("error"); setRapidNotice(message === "Locations must be inside Assam. Please select or share a location within Assam." ? t(message) : t("SOS could not be sent. Check connection and try again."));
       }
     }, () => { setRapidStatus("error"); setRapidNotice(t("Location permission is needed before SOS can be sent.")); }, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 });
   };

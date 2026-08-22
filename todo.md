@@ -120,3 +120,10 @@
 - [x] Add a direct regression for requester-owned Safety request views versus operations-only queue access.
 - [x] Add a router-level safety queue regression with mocked request rows for medical, government, and field callers.
 - [x] Add a router-level requester-view regression with mocked request rows for victim and operations callers.
+- [x] Restrict Victim, Command, Medical, and Rescuer map views to Assam geographic bounds and prevent out-of-Assam location submissions.
+- [x] Add shared Assam boundary regressions for map configuration and SOS or safety location validation.
+- [x] Add a direct map-component regression confirming Assam camera restriction settings are passed to the Google Maps constructor.
+- [x] Add a router-level regression confirming out-of-Assam Safety assistance requests are rejected before persistence.
+- [x] Verify responsive Assam-only map behavior and save a checkpoint for the boundary update.
+- [x] Verify the Assam-only map lock at mobile width in both the Victim App and a map-bearing Operations screen.
+- [x] Save the Assam-only boundary update checkpoint after the completed final validation evidence is recorded.

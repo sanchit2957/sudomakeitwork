@@ -37,6 +37,7 @@ import { mayEditPostAlertDetails } from "../post-alert-details.policy";
 import { mayShareLiveMissionLocation, presentAssignedRescuerToVictim } from "../rescuer-profile.policy";
 import { canHandleSafetyAssistance, canTransitionSafetyAssistance, isSafetyRequestOwnedBy, visibleSafetyCategoriesForRole } from "../safety-assistance.policy";
 import { sendRescuerPush } from "../push";
+import { isPointInAssam } from "../../shared/assam-boundary";
 
 const incidentCode = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
 const severitySchema = z.enum(["critical", "high", "medium", "low"]);
@@ -63,6 +64,10 @@ async function database() {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The operational database is unavailable." });
   return db;
+}
+
+function requireAssamLocation(latitude: number, longitude: number) {
+  if (!isPointInAssam(latitude, longitude)) throw new TRPCError({ code: "BAD_REQUEST", message: "Locations must be inside Assam. Please select or share a location within Assam." });
 }
 
 function readEvidence(dataUrl?: string) {
@@ -146,6 +151,7 @@ export const rescueRouter = router({
     conditions: publicProcedure.input(z.object({ latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional() }).optional()).query(async ({ input }) => {
       const latitude = input?.latitude ?? 26.1445;
       const longitude = input?.longitude ?? 91.7362;
+      requireAssamLocation(latitude, longitude);
       const db = await database();
       const activeZones = await db.select({ id: floodZones.id, severity: floodZones.severity }).from(floodZones).where(eq(floodZones.active, "yes"));
       try {
@@ -183,6 +189,7 @@ export const rescueRouter = router({
         voiceNoteDurationSeconds: z.number().int().min(1).max(120).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        requireAssamLocation(input.latitude, input.longitude);
         const db = await database();
         const publicCode = `SOS-${incidentCode()}`;
         const evidence = readEvidence(input.evidenceDataUrl);
@@ -273,9 +280,10 @@ export const rescueRouter = router({
         db.select({ id: shelters.id, name: shelters.name, address: shelters.address, latitude: shelters.latitude, longitude: shelters.longitude, capacity: shelters.capacity, occupancy: shelters.occupancy, status: shelters.status }).from(shelters).where(and(eq(shelters.status, "open"))),
         db.select({ id: hospitals.id, name: hospitals.name, address: hospitals.address, latitude: hospitals.latitude, longitude: hospitals.longitude, availableEmergencyBeds: hospitals.availableEmergencyBeds, availableIcuBeds: hospitals.availableIcuBeds, status: hospitals.status }).from(hospitals).where(and(eq(hospitals.status, "open"))),
       ]);
-      return { shelters: shelterRows, hospitals: hospitalRows };
+      return { shelters: shelterRows.filter(row => isPointInAssam(row.latitude, row.longitude)), hospitals: hospitalRows.filter(row => isPointInAssam(row.latitude, row.longitude)) };
     }),
     createRequest: protectedProcedure.input(z.object({ category: z.enum(["shelter", "food", "medical", "protection"]), peopleAffected: z.number().int().min(1).max(500), details: z.string().trim().max(1000).optional(), latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) })).mutation(async ({ input, ctx }) => {
+      requireAssamLocation(input.latitude, input.longitude);
       const db = await database();
       const result = await db.insert(safetyAssistanceRequests).values({ requesterId: ctx.user.id, category: input.category, peopleAffected: input.peopleAffected, details: input.details || null, latitude: input.latitude, longitude: input.longitude });
       const requestId = Number(result[0].insertId);
@@ -374,6 +382,7 @@ export const rescueRouter = router({
     }),
     addShelter: adminProcedure.input(z.object({ name: z.string().trim().min(2).max(180), address: z.string().trim().min(3).max(360), latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180), capacity: z.number().int().min(0).max(1_000_000), occupancy: z.number().int().min(0).max(1_000_000), status: z.enum(["open", "limited", "closed"]) })).mutation(async ({ input, ctx }) => {
       if (input.occupancy > input.capacity && input.capacity > 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Occupancy cannot exceed capacity." });
+      requireAssamLocation(input.latitude, input.longitude);
       const db = await database();
       const result = await db.insert(shelters).values({ ...input, createdBy: ctx.user.id });
       await writeAudit(ctx.user.id, "shelter.create", "shelter", Number(result[0].insertId), input.name);
@@ -381,6 +390,7 @@ export const rescueRouter = router({
     }),
     updateShelter: adminProcedure.input(z.object({ id: z.number().int().positive(), name: z.string().trim().min(2).max(180), address: z.string().trim().min(3).max(360), latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180), capacity: z.number().int().min(0).max(1_000_000), occupancy: z.number().int().min(0).max(1_000_000), status: z.enum(["open", "limited", "closed"]) })).mutation(async ({ input, ctx }) => {
       if (input.occupancy > input.capacity && input.capacity > 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Occupancy cannot exceed capacity." });
+      requireAssamLocation(input.latitude, input.longitude);
       const db = await database();
       const existing = (await db.select().from(shelters).where(eq(shelters.id, input.id)).limit(1))[0];
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Shelter not found." });
@@ -390,6 +400,7 @@ export const rescueRouter = router({
     }),
     addHospital: medicalOperationsProcedure.input(hospitalInput).mutation(async ({ input, ctx }) => {
       if (!hasValidHospitalCapacity(input.totalEmergencyBeds, input.availableEmergencyBeds, input.totalIcuBeds, input.availableIcuBeds)) throw new TRPCError({ code: "BAD_REQUEST", message: "Available beds cannot exceed the declared hospital capacity." });
+      requireAssamLocation(input.latitude, input.longitude);
       const db = await database();
       const result = await db.insert(hospitals).values({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id });
       await writeAudit(ctx.user.id, "hospital.create", "hospital", Number(result[0].insertId), input.name);
@@ -397,6 +408,7 @@ export const rescueRouter = router({
     }),
     updateHospital: medicalOperationsProcedure.input(hospitalInput.extend({ id: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
       if (!hasValidHospitalCapacity(input.totalEmergencyBeds, input.availableEmergencyBeds, input.totalIcuBeds, input.availableIcuBeds)) throw new TRPCError({ code: "BAD_REQUEST", message: "Available beds cannot exceed the declared hospital capacity." });
+      requireAssamLocation(input.latitude, input.longitude);
       const db = await database();
       const existing = (await db.select().from(hospitals).where(eq(hospitals.id, input.id)).limit(1))[0];
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Hospital not found." });
@@ -405,6 +417,7 @@ export const rescueRouter = router({
       return { success: true };
     }),
     addFloodZone: adminProcedure.input(z.object({ name: z.string().trim().min(2).max(180), severity: severitySchema, points: z.array(pointSchema).min(3).max(200) })).mutation(async ({ input, ctx }) => {
+      if (!input.points.every(point => isPointInAssam(point.lat, point.lng))) throw new TRPCError({ code: "BAD_REQUEST", message: "Flood-zone points must all be inside Assam." });
       const db = await database();
       const result = await db.insert(floodZones).values({ name: input.name, severity: input.severity, polygonJson: JSON.stringify(input.points), createdBy: ctx.user.id, active: "yes" });
       await writeAudit(ctx.user.id, "floodZone.create", "floodZone", Number(result[0].insertId), input.name);
@@ -470,6 +483,7 @@ export const rescueRouter = router({
       return { success: true };
     }),
     updateLiveLocation: rescuerProcedure.input(z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) })).mutation(async ({ input, ctx }) => {
+      requireAssamLocation(input.latitude, input.longitude);
       const db = await database();
       const profile = await getRescuerProfile(ctx.user.id);
       if (!profile || profile.locationSharing !== "yes") throw new TRPCError({ code: "FORBIDDEN", message: "Enable live location sharing before sending a location update." });
@@ -489,6 +503,10 @@ export const rescueRouter = router({
       return { success: true };
     }),
     setAvailability: rescuerProcedure.input(z.object({ availability: z.enum(["available", "on_mission", "off_duty"]), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional() })).mutation(async ({ input, ctx }) => {
+      if (input.latitude !== undefined || input.longitude !== undefined) {
+        if (input.latitude === undefined || input.longitude === undefined) throw new TRPCError({ code: "BAD_REQUEST", message: "Provide both latitude and longitude for an availability location." });
+        requireAssamLocation(input.latitude, input.longitude);
+      }
       const db = await database();
       const profile = await getRescuerProfile(ctx.user.id);
       if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Rescuer profile not found." });
