@@ -122,3 +122,5 @@ Accordingly, the platform retains the current provider-backed secure sign-in rat
 [2]: https://resend.com/docs/dashboard/domains/introduction
 
 Final 375px full-page verification showed the circular SOS control, rainfall/wind readings, transparent unavailable river level, clickable seven-day trend entry, and seven-day forecast rendering without overflow. Safety opened directly on Medical support and showed the verified-empty-resource state rather than fabricated hospitals. Track opened as a code-free rescue-flow view with the saved-on-device empty state until a real SOS is created.
+
+The subsequent SOS visual refinement was reviewed at 375px: the control remains circular and high-contrast, now with a translucent red glass sheen, light rim, and internal highlight. The former raised lower shadow has been removed; active feedback uses a subtle scale response instead.

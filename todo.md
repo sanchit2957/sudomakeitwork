@@ -144,3 +144,5 @@
 - [x] Assess the no-cost Email OTP tier; its required owned-and-verified sender domain is not currently available.
 - [x] Retain the current secure provider-backed sign-in behind separate Admin, Medical, and Rescuer access portals until Email OTP can be verified with an owned domain.
 - [x] Document that Email OTP remains deferred pending a verifiable sending domain and Resend credentials.
+- [x] Restyle the circular SOS control with a glass finish and remove its lower shadow while retaining emergency contrast and accessible size.
+- [x] Verify the revised SOS control at the mobile breakpoint and save a checkpoint.
