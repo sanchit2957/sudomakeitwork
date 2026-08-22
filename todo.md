@@ -177,3 +177,6 @@
 - [x] Add an accessible Google Maps directions action beside each verified hospital name in Safety, with regression and mobile verification.
 - [x] Add a clearly visible SOS tracking/case number to Track without changing the rest of the page.
 - [x] Add regression coverage, verify the minimal Track-page addition, and save a checkpoint.
+- [x] Audit current manual responder location-sharing controls, active-mission data flow, and disclosure safeguards.
+- [x] Automatically publish an assigned rescuer’s location every five seconds only during their active mission, ending it automatically on resolution.
+- [x] Remove the manual active-mission sharing control, add clear automatic-sharing state, regression coverage, cross-role validation, and a checkpoint.

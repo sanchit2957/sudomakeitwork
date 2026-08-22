@@ -36,7 +36,7 @@ import { hasValidHospitalCapacity } from "../hospital.policy";
 import { canEditHospitalResources, canRequestHospitalRegistration } from "../hospital-registration.policy";
 import { canRequestRescuerRegistration, requiresCallSign } from "../registration.policy";
 import { mayEditPostAlertDetails } from "../post-alert-details.policy";
-import { mayShareLiveMissionLocation, presentAssignedRescuerToVictim } from "../rescuer-profile.policy";
+import { presentAssignedRescuerToVictim } from "../rescuer-profile.policy";
 import { canHandleSafetyAssistance, canTransitionSafetyAssistance, isSafetyRequestOwnedBy, visibleSafetyCategoriesForRole } from "../safety-assistance.policy";
 import { sendRescuerPush } from "../push";
 
@@ -440,7 +440,7 @@ export const rescueRouter = router({
       if (profile.availability !== "available") throw new TRPCError({ code: "BAD_REQUEST", message: "Selected rescuer is not available." });
       const mission = await db.insert(missions).values({ incidentId: incident.id, rescuerId: input.rescuerId, assignedBy: ctx.user.id, status: "pending" });
       await db.update(incidents).set({ assignedRescuerId: input.rescuerId }).where(eq(incidents.id, incident.id));
-      await db.update(rescueProfiles).set({ availability: "on_mission", locationSharing: "no", lastLatitude: null, lastLongitude: null, locationUpdatedAt: null }).where(eq(rescueProfiles.userId, input.rescuerId));
+       await db.update(rescueProfiles).set({ availability: "on_mission", locationSharing: "yes", lastLatitude: null, lastLongitude: null, locationUpdatedAt: null }).where(eq(rescueProfiles.userId, input.rescuerId));
       await db.insert(notifications).values({ recipientId: input.rescuerId, incidentId: incident.id, type: "mission_assigned", title: `Mission assigned: ${incident.publicCode}`, body: `Proceed to ${incident.locationLabel} and update the mission status when dispatched.` });
       await sendRescuerPush([input.rescuerId], { title: `Mission assigned: ${incident.publicCode}`, body: `Proceed to ${incident.locationLabel} and update the mission status when dispatched.`, incidentId: incident.id, url: "/responder/alerts" });
       await addIncidentEvent(incident.id, ctx.user.id, "mission_assigned", "Rescue mission assigned", "A rescuer has been assigned and is preparing to deploy.");
@@ -546,23 +546,13 @@ export const rescueRouter = router({
       await writeAudit(ctx.user.id, "rescuer.profile.update", "rescueProfile", profile.id, input.clearPhoto ? "Cleared profile photo" : uploaded ? "Updated profile photo" : "Updated profile sharing preferences");
       return { success: true };
     }),
-    setLocationSharing: rescuerProcedure.input(z.object({ enabled: z.boolean() })).mutation(async ({ input, ctx }) => {
+    updateLiveLocation: rescuerProcedure.input(z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) })).mutation(async ({ input, ctx }) => {
       const db = await database();
       const profile = await getRescuerProfile(ctx.user.id);
       if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Rescuer profile not found." });
       const hasOpenMission = (await listMissionsForRescuer(ctx.user.id)).some(({ mission }) => mission.status !== "resolved");
-      if (input.enabled && !mayShareLiveMissionLocation(hasOpenMission, input.enabled)) throw new TRPCError({ code: "BAD_REQUEST", message: "Live location can only be shared during an active assigned mission." });
-      await db.update(rescueProfiles).set(input.enabled ? { locationSharing: "yes" } : { locationSharing: "no", lastLatitude: null, lastLongitude: null, locationUpdatedAt: null }).where(eq(rescueProfiles.userId, ctx.user.id));
-      await writeAudit(ctx.user.id, "rescuer.locationSharing", "rescueProfile", profile.id, input.enabled ? "Enabled for active mission" : "Disabled and cleared");
-      return { success: true };
-    }),
-    updateLiveLocation: rescuerProcedure.input(z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) })).mutation(async ({ input, ctx }) => {
-      const db = await database();
-      const profile = await getRescuerProfile(ctx.user.id);
-      if (!profile || profile.locationSharing !== "yes") throw new TRPCError({ code: "FORBIDDEN", message: "Enable live location sharing before sending a location update." });
-      const hasOpenMission = (await listMissionsForRescuer(ctx.user.id)).some(({ mission }) => mission.status !== "resolved");
-      if (!hasOpenMission) throw new TRPCError({ code: "FORBIDDEN", message: "Live location sharing is only available during an active assigned mission." });
-      await db.update(rescueProfiles).set({ lastLatitude: input.latitude, lastLongitude: input.longitude, locationUpdatedAt: new Date() }).where(eq(rescueProfiles.userId, ctx.user.id));
+      if (!hasOpenMission) throw new TRPCError({ code: "FORBIDDEN", message: "Live location updates are available only during an active assigned mission." });
+      await db.update(rescueProfiles).set({ locationSharing: "yes", lastLatitude: input.latitude, lastLongitude: input.longitude, locationUpdatedAt: new Date() }).where(eq(rescueProfiles.userId, ctx.user.id));
       return { success: true };
     }),
     missions: rescuerProcedure.query(({ ctx }) => listMissionsForRescuer(ctx.user.id)),

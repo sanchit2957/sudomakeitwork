@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mayShareLiveMissionLocation, presentAssignedRescuerToVictim } from "./rescuer-profile.policy";
+import { presentAssignedRescuerToVictim } from "./rescuer-profile.policy";
 
 const now = new Date("2026-08-20T10:45:00.000Z");
 const assigned = {
@@ -28,10 +28,8 @@ describe("assigned rescuer privacy policy", () => {
     expect(presentAssignedRescuerToVictim({ ...assigned, contactSharing: "no" }, now.getTime()).phone).toBeNull();
   });
 
-  it("never returns stale coordinates as live and requires an active mission before sharing begins", () => {
+  it("never returns stale coordinates as live after an automatic active-mission update stops", () => {
     const stale = presentAssignedRescuerToVictim({ ...assigned, locationUpdatedAt: new Date(now.getTime() - 120_001) }, now.getTime());
     expect(stale).toMatchObject({ locationStatus: "paused", location: null });
-    expect(mayShareLiveMissionLocation(false, true)).toBe(false);
-    expect(mayShareLiveMissionLocation(true, true)).toBe(true);
   });
 });

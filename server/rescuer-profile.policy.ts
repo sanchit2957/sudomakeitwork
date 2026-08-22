@@ -27,7 +27,3 @@ export function presentAssignedRescuerToVictim(profile: AssignmentProfileForVict
     location: isFresh ? { latitude: profile.lastLatitude!, longitude: profile.lastLongitude!, updatedAt: profile.locationUpdatedAt! } : null,
   };
 }
-
-export function mayShareLiveMissionLocation(hasOpenMission: boolean, enabled: boolean) {
-  return hasOpenMission && enabled;
-}
