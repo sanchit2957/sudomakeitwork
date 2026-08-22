@@ -35,12 +35,11 @@ describe("Home rapid-SOS success flow", () => {
     await waitFor(() => expect(runtime.navigate).toHaveBeenCalledWith("/track?code=SOS-ABCDEFGH"));
   });
 
-  it("shows the Assam-only boundary message when the server rejects a GPS point outside the state", async () => {
-    runtime.mutateAsync.mockRejectedValue(new Error("Locations must be inside Assam. Please select or share a location within Assam."));
+  it("uses an out-of-Assam device location for the temporary unrestricted rapid SOS flow", async () => {
     Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition: (success: PositionCallback) => success({ coords: { latitude: 25.5788, longitude: 91.8933 } } as GeolocationPosition) } });
     const view = render(<Home />);
     fireEvent.click(view.getByRole("button", { name: "Send SOS" }));
-    await waitFor(() => expect(view.getByRole("status").textContent).toContain("Locations must be inside Assam. Please select or share a location within Assam."));
-    expect(runtime.navigate).not.toHaveBeenCalled();
+    await waitFor(() => expect(runtime.mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ latitude: 25.5788, longitude: 91.8933 })));
+    await waitFor(() => expect(runtime.navigate).toHaveBeenCalledWith("/track?code=SOS-ABCDEFGH"));
   });
 });

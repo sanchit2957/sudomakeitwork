@@ -127,3 +127,8 @@
 - [x] Verify responsive Assam-only map behavior and save a checkpoint for the boundary update.
 - [x] Verify the Assam-only map lock at mobile width in both the Victim App and a map-bearing Operations screen.
 - [x] Save the Assam-only boundary update checkpoint after the completed final validation evidence is recorded.
+- [x] Diagnose why the Victim App map preview does not refresh to the device’s current location after access.
+- [x] Restore reliable current-location acquisition and map recentering without weakening Assam-only boundaries.
+- [x] Add regression coverage, verify the corrected location preview, and save a checkpoint.
+- [x] Temporarily disable Assam-only map camera restrictions, location filters, and server-side coordinate rejections.
+- [x] Verify the map preview accepts the device’s current location again and save a checkpoint for this temporary configuration.

@@ -79,7 +79,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { cn } from "@/lib/utils";
-import { ASSAM_CENTER, ASSAM_MAP_RESTRICTION } from "@shared/assam-boundary";
 
 declare global {
   interface Window {
@@ -117,16 +116,14 @@ interface MapViewProps {
   className?: string;
   initialCenter?: google.maps.LatLngLiteral;
   initialZoom?: number;
-  restrictToAssam?: boolean;
   onMapReady?: (map: google.maps.Map) => void;
   onMapError?: () => void;
 }
 
 export function MapView({
   className,
-  initialCenter = ASSAM_CENTER,
+  initialCenter = { lat: 26.2006, lng: 92.9376 },
   initialZoom = 12,
-  restrictToAssam = true,
   onMapReady,
   onMapError,
 }: MapViewProps) {
@@ -154,7 +151,6 @@ export function MapView({
       zoomControl: true,
       streetViewControl: true,
       mapId: "DEMO_MAP_ID",
-      restriction: restrictToAssam ? ASSAM_MAP_RESTRICTION : undefined,
     });
     if (onMapReady) {
       onMapReady(map.current);
@@ -165,5 +161,11 @@ export function MapView({
     init();
   }, [init]);
 
-  return <div ref={mapContainer} className={cn("relative w-full h-[500px]", className)}>{loadError && <div className="absolute inset-0 grid place-items-center bg-[#deebe7] p-6 text-center"><div><p className="font-semibold text-[#1d5148]">Map service is temporarily unavailable.</p><p className="mt-1 text-sm text-[#54736c]">Manual coordinates and location submissions are limited to Assam. Use a clear nearby Assam landmark.</p></div></div>}</div>;
+  useEffect(() => {
+    if (!map.current) return;
+    map.current.setCenter(initialCenter);
+    map.current.setZoom(initialZoom);
+  }, [initialCenter.lat, initialCenter.lng, initialZoom]);
+
+  return <div ref={mapContainer} className={cn("relative w-full h-[500px]", className)}>{loadError && <div className="absolute inset-0 grid place-items-center bg-[#deebe7] p-6 text-center"><div><p className="font-semibold text-[#1d5148]">Map service is temporarily unavailable.</p><p className="mt-1 text-sm text-[#54736c]">Enter latitude and longitude manually, then submit the location with a clear nearby landmark.</p></div></div>}</div>;
 }
