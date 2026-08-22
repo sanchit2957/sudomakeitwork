@@ -15,6 +15,13 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 export const startLogin = () => {
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
   const appId = import.meta.env.VITE_APP_ID;
+
+  if (!oauthPortalUrl) {
+    console.warn("[Auth] OAuth is not configured for local development.");
+    alert("Login is not available in local development mode. OAuth (VITE_OAUTH_PORTAL_URL) is not configured.");
+    return;
+  }
+
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
 
   const nonce = crypto.randomUUID();
