@@ -124,3 +124,9 @@ Accordingly, the platform retains the current provider-backed secure sign-in rat
 Final 375px full-page verification showed the circular SOS control, rainfall/wind readings, transparent unavailable river level, clickable seven-day trend entry, and seven-day forecast rendering without overflow. Safety opened directly on Medical support and showed the verified-empty-resource state rather than fabricated hospitals. Track opened as a code-free rescue-flow view with the saved-on-device empty state until a real SOS is created.
 
 The subsequent SOS visual refinement was reviewed at 375px: the control remains circular and high-contrast, now with a translucent red glass sheen, light rim, and internal highlight. The former raised lower shadow has been removed; active feedback uses a subtle scale response instead.
+
+The global appearance control was rendered beside the language selector on the Victim home header. Its accessible label correctly announced **Switch to dark theme**, and the page remained readable with active map, SOS, voice-note, and weather interfaces before dark-mode verification.
+
+Activating the shared control changed its accessible action to **Switch to light theme** and transitioned the rendered Victim home to dark mode. The outer page, header, SOS region, voice-note card, map framing, conditions panel, statistic tiles, forecast card surfaces, and bottom navigation all retained readable contrast in the dark palette.
+
+The selected dark theme persisted on navigation to the Government Command access portal. Its role-specific secure-access card, assistance text, actions, grid background, language selector, and theme control all rendered with readable contrast, confirming the global setting applies beyond the Victim App.
