@@ -119,6 +119,7 @@ export function useAuth(options?: UseAuthOptions) {
   return {
     ...state,
     refresh: () => meQuery.refetch(),
+    login,
     loginAsRole,
     logout,
   };
