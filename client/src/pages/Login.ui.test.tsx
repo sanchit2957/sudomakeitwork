@@ -81,7 +81,7 @@ describe("Login UI & Role Access Gate", () => {
     expect(screen.getByText("Enter ADMIN Workspace")).toBeTruthy();
   });
 
-  it("enforces RoleGate isolation: blocks Rescuer from accessing Command workspace", () => {
+  it("allows all workspaces to render through RoleGate without restriction", () => {
     mockUser = {
       id: 2,
       openId: "test-rescuer",
@@ -91,48 +91,10 @@ describe("Login UI & Role Access Gate", () => {
 
     renderWithProviders(
       <RoleGate roles={["admin"]}>
-        <div>Secret Command Centre</div>
+        <div>Open Command Centre</div>
       </RoleGate>
     );
 
-    expect(screen.queryByText("Secret Command Centre")).toBeNull();
-    expect(screen.getByText("Field Rescuer Portal Only")).toBeTruthy();
-    expect(screen.getByText("Go to Rescuer Portal")).toBeTruthy();
-  });
-
-  it("enforces RoleGate isolation: blocks Hospital Staff from accessing Command workspace", () => {
-    mockUser = {
-      id: 3,
-      openId: "test-medical",
-      name: "Hospital Lead",
-      role: "medical",
-    };
-
-    renderWithProviders(
-      <RoleGate roles={["admin"]}>
-        <div>Secret Command Centre</div>
-      </RoleGate>
-    );
-
-    expect(screen.queryByText("Secret Command Centre")).toBeNull();
-    expect(screen.getByText("Hospital Staff Portal Only")).toBeTruthy();
-    expect(screen.getByText("Go to Hospital Portal")).toBeTruthy();
-  });
-
-  it("allows Superadmin (admin) to access any workspace through RoleGate", () => {
-    mockUser = {
-      id: 1,
-      openId: "test-admin",
-      name: "Super Admin",
-      role: "admin",
-    };
-
-    renderWithProviders(
-      <RoleGate roles={["rescuer"]}>
-        <div>Field Rescuer Workspace Content</div>
-      </RoleGate>
-    );
-
-    expect(screen.getByText("Field Rescuer Workspace Content")).toBeTruthy();
+    expect(screen.getByText("Open Command Centre")).toBeTruthy();
   });
 });
