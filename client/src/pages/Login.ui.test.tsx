@@ -15,6 +15,7 @@ vi.mock("@/_core/hooks/useAuth", () => ({
   useAuth: () => ({
     user: mockUser,
     loading: false,
+    login: mockLoginAsRole,
     loginAsRole: mockLoginAsRole,
     logout: mockLogout,
   }),
@@ -34,67 +35,34 @@ function renderWithProviders(ui: React.ReactElement) {
 }
 
 describe("Login UI & Role Access Gate", () => {
-  it("renders the 4 dedicated role cards on the Login page", () => {
+  it("renders the sign in form with email and password inputs", () => {
     mockUser = null;
     renderWithProviders(<Login />);
 
-    expect(screen.getByText("Government Command")).toBeTruthy();
-    expect(screen.getByText("Field Rescuer Operations")).toBeTruthy();
-    expect(screen.getByText("Hospital & Medical Staff")).toBeTruthy();
-    expect(screen.getByText("Assam Resident / Citizen")).toBeTruthy();
+    expect(screen.getByText("Sign In")).toBeTruthy();
+    expect(screen.getByLabelText(/Email or Username/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Password/i)).toBeTruthy();
   });
 
-  it("handles 1-Click Superadmin login and triggers navigation to /command", async () => {
+  it("handles credential submission and triggers login", async () => {
     mockUser = null;
     renderWithProviders(<Login />);
 
-    const adminBtn = screen.getAllByRole("button", { name: /Government/i })[0];
-    fireEvent.click(adminBtn);
+    const emailInput = screen.getByLabelText(/Email or Username/i);
+    const passwordInput = screen.getByLabelText(/Password/i);
+    const submitBtn = screen.getAllByRole("button", { name: /Sign in/i })[0];
+
+    fireEvent.change(emailInput, { target: { value: "admin" } });
+    fireEvent.change(passwordInput, { target: { value: "admin" } });
+    fireEvent.click(submitBtn);
 
     await waitFor(() => {
       expect(mockLoginAsRole).toHaveBeenCalledWith(
         expect.objectContaining({
-          role: "admin",
-          email: "admin@assamrescue.gov.in",
+          email: "admin",
+          password: "admin",
         })
       );
-      expect(mockSetLocation).toHaveBeenCalledWith("/command");
-    });
-  });
-
-  it("handles 1-Click Field Rescuer login and triggers navigation to /responder", async () => {
-    mockUser = null;
-    renderWithProviders(<Login />);
-
-    const rescuerBtn = screen.getAllByRole("button", { name: /Field/i })[0];
-    fireEvent.click(rescuerBtn);
-
-    await waitFor(() => {
-      expect(mockLoginAsRole).toHaveBeenCalledWith(
-        expect.objectContaining({
-          role: "rescuer",
-          email: "rescuer@assamrescue.gov.in",
-        })
-      );
-      expect(mockSetLocation).toHaveBeenCalledWith("/responder");
-    });
-  });
-
-  it("handles 1-Click Hospital Staff login and triggers navigation to /medical", async () => {
-    mockUser = null;
-    renderWithProviders(<Login />);
-
-    const medicalBtn = screen.getAllByRole("button", { name: /Hospital/i })[0];
-    fireEvent.click(medicalBtn);
-
-    await waitFor(() => {
-      expect(mockLoginAsRole).toHaveBeenCalledWith(
-        expect.objectContaining({
-          role: "medical",
-          email: "medical@gmch.gov.in",
-        })
-      );
-      expect(mockSetLocation).toHaveBeenCalledWith("/medical");
     });
   });
 

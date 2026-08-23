@@ -16,7 +16,7 @@ import React, { FormEvent, useState } from "react";
 import { useLocation } from "wouter";
 
 export default function Login() {
-  const { user, loginAsRole, logout } = useAuth();
+  const { user, login, logout } = useAuth();
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
 
@@ -33,9 +33,7 @@ export default function Login() {
     setIsSubmitting(true);
     setErrorMessage("");
     try {
-      // Cast loginAsRole to any because we changed the TRPC input signature on the server, 
-      // but haven't updated the React Query wrapper types yet in useAuth.
-      const res = await (loginAsRole as any)({
+      const res = await login({
         email: email.trim(),
         password: password,
       });
@@ -132,7 +130,7 @@ export default function Login() {
                   onClick={() => setLocation(getDashboardDestinationForRole(user.role))}
                   className="w-full rounded-xl bg-[#0f766e] font-bold hover:bg-[#0f766e]/90 text-white"
                 >
-                  Enter Workspace
+                  Enter {user.role.toUpperCase()} Workspace
                 </Button>
                 <Button
                   onClick={() => logout()}
@@ -154,8 +152,9 @@ export default function Login() {
             )}
             <form onSubmit={handleCustomSubmit} className="space-y-4">
               <div>
-                <Label className="text-sm font-bold">Email or Username</Label>
+                <Label htmlFor="email" className="text-sm font-bold">Email or Username</Label>
                 <Input
+                  id="email"
                   type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -166,8 +165,9 @@ export default function Login() {
               </div>
 
               <div>
-                <Label className="text-sm font-bold">Password</Label>
+                <Label htmlFor="password" className="text-sm font-bold">Password</Label>
                 <Input
+                  id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

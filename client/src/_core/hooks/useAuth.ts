@@ -35,12 +35,10 @@ export function useAuth(options?: UseAuthOptions) {
     },
   });
 
-  const loginAsRole = useCallback(
+  const login = useCallback(
     async (params: {
-      role: "admin" | "rescuer" | "medical" | "user";
-      name?: string;
-      email?: string;
-      callSign?: string;
+      email: string;
+      password: string;
     }) => {
       const res = await loginMutation.mutateAsync(params);
       utils.auth.me.setData(undefined, res.user as any);
@@ -49,6 +47,8 @@ export function useAuth(options?: UseAuthOptions) {
     },
     [loginMutation, utils]
   );
+
+  const loginAsRole = login;
 
   const logout = useCallback(async () => {
     try {
