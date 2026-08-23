@@ -1,3 +1,4 @@
+import React from "react";
 import { Languages, Moon, Sun } from "lucide-react";
 import { localeOptions, useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";

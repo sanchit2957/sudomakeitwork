@@ -26,6 +26,6 @@ describe("dark theme coverage", () => {
     expect(source("../client/src/components/OperationsMap.tsx")).toContain("dark:bg-[#1a1a1c]/95");
     expect(source("../client/src/components/RoleGate.tsx")).toContain("dark:bg-[#242426] dark:text-[#d4d4d8]");
     expect(source("../client/src/components/DashboardLayout.tsx")).toContain("dark:bg-[#28282d] dark:text-[#f4f4f5]");
-    expect(source("../client/src/components/ManusDialog.tsx")).toContain("dark:border-[#424248] dark:bg-[#1a1a1c] dark:text-[#f4f4f5]");
+    expect(source("../client/src/components/PlatformLoginDialog.tsx")).toContain("dark:border-[#424248] dark:bg-[#1a1a1c] dark:text-[#f4f4f5]");
   });
 });

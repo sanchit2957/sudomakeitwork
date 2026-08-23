@@ -5,7 +5,7 @@ const now = new Date("2026-08-20T10:45:00.000Z");
 const assigned = {
   callSign: "Boat 4",
   name: "Rescue Volunteer",
-  photoUrl: "/manus-storage/rescuer-photo.png",
+  photoUrl: "/storage/rescuer-photo.png",
   phone: "+919999999999",
   contactSharing: "yes" as const,
   locationSharing: "yes" as const,

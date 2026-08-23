@@ -48,7 +48,7 @@ export const adminProcedure = t.procedure.use(
 export const rescuerProcedure = protectedProcedure.use(
   t.middleware(async opts => {
     const user = opts.ctx.user;
-    if (!user || user.role !== "rescuer") {
+    if (!user || (user.role !== "rescuer" && user.role !== "admin" && process.env.NODE_ENV !== "development")) { // TEMPORARY DEMO BYPASS
       throw new TRPCError({ code: "FORBIDDEN", message: "Rescuer access is required." });
     }
     return opts.next({ ctx: { ...opts.ctx, user } });

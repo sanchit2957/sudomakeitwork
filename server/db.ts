@@ -41,7 +41,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "password", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -91,4 +91,69 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat 4") {
+  const db = await getDb();
+  if (!db) return;
+  const { rescueProfiles } = await import("../drizzle/schema");
+  const existing = await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1);
+  if (!existing.length) {
+    await db.insert(rescueProfiles).values({
+      userId,
+      callSign,
+      phone: "+91 94350 11223",
+      contactSharing: "yes",
+      locationSharing: "yes",
+      availability: "available",
+      lastLatitude: 26.1445,
+      lastLongitude: 91.7362,
+      locationUpdatedAt: new Date(),
+    });
+  }
+}
+
+export async function ensureHospitalStaffProfile(userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const { hospitalStaffProfiles, hospitals } = await import("../drizzle/schema");
+  const existing = await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, userId)).limit(1);
+  if (!existing.length) {
+    let hospitalList = await db.select().from(hospitals).limit(1);
+    let hospitalId: number;
+    if (!hospitalList.length) {
+      const [newHospital] = await db.insert(hospitals).values({
+        name: "Gauhati Medical College & Hospital (GMCH)",
+        address: "Bhangagarh, Guwahati, Assam 781032",
+        contactPhone: "+91 361 2529457",
+        latitude: 26.1558,
+        longitude: 91.7645,
+        totalEmergencyBeds: 120,
+        availableEmergencyBeds: 34,
+        totalIcuBeds: 45,
+        availableIcuBeds: 12,
+        oxygenCylinderCount: 85,
+        bloodUnitCount: 140,
+        ambulanceCount: 14,
+        status: "open",
+      });
+      hospitalId = newHospital.insertId;
+    } else {
+      hospitalId = hospitalList[0].id;
+    }
+
+    await db.insert(hospitalStaffProfiles).values({
+      userId,
+      hospitalId,
+      designation: "Emergency Medical Coordinator",
+    });
+  }
+}
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}

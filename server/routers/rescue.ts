@@ -123,17 +123,25 @@ async function emitIncidentAlerts(incidentId: number, publicCode: string, locati
         body: `${publicCode} reported at ${locationLabel}. Review the operations board.`,
       })),
     );
-    await sendRescuerPush(nearbyRescuers.map(({ user }) => user.id), {
-      title: `${severity === "critical" ? "Critical" : "High-priority"} SOS nearby`,
-      body: `${publicCode} reported at ${locationLabel}. Review the operations board.`,
-      incidentId,
-      url: "/responder/alerts",
-    });
+    try {
+      await sendRescuerPush(nearbyRescuers.map(({ user }) => user.id), {
+        title: `${severity === "critical" ? "Critical" : "High-priority"} SOS nearby`,
+        body: `${publicCode} reported at ${locationLabel}. Review the operations board.`,
+        incidentId,
+        url: "/responder/alerts",
+      });
+    } catch (pushErr) {
+      console.warn("[Alerts] Rescuer push notification skipped:", pushErr);
+    }
   }
-  await notifyOwner({
-    title: `${severity === "critical" ? "Critical" : "High-priority"} SOS: ${publicCode}`,
-    content: `New SOS at ${locationLabel}. ${nearbyRescuers.length} nearby available rescuer(s) notified in-app.`,
-  });
+  try {
+    await notifyOwner({
+      title: `${severity === "critical" ? "Critical" : "High-priority"} SOS: ${publicCode}`,
+      content: `New SOS at ${locationLabel}. ${nearbyRescuers.length} nearby available rescuer(s) notified in-app.`,
+    });
+  } catch (ownerErr) {
+    console.warn("[Alerts] Owner notification skipped:", ownerErr);
+  }
 }
 
 async function enforceGuestSosRateLimit(guestKey: string) {

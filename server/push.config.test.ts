@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { createECDH } from "node:crypto";
 import webpush from "web-push";
 import { describe, expect, it } from "vitest";

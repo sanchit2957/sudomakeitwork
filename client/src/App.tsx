@@ -9,6 +9,7 @@ import Command from "./pages/Command";
 import Emergency from "./pages/Emergency";
 import Home from "./pages/Home";
 import HospitalRegistration from "./pages/HospitalRegistration";
+import Login from "./pages/Login";
 import Medical from "./pages/Medical";
 import More from "./pages/More";
 import Responder from "./pages/Responder";
@@ -21,6 +22,7 @@ function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/login"} component={Login} />
       <Route path={"/emergency"} component={Emergency} />
       <Route path={"/track"} component={TrackFlow} />
       <Route path={"/safety"} component={Safety} />

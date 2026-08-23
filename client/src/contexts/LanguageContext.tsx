@@ -555,7 +555,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void fetch("/manus-storage/operational-language-pack_86163712.json")
+    void fetch("/storage/operational-language-pack_86163712.json")
       .then(response => response.ok ? response.json() : {})
       .then((data: Partial<Record<Locale, Record<string, string>>>) => setOperationalTerms(data))
       .catch(() => undefined);

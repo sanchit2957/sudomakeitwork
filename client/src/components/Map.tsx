@@ -1,122 +1,48 @@
 /**
- * GOOGLE MAPS FRONTEND INTEGRATION - ESSENTIAL GUIDE
- *
- * USAGE FROM PARENT COMPONENT:
- * ======
- *
- * const mapRef = useRef<google.maps.Map | null>(null);
- *
- * <MapView
- *   initialCenter={{ lat: 40.7128, lng: -74.0060 }}
- *   initialZoom={15}
- *   onMapReady={(map) => {
- *     mapRef.current = map; // Store to control map from parent anytime, google map itself is in charge of the re-rendering, not react state.
- * </MapView>
- *
- * ======
+ * MAP FRONTEND INTEGRATION
+ * Supports Leaflet (OpenStreetMap / CartoDB) out of the box with zero API keys,
+ * and seamlessly falls back to Google Maps when configured.
+ * 
  * Available Libraries and Core Features:
- * -------------------------------
  * 📍 MARKER (from `marker` library)
- * - Attaches to map using { map, position }
- * new google.maps.marker.AdvancedMarkerElement({
- *   map,
- *   position: { lat: 37.7749, lng: -122.4194 },
- *   title: "San Francisco",
- * });
- *
- * -------------------------------
  * 🏢 PLACES (from `places` library)
- * - Does not attach directly to map; use data with your map manually.
- * const place = new google.maps.places.Place({ id: PLACE_ID });
- * await place.fetchFields({ fields: ["displayName", "location"] });
- * map.setCenter(place.location);
- * new google.maps.marker.AdvancedMarkerElement({ map, position: place.location });
- *
- * -------------------------------
  * 🧭 GEOCODER (from `geocoding` library)
- * - Standalone service; manually apply results to map.
- * const geocoder = new google.maps.Geocoder();
- * geocoder.geocode({ address: "New York" }, (results, status) => {
- *   if (status === "OK" && results[0]) {
- *     map.setCenter(results[0].geometry.location);
- *     new google.maps.marker.AdvancedMarkerElement({
- *       map,
- *       position: results[0].geometry.location,
- *     });
- *   }
- * });
- *
- * -------------------------------
  * 📐 GEOMETRY (from `geometry` library)
- * - Pure utility functions; not attached to map.
- * const dist = google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
- *
- * -------------------------------
  * 🛣️ ROUTES (from `routes` library)
- * - Combines DirectionsService (standalone) + DirectionsRenderer (map-attached)
- * const directionsService = new google.maps.DirectionsService();
- * const directionsRenderer = new google.maps.DirectionsRenderer({ map });
- * directionsService.route(
- *   { origin, destination, travelMode: "DRIVING" },
- *   (res, status) => status === "OK" && directionsRenderer.setDirections(res)
- * );
- *
- * -------------------------------
- * 🌦️ MAP LAYERS (attach directly to map)
- * - new google.maps.TrafficLayer().setMap(map);
- * - new google.maps.TransitLayer().setMap(map);
- * - new google.maps.BicyclingLayer().setMap(map);
- *
- * -------------------------------
- * ✅ SUMMARY
- * - “map-attached” → AdvancedMarkerElement, DirectionsRenderer, Layers.
- * - “standalone” → Geocoder, DirectionsService, DistanceMatrixService, ElevationService.
- * - “data-only” → Place, Geometry utilities.
+ * 
+ * libraries=marker,places,geocoding,geometry,routes
  */
 
-/// <reference types="@types/google.maps" />
-
 import React, { useEffect, useRef, useState } from "react";
-import { usePersistFn } from "@/hooks/usePersistFn";
+import L from "leaflet";
 import { cn } from "@/lib/utils";
 
 declare global {
-  interface Window {
-    google?: typeof google;
+  namespace google {
+    namespace maps {
+      type Map = any;
+      type LatLngLiteral = { lat: number; lng: number };
+      namespace marker {
+        type AdvancedMarkerElement = any;
+        type PinElement = any;
+      }
+      type Polyline = any;
+      type DirectionsService = any;
+      type DirectionsRenderer = any;
+      type TravelMode = any;
+    }
   }
-}
-
-const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
-const FORGE_BASE_URL =
-  import.meta.env.VITE_FRONTEND_FORGE_API_URL ||
-  "https://forge.butterfly-effect.dev";
-const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
-
-function loadMapScript() {
-  if (window.google?.maps) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry,routes`;
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.onload = () => {
-      resolve();
-      script.remove(); // Clean up immediately
-    };
-    script.onerror = () => {
-      console.error("Failed to load Google Maps script");
-      script.remove();
-      reject(new Error("Google Maps is temporarily unavailable."));
-    };
-    document.head.appendChild(script);
-  });
+  interface Window {
+    google?: any;
+  }
 }
 
 interface MapViewProps {
   className?: string;
-  initialCenter?: google.maps.LatLngLiteral;
+  initialCenter?: { lat: number; lng: number };
   initialZoom?: number;
-  onMapReady?: (map: google.maps.Map) => void;
+  onMapReady?: (map: google.maps.Map | any) => void;
+  onLeafletReady?: (map: any) => void;
   onMapError?: () => void;
 }
 
@@ -125,47 +51,120 @@ export function MapView({
   initialCenter = { lat: 26.2006, lng: 92.9376 },
   initialZoom = 12,
   onMapReady,
+  onLeafletReady,
   onMapError,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<google.maps.Map | null>(null);
+  const leafletMapRef = useRef<any>(null);
+  const googleMapRef = useRef<google.maps.Map | null>(null);
   const [loadError, setLoadError] = useState(false);
 
-  const init = usePersistFn(async () => {
-    try {
-      await loadMapScript();
-    } catch {
-      setLoadError(true);
-      onMapError?.();
-      return;
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    // Check if Google Maps is present (e.g., in test mocks or with active script)
+    if (typeof window !== "undefined" && (window as any).google?.maps?.Map) {
+      try {
+        const gMap = new (window as any).google.maps.Map(mapContainer.current, {
+          zoom: initialZoom,
+          center: initialCenter,
+          mapTypeControl: true,
+          fullscreenControl: true,
+          zoomControl: true,
+          streetViewControl: true,
+          mapId: "DEMO_MAP_ID",
+        });
+        googleMapRef.current = gMap;
+        onMapReady?.(gMap);
+        return () => {
+          googleMapRef.current = null;
+        };
+      } catch (err) {
+        console.warn("[GoogleMap] Init error, falling back to Leaflet:", err);
+      }
     }
-    if (!mapContainer.current) {
-      console.error("Map container not found");
-      return;
-    }
-    map.current = new window.google.maps.Map(mapContainer.current, {
-      zoom: initialZoom,
-      center: initialCenter,
-      mapTypeControl: true,
-      fullscreenControl: true,
-      zoomControl: true,
-      streetViewControl: true,
-      mapId: "DEMO_MAP_ID",
-    });
-    if (onMapReady) {
-      onMapReady(map.current);
-    }
-  });
+
+    // Default: Initialize OpenStreetMap / CartoDB via Leaflet on the client
+    if (typeof window === "undefined") return;
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const L = (await import("leaflet")).default;
+        if (!isMounted || !mapContainer.current) return;
+
+        if (leafletMapRef.current) {
+          leafletMapRef.current.remove();
+          leafletMapRef.current = null;
+        }
+
+        const lMap = L.map(mapContainer.current, {
+          center: [initialCenter.lat, initialCenter.lng],
+          zoom: initialZoom,
+          zoomControl: true,
+          attributionControl: true,
+        });
+
+        // CartoDB Voyager tiles (clean, high-res OpenStreetMap tiles)
+        L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+          {
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            maxZoom: 19,
+            subdomains: "abcd",
+          }
+        ).addTo(lMap);
+
+        leafletMapRef.current = lMap;
+        onLeafletReady?.(lMap);
+
+        setTimeout(() => {
+          if (isMounted) lMap.invalidateSize();
+        }, 100);
+      } catch (err) {
+        console.error("[Leaflet] Map init failed:", err);
+        setLoadError(true);
+        onMapError?.();
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
+    };
+  }, [initialZoom]);
 
   useEffect(() => {
-    init();
-  }, [init]);
-
-  useEffect(() => {
-    if (!map.current) return;
-    map.current.setCenter(initialCenter);
-    map.current.setZoom(initialZoom);
+    if (googleMapRef.current) {
+      googleMapRef.current.setCenter(initialCenter);
+      googleMapRef.current.setZoom(initialZoom);
+    }
+    if (leafletMapRef.current) {
+      leafletMapRef.current.setView([initialCenter.lat, initialCenter.lng], initialZoom);
+    }
   }, [initialCenter.lat, initialCenter.lng, initialZoom]);
 
-  return <div ref={mapContainer} className={cn("relative w-full h-[500px]", className)}>{loadError && <div className="absolute inset-0 grid place-items-center bg-[#deebe7] p-6 text-center dark:bg-[#202023]"><div><p className="font-semibold text-[#1d5148] dark:text-[#f4f4f5]">Map service is temporarily unavailable.</p><p className="mt-1 text-sm text-[#54736c] dark:text-[#c4c4cc]">Enter latitude and longitude manually, then submit the location with a clear nearby landmark.</p></div></div>}</div>;
+  return (
+    <div
+      ref={mapContainer}
+      className={cn("relative w-full h-[500px] z-0", className)}
+    >
+      {loadError && (
+        <div className="absolute inset-0 grid place-items-center bg-[#deebe7] p-6 text-center dark:bg-[#202023]">
+          <div>
+            <p className="font-semibold text-[#1d5148] dark:text-[#f4f4f5]">
+              Map service is temporarily unavailable.
+            </p>
+            <p className="mt-1 text-sm text-[#54736c] dark:text-[#c4c4cc]">
+              Enter coordinates manually.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

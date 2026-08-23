@@ -55,33 +55,68 @@ export default function Home() {
   const startRapidSos = () => {
     if (authLoading) return;
     if (!user) { startLogin(); return; }
-    if (!navigator.geolocation) { setRapidStatus("error"); setRapidNotice(t("Location is required to send SOS. This device cannot provide location.")); return; }
-    setRapidStatus("locating"); setRapidNotice(t("Allow location to send SOS immediately."));
-    navigator.geolocation.getCurrentPosition(async result => {
-      const latitude = result.coords.latitude; const longitude = result.coords.longitude;
-      setPosition({ latitude, longitude }); setLocationStatus("ready");
+
+    const submitSosWithCoords = async (latitude: number, longitude: number, label: string) => {
+      setPosition({ latitude, longitude });
+      setLocationStatus("ready");
       const voiceNote = readSosVoiceNote();
-      const payload = { contactName: user.name || undefined, locationLabel: t("GPS location captured from this phone"), latitude, longitude, emergencyType: "flood" as const, severity: "high" as const, peopleAffected: 1, voiceNoteDataUrl: voiceNote?.dataUrl, voiceNoteDurationSeconds: voiceNote?.durationSeconds };
+      const payload = {
+        contactName: user.name || undefined,
+        locationLabel: label,
+        latitude,
+        longitude,
+        emergencyType: "flood" as const,
+        severity: "high" as const,
+        peopleAffected: 1,
+        voiceNoteDataUrl: voiceNote?.dataUrl,
+        voiceNoteDurationSeconds: voiceNote?.durationSeconds,
+      };
+
       if (!navigator.onLine) {
         const guestKey = localStorage.getItem("sudo-makeitwork-guest-key") || crypto.randomUUID().replaceAll("-", "");
         localStorage.setItem("sudo-makeitwork-guest-key", guestKey);
-        queueOfflineSos({ ...payload, guestKey }); setRapidStatus("queued"); setRapidNotice(t("SOS is saved on this phone and will send automatically when connection returns.")); return;
+        queueOfflineSos({ ...payload, guestKey });
+        setRapidStatus("queued");
+        setRapidNotice(t("SOS is saved on this phone and will send automatically when connection returns."));
+        return;
       }
+
       try {
         setRapidStatus("sending");
         await createAndRedirectAfterRapidSos({ payload, createSos: createSos.mutateAsync, navigate: setLocation });
         clearSosVoiceNote();
+        setRapidStatus("idle");
       } catch (error) {
         const message = error instanceof Error ? error.message : "";
         const isSafeInputMessage = /^(Voice notes|Evidence|Locations|Available beds)/.test(message);
-        setRapidStatus("error"); setRapidNotice(isSafeInputMessage ? t(message) : t("SOS could not be sent. Check connection and try again."));
+        setRapidStatus("error");
+        setRapidNotice(isSafeInputMessage ? t(message) : t("SOS could not be sent. Check connection and try again."));
       }
-    }, () => { setRapidStatus("error"); setRapidNotice(t("Location permission is needed before SOS can be sent.")); }, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 });
+    };
+
+    setRapidStatus("locating");
+    setRapidNotice(t("Getting location to send SOS immediately…"));
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        result => {
+          submitSosWithCoords(result.coords.latitude, result.coords.longitude, t("GPS location captured from this phone"));
+        },
+        () => {
+          const fallback = position || guwahati;
+          submitSosWithCoords(fallback.latitude, fallback.longitude, t("Assam emergency coordinates"));
+        },
+        { enableHighAccuracy: true, timeout: 8_000, maximumAge: 30_000 }
+      );
+    } else {
+      const fallback = position || guwahati;
+      submitSosWithCoords(fallback.latitude, fallback.longitude, t("Assam emergency coordinates"));
+    }
   };
 
   const activePoint = position || guwahati;
   return <div className="victim-page min-h-screen bg-[#f6f8f7] text-[#142c2b] dark:bg-[#050505] dark:text-[#f4f4f5]"><main className="victim-main relative mx-auto min-h-screen max-w-lg overflow-hidden bg-[#fcfdfd] px-5 pb-28 pt-6 shadow-2xl shadow-[#113c35]/10 dark:bg-[#101011] dark:shadow-black/30 md:my-6 md:min-h-[850px] md:rounded-[2.75rem] md:border">
-    <header className="flex items-start justify-between gap-3"><button onClick={() => setLocation("/")} className="text-left"><span className="block text-2xl font-black tracking-[-0.06em]">sudo <span className="text-[#da3e42]">MakeItWork</span></span><span className="mt-1 block font-mono text-[9px] font-bold uppercase tracking-[0.17em] text-[#63817b]">Assam safety companion</span></button><div className="flex flex-col items-end gap-2"><LanguageSelector compact /><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ${online ? "bg-[#dff6e7] text-[#197b55]" : "bg-[#fff1dd] text-[#9b6519]"}`}>{online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}{online ? t("Connected") : t("Offline")}</span></div></header>
+    <header className="flex items-start justify-between gap-3"><button onClick={() => setLocation("/")} className="text-left"><span className="block text-2xl font-black tracking-[-0.06em]">sudo <span className="text-[#da3e42]">MakeItWork</span></span><span className="mt-1 block font-mono text-[9px] font-bold uppercase tracking-[0.17em] text-[#63817b]">Assam safety companion</span></button><div className="flex flex-col items-end gap-2"><div className="flex items-center gap-1.5"><button onClick={() => setLocation("/login")} className="rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-2.5 py-1 font-mono text-[10px] font-extrabold uppercase text-[#0f766e] transition hover:bg-[#0f766e]/20 dark:text-emerald-400">{user ? user.role : "Sign in"}</button><LanguageSelector compact /></div><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ${online ? "bg-[#dff6e7] text-[#197b55]" : "bg-[#fff1dd] text-[#9b6519]"}`}>{online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}{online ? t("Connected") : t("Offline")}</span></div></header>
 
     <section className="mt-6 flex flex-col items-center"><button onClick={startRapidSos} disabled={authLoading || rapidStatus === "locating" || rapidStatus === "sending"} aria-label={t("Send SOS")} className="group isolate grid h-44 w-44 shrink-0 aspect-square place-items-center overflow-hidden rounded-[9999px] border border-white/55 bg-[linear-gradient(145deg,rgba(255,109,118,.91),rgba(209,47,55,.84)_55%,rgba(174,27,36,.9))] text-white ring-1 ring-[#ca3540]/25 backdrop-blur-md transition active:scale-[.975] disabled:cursor-wait disabled:opacity-80"><span aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-3 h-16 rounded-full bg-white/25 blur-md" /><span className="relative z-10 grid place-items-center">{rapidStatus === "locating" || rapidStatus === "sending" ? <Radio className="mb-2 h-8 w-8 animate-pulse" /> : <Siren className="mb-1 h-7 w-7" />}<span className="text-5xl font-black tracking-[-0.08em]">SOS</span><span className="mt-1 text-xs font-bold">{rapidStatus === "locating" ? t("Getting location") : rapidStatus === "sending" ? t("Sending SOS") : user ? t("Tap for immediate help") : t("Sign in to activate")}</span></span></button><p className="mt-6 flex items-center gap-2 rounded-full bg-[#fff3ef] px-3 py-1.5 text-[11px] font-bold text-[#a43d3e]"><Waves className="h-3.5 w-3.5" />{t("Use this only for an emergency")}</p>{rapidNotice && <p role="status" className={`mt-3 max-w-xs text-center text-xs font-semibold leading-5 ${rapidStatus === "error" ? "text-[#b73f43]" : "text-[#38675d]"}`}>{rapidNotice}</p>}</section>
 
@@ -122,7 +157,7 @@ function VoiceNoteCard() {
 function LocationPreview({ point, state }: { point: Point; state: "finding" | "ready" | "unavailable" }) {
   const { t } = useLanguage();
   const pointKey = `${point.latitude.toFixed(6)}-${point.longitude.toFixed(6)}`;
-  return <section className="mt-5 overflow-hidden rounded-[1.55rem] bg-white p-3 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10"><div className="relative overflow-hidden rounded-[1.15rem]"><MapView key={pointKey} className="h-44" initialCenter={{ lat: point.latitude, lng: point.longitude }} initialZoom={14} onMapReady={map => { new window.google!.maps.marker.AdvancedMarkerElement({ map, position: { lat: point.latitude, lng: point.longitude }, title: "Your location" }); }} /><div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-white/95 px-2.5 py-1 text-xs font-extrabold shadow-sm dark:bg-[#1a1a1c]/95">{t("Map preview")}</div></div><div className="flex items-center justify-between px-1 pt-3"><span className="flex items-center gap-2 text-xs font-bold text-[#2d514a] dark:text-[#ededf0]"><MapPin className="h-4 w-4 text-[#df3e43]" />{state === "ready" ? t("Your current location") : state === "finding" ? t("Finding your location") : t("Map centered on Assam")}</span><span className="font-mono text-[10px] font-bold text-[#6a867e] dark:text-[#b9b9c0]">{point.latitude.toFixed(4)}° N, {point.longitude.toFixed(4)}° E</span></div></section>;
+  return <section className="mt-5 overflow-hidden rounded-[1.55rem] bg-white p-3 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10"><div className="relative overflow-hidden rounded-[1.15rem]"><MapView key={pointKey} className="h-44" initialCenter={{ lat: point.latitude, lng: point.longitude }} initialZoom={14} onMapReady={map => { if ((window as any).google?.maps?.marker?.AdvancedMarkerElement) new (window as any).google.maps.marker.AdvancedMarkerElement({ map, position: { lat: point.latitude, lng: point.longitude }, title: "Your location" }); }} onLeafletReady={async lMap => { const L = (await import("leaflet")).default; const icon = L.divIcon({ className: "loc-pin", html: `<div style="background:#df3e43;color:#fff;border-radius:50%;width:24px;height:24px;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,0.3);font-size:12px;">📍</div>`, iconSize: [24, 24], iconAnchor: [12, 24] }); L.marker([point.latitude, point.longitude], { icon }).addTo(lMap); }} /><div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-white/95 px-2.5 py-1 text-xs font-extrabold shadow-sm dark:bg-[#1a1a1c]/95">{t("Map preview")}</div></div><div className="flex items-center justify-between px-1 pt-3"><span className="flex items-center gap-2 text-xs font-bold text-[#2d514a] dark:text-[#ededf0]"><MapPin className="h-4 w-4 text-[#df3e43]" />{state === "ready" ? t("Your current location") : state === "finding" ? t("Finding your location") : t("Map centered on Assam")}</span><span className="font-mono text-[10px] font-bold text-[#6a867e] dark:text-[#b9b9c0]">{point.latitude.toFixed(4)}° N, {point.longitude.toFixed(4)}° E</span></div></section>;
 }
 
 function FloodConditions({ conditions, loading }: { conditions?: { available: boolean; risk: string; activeFloodZones: number; current: { temperatureC: number | null; precipitationMm: number | null; windKmh: number | null }; forecast: { rainChance: number | null; rainAmountMm: number | null } }; loading: boolean }) {

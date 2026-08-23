@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
+import "leaflet/dist/leaflet.css";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ if ("serviceWorker" in navigator) {
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
+  if (import.meta.env.DEV) return; // TEMPORARY DEMO BYPASS — don't redirect to login in dev
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
 
@@ -60,7 +62,7 @@ const trpcClient = trpc.createClient({
         // session into sessionStorage so we can forward it as a Bearer token.
         // The regular OAuth cookie flow keeps working and takes priority server-side.
         try {
-          const raw = sessionStorage.getItem("manus-cookie");
+          const raw = sessionStorage.getItem("app-session-cookie");
           if (raw) {
             const prefix = `${COOKIE_NAME}=`;
             const pair = raw.split(";").find(s => s.trim().startsWith(prefix));

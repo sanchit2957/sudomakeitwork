@@ -2,7 +2,7 @@ import { OAUTH_STATE_COOKIE, encodeOAuthState } from "@shared/const";
 
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
-// Start the Manus OAuth login. Call this from an event handler or effect at the
+// Start the OAuth login. Call this from an event handler or effect at the
 // moment you want to navigate, e.g. `onClick={() => startLogin()}`.
 //
 // It has SIDE EFFECTS — it mints a one-time nonce, writes the __Host- state
@@ -12,13 +12,13 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 // call would desync it from an in-flight login and the callback would reject it
 // with "invalid oauth state". It returns void by design, so there is no URL to
 // stash across renders.
-export const startLogin = () => {
+export const startLogin = (redirectPath?: string) => {
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
   const appId = import.meta.env.VITE_APP_ID;
 
   if (!oauthPortalUrl) {
-    console.warn("[Auth] OAuth is not configured for local development.");
-    alert("Login is not available in local development mode. OAuth (VITE_OAUTH_PORTAL_URL) is not configured.");
+    const target = redirectPath || window.location.pathname;
+    window.location.href = `/login${target && target !== "/login" ? `?redirect=${encodeURIComponent(target)}` : ""}`;
     return;
   }
 
