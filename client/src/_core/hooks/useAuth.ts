@@ -35,6 +35,7 @@ export function useAuth(options?: UseAuthOptions) {
       if (data.sessionToken) {
         try {
           sessionStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
+          localStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
         } catch {}
       }
       await utils.auth.me.invalidate();
@@ -62,6 +63,36 @@ export function useAuth(options?: UseAuthOptions) {
 
   const loginAsRole = login;
 
+  const registerMutation = trpc.auth.register.useMutation({
+    onSuccess: async (data) => {
+      utils.auth.me.setData(undefined, data.user as any);
+      if (data.sessionToken) {
+        try {
+          sessionStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
+          localStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
+        } catch {}
+      }
+      await utils.auth.me.invalidate();
+    },
+  });
+
+  const register = useCallback(
+    async (params: {
+      name: string;
+      email: string;
+      password: string;
+      role?: "user" | "rescuer" | "medical" | "admin";
+      phone?: string;
+      callSign?: string;
+    }) => {
+      const res = await registerMutation.mutateAsync(params);
+      utils.auth.me.setData(undefined, res.user as any);
+      await utils.auth.me.invalidate();
+      return res;
+    },
+    [registerMutation, utils]
+  );
+
   const logout = useCallback(async () => {
     try {
       await logoutMutation.mutateAsync();
@@ -76,6 +107,7 @@ export function useAuth(options?: UseAuthOptions) {
     } finally {
       try {
         sessionStorage.removeItem("app-session-cookie");
+        localStorage.removeItem("app-session-cookie");
         localStorage.removeItem("app-runtime-user-info");
       } catch {}
       utils.auth.me.setData(undefined, null);
@@ -83,21 +115,31 @@ export function useAuth(options?: UseAuthOptions) {
     }
   }, [logoutMutation, utils]);
 
+  useEffect(() => {
+    if (!redirectOnUnauthenticated) return;
+    if (meQuery.isLoading) return;
+    if (meQuery.data) return;
+    if (typeof window === "undefined") return;
+    if (window.location.pathname.startsWith("/login") || window.location.pathname.startsWith("/admin/login")) return;
+    startLogin(redirectPath);
+  }, [redirectOnUnauthenticated, redirectPath, meQuery.isLoading, meQuery.data]);
+
   const state = useMemo(() => {
-    const effectiveUser = meQuery.data ?? DEFAULT_USER;
+    const effectiveUser = meQuery.data ?? null;
     return {
       user: effectiveUser,
-      loading: false,
-      error: null,
-      isAuthenticated: true,
+      loading: meQuery.isLoading,
+      error: meQuery.error ?? null,
+      isAuthenticated: Boolean(effectiveUser),
     };
-  }, [meQuery.data]);
+  }, [meQuery.data, meQuery.isLoading, meQuery.error]);
 
   return {
     ...state,
     refresh: () => meQuery.refetch(),
     login,
     loginAsRole,
+    register,
     logout,
   };
 }

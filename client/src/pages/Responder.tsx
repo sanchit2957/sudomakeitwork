@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
+import { showNotification } from "@/lib/nativeNotifications";
 import { reconcileAvailability, reconcileMissionStatus } from "@/lib/operationalSync";
 import { Bell, Camera, CheckCircle2, ClipboardList, ClipboardPenLine, LocateFixed, MapPinned, MessageCircle, Navigation, Phone, Radio, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -65,9 +66,15 @@ function ResponderWorkspace() {
   }, []);
 
   useEffect(() => {
-    if (typeof Notification === "undefined" || Notification.permission !== "granted" || !alerts.data) return;
+    if (!alerts.data) return;
     const newest = alerts.data.items.find(item => !item.readAt);
-    if (newest && document.visibilityState === "hidden") new Notification(newest.title, { body: newest.body });
+    if (!newest) return;
+    if (document.visibilityState === "hidden") {
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        try { new Notification(newest.title, { body: newest.body }); } catch {}
+      }
+      void showNotification({ title: newest.title, body: newest.body, id: newest.id });
+    }
   }, [alerts.data]);
 
   useEffect(() => {

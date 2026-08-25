@@ -56,7 +56,61 @@ export async function makeRequest<T = unknown>(
   params: Record<string, unknown> = {},
   options: RequestOptions = {}
 ): Promise<T> {
+  if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
+    // Local offline mock responses for common maps endpoints
+    if (endpoint.includes("geocode")) {
+      return {
+        results: [
+          {
+            formatted_address: (params.address as string) || "Guwahati, Assam, India",
+            geometry: {
+              location: { lat: 26.1445, lng: 91.7362 },
+              location_type: "APPROXIMATE",
+            },
+            place_id: "ChIJb9xN80YVWDcRUwO7hX2bC8k",
+            types: ["locality", "political"],
+          },
+        ],
+        status: "OK",
+      } as T;
+    }
+    if (endpoint.includes("directions") || endpoint.includes("distancematrix")) {
+      return {
+        status: "OK",
+        origin_addresses: ["Guwahati, Assam"],
+        destination_addresses: ["Silchar, Assam"],
+        rows: [
+          {
+            elements: [
+              {
+                status: "OK",
+                duration: { text: "25 mins", value: 1500 },
+                distance: { text: "12.4 km", value: 12400 },
+              },
+            ],
+          },
+        ],
+        routes: [
+          {
+            summary: "GS Road / NH27",
+            legs: [
+              {
+                distance: { text: "12.4 km", value: 12400 },
+                duration: { text: "25 mins", value: 1500 },
+                start_address: "Guwahati Rescue Station",
+                end_address: "Assam Incident Location",
+                steps: [],
+              },
+            ],
+          },
+        ],
+      } as T;
+    }
+    return { status: "OK", results: [] } as T;
+  }
+
   const { baseUrl, apiKey } = getMapsConfig();
+
 
   // Construct full URL: baseUrl + /v1/maps/proxy + endpoint
   const url = new URL(`${baseUrl}/v1/maps/proxy${endpoint}`);

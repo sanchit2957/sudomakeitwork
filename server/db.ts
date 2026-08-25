@@ -4,6 +4,7 @@ import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _dbChecked = false;
 
 export function planRoleSync(role: InsertUser["role"] | undefined, isProjectOwner: boolean) {
   if (role !== undefined) return { insertRole: role, updateRole: role };
@@ -11,20 +12,20 @@ export function planRoleSync(role: InsertUser["role"] | undefined, isProjectOwne
   return { insertRole: undefined, updateRole: undefined };
 }
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
+// Lazily create the drizzle instance so local tooling can run without a DB or with a local DB.
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db && process.env.DATABASE_URL && !_dbChecked) {
     try {
       _db = drizzle(process.env.DATABASE_URL);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.warn("[Database] Failed to connect MySQL, falling back to local memory store:", error);
       _db = null;
     }
   }
   return _db;
 }
 
-const _memoryUsers: Map<string, any> = new Map([
+export const _memoryUsers: Map<string, any> = new Map([
   [
     "user-admin",
     {
@@ -49,6 +50,96 @@ const _memoryUsers: Map<string, any> = new Map([
       email: "admin@assamrescue.gov.in",
       password: "admin",
       role: "admin",
+      loginMethod: "platform-login",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "user-rescuer",
+    {
+      id: 2,
+      openId: "user-rescuer",
+      name: "Inspector Barua",
+      email: "rescuer@assamrescue.gov.in",
+      password: "rescuer",
+      role: "rescuer",
+      loginMethod: "platform-login",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "rescuer@assamrescue.gov.in",
+    {
+      id: 2,
+      openId: "user-rescuer",
+      name: "Inspector Barua",
+      email: "rescuer@assamrescue.gov.in",
+      password: "rescuer",
+      role: "rescuer",
+      loginMethod: "platform-login",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "user-medical",
+    {
+      id: 3,
+      openId: "user-medical",
+      name: "Dr. Hazarika",
+      email: "medical@assamrescue.gov.in",
+      password: "medical",
+      role: "medical",
+      loginMethod: "platform-login",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "medical@assamrescue.gov.in",
+    {
+      id: 3,
+      openId: "user-medical",
+      name: "Dr. Hazarika",
+      email: "medical@assamrescue.gov.in",
+      password: "medical",
+      role: "medical",
+      loginMethod: "platform-login",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "user-citizen",
+    {
+      id: 4,
+      openId: "user-citizen",
+      name: "Anamika Das",
+      email: "citizen@assamrescue.gov.in",
+      password: "citizen",
+      role: "user",
+      loginMethod: "platform-login",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "citizen@assamrescue.gov.in",
+    {
+      id: 4,
+      openId: "user-citizen",
+      name: "Anamika Das",
+      email: "citizen@assamrescue.gov.in",
+      password: "citizen",
+      role: "user",
       loginMethod: "platform-login",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -80,7 +171,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot upsert user to MySQL: using memory store");
     return;
   }
 
@@ -123,7 +213,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       set: updateSet,
     });
   } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
+    console.warn("[Database] MySQL sync skipped, using local memory store:", error);
   }
 }
 
@@ -167,61 +257,85 @@ export async function getAllUsers() {
 
 export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat 4") {
   const db = await getDb();
-  if (!db) return;
+  if (db) {
+    try {
+      const { rescueProfiles } = await import("../drizzle/schema");
+      const existing = await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1);
+      if (!existing.length) {
+        await db.insert(rescueProfiles).values({
+          userId,
+          callSign,
+          phone: "+91 94350 11223",
+          contactSharing: "yes",
+          locationSharing: "yes",
+          availability: "available",
+          lastLatitude: 26.1445,
+          lastLongitude: 91.7362,
+          locationUpdatedAt: new Date(),
+        });
+      }
+    } catch {}
+  }
+  // Also register into rescue memory
   try {
-    const { rescueProfiles } = await import("../drizzle/schema");
-    const existing = await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1);
-    if (!existing.length) {
-      await db.insert(rescueProfiles).values({
-        userId,
-        callSign,
-        phone: "+91 94350 11223",
-        contactSharing: "yes",
-        locationSharing: "yes",
-        availability: "available",
-        lastLatitude: 26.1445,
-        lastLongitude: 91.7362,
-        locationUpdatedAt: new Date(),
-      });
-    }
+    const { registerMemoryRescuerProfile } = await import("./rescue.db");
+    registerMemoryRescuerProfile({
+      userId,
+      callSign,
+      phone: "+91 94350 11223",
+      contactSharing: "yes",
+      locationSharing: "yes",
+      availability: "available",
+      lastLatitude: 26.1445,
+      lastLongitude: 91.7362,
+    });
   } catch {}
 }
 
 export async function ensureHospitalStaffProfile(userId: number) {
   const db = await getDb();
-  if (!db) return;
-  try {
-    const { hospitalStaffProfiles, hospitals } = await import("../drizzle/schema");
-    const existing = await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, userId)).limit(1);
-    if (!existing.length) {
-      let hospitalList = await db.select().from(hospitals).limit(1);
-      let hospitalId: number;
-      if (!hospitalList.length) {
-        const [newHospital] = await db.insert(hospitals).values({
-          name: "Gauhati Medical College & Hospital (GMCH)",
-          address: "Bhangagarh, Guwahati, Assam 781032",
-          contactPhone: "+91 361 2529457",
-          latitude: 26.1558,
-          longitude: 91.7645,
-          totalEmergencyBeds: 120,
-          availableEmergencyBeds: 34,
-          totalIcuBeds: 45,
-          availableIcuBeds: 12,
-          oxygenCylinderCount: 85,
-          bloodUnitCount: 140,
-          ambulanceCount: 14,
-          status: "open",
-        });
-        hospitalId = newHospital.insertId;
-      } else {
-        hospitalId = hospitalList[0].id;
-      }
+  if (db) {
+    try {
+      const { hospitalStaffProfiles, hospitals } = await import("../drizzle/schema");
+      const existing = await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, userId)).limit(1);
+      if (!existing.length) {
+        let hospitalList = await db.select().from(hospitals).limit(1);
+        let hospitalId: number;
+        if (!hospitalList.length) {
+          const [newHospital] = await db.insert(hospitals).values({
+            name: "Gauhati Medical College & Hospital (GMCH)",
+            address: "Bhangagarh, Guwahati, Assam 781032",
+            contactPhone: "+91 361 2529457",
+            latitude: 26.1558,
+            longitude: 91.7645,
+            totalEmergencyBeds: 120,
+            availableEmergencyBeds: 34,
+            totalIcuBeds: 45,
+            availableIcuBeds: 12,
+            oxygenCylinderCount: 85,
+            bloodUnitCount: 140,
+            ambulanceCount: 14,
+            status: "open",
+          });
+          hospitalId = newHospital.insertId;
+        } else {
+          hospitalId = hospitalList[0].id;
+        }
 
-      await db.insert(hospitalStaffProfiles).values({
-        userId,
-        hospitalId,
-        designation: "Emergency Medical Coordinator",
-      });
-    }
+        await db.insert(hospitalStaffProfiles).values({
+          userId,
+          hospitalId,
+          designation: "Emergency Medical Coordinator",
+        });
+      }
+    } catch {}
+  }
+  try {
+    const { registerMemoryHospitalStaffProfile } = await import("./rescue.db");
+    registerMemoryHospitalStaffProfile({
+      userId,
+      hospitalId: 1,
+      designation: "Emergency Medical Coordinator",
+    });
   } catch {}
 }

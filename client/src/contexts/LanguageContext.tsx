@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { getApiUrl } from "@/lib/apiConfig";
 import { currentInterfaceTerms } from "./currentInterfaceTerms";
 
 export type Locale = "en" | "as" | "hi" | "bn" | "or" | "mr" | "gu" | "ta" | "te" | "kn";
@@ -555,7 +556,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void fetch("/storage/operational-language-pack_86163712.json")
+    void fetch(getApiUrl("/storage/operational-language-pack_86163712.json"))
       .then(response => response.ok ? response.json() : {})
       .then((data: Partial<Record<Locale, Record<string, string>>>) => setOperationalTerms(data))
       .catch(() => undefined);

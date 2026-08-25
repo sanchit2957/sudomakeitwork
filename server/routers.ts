@@ -84,6 +84,51 @@ export const appRouter = router({
           sessionToken,
         };
       }),
+    register: publicProcedure
+      .input(
+        z.object({
+          name: z.string().min(1, "Name is required"),
+          email: z.string().email("Invalid email address"),
+          password: z.string().min(1, "Password is required"),
+          role: z.enum(["admin", "rescuer", "medical", "user"]).default("user"),
+          phone: z.string().optional(),
+          callSign: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const emailVal = input.email.trim().toLowerCase();
+        const existing = await getUserByEmail(emailVal);
+        if (existing) {
+          throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
+        }
+        const openId = `user-${emailVal.replace(/[^a-z0-9]/g, "-")}`;
+        await upsertUser({
+          openId,
+          name: input.name.trim(),
+          email: emailVal,
+          password: input.password.trim(),
+          role: input.role,
+          loginMethod: "platform-login",
+          lastSignedIn: new Date(),
+        });
+        const dbUser = await getUserByEmail(emailVal);
+        if (!dbUser) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create user account." });
+        }
+        if (input.role === "rescuer") {
+          await ensureRescuerProfile(dbUser.id, input.callSign || input.name.trim());
+        } else if (input.role === "medical") {
+          await ensureHospitalStaffProfile(dbUser.id);
+        }
+        const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User" });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
+        return {
+          success: true,
+          user: dbUser,
+          sessionToken,
+        };
+      }),
     createUser: adminProcedure
       .input(
         z.object({

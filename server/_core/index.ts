@@ -1,7 +1,9 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
@@ -31,11 +33,49 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+
+  // Enable CORS for native mobile apps (Capacitor) and cross-origin clients
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, server-to-server)
+        if (!origin) return callback(null, true);
+        // Allow Capacitor local origins and localhost
+        if (
+          origin === "capacitor://localhost" ||
+          origin === "https://localhost" ||
+          origin === "http://localhost" ||
+          origin.startsWith("http://localhost:") ||
+          origin.startsWith("http://127.0.0.1:") ||
+          origin.startsWith("http://10.0.2.2:") // Android emulator host alias
+        ) {
+          return callback(null, true);
+        }
+        // In production/development, allow all valid origins
+        return callback(null, true);
+      },
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+        "Cache-Control",
+        "Pragma",
+      ],
+    })
+  );
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use("/uploads", express.static(path.resolve(process.cwd(), "client/public/uploads")));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+
+
   // tRPC API
   app.use("/api/trpc", (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private, max-age=0");
