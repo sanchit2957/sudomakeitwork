@@ -20,7 +20,13 @@ type HospitalForm = { id?: number; name: string; address: string; contactPhone: 
 const blankShelter = (): ShelterForm => ({ name: "", address: "", latitude: "", longitude: "", capacity: "", occupancy: "", status: "open" });
 const blankHospital = (): HospitalForm => ({ name: "", address: "", contactPhone: "", latitude: "", longitude: "", totalEmergencyBeds: "", availableEmergencyBeds: "", totalIcuBeds: "", availableIcuBeds: "", oxygenCylinderCount: "", bloodUnitCount: "", ambulanceCount: "", foodSupplyStatus: "available", medicineSupplyStatus: "available", waterSupplyStatus: "available", powerBackupStatus: "available", status: "open" });
 
-export default function Command() { return <RoleGate roles={["admin"]}><CommandWorkspace /></RoleGate>; }
+import { isNativeApp } from "@/lib/apiConfig";
+import MobileCommandRestricted from "@/components/MobileCommandRestricted";
+
+export default function Command() {
+  if (isNativeApp()) return <MobileCommandRestricted />;
+  return <RoleGate roles={["admin"]}><CommandWorkspace /></RoleGate>;
+}
 function CommandWorkspace() {
   const { t } = useLanguage();
   const nav: WorkspaceNavItem[] = [{ label: t("command.operations"), path: "/command", icon: ClipboardList }, { label: t("command.map"), path: "/command/map", icon: MapPinned }, { label: "Safety assistance", path: "/command/safety", icon: ShieldPlus }, { label: t("command.shelters"), path: "/command/shelters", icon: TentTree }, { label: t("command.hospitals"), path: "/command/hospitals", icon: Hospital }, { label: t("command.requests"), path: "/command/requests", icon: ClipboardPenLine }, { label: t("command.team"), path: "/command/team", icon: UsersRound }, { label: "System users", path: "/command/users", icon: UserPlus }];

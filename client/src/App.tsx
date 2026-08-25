@@ -25,9 +25,13 @@ import {
 import Emergency from "./pages/Emergency";
 import { useMobileLifecycle } from "./hooks/useMobileLifecycle";
 
+import { isNativeApp } from "./lib/apiConfig";
+import MobileCommandRestricted from "./components/MobileCommandRestricted";
+
 function Router() {
   useMobileLifecycle();
   const { user, loading } = useAuth();
+  const native = isNativeApp();
 
   if (loading) {
     return (
@@ -45,8 +49,12 @@ function Router() {
       {/* Auth Routes */}
       <Route path={"/login"} component={UserLogin} />
       <Route path={"/user/login"} component={UserLogin} />
-      <Route path={"/admin/login"} component={AdminLogin} />
-      <Route path={"/admin"} component={AdminLogin} />
+      <Route path={"/admin/login"}>
+        {native ? <MobileCommandRestricted /> : <AdminLogin />}
+      </Route>
+      <Route path={"/admin"}>
+        {native ? <MobileCommandRestricted /> : <AdminLogin />}
+      </Route>
 
       {/* Main Entry: Registration & Sign In first if not logged in */}
       <Route path={"/"}>
@@ -84,12 +92,12 @@ function Router() {
         {user ? <UserResponder /> : <UserLogin />}
       </Route>
 
-      {/* Admin Section Routes */}
+      {/* Admin Section Routes - Restricted in Mobile Native App */}
       <Route path={"/command/:rest*"}>
-        {user ? <AdminCommand /> : <AdminLogin />}
+        {native ? <MobileCommandRestricted /> : user ? <AdminCommand /> : <AdminLogin />}
       </Route>
       <Route path={"/command"}>
-        {user ? <AdminCommand /> : <AdminLogin />}
+        {native ? <MobileCommandRestricted /> : user ? <AdminCommand /> : <AdminLogin />}
       </Route>
 
       {/* Fallback Routes */}
