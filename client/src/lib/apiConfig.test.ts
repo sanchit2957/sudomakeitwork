@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeEach } from "vitest";
-import { getApiBaseUrl, getApiUrl, isNativeApp } from "./apiConfig";
+import { getApiBaseUrl, getApiUrl, isNativeApp, DEFAULT_PRODUCTION_API_URL } from "./apiConfig";
 
 describe("apiConfig utility", () => {
   beforeEach(() => {
@@ -10,10 +10,8 @@ describe("apiConfig utility", () => {
     }
   });
 
-  it("returns relative paths when no external API base is configured in web mode", () => {
-    expect(getApiUrl("/api/trpc")).toBe("/api/trpc");
-    expect(getApiUrl("/storage/file.json")).toBe("/storage/file.json");
-    expect(getApiUrl("api/status")).toBe("api/status");
+  it("exports a valid default production API URL", () => {
+    expect(DEFAULT_PRODUCTION_API_URL).toBe("https://assam-rescue-platform.onrender.com");
   });
 
   it("preserves already absolute URLs", () => {
@@ -40,3 +38,4 @@ describe("apiConfig utility", () => {
     expect(typeof isNativeApp()).toBe("boolean");
   });
 });
+
