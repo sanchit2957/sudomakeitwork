@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: assam-rescue-platform
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: VITE_APP_TITLE
+        value: sudo MakeItWork
+      - key: JWT_SECRET
+        generateValue: true
+      - key: VAPID_SUBJECT
+        value: mailto:admin@assamrescue.gov.in
+      - key: VAPID_PUBLIC_KEY
+        value: BBuEYw8dKqeUa1GM_zeq1eZAnr2PZrTrt93PAk_2rlk4mOLAOsawhWLfsNI8ioEMLkiel279rkG20aZMwsPRls0
+      - key: VAPID_PRIVATE_KEY
+        value: 6fAok1f93tPFGAOW7U27tez6gHe4Gc5jnh7FFSLAVaQ

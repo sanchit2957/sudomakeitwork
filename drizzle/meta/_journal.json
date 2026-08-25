@@ -1,0 +1,104 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1787146833676,
+      "tag": "0000_nostalgic_edwin_jarvis",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1787147107280,
+      "tag": "0001_steep_jackal",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787147363766,
+      "tag": "0002_legal_gambit",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1787149353607,
+      "tag": "0003_familiar_sister_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1787175545402,
+      "tag": "0004_unique_colossus",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1787177053640,
+      "tag": "0005_fixed_microchip",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787222451634,
+      "tag": "0006_medical_marvel_zombies",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787347728213,
+      "tag": "0007_fresh_clea",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1787348225729,
+      "tag": "0008_nebulous_red_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1787348704238,
+      "tag": "0009_melodic_ser_duncan",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1787381932349,
+      "tag": "0010_nifty_expediter",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1787382220990,
+      "tag": "0011_tearful_wonder_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1787422814003,
+      "tag": "0012_productive_swordsman",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1787509656271,
+      "tag": "0013_gorgeous_wonder_man",
+      "breakpoints": true
+    }
+  ]
+}

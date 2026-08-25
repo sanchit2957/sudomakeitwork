@@ -1,0 +1,13 @@
+# Dark Theme Audit
+
+## Public Victim pages — 22 August 2026
+
+The persisted dark theme correctly set the outer canvas and shared bottom navigation to black and charcoal, but the Safety and More route shells still rendered their hard-coded white content cards without corresponding dark variants. This produced low-contrast pale text, washed-out form controls, and white blocks against the dark canvas. The affected areas include local-alert and support cards, need-selection tiles, request form surfaces, More information cards, and protected-operations entry tiles. These pages require a shared victim-page surface class plus explicit neutral dark card, border, text, input, and button treatments rather than reliance on Home-only overrides.
+
+The empty SOS Tracking card also remained bright white under dark mode. The protected Command access portal used the global semantic card successfully, but its helper callout remained white. The theme repair therefore needs both a reusable public-page surface strategy and a small set of focused component-level utility variants for hard-coded helper cards, maps, dialogs, and operations widgets.
+
+After applying the shared Victim surface wrapper and neutral dark overrides, the Safety page rendered with an charcoal page shell, readable local-alert card, dark need-selection controls, clear form fields, muted supporting copy, and an opaque dark navigation bar. The More page likewise rendered readable profile, support, and Operations-entry cards without the earlier white surface leakage. The remaining visual audit covers SOS tracking and protected workspace content.
+
+The SOS Tracking empty-state surface now renders as a neutral charcoal card with distinct white heading, muted explanatory copy, and a clear SOS return action. The protected Command portal now keeps its security helper callout on a charcoal surface instead of white, with readable helper text, focus treatment, and preserved action hierarchy. Both page states retained the globally persisted dark setting and visible language/theme controls.
+
+The final Home check retained an accessible red SOS control, readable connected state, charcoal voice-note and condition cards, framed map preview, and opaque charcoal navigation. The Medical protected-route access state used the same corrected neutral-card and readable helper treatment as Command, confirming that shared role-gate styling is covered across protected entry points. The available browser session was not authorized to inspect authenticated workspace content; the shared `workspace-surface` overrides and static regression coverage protect those dashboard cards, forms, borders, controls, maps, and sidebars.
