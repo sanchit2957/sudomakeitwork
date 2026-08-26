@@ -2,27 +2,17 @@ import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
   redirectPath?: string;
 };
 
-const DEFAULT_USER = {
-  id: 1,
-  openId: "user-admin",
-  name: "Command Administrator",
-  email: "admin@assamrescue.gov.in",
-  role: "admin" as const,
-  loginMethod: "platform-login",
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  lastSignedIn: new Date(),
-};
-
 export function useAuth(options?: UseAuthOptions) {
   const { redirectOnUnauthenticated = false, redirectPath } = options ?? {};
   const utils = trpc.useUtils();
+  const [, setLocation] = useLocation();
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
@@ -32,12 +22,6 @@ export function useAuth(options?: UseAuthOptions) {
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async (data) => {
       utils.auth.me.setData(undefined, data.user as any);
-      if (data.sessionToken) {
-        try {
-          sessionStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
-          localStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
-        } catch {}
-      }
       await utils.auth.me.invalidate();
     },
   });
@@ -66,12 +50,6 @@ export function useAuth(options?: UseAuthOptions) {
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: async (data) => {
       utils.auth.me.setData(undefined, data.user as any);
-      if (data.sessionToken) {
-        try {
-          sessionStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
-          localStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
-        } catch {}
-      }
       await utils.auth.me.invalidate();
     },
   });
@@ -81,7 +59,7 @@ export function useAuth(options?: UseAuthOptions) {
       name: string;
       email: string;
       password: string;
-      role?: "user" | "rescuer" | "medical" | "admin";
+      role?: "user" | "rescuer" | "medical";
       phone?: string;
       callSign?: string;
     }) => {
@@ -112,8 +90,9 @@ export function useAuth(options?: UseAuthOptions) {
       } catch {}
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
+      setLocation("/login");
     }
-  }, [logoutMutation, utils]);
+  }, [logoutMutation, setLocation, utils]);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;

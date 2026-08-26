@@ -15,13 +15,18 @@ import {
   User,
   Users,
 } from "lucide-react";
-import React, { FormEvent, useState } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
 export default function AdminLogin() {
   const { user, login, logout } = useAuth();
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!user || user.role === "admin") return;
+    setLocation(user.role === "rescuer" ? "/responder" : user.role === "medical" ? "/medical" : "/");
+  }, [setLocation, user]);
 
   const [email, setEmail] = useState("admin@assamrescue.gov.in");
   const [password, setPassword] = useState("admin");
@@ -42,8 +47,7 @@ export default function AdminLogin() {
       if (role === "admin") {
         setLocation("/command");
       } else {
-        // If logged in as another role, still take to appropriate place or command
-        setLocation("/command");
+        setLocation(role === "rescuer" ? "/responder" : role === "medical" ? "/medical" : "/");
       }
     } catch (err: any) {
       setErrorMessage(err?.message || "Administrator authentication failed. Please verify your credentials.");

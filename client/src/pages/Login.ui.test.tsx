@@ -81,7 +81,7 @@ describe("Login UI & Role Access Gate", () => {
     expect(screen.getByText("Enter ADMIN Workspace")).toBeTruthy();
   });
 
-  it("allows all workspaces to render through RoleGate without restriction", () => {
+  it("denies a wrong role through RoleGate", () => {
     mockUser = {
       id: 2,
       openId: "test-rescuer",
@@ -95,6 +95,7 @@ describe("Login UI & Role Access Gate", () => {
       </RoleGate>
     );
 
-    expect(screen.getByText("Open Command Centre")).toBeTruthy();
+    expect(screen.queryByText("Open Command Centre")).toBeNull();
+    expect(mockSetLocation).toHaveBeenCalledWith("/");
   });
 });

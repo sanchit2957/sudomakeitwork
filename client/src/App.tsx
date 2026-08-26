@@ -53,7 +53,7 @@ function Router() {
         {native ? <MobileCommandRestricted /> : <AdminLogin />}
       </Route>
       <Route path={"/admin"}>
-        {native ? <MobileCommandRestricted /> : <AdminLogin />}
+        {native ? <MobileCommandRestricted /> : user?.role === "admin" ? <AdminCommand /> : <AdminLogin />}
       </Route>
 
       {/* Main Entry: Registration & Sign In first if not logged in */}
@@ -94,10 +94,10 @@ function Router() {
 
       {/* Admin Section Routes - Restricted in Mobile Native App */}
       <Route path={"/command/:rest*"}>
-        {native ? <MobileCommandRestricted /> : user ? <AdminCommand /> : <AdminLogin />}
+        {native ? <MobileCommandRestricted /> : user?.role === "admin" ? <AdminCommand /> : <AdminLogin />}
       </Route>
       <Route path={"/command"}>
-        {native ? <MobileCommandRestricted /> : user ? <AdminCommand /> : <AdminLogin />}
+        {native ? <MobileCommandRestricted /> : user?.role === "admin" ? <AdminCommand /> : <AdminLogin />}
       </Route>
 
       {/* Fallback Routes */}

@@ -1,21 +1,32 @@
 // @vitest-environment jsdom
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { RoleGate } from "./RoleGate";
 
-describe("RoleGate open access portals", () => {
-  it("renders workspace children directly without login barriers", () => {
-    const command = render(<RoleGate roles={["admin"]}><span>Command Workspace Content</span></RoleGate>);
-    expect(command.getByText("Command Workspace Content")).toBeTruthy();
-    command.unmount();
+const mockSetLocation = vi.fn();
+let mockUser: any = null;
 
-    const medical = render(<RoleGate roles={["medical"]}><span>Medical Workspace Content</span></RoleGate>);
-    expect(medical.getByText("Medical Workspace Content")).toBeTruthy();
-    medical.unmount();
+vi.mock("@/_core/hooks/useAuth", () => ({
+  useAuth: () => ({ user: mockUser, loading: false }),
+}));
+vi.mock("wouter", () => ({
+  useLocation: () => ["/command", mockSetLocation],
+}));
 
-    const responder = render(<RoleGate roles={["rescuer"]}><span>Responder Workspace Content</span></RoleGate>);
-    expect(responder.getByText("Responder Workspace Content")).toBeTruthy();
+describe("RoleGate", () => {
+  it("renders content for an allowed role", () => {
+    mockUser = { role: "admin" };
+    const view = render(<RoleGate roles={["admin"]}><span>Command Workspace Content</span></RoleGate>);
+    expect(view.getByText("Command Workspace Content")).toBeTruthy();
+    view.unmount();
+  });
+
+  it("redirects a wrong role and does not render protected content", () => {
+    mockUser = { role: "user" };
+    render(<RoleGate roles={["admin"]}><span>Command Workspace Content</span></RoleGate>);
+    expect(screen.queryByText("Command Workspace Content")).toBeNull();
+    expect(mockSetLocation).toHaveBeenCalledWith("/");
   });
 });

@@ -59,9 +59,9 @@ describe("Role Hierarchy & Isolation", () => {
     const caller = appRouter.createCaller(ctx);
 
     const adminLogin = await caller.auth.login({
-      role: "admin",
       name: "Super Admin",
       email: "admin@assamrescue.gov.in",
+      password: "admin",
     });
     expect(adminLogin.success).toBe(true);
     expect(adminLogin.user.role).toBe("admin");
@@ -69,9 +69,10 @@ describe("Role Hierarchy & Isolation", () => {
     expect(cookiesSet[0].name).toBe(COOKIE_NAME);
 
     const rescuerLogin = await caller.auth.login({
-      role: "rescuer",
       name: "NDRF Lead",
       callSign: "NDRF Boat 4",
+      email: "rescuer@assamrescue.gov.in",
+      password: "rescuer",
     });
     expect(rescuerLogin.success).toBe(true);
     expect(rescuerLogin.user.role).toBe("rescuer");
