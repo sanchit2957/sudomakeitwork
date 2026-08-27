@@ -7,11 +7,14 @@ import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, publicProcedure, router } from "./_core/trpc";
 import {
+  deleteEmergencyContact,
   ensureHospitalStaffProfile,
   ensureRescuerProfile,
   getAllUsers,
+  getEmergencyContactsByUserId,
   getUserByEmail,
   getUserByOpenId,
+  upsertEmergencyContact,
   upsertUser,
 } from "./db";
 import { rescueRouter } from "./routers/rescue";
@@ -140,6 +143,88 @@ export const appRouter = router({
         }
         return { success: true, user: sanitizeUser(dbUser) };
       }),
+    updateProfile: publicProcedure
+      .input(
+        z.object({
+          name: z.string().min(1, "Name cannot be empty").optional(),
+          phone: z.string().optional(),
+          emergencyContact: z.string().optional(),
+          bloodGroup: z.string().optional(),
+          medicalNotes: z.string().optional(),
+          homeDistrict: z.string().optional(),
+          address: z.string().optional(),
+          preferredLanguage: z.string().optional(),
+          safetyNotifications: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "You must be signed in to update your profile." });
+        }
+        const updated = {
+          ...ctx.user,
+          ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+          ...(input.phone !== undefined ? { phone: input.phone.trim() } : {}),
+          ...(input.emergencyContact !== undefined ? { emergencyContact: input.emergencyContact.trim() } : {}),
+          ...(input.bloodGroup !== undefined ? { bloodGroup: input.bloodGroup.trim() } : {}),
+          ...(input.medicalNotes !== undefined ? { medicalNotes: input.medicalNotes.trim() } : {}),
+          ...(input.homeDistrict !== undefined ? { homeDistrict: input.homeDistrict.trim() } : {}),
+          ...(input.address !== undefined ? { address: input.address.trim() } : {}),
+          ...(input.preferredLanguage !== undefined ? { preferredLanguage: input.preferredLanguage.trim() } : {}),
+          ...(input.safetyNotifications !== undefined ? { safetyNotifications: input.safetyNotifications } : {}),
+          updatedAt: new Date(),
+        };
+
+        await upsertUser(updated);
+        const refreshed = await getUserByOpenId(ctx.user.openId);
+        return {
+          success: true,
+          user: sanitizeUser(refreshed || updated),
+        };
+      }),
+    emergencyContacts: router({
+      list: publicProcedure.query(async ({ ctx }) => {
+        if (!ctx.user) return [];
+        return await getEmergencyContactsByUserId(ctx.user.id);
+      }),
+      upsert: publicProcedure
+        .input(
+          z.object({
+            id: z.number().optional(),
+            name: z.string().min(1, "Contact name is required"),
+            relation: z.string().min(1, "Relation is required"),
+            phone: z.string().min(1, "Phone number is required"),
+            alternatePhone: z.string().optional(),
+            isPrimary: z.enum(["yes", "no"]).default("no"),
+            notes: z.string().optional(),
+          })
+        )
+        .mutation(async ({ input, ctx }) => {
+          if (!ctx.user) {
+            throw new TRPCError({ code: "UNAUTHORIZED", message: "You must be signed in to manage emergency contacts." });
+          }
+          return await upsertEmergencyContact({
+            ...input,
+            userId: ctx.user.id,
+          });
+        }),
+      delete: publicProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input, ctx }) => {
+          if (!ctx.user) {
+            throw new TRPCError({ code: "UNAUTHORIZED", message: "You must be signed in to delete emergency contacts." });
+          }
+          return await deleteEmergencyContact(input.id, ctx.user.id);
+        }),
+      getForUser: publicProcedure
+        .input(z.object({ userId: z.number() }))
+        .query(async ({ input, ctx }) => {
+          if (!ctx.user || (ctx.user.role !== "admin" && ctx.user.role !== "rescuer" && ctx.user.role !== "medical" && ctx.user.id !== input.userId)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access restricted to emergency personnel (Admin, Rescuer, Medical)." });
+          }
+          return await getEmergencyContactsByUserId(input.userId);
+        }),
+    }),
     listUsers: adminProcedure.query(async () => {
       const all = await getAllUsers();
       return all.map(u => sanitizeUser(u));

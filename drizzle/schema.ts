@@ -314,7 +314,26 @@ export const auditLogs = mysqlTable(
   table => [index("auditLogs_resource_idx").on(table.resourceType, table.resourceId)],
 );
 
+export const emergencyContacts = mysqlTable(
+  "emergencyContacts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    name: varchar("name", { length: 160 }).notNull(),
+    relation: varchar("relation", { length: 64 }).notNull(),
+    phone: varchar("phone", { length: 32 }).notNull(),
+    alternatePhone: varchar("alternatePhone", { length: 32 }),
+    isPrimary: mysqlEnum("isPrimary", ["yes", "no"]).default("no").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("emergencyContacts_userId_idx").on(table.userId)],
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Incident = typeof incidents.$inferSelect;
 export type Mission = typeof missions.$inferSelect;
+export type EmergencyContact = typeof emergencyContacts.$inferSelect;
+export type InsertEmergencyContact = typeof emergencyContacts.$inferInsert;

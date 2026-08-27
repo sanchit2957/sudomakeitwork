@@ -22,6 +22,7 @@ import {
   UserMedical,
   UserHospitalRegister,
   UserMore,
+  UserProfile,
 } from "./pages/user";
 import Emergency from "./pages/Emergency";
 import { useMobileLifecycle } from "./hooks/useMobileLifecycle";
@@ -71,6 +72,12 @@ function Router() {
       </Route>
       <Route path={"/safety"}>
         <RoleGate><UserSafety /></RoleGate>
+      </Route>
+      <Route path={"/profile"}>
+        <RoleGate><UserProfile /></RoleGate>
+      </Route>
+      <Route path={"/user/profile"}>
+        <RoleGate><UserProfile /></RoleGate>
       </Route>
       <Route path={"/more"}>
         <RoleGate><UserMore /></RoleGate>

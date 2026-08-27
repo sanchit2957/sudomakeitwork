@@ -1,7 +1,7 @@
 import mysql from "mysql2/promise";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { emergencyContacts, EmergencyContact, InsertEmergencyContact, InsertUser, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { hashPassword } from "./auth.password";
 
@@ -419,4 +419,142 @@ export async function ensureHospitalStaffProfile(userId: number) {
       designation: "Emergency Medical Coordinator",
     });
   } catch {}
+}
+
+export const _memoryEmergencyContacts: Map<number, EmergencyContact> = new Map([
+  [
+    1,
+    {
+      id: 1,
+      userId: 4, // citizen
+      name: "Manashi Deka",
+      relation: "Spouse",
+      phone: "+91 94350 98765",
+      alternatePhone: "+91 361 223344",
+      isPrimary: "yes",
+      notes: "Emergency contact for Guwahati residence.",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ],
+]);
+
+let _nextEmergencyContactId = 2;
+
+export async function getEmergencyContactsByUserId(userId: number): Promise<EmergencyContact[]> {
+  const db = await getDb();
+  if (db) {
+    try {
+      return await db
+        .select()
+        .from(emergencyContacts)
+        .where(eq(emergencyContacts.userId, userId));
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Failed to load emergency contacts: ${(error as Error)?.message}`);
+      }
+      console.warn("[Database] MySQL read skipped, reading memory emergency contacts:", error);
+    }
+  }
+  return Array.from(_memoryEmergencyContacts.values()).filter(c => c.userId === userId);
+}
+
+export async function upsertEmergencyContact(
+  contact: {
+    id?: number;
+    userId: number;
+    name: string;
+    relation: string;
+    phone: string;
+    alternatePhone?: string;
+    isPrimary?: "yes" | "no";
+    notes?: string;
+  }
+): Promise<EmergencyContact> {
+  const db = await getDb();
+  if (db) {
+    try {
+      if (contact.id) {
+        await db
+          .update(emergencyContacts)
+          .set({
+            name: contact.name,
+            relation: contact.relation,
+            phone: contact.phone,
+            alternatePhone: contact.alternatePhone || null,
+            isPrimary: contact.isPrimary || "no",
+            notes: contact.notes || null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(emergencyContacts.id, contact.id), eq(emergencyContacts.userId, contact.userId)));
+        const updated = await db
+          .select()
+          .from(emergencyContacts)
+          .where(eq(emergencyContacts.id, contact.id))
+          .limit(1);
+        if (updated.length > 0) return updated[0];
+      } else {
+        const [inserted] = await db.insert(emergencyContacts).values({
+          userId: contact.userId,
+          name: contact.name,
+          relation: contact.relation,
+          phone: contact.phone,
+          alternatePhone: contact.alternatePhone || null,
+          isPrimary: contact.isPrimary || "no",
+          notes: contact.notes || null,
+        });
+        const created = await db
+          .select()
+          .from(emergencyContacts)
+          .where(eq(emergencyContacts.id, inserted.insertId))
+          .limit(1);
+        if (created.length > 0) return created[0];
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Failed to save emergency contact: ${(error as Error)?.message}`);
+      }
+      console.warn("[Database] MySQL write skipped, saving to memory store:", error);
+    }
+  }
+
+  const id = contact.id || _nextEmergencyContactId++;
+  const existing = _memoryEmergencyContacts.get(id);
+  const record: EmergencyContact = {
+    id,
+    userId: contact.userId,
+    name: contact.name,
+    relation: contact.relation,
+    phone: contact.phone,
+    alternatePhone: contact.alternatePhone || null,
+    isPrimary: contact.isPrimary || "no",
+    notes: contact.notes || null,
+    createdAt: existing?.createdAt || new Date(),
+    updatedAt: new Date(),
+  };
+  _memoryEmergencyContacts.set(id, record);
+  return record;
+}
+
+export async function deleteEmergencyContact(id: number, userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (db) {
+    try {
+      await db
+        .delete(emergencyContacts)
+        .where(and(eq(emergencyContacts.id, id), eq(emergencyContacts.userId, userId)));
+      return true;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Failed to delete emergency contact: ${(error as Error)?.message}`);
+      }
+      console.warn("[Database] MySQL delete skipped, deleting from memory store:", error);
+    }
+  }
+  const existing = _memoryEmergencyContacts.get(id);
+  if (existing && existing.userId === userId) {
+    _memoryEmergencyContacts.delete(id);
+    return true;
+  }
+  return false;
 }

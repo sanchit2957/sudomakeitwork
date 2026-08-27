@@ -133,12 +133,50 @@ export function useAuth(options?: UseAuthOptions) {
     };
   }, [meQuery.data, meQuery.isLoading, meQuery.error]);
 
+  const updateProfileMutation = trpc.auth.updateProfile.useMutation({
+    onSuccess: async (data) => {
+      if (data.user) {
+        try {
+          localStorage.setItem("app-runtime-user-info", JSON.stringify(data.user));
+        } catch {}
+        utils.auth.me.setData(undefined, data.user as any);
+      }
+      await utils.auth.me.invalidate();
+    },
+  });
+
+  const updateProfile = useCallback(
+    async (params: {
+      name?: string;
+      phone?: string;
+      emergencyContact?: string;
+      bloodGroup?: string;
+      medicalNotes?: string;
+      homeDistrict?: string;
+      address?: string;
+      preferredLanguage?: string;
+      safetyNotifications?: boolean;
+    }) => {
+      const res = await updateProfileMutation.mutateAsync(params);
+      if (res.user) {
+        try {
+          localStorage.setItem("app-runtime-user-info", JSON.stringify(res.user));
+        } catch {}
+        utils.auth.me.setData(undefined, res.user as any);
+      }
+      await utils.auth.me.invalidate();
+      return res;
+    },
+    [updateProfileMutation, utils]
+  );
+
   return {
     ...state,
     refresh: () => meQuery.refetch(),
     login,
     loginAsRole,
     register,
+    updateProfile,
     logout,
   };
 }
