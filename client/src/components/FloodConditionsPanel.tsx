@@ -1,31 +1,350 @@
-import { CalendarDays, CloudRain, Droplets, Gauge, TrendingUp, Waves, Wind } from "lucide-react";
+import {
+  Activity,
+  CalendarDays,
+  CloudRain,
+  Compass,
+  Droplets,
+  Gauge,
+  ShieldAlert,
+  Thermometer,
+  TrendingUp,
+  Waves,
+  Wind,
+} from "lucide-react";
 import React, { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-type WeatherDay = { date: string; temperatureHighC: number | null; temperatureLowC: number | null; rainChance: number | null; rainMm: number | null; windKmh: number | null; weatherCode: number | null };
-export type FloodConditionsData = { available: boolean; risk: string; activeFloodZones: number; current: { temperatureC: number | null; precipitationMm: number | null; windKmh: number | null }; forecast: { rainChance: number | null; rainAmountMm: number | null; days?: WeatherDay[] }; trend?: { source: string; days: WeatherDay[] }; river?: { available: boolean; levelMetres?: number | null; trend?: string | null; updatedAt?: Date | null; stationName?: string | null; riverName?: string | null; distanceKm?: number | null; sourceName?: string; sourceUrl?: string; message?: string } };
+type WeatherDay = {
+  date: string;
+  temperatureHighC: number | null;
+  temperatureLowC: number | null;
+  rainChance: number | null;
+  rainMm: number | null;
+  windKmh: number | null;
+  weatherCode: number | null;
+  condition?: string;
+};
 
-function Stat({ icon: Icon, label, value, detail }: { icon: typeof CloudRain; label: string; value: string; detail: string }) {
-  return <div className="rounded-2xl bg-[#f7faf9] p-3 dark:bg-[#202023]"><Icon className="h-5 w-5 text-[#277b6b] dark:text-[#7fd6bb]" /><p className="mt-3 text-[11px] font-bold text-[#6f8880] dark:text-[#b5cdc5]">{label}</p><p className="mt-0.5 text-lg font-black tracking-[-0.04em]">{value}</p><p className="mt-0.5 text-[10px] font-semibold leading-4 text-[#719087] dark:text-[#b5cdc5]">{detail}</p></div>;
+export type FloodConditionsData = {
+  available: boolean;
+  source?: string;
+  risk: string;
+  activeFloodZones: number;
+  current: {
+    temperatureC: number | null;
+    feelsLikeC?: number | null;
+    humidityPercent?: number | null;
+    precipitationMm: number | null;
+    windKmh: number | null;
+    condition?: string;
+    weatherCode?: number | null;
+  };
+  forecast: {
+    rainChance: number | null;
+    rainAmountMm: number | null;
+    days?: WeatherDay[];
+  };
+  trend?: {
+    source: string;
+    days: WeatherDay[];
+  };
+  airQuality?: {
+    aqiUs: number | null;
+    category: string;
+    pm25: number | null;
+    pm10: number | null;
+  };
+  floodRisk?: {
+    riskLevel: string;
+    title: string;
+    summary: string;
+    riverDischargeM3s: number | null;
+    riverDischargeTrend: string;
+  };
+  river?: {
+    available: boolean;
+    levelMetres?: number | null;
+    trend?: string | null;
+    updatedAt?: Date | null;
+    stationName?: string | null;
+    riverName?: string | null;
+    distanceKm?: number | null;
+    sourceName?: string;
+    sourceUrl?: string;
+    message?: string;
+  };
+};
+
+function Stat({
+  icon: Icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: typeof CloudRain;
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-[#f7faf9] p-3 dark:bg-[#202023]">
+      <Icon className="h-5 w-5 text-[#277b6b] dark:text-[#7fd6bb]" />
+      <p className="mt-3 text-[11px] font-bold text-[#6f8880] dark:text-[#b5cdc5]">{label}</p>
+      <p className="mt-0.5 text-lg font-black tracking-[-0.04em]">{value}</p>
+      <p className="mt-0.5 text-[10px] font-semibold leading-4 text-[#719087] dark:text-[#b5cdc5]">
+        {detail}
+      </p>
+    </div>
+  );
 }
 
-export function FloodConditionsPanel({ conditions, loading }: { conditions?: FloodConditionsData; loading: boolean }) {
+export function FloodConditionsPanel({
+  conditions,
+  loading,
+}: {
+  conditions?: FloodConditionsData;
+  loading: boolean;
+}) {
   const { t } = useLanguage();
   const [trendOpen, setTrendOpen] = useState(false);
-  const riskTone = conditions?.risk === "high" ? "bg-[#fff0ee] text-[#b83f43]" : conditions?.risk === "elevated" ? "bg-[#fff5df] text-[#9a681d]" : "bg-[#e6f6ef] text-[#197654]";
+  const riskTone =
+    conditions?.risk === "high" || conditions?.risk === "critical"
+      ? "bg-[#fff0ee] text-[#b83f43]"
+      : conditions?.risk === "elevated"
+      ? "bg-[#fff5df] text-[#9a681d]"
+      : "bg-[#e6f6ef] text-[#197654]";
+
   const trendDays = conditions?.trend?.days || [];
   const forecastDays = conditions?.forecast.days || [];
-  const maxRain = Math.max(1, ...trendDays.map(day => day.rainMm || 0));
-  const pointX = (index: number, size: number) => size > 1 ? (index / (size - 1)) * 176 + 8 : 92;
+  const maxRain = Math.max(1, ...trendDays.map((day) => day.rainMm || 0));
+  const pointX = (index: number, size: number) => (size > 1 ? (index / (size - 1)) * 176 + 8 : 92);
   const pointY = (rain: number | null) => 50 - ((rain || 0) / maxRain) * 38;
-  const trendPoints = trendDays.map((day, index) => `${pointX(index, trendDays.length)},${pointY(day.rainMm)}`).join(" ");
-  const dayName = (date: string) => new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(`${date}T12:00:00`));
+  const trendPoints = trendDays
+    .map((day, index) => `${pointX(index, trendDays.length)},${pointY(day.rainMm)}`)
+    .join(" ");
+  const dayName = (date: string) =>
+    new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(`${date}T12:00:00`));
 
-  return <section className="mt-5 rounded-[1.55rem] bg-white p-5 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10">
-    <div className="flex items-center justify-between gap-3"><div><h2 className="text-lg font-black tracking-[-0.04em]">{t("Local flood conditions")}</h2><p className="mt-0.5 text-[11px] font-semibold text-[#789087]">{loading ? t("Updating local forecast") : conditions?.available ? t("Weather model based") : t("Weather source unavailable")}</p></div><span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${riskTone}`}>{conditions?.risk === "high" ? t("High rain risk") : conditions?.risk === "elevated" ? t("Watch conditions") : t("Normal")}</span></div>
-    <div className="mt-5 grid grid-cols-2 gap-3"><Stat icon={Droplets} label={t("Rainfall now")} value={conditions?.current.precipitationMm !== null && conditions?.current.precipitationMm !== undefined ? `${conditions.current.precipitationMm} mm` : "—"} detail={conditions?.forecast.rainAmountMm !== null && conditions?.forecast.rainAmountMm !== undefined ? `${conditions.forecast.rainAmountMm} mm expected today` : t("No reading")} /><Stat icon={Wind} label={t("Wind speed")} value={conditions?.current.windKmh !== null && conditions?.current.windKmh !== undefined ? `${Math.round(conditions.current.windKmh)} km/h` : "—"} detail={conditions?.current.temperatureC !== null && conditions?.current.temperatureC !== undefined ? `${Math.round(conditions.current.temperatureC)}° now` : t("No reading")} /><Stat icon={Gauge} label={t("River level")} value={conditions?.river?.available && conditions.river.levelMetres !== null && conditions?.river.levelMetres !== undefined ? `${conditions.river.levelMetres} m` : t("Unavailable")} detail={conditions?.river?.message || t("No official gauge linked")} /><button type="button" onClick={() => setTrendOpen(open => !open)} aria-expanded={trendOpen} className="rounded-2xl bg-[#eef7f5] p-3 text-left transition active:scale-[.98] dark:bg-[#242426]"><TrendingUp className="h-5 w-5 text-[#277b6b] dark:text-[#7fd6bb]" /><p className="mt-3 text-[11px] font-bold text-[#41665c] dark:text-[#d5e9e1]">{t("7-day trend")}</p><p className="mt-0.5 text-[10px] font-semibold text-[#2b7665] dark:text-[#aee3d1]">{trendOpen ? t("Hide graph") : t("View graph")}</p></button></div>
-    {trendOpen && <section className="mt-3 rounded-2xl bg-[#f3faf7] p-3" aria-label={t("Seven-day rainfall trend")}><div className="flex items-center justify-between gap-2"><p className="text-xs font-black text-[#285f55]">{t("Seven-day rainfall trend")}</p><span className="text-right text-[10px] font-semibold text-[#708981]">{conditions?.trend?.source || t("No model history")}</span></div>{trendDays.length ? <><svg viewBox="0 0 192 58" role="img" aria-label={t("Modelled rainfall in millimetres over the past seven days")} className="mt-3 h-16 w-full overflow-visible"><line x1="8" y1="50" x2="184" y2="50" stroke="#cae4dc" strokeWidth="1" /><polyline fill="none" points={trendPoints} stroke="#27806b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />{trendDays.map((day, index) => <circle key={day.date} cx={pointX(index, trendDays.length)} cy={pointY(day.rainMm)} r="2.5" fill="#27806b" />)}</svg><div className="mt-1 grid grid-cols-7 gap-1">{trendDays.map(day => <span key={day.date} className="text-center text-[9px] font-bold text-[#6a867e]">{dayName(day.date)}<br />{day.rainMm ?? "—"}</span>)}</div></> : <p className="mt-2 text-xs text-[#6f8880]">{t("Modelled history is not available yet.")}</p>}</section>}
-    <section className="mt-4 border-t border-[#e6eeeb] pt-4 dark:border-[#37373c]"><div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-[#277b6b] dark:text-[#7fd6bb]" /><h3 className="text-sm font-black text-[#234b42] dark:text-[#d5e9e1]">{t("Weather forecast")}</h3></div><div className="mt-3 grid grid-cols-7 gap-1.5">{forecastDays.length ? forecastDays.map(day => <div key={day.date} className="rounded-xl bg-[#f7faf9] px-1 py-2 text-center dark:bg-[#202023]"><span className="block text-[9px] font-black text-[#58766d] dark:text-[#b5cdc5]">{dayName(day.date)}</span><CloudRain className="mx-auto my-1 h-3.5 w-3.5 text-[#277b6b] dark:text-[#7fd6bb]" /><span className="block text-[10px] font-black text-[#244e45] dark:text-[#e6f5ef]">{day.rainChance ?? "—"}%</span><span className="mt-0.5 block text-[9px] font-semibold text-[#748c84] dark:text-[#b5cdc5]">{day.rainMm ?? "—"} mm</span></div>) : <p className="col-span-7 text-xs text-[#6f8880]">{t("Forecast is loading.")}</p>}</div></section>
-    <div className="mt-3 rounded-2xl bg-[#f1f8f5] px-3 py-3 text-xs font-bold text-[#315e52] dark:bg-[#242426] dark:text-[#d5e9e1]"><div className="flex items-center gap-3"><Waves className="h-5 w-5 shrink-0 text-[#277b6b] dark:text-[#7fd6bb]" /><span>{conditions?.activeFloodZones ? `${conditions.activeFloodZones} ${t("active flood-zone alerts nearby")}` : conditions?.river?.message || t("Official river-gauge data is temporarily unavailable.")}</span></div>{conditions?.river?.sourceUrl && <a href={conditions.river.sourceUrl} target="_blank" rel="noreferrer" className="ml-8 mt-1 inline-block text-[10px] font-bold text-[#277b6b] underline underline-offset-2 dark:text-[#9ce4cc]">{conditions.river.sourceName || t("Official source")}{conditions.river.updatedAt ? ` · ${t("Observed")} ${new Date(conditions.river.updatedAt).toLocaleString()}` : ""}</a>}</div>
-  </section>;
+  return (
+    <section className="mt-5 rounded-[1.55rem] bg-white p-5 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-black tracking-[-0.04em]">{t("Local flood conditions")}</h2>
+          <p className="mt-0.5 text-[11px] font-semibold text-[#789087]">
+            {loading
+              ? t("Updating local forecast")
+              : conditions?.available
+              ? conditions.source || t("Weather model based")
+              : t("Weather source unavailable")}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${riskTone}`}
+        >
+          {conditions?.risk === "high" || conditions?.risk === "critical"
+            ? t("High rain risk")
+            : conditions?.risk === "elevated"
+            ? t("Watch conditions")
+            : t("Normal")}
+        </span>
+      </div>
+
+      {conditions?.current?.condition && (
+        <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#edf6f3] px-3 py-2 text-xs font-bold text-[#23584d] dark:bg-[#252528] dark:text-[#aee3d1]">
+          <Activity className="h-4 w-4 shrink-0 text-[#277b6b] dark:text-[#7fd6bb]" />
+          <span>{conditions.current.condition}</span>
+          {conditions.current.feelsLikeC !== null && conditions.current.feelsLikeC !== undefined && (
+            <span className="ml-auto text-[11px] font-semibold opacity-85">
+              Feels like {Math.round(conditions.current.feelsLikeC)}°C
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat
+          icon={Droplets}
+          label={t("Rainfall now")}
+          value={
+            conditions?.current.precipitationMm !== null &&
+            conditions?.current.precipitationMm !== undefined
+              ? `${conditions.current.precipitationMm} mm`
+              : "—"
+          }
+          detail={
+            conditions?.forecast.rainAmountMm !== null &&
+            conditions?.forecast.rainAmountMm !== undefined
+              ? `${conditions.forecast.rainAmountMm} mm expected today`
+              : t("No reading")}
+        />
+        <Stat
+          icon={Wind}
+          label={t("Wind speed")}
+          value={
+            conditions?.current.windKmh !== null && conditions?.current.windKmh !== undefined
+              ? `${Math.round(conditions.current.windKmh)} km/h`
+              : "—"
+          }
+          detail={
+            conditions?.current.temperatureC !== null && conditions?.current.temperatureC !== undefined
+              ? `${Math.round(conditions.current.temperatureC)}° now`
+              : t("No reading")}
+        />
+        <Stat
+          icon={Gauge}
+          label={t("River level")}
+          value={
+            conditions?.river?.available &&
+            conditions.river.levelMetres !== null &&
+            conditions?.river.levelMetres !== undefined
+              ? `${conditions.river.levelMetres} m`
+              : t("Unavailable")}
+          detail={conditions?.river?.message || t("No official gauge linked")}
+        />
+        <button
+          type="button"
+          onClick={() => setTrendOpen((open) => !open)}
+          aria-expanded={trendOpen}
+          className="rounded-2xl bg-[#eef7f5] p-3 text-left transition active:scale-[.98] dark:bg-[#242426]"
+        >
+          <TrendingUp className="h-5 w-5 text-[#277b6b] dark:text-[#7fd6bb]" />
+          <p className="mt-3 text-[11px] font-bold text-[#41665c] dark:text-[#d5e9e1]">
+            {t("7-day trend")}
+          </p>
+          <p className="mt-0.5 text-[10px] font-semibold text-[#2b7665] dark:text-[#aee3d1]">
+            {trendOpen ? t("Hide graph") : t("View graph")}
+          </p>
+        </button>
+      </div>
+
+      {conditions?.airQuality?.aqiUs !== null && conditions?.airQuality?.aqiUs !== undefined && (
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-[#e2ede8] bg-[#f8fcfb] px-3.5 py-2 text-xs font-semibold dark:border-[#37373c] dark:bg-[#202023]">
+          <span className="flex items-center gap-2 text-[#43655d] dark:text-[#b5cdc5]">
+            <Compass className="h-4 w-4 text-[#277b6b] dark:text-[#7fd6bb]" />
+            Air Quality: <strong className="text-[#1d4c42] dark:text-[#e4f5ef]">{conditions.airQuality.category}</strong> (AQI {conditions.airQuality.aqiUs})
+          </span>
+          {conditions.airQuality.pm25 !== null && (
+            <span className="text-[10px] text-[#718d84] dark:text-[#a3b8b1]">
+              PM2.5: {conditions.airQuality.pm25} µg/m³
+            </span>
+          )}
+        </div>
+      )}
+
+      {trendOpen && (
+        <section
+          className="mt-3 rounded-2xl bg-[#f3faf7] p-3 dark:bg-[#202023]"
+          aria-label={t("Seven-day rainfall trend")}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-black text-[#285f55] dark:text-[#aee3d1]">
+              {t("Seven-day rainfall trend")}
+            </p>
+            <span className="text-right text-[10px] font-semibold text-[#708981] dark:text-[#b5cdc5]">
+              {conditions?.trend?.source || t("No model history")}
+            </span>
+          </div>
+          {trendDays.length ? (
+            <>
+              <svg
+                viewBox="0 0 192 58"
+                role="img"
+                aria-label={t("Modelled rainfall in millimetres over the past seven days")}
+                className="mt-3 h-16 w-full overflow-visible"
+              >
+                <line x1="8" y1="50" x2="184" y2="50" stroke="#cae4dc" strokeWidth="1" />
+                <polyline
+                  fill="none"
+                  points={trendPoints}
+                  stroke="#27806b"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {trendDays.map((day, index) => (
+                  <circle
+                    key={day.date}
+                    cx={pointX(index, trendDays.length)}
+                    cy={pointY(day.rainMm)}
+                    r="2.5"
+                    fill="#27806b"
+                  />
+                ))}
+              </svg>
+              <div className="mt-1 grid grid-cols-7 gap-1">
+                {trendDays.map((day) => (
+                  <span
+                    key={day.date}
+                    className="text-center text-[9px] font-bold text-[#6a867e] dark:text-[#b5cdc5]"
+                  >
+                    {dayName(day.date)}
+                    <br />
+                    {day.rainMm ?? "—"}
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="mt-2 text-xs text-[#6f8880]">{t("Modelled history is not available yet.")}</p>
+          )}
+        </section>
+      )}
+
+      <section className="mt-4 border-t border-[#e6eeeb] pt-4 dark:border-[#37373c]">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-[#277b6b] dark:text-[#7fd6bb]" />
+          <h3 className="text-sm font-black text-[#234b42] dark:text-[#d5e9e1]">
+            {t("Weather forecast")}
+          </h3>
+        </div>
+        <div className="mt-3 grid grid-cols-7 gap-1.5">
+          {forecastDays.length ? (
+            forecastDays.map((day) => (
+              <div
+                key={day.date}
+                className="rounded-xl bg-[#f7faf9] px-1 py-2 text-center dark:bg-[#202023]"
+              >
+                <span className="block text-[9px] font-black text-[#58766d] dark:text-[#b5cdc5]">
+                  {dayName(day.date)}
+                </span>
+                <CloudRain className="mx-auto my-1 h-3.5 w-3.5 text-[#277b6b] dark:text-[#7fd6bb]" />
+                <span className="block text-[10px] font-black text-[#244e45] dark:text-[#e6f5ef]">
+                  {day.rainChance ?? "—"}%
+                </span>
+                <span className="mt-0.5 block text-[9px] font-semibold text-[#748c84] dark:text-[#b5cdc5]">
+                  {day.rainMm ?? "—"} mm
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="col-span-7 text-xs text-[#6f8880]">{t("Forecast is loading.")}</p>
+          )}
+        </div>
+      </section>
+
+      <div className="mt-3 rounded-2xl bg-[#f1f8f5] px-3 py-3 text-xs font-bold text-[#315e52] dark:bg-[#242426] dark:text-[#d5e9e1]">
+        <div className="flex items-center gap-3">
+          <Waves className="h-5 w-5 shrink-0 text-[#277b6b] dark:text-[#7fd6bb]" />
+          <span>
+            {conditions?.activeFloodZones
+              ? `${conditions.activeFloodZones} ${t("active flood-zone alerts nearby")}`
+              : conditions?.river?.message || t("Official river-gauge data is temporarily unavailable.")}
+          </span>
+        </div>
+        {conditions?.river?.sourceUrl && (
+          <a
+            href={conditions.river.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-8 mt-1 inline-block text-[10px] font-bold text-[#277b6b] underline underline-offset-2 dark:text-[#9ce4cc]"
+          >
+            {conditions.river.sourceName || t("Official source")}
+            {conditions.river.updatedAt
+              ? ` · ${t("Observed")} ${new Date(conditions.river.updatedAt).toLocaleString()}`
+              : ""}
+          </a>
+        )}
+      </div>
+    </section>
+  );
 }

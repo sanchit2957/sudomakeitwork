@@ -23,6 +23,7 @@ import {
 import { getDb } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
+import { getComprehensiveWeather } from "../weather.service";
 import {
   adminProcedure,
   medicalOperationsProcedure,
@@ -302,90 +303,47 @@ export const rescueRouter = router({
               .select({ id: floodZones.id, severity: floodZones.severity })
               .from(floodZones)
               .where(eq(floodZones.active, "yes"));
-          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+          } catch (err) {
+            if (process.env.NODE_ENV === "production")
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database operation failed in production" });
+          }
         } else {
           activeZones = Array.from(_memoryFloodZones.values())
-            .filter(z => z.active === "yes")
-            .map(z => ({ id: z.id, severity: z.severity }));
+            .filter((z) => z.active === "yes")
+            .map((z) => ({ id: z.id, severity: z.severity }));
         }
-        const river = await getOfficialAssamRiverGauge(latitude, longitude);
-        try {
-          const endpoint = new URL("https://api.open-meteo.com/v1/forecast");
-          endpoint.searchParams.set("latitude", String(latitude));
-          endpoint.searchParams.set("longitude", String(longitude));
-          endpoint.searchParams.set("current", "temperature_2m,precipitation,weather_code,wind_speed_10m");
-          endpoint.searchParams.set(
-            "daily",
-            "temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,weather_code,wind_speed_10m_max"
-          );
-          endpoint.searchParams.set("past_days", "7");
-          endpoint.searchParams.set("forecast_days", "7");
-          endpoint.searchParams.set("timezone", "auto");
-          const response = await fetch(endpoint, {
-            signal: AbortSignal.timeout(8_000),
-            headers: { accept: "application/json" },
-          });
-          if (!response.ok) throw new Error(`Weather source responded ${response.status}`);
-          const weather = (await response.json()) as {
-            current?: { temperature_2m?: number; precipitation?: number; weather_code?: number; wind_speed_10m?: number };
-            daily?: {
-              time?: string[];
-              temperature_2m_max?: number[];
-              temperature_2m_min?: number[];
-              precipitation_probability_max?: number[];
-              precipitation_sum?: number[];
-              weather_code?: number[];
-              wind_speed_10m_max?: number[];
-            };
-          };
-          const rainChance = weather.daily?.precipitation_probability_max?.[0] ?? null;
-          const rainAmount = weather.daily?.precipitation_sum?.[0] ?? null;
-          const risk =
-            rainChance !== null && (rainChance >= 80 || (rainAmount ?? 0) >= 40)
-              ? "high"
-              : rainChance !== null && (rainChance >= 50 || (rainAmount ?? 0) >= 15)
-              ? "elevated"
-              : "normal";
-          const daily = weather.daily;
-          const dailyRows = (daily?.time || []).map((date, index) => ({
-            date,
-            temperatureHighC: daily?.temperature_2m_max?.[index] ?? null,
-            temperatureLowC: daily?.temperature_2m_min?.[index] ?? null,
-            rainChance: daily?.precipitation_probability_max?.[index] ?? null,
-            rainMm: daily?.precipitation_sum?.[index] ?? null,
-            windKmh: daily?.wind_speed_10m_max?.[index] ?? null,
-            weatherCode: daily?.weather_code?.[index] ?? null,
-          }));
-          const forecastDays = dailyRows.slice(-7);
-          const trendDays = dailyRows.slice(0, Math.max(0, dailyRows.length - 7)).slice(-7);
-          return {
-            available: true,
-            source: "Open-Meteo weather model",
-            updatedAt: new Date(),
-            risk,
-            activeFloodZones: activeZones.length,
-            current: {
-              temperatureC: weather.current?.temperature_2m ?? null,
-              precipitationMm: weather.current?.precipitation ?? null,
-              windKmh: weather.current?.wind_speed_10m ?? null,
-              weatherCode: weather.current?.weather_code ?? null,
-            },
-            forecast: { rainChance, rainAmountMm: rainAmount, days: forecastDays },
-            trend: { source: "Modelled daily weather history", days: trendDays },
-            river,
-          };
-        } catch {
-          return {
-            available: false,
-            source: "Weather source unavailable",
-            updatedAt: new Date(),
-            risk: "unknown" as const,
-            activeFloodZones: activeZones.length,
-            current: { temperatureC: null, precipitationMm: null, windKmh: null, weatherCode: null },
-            forecast: { rainChance: null, rainAmountMm: null },
-            river,
-          };
-        }
+
+        const weather = await getComprehensiveWeather(latitude, longitude, activeZones.length);
+
+        return {
+          available: weather.available,
+          source: weather.provider,
+          updatedAt: new Date(weather.updatedAt),
+          risk: weather.floodRisk.riskLevel,
+          activeFloodZones: activeZones.length,
+          current: {
+            temperatureC: weather.current.temperatureC,
+            precipitationMm: weather.current.precipitationMm,
+            windKmh: weather.current.windKmh,
+            weatherCode: weather.current.weatherCode,
+            feelsLikeC: weather.current.feelsLikeC,
+            humidityPercent: weather.current.humidityPercent,
+            condition: weather.current.condition,
+          },
+          forecast: {
+            rainChance: weather.forecast.rainChance,
+            rainAmountMm: weather.forecast.rainAmountMm,
+            days: weather.forecast.days7,
+            hourly24h: weather.forecast.hourly24h,
+          },
+          trend: {
+            source: weather.trend.source,
+            days: weather.trend.pastDays7,
+          },
+          floodRisk: weather.floodRisk,
+          airQuality: weather.airQuality,
+          river: weather.river,
+        };
       }),
     create: protectedProcedure
       .input(
@@ -644,6 +602,101 @@ export const rescueRouter = router({
         return { id: messageId };
       }),
     mine: protectedProcedure.query(({ ctx }) => listIncidentsForReporter(ctx.user.id)),
+  }),
+
+  weather: router({
+    current: publicProcedure
+      .input(
+        z
+          .object({
+            latitude: z.number().min(-90).max(90).optional(),
+            longitude: z.number().min(-180).max(180).optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        const latitude = input?.latitude ?? 26.1445;
+        const longitude = input?.longitude ?? 91.7362;
+        const weather = await getComprehensiveWeather(latitude, longitude);
+        return {
+          available: weather.available,
+          provider: weather.provider,
+          updatedAt: weather.updatedAt,
+          location: weather.location,
+          current: weather.current,
+        };
+      }),
+    forecast: publicProcedure
+      .input(
+        z
+          .object({
+            latitude: z.number().min(-90).max(90).optional(),
+            longitude: z.number().min(-180).max(180).optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        const latitude = input?.latitude ?? 26.1445;
+        const longitude = input?.longitude ?? 91.7362;
+        const weather = await getComprehensiveWeather(latitude, longitude);
+        return {
+          available: weather.available,
+          provider: weather.provider,
+          updatedAt: weather.updatedAt,
+          forecast: weather.forecast,
+          trend: weather.trend,
+        };
+      }),
+    floodAlerts: publicProcedure
+      .input(
+        z
+          .object({
+            latitude: z.number().min(-90).max(90).optional(),
+            longitude: z.number().min(-180).max(180).optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        const latitude = input?.latitude ?? 26.1445;
+        const longitude = input?.longitude ?? 91.7362;
+        const db = await database();
+        let activeZonesCount = 0;
+        if (db) {
+          try {
+            const zones = await db.select({ id: floodZones.id }).from(floodZones).where(eq(floodZones.active, "yes"));
+            activeZonesCount = zones.length;
+          } catch {
+            activeZonesCount = Array.from(_memoryFloodZones.values()).filter((z) => z.active === "yes").length;
+          }
+        } else {
+          activeZonesCount = Array.from(_memoryFloodZones.values()).filter((z) => z.active === "yes").length;
+        }
+        const weather = await getComprehensiveWeather(latitude, longitude, activeZonesCount);
+        return {
+          available: weather.available,
+          floodRisk: weather.floodRisk,
+          riverGauge: weather.river,
+        };
+      }),
+    airQuality: publicProcedure
+      .input(
+        z
+          .object({
+            latitude: z.number().min(-90).max(90).optional(),
+            longitude: z.number().min(-180).max(180).optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        const latitude = input?.latitude ?? 26.1445;
+        const longitude = input?.longitude ?? 91.7362;
+        const weather = await getComprehensiveWeather(latitude, longitude);
+        return {
+          available: weather.available,
+          updatedAt: weather.updatedAt,
+          airQuality: weather.airQuality,
+        };
+      }),
   }),
 
   safety: router({
