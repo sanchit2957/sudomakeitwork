@@ -496,7 +496,10 @@ export async function writeAudit(
       resourceId: resourceId ? String(resourceId) : null,
       detail: detail ?? null,
     });
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     _memoryAuditLogs.push({
       id: _memoryAuditLogs.length + 1,
       actorId,
@@ -519,7 +522,10 @@ export async function addIncidentEvent(
   try {
     const db = await database();
     await db.insert(incidentEvents).values({ incidentId, actorId, eventType, title, detail: detail ?? null });
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     _memoryIncidentEvents.unshift({
       id: _memoryIncidentEvents.length + 1,
       incidentId,
@@ -536,7 +542,10 @@ export async function getIncidentById(id: number) {
   try {
     const db = await database();
     return (await db.select().from(incidents).where(eq(incidents.id, id)).limit(1))[0];
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     return _memoryIncidents.get(id) || null;
   }
 }
@@ -545,7 +554,10 @@ export async function getIncidentByCode(publicCode: string) {
   try {
     const db = await database();
     return (await db.select().from(incidents).where(eq(incidents.publicCode, publicCode)).limit(1))[0];
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     return Array.from(_memoryIncidents.values()).find(i => i.publicCode === publicCode) || null;
   }
 }
@@ -558,7 +570,10 @@ export async function getIncidentTimeline(incidentId: number) {
       .from(incidentEvents)
       .where(eq(incidentEvents.incidentId, incidentId))
       .orderBy(desc(incidentEvents.createdAt));
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     return _memoryIncidentEvents
       .filter(e => e.incidentId === incidentId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -569,7 +584,10 @@ export async function getIncidentMessages(incidentId: number) {
   try {
     const db = await database();
     return await db.select().from(incidentMessages).where(eq(incidentMessages.incidentId, incidentId)).orderBy(incidentMessages.createdAt);
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     return _memoryIncidentMessages
       .filter(m => m.incidentId === incidentId)
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -588,7 +606,10 @@ export async function getActiveAssignedRescuerForIncident(incidentId: number) {
         .where(and(eq(missions.incidentId, incidentId), inArray(missions.status, ["pending", "dispatched"])))
         .limit(1)
     )[0];
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     const mission = Array.from(_memoryMissions.values()).find(
       m => m.incidentId === incidentId && (m.status === "pending" || m.status === "dispatched")
     );
@@ -616,7 +637,10 @@ export async function listIncidents(status?: "pending" | "dispatched" | "resolve
       .where(status ? eq(incidents.status, status) : undefined)
       .orderBy(desc(incidents.createdAt));
     return rows;
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     const list = Array.from(_memoryIncidents.values()).filter(i => !status || i.status === status);
     return list.map(incident => ({
       incident,
@@ -631,7 +655,10 @@ export async function listIncidentsForReporter(reporterId: number) {
   try {
     const db = await database();
     return await db.select().from(incidents).where(eq(incidents.reporterId, reporterId)).orderBy(desc(incidents.createdAt));
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     return Array.from(_memoryIncidents.values())
       .filter(i => i.reporterId === reporterId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -647,7 +674,10 @@ export async function listMissionsForRescuer(rescuerId: number) {
       .innerJoin(incidents, eq(missions.incidentId, incidents.id))
       .where(eq(missions.rescuerId, rescuerId))
       .orderBy(desc(missions.assignedAt));
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     const userMissions = Array.from(_memoryMissions.values()).filter(m => m.rescuerId === rescuerId);
     return userMissions
       .map(mission => {
@@ -669,7 +699,10 @@ export async function getMissionForRescuer(missionId: number, rescuerId: number)
         .where(and(eq(missions.id, missionId), eq(missions.rescuerId, rescuerId)))
         .limit(1)
     )[0];
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     const mission = _memoryMissions.get(missionId);
     if (mission && mission.rescuerId === rescuerId) return mission;
     return null;
@@ -684,7 +717,10 @@ export async function getRescuerRoster() {
       .from(rescueProfiles)
       .innerJoin(users, eq(rescueProfiles.userId, users.id))
       .orderBy(users.name);
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     const roster: Array<{ user: any; profile: MemoryRescueProfile }> = [];
     const profiles = Array.from(_memoryRescueProfiles.values());
     for (const profile of profiles) {
@@ -702,7 +738,14 @@ export async function getRescuerProfile(userId: number) {
       const res = (await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1))[0];
       if (res) return res;
     }
-  } catch {}
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Rescuer profile not found in operational database.");
+  }
   let profile = _memoryRescueProfiles.get(userId);
   if (!profile) {
     const user = Array.from(_memoryUsers.values()).find(u => u.id === userId);
@@ -734,7 +777,10 @@ export async function listRescuerRegistrationRequests() {
       .from(rescuerRegistrationRequests)
       .innerJoin(users, eq(rescuerRegistrationRequests.userId, users.id))
       .orderBy(desc(rescuerRegistrationRequests.createdAt));
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     const requests: Array<{ request: MemoryRescuerRequest; user: any }> = [];
     const allReqs = Array.from(_memoryRescuerRequests.values());
     for (const request of allReqs) {
@@ -753,7 +799,10 @@ export async function listNotificationFeed(recipientId: number) {
       .from(notifications)
       .where(eq(notifications.recipientId, recipientId))
       .orderBy(desc(notifications.createdAt));
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     return _memoryNotifications.filter(n => n.recipientId === recipientId);
   }
 }
@@ -776,7 +825,10 @@ export async function getMapLayers(includeOperational: boolean) {
         .where(and(eq(users.role, "rescuer"), inArray(rescueProfiles.availability, ["available", "on_mission"]))),
     ]);
     return { shelters: shelterRows, hospitals: hospitalRows, floodZones: zoneRows, incidents: incidentRows, rescuers: rescuerRows };
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     const sheltersList = Array.from(_memoryShelters.values());
     const hospitalsList = Array.from(_memoryHospitals.values());
     const floodZonesList = Array.from(_memoryFloodZones.values()).filter(z => z.active === "yes");
@@ -796,7 +848,10 @@ export async function listHospitals() {
   try {
     const db = await database();
     return await db.select().from(hospitals).orderBy(hospitals.name);
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     return Array.from(_memoryHospitals.values());
   }
 }
@@ -828,7 +883,10 @@ export async function getAnalytics() {
       activeRescuers: activeRescuerRows.length,
       averageResponseMinutes,
     };
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     const incidentRows = Array.from(_memoryIncidents.values());
     const activeRescuerRows = Array.from(_memoryRescueProfiles.values()).filter(p => p.availability !== "off_duty");
     return {
@@ -851,7 +909,10 @@ export async function getAvailableRescuersNear(latitude: number, longitude: numb
       .from(rescueProfiles)
       .innerJoin(users, eq(rescueProfiles.userId, users.id))
       .where(and(eq(users.role, "rescuer"), eq(rescueProfiles.availability, "available")));
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     const profiles = Array.from(_memoryRescueProfiles.values());
     for (const profile of profiles) {
       if (profile.availability === "available") {
@@ -876,7 +937,10 @@ export async function unreadNotificationCount(recipientId: number) {
     const db = await database();
     const result = await db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.recipientId, recipientId), isNull(notifications.readAt)));
     return result.length;
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
     return _memoryNotifications.filter(n => n.recipientId === recipientId && !n.readAt).length;
   }
 }

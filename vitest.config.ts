@@ -15,6 +15,8 @@ export default defineConfig({
   test: {
     environment: "node",
     setupFiles: ["dotenv/config"],
+    testTimeout: 30000,
+    hookTimeout: 30000,
     include: ["server/**/*.test.ts", "server/**/*.spec.ts", "client/src/**/*.test.ts", "client/src/**/*.spec.ts", "client/src/**/*.test.tsx", "client/src/**/*.spec.tsx"],
   },
 });

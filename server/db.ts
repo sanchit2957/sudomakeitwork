@@ -1,11 +1,12 @@
+import mysql from "mysql2/promise";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { hashPassword } from "./auth.password";
 
-let _db: ReturnType<typeof drizzle> | null = null;
-let _dbChecked = false;
+let _pool: mysql.Pool | null = null;
+let _db: MySql2Database<any> | null = null;
 
 export function planRoleSync(role: InsertUser["role"] | undefined, isProjectOwner: boolean) {
   if (role !== undefined) return { insertRole: role, updateRole: role };
@@ -13,11 +14,25 @@ export function planRoleSync(role: InsertUser["role"] | undefined, isProjectOwne
   return { insertRole: undefined, updateRole: undefined };
 }
 
+export function createDatabasePool(connectionUri: string): mysql.Pool {
+  const isRemoteOrTiDB = connectionUri.includes("tidbcloud.com") || connectionUri.includes("ssl=") || !connectionUri.includes("localhost");
+  return mysql.createPool({
+    uri: connectionUri,
+    ssl: isRemoteOrTiDB ? { minVersion: "TLSv1.2", rejectUnauthorized: true } : undefined,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+  });
+}
+
 // Lazily create the drizzle instance so local tooling can run without a DB or with a local DB.
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL && !_dbChecked) {
+  if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      if (!_pool) {
+        _pool = createDatabasePool(process.env.DATABASE_URL);
+      }
+      _db = drizzle(_pool);
     } catch (error) {
       if (process.env.NODE_ENV === "production") {
         throw new Error("The operational database is disconnected. Cannot safely process request.");
