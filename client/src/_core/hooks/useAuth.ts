@@ -2,7 +2,6 @@ import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
-import { useLocation } from "wouter";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -12,7 +11,6 @@ type UseAuthOptions = {
 export function useAuth(options?: UseAuthOptions) {
   const { redirectOnUnauthenticated = false, redirectPath } = options ?? {};
   const utils = trpc.useUtils();
-  const [, setLocation] = useLocation();
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
@@ -59,9 +57,7 @@ export function useAuth(options?: UseAuthOptions) {
       name: string;
       email: string;
       password: string;
-      role?: "user" | "rescuer" | "medical";
       phone?: string;
-      callSign?: string;
     }) => {
       const res = await registerMutation.mutateAsync(params);
       utils.auth.me.setData(undefined, res.user as any);
@@ -84,15 +80,12 @@ export function useAuth(options?: UseAuthOptions) {
       throw error;
     } finally {
       try {
-        sessionStorage.removeItem("app-session-cookie");
-        localStorage.removeItem("app-session-cookie");
         localStorage.removeItem("app-runtime-user-info");
       } catch {}
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
-      setLocation("/login");
     }
-  }, [logoutMutation, setLocation, utils]);
+  }, [logoutMutation, utils]);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;

@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { ENV } from "./_core/env";
+import { hashPassword } from "./auth.password";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _dbChecked = false;
@@ -18,12 +19,26 @@ export async function getDb() {
     try {
       _db = drizzle(process.env.DATABASE_URL);
     } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("The operational database is disconnected. Cannot safely process request.");
+      }
       console.warn("[Database] Failed to connect MySQL, falling back to local memory store:", error);
       _db = null;
     }
   }
+
+  if (!_db && process.env.NODE_ENV === "production") {
+    throw new Error("The operational database is disconnected. Cannot safely process request.");
+  }
+
   return _db;
 }
+
+// Default development seed accounts with salted scrypt hashed passwords
+const defaultAdminHash = hashPassword("admin");
+const defaultRescuerHash = hashPassword("rescuer");
+const defaultMedicalHash = hashPassword("medical");
+const defaultCitizenHash = hashPassword("citizen");
 
 export const _memoryUsers: Map<string, any> = new Map([
   [
@@ -33,7 +48,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-admin",
       name: "Superadmin",
       email: "admin@assamrescue.gov.in",
-      password: "admin",
+      password: defaultAdminHash,
       role: "admin",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -48,7 +63,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-admin",
       name: "Superadmin",
       email: "admin@assamrescue.gov.in",
-      password: "admin",
+      password: defaultAdminHash,
       role: "admin",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -63,7 +78,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-rescuer",
       name: "Inspector Barua",
       email: "rescuer@assamrescue.gov.in",
-      password: "rescuer",
+      password: defaultRescuerHash,
       role: "rescuer",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -78,7 +93,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-rescuer",
       name: "Inspector Barua",
       email: "rescuer@assamrescue.gov.in",
-      password: "rescuer",
+      password: defaultRescuerHash,
       role: "rescuer",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -93,7 +108,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-medical",
       name: "Dr. Hazarika",
       email: "medical@assamrescue.gov.in",
-      password: "medical",
+      password: defaultMedicalHash,
       role: "medical",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -108,7 +123,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-medical",
       name: "Dr. Hazarika",
       email: "medical@assamrescue.gov.in",
-      password: "medical",
+      password: defaultMedicalHash,
       role: "medical",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -123,7 +138,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-citizen",
       name: "Anamika Das",
       email: "citizen@assamrescue.gov.in",
-      password: "citizen",
+      password: defaultCitizenHash,
       role: "user",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -138,7 +153,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-citizen",
       name: "Anamika Das",
       email: "citizen@assamrescue.gov.in",
-      password: "citizen",
+      password: defaultCitizenHash,
       role: "user",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -153,28 +168,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     throw new Error("User openId is required for upsert");
   }
 
-  // Update memory cache
-  const existingMem = _memoryUsers.get(user.openId) || {};
-  const merged = {
-    id: existingMem.id || (_memoryUsers.size + 1),
-    ...existingMem,
-    ...user,
-    role: user.role || existingMem.role || "user",
-    lastSignedIn: user.lastSignedIn || new Date(),
-    updatedAt: new Date(),
-    createdAt: existingMem.createdAt || new Date(),
-  };
-  _memoryUsers.set(user.openId, merged);
-  if (user.email) {
-    _memoryUsers.set(user.email.toLowerCase(), merged);
-  }
-
   const db = await getDb();
-  if (!db) {
-    return;
-  }
-
-  try {
+  if (db) {
     const values: InsertUser = {
       openId: user.openId,
     };
@@ -209,11 +204,37 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
-  } catch (error) {
-    console.warn("[Database] MySQL sync skipped, using local memory store:", error);
+    try {
+      await db.insert(users).values(values).onDuplicateKeyUpdate({
+        set: updateSet,
+      });
+      return;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database user update failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL sync skipped, updating local development store:", error);
+    }
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("The authoritative database is unavailable. User operations cannot proceed in production.");
+  }
+
+  // Update memory cache in non-production environments
+  const existingMem = _memoryUsers.get(user.openId) || {};
+  const merged = {
+    id: existingMem.id || (_memoryUsers.size + 1),
+    ...existingMem,
+    ...user,
+    role: user.role || existingMem.role || "user",
+    lastSignedIn: user.lastSignedIn || new Date(),
+    updatedAt: new Date(),
+    createdAt: existingMem.createdAt || new Date(),
+  };
+  _memoryUsers.set(user.openId, merged);
+  if (user.email) {
+    _memoryUsers.set(user.email.toLowerCase(), merged);
   }
 }
 
@@ -223,24 +244,47 @@ export async function getUserByOpenId(openId: string) {
     try {
       const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
       if (result.length > 0) return result[0];
-    } catch {}
+      return null;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL read skipped, checking local development store:", error);
+    }
   }
-  return _memoryUsers.get(openId);
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
+  }
+  return _memoryUsers.get(openId) || null;
 }
 
 export async function getUserByEmail(emailOrUsername: string) {
   const db = await getDb();
   if (db) {
     try {
-      const result = await db.select().from(users).where(eq(users.email, emailOrUsername)).limit(1);
+      const result = await db
+        .select()
+        .from(users)
+        .where(or(eq(users.email, emailOrUsername), eq(users.name, emailOrUsername)))
+        .limit(1);
       if (result.length > 0) return result[0];
-    } catch {}
+      return null;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL read skipped, checking local development store:", error);
+    }
   }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
+  }
+  const lower = emailOrUsername.toLowerCase();
   return (
-    _memoryUsers.get(emailOrUsername.toLowerCase()) ||
+    _memoryUsers.get(lower) ||
     Array.from(_memoryUsers.values()).find(
-      u => u.email?.toLowerCase() === emailOrUsername.toLowerCase() || u.openId === `user-${emailOrUsername.toLowerCase()}`
-    )
+      u => u.email?.toLowerCase() === lower || u.name?.toLowerCase() === lower || u.openId === `user-${lower}`
+    ) || null
   );
 }
 
@@ -249,7 +293,15 @@ export async function getAllUsers() {
   if (db) {
     try {
       return await db.select().from(users).orderBy(users.id);
-    } catch {}
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL read skipped, returning local development store:", error);
+    }
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
   }
   const uniqueUsers = Array.from(new Set(Array.from(_memoryUsers.values())));
   return uniqueUsers;
@@ -274,9 +326,18 @@ export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat
           locationUpdatedAt: new Date(),
         });
       }
-    } catch {}
+      return;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database rescuer profile failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL sync skipped, updating local development store:", error);
+    }
   }
-  // Also register into rescue memory
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
+  }
+  // Register into rescue memory in development/test
   try {
     const { registerMemoryRescuerProfile } = await import("./rescue.db");
     registerMemoryRescuerProfile({
@@ -328,7 +389,16 @@ export async function ensureHospitalStaffProfile(userId: number) {
           designation: "Emergency Medical Coordinator",
         });
       }
-    } catch {}
+      return;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database hospital staff profile failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL sync skipped, updating local development store:", error);
+    }
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
   }
   try {
     const { registerMemoryHospitalStaffProfile } = await import("./rescue.db");

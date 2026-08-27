@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { blobToDataUrl, clearSosVoiceNote, readSosVoiceNote, saveSosVoiceNote, type SosVoiceNoteDraft } from "@/lib/sosVoiceNote";
 import { flushOfflineSos, queueOfflineSos } from "@/lib/offlineSos";
+import { getCurrentCoordinates } from "@/lib/nativeLocation";
 import { createAndRedirectAfterRapidSos, redirectAfterRapidSos } from "@/lib/rapidSos";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -31,12 +32,9 @@ export default function Home() {
   useEffect(() => {
     const sync = () => setOnline(navigator.onLine);
     window.addEventListener("online", sync); window.addEventListener("offline", sync);
-    if (!navigator.geolocation) { setLocationStatus("unavailable"); return () => { window.removeEventListener("online", sync); window.removeEventListener("offline", sync); }; }
-    navigator.geolocation.getCurrentPosition(
-      result => { setPosition({ latitude: result.coords.latitude, longitude: result.coords.longitude }); setLocationStatus("ready"); },
-      () => setLocationStatus("unavailable"),
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
-    );
+    void getCurrentCoordinates({ enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 })
+      .then(result => { setPosition(result); setLocationStatus("ready"); })
+      .catch(() => setLocationStatus("unavailable"));
     return () => { window.removeEventListener("online", sync); window.removeEventListener("offline", sync); };
   }, []);
 
@@ -97,21 +95,12 @@ export default function Home() {
     setRapidStatus("locating");
     setRapidNotice(t("Getting location to send SOS immediately…"));
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        result => {
-          submitSosWithCoords(result.coords.latitude, result.coords.longitude, t("GPS location captured from this phone"));
-        },
-        () => {
-          const fallback = position || guwahati;
-          submitSosWithCoords(fallback.latitude, fallback.longitude, t("Assam emergency coordinates"));
-        },
-        { enableHighAccuracy: true, timeout: 8_000, maximumAge: 30_000 }
-      );
-    } else {
-      const fallback = position || guwahati;
-      submitSosWithCoords(fallback.latitude, fallback.longitude, t("Assam emergency coordinates"));
-    }
+    void getCurrentCoordinates({ enableHighAccuracy: true, timeout: 8_000, maximumAge: 30_000 })
+      .then(result => submitSosWithCoords(result.latitude, result.longitude, t("GPS location captured from this phone")))
+      .catch(() => {
+        const fallback = position || guwahati;
+        submitSosWithCoords(fallback.latitude, fallback.longitude, t("Assam emergency coordinates"));
+      });
   };
 
   const activePoint = position || guwahati;

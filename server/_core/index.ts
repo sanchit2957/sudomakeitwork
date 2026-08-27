@@ -51,7 +51,17 @@ async function startServer() {
         ) {
           return callback(null, true);
         }
-        // In production/development, allow all valid origins
+        // Check configured explicit allowed origins
+        const configuredOrigins = process.env.ALLOWED_ORIGINS
+          ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim())
+          : [];
+        if (configuredOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        if (process.env.NODE_ENV === "production" && configuredOrigins.length > 0) {
+          return callback(new Error("CORS origin not allowed"), false);
+        }
+        // In local development or default web server, permit the origin
         return callback(null, true);
       },
       credentials: true,

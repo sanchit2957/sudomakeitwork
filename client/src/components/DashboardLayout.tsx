@@ -63,24 +63,27 @@ export default function DashboardLayout({ children, navItems, workspace, roleLab
             <div className="flex items-center gap-2.5"><Avatar className="h-9 w-9 border border-border"><AvatarFallback className="bg-white text-xs font-bold text-primary dark:bg-[#29292d]">{user.name?.slice(0, 1).toUpperCase() || "U"}</AvatarFallback></Avatar><div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><p className="truncate text-sm font-bold">{user.name || "Authorized user"}</p><p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{roleLabel}</p></div></div>
             <div className="mt-2 flex flex-col gap-1 group-data-[collapsible=icon]:hidden">
               <button onClick={() => setLocation("/")} className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-xs font-semibold text-primary hover:bg-white dark:hover:bg-[#29292d]"><ShieldCheck className="h-3.5 w-3.5" /> Return to Public Hub</button>
+              <button onClick={() => void logout().then(() => setLocation("/login"))} className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-xs font-semibold text-destructive hover:bg-white dark:hover:bg-[#29292d]"><LogOut className="h-3.5 w-3.5" /> Sign out</button>
             </div>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              aria-label="Log out"
-              title="Log out"
-              className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1 text-xs font-semibold text-destructive hover:bg-white dark:hover:bg-[#29292d]"
-            >
-              <LogOut className="h-3.5 w-3.5 shrink-0" />
-              <span className="group-data-[collapsible=icon]:hidden">Log out</span>
-            </button>
           </div>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset className="min-h-screen bg-background">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/70 bg-background/85 px-4 backdrop-blur md:px-7">
           <div className="flex items-center gap-3"><SidebarTrigger className="md:hidden"><Menu className="h-4 w-4" /></SidebarTrigger><div><p className="text-sm font-extrabold tracking-tight">{workspace}</p><p className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">{t("dashboard.liveWorkspace")}</p></div></div>
-          <div className="flex items-center gap-2"><LanguageSelector compact /><div className="flex items-center gap-2 rounded-full bg-[#d9f1e7] px-3 py-1.5 text-xs font-bold text-[#176154] dark:bg-[#242426] dark:text-[#e4e4e7]"><span className="h-2 w-2 rounded-full bg-[#43c69c]" /> {t("general.live")}</div><Button type="button" variant="outline" onClick={() => void logout()} className="h-9 gap-1.5 px-3 text-xs font-bold"><LogOut className="h-3.5 w-3.5" /> Logout</Button></div>
+          <div className="flex items-center gap-2">
+            <LanguageSelector compact />
+            <div className="hidden items-center gap-2 rounded-full bg-[#d9f1e7] px-3 py-1.5 text-xs font-bold text-[#176154] dark:bg-[#242426] dark:text-[#e4e4e7] sm:flex"><span className="h-2 w-2 rounded-full bg-[#43c69c]" /> {t("general.live")}</div>
+            <Button
+              onClick={() => void logout().then(() => setLocation("/login"))}
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-destructive/30 px-3 text-xs font-bold text-destructive hover:bg-destructive/10"
+            >
+              <LogOut className="mr-1.5 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
         </header>
         <main className="workspace-surface p-4 md:p-7">{children}</main>
       </SidebarInset>

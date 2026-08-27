@@ -7,6 +7,7 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 
 import { useAuth } from "./_core/hooks/useAuth";
+import { RoleGate } from "./components/RoleGate";
 
 // Admin Section Pages
 import { AdminLogin, AdminCommand } from "./pages/admin";
@@ -27,6 +28,7 @@ import { useMobileLifecycle } from "./hooks/useMobileLifecycle";
 
 import { isNativeApp } from "./lib/apiConfig";
 import MobileCommandRestricted from "./components/MobileCommandRestricted";
+import { MedicalLogin, RescuerLogin } from "./pages/RoleLogin";
 
 function Router() {
   useMobileLifecycle();
@@ -53,8 +55,10 @@ function Router() {
         {native ? <MobileCommandRestricted /> : <AdminLogin />}
       </Route>
       <Route path={"/admin"}>
-        {native ? <MobileCommandRestricted /> : user?.role === "admin" ? <AdminCommand /> : <AdminLogin />}
+        {native ? <MobileCommandRestricted /> : <AdminLogin />}
       </Route>
+      <Route path={"/responder/login"} component={RescuerLogin} />
+      <Route path={"/medical/login"} component={MedicalLogin} />
 
       {/* Main Entry: Registration & Sign In first if not logged in */}
       <Route path={"/"}>
@@ -63,41 +67,41 @@ function Router() {
 
       {/* User Section Routes */}
       <Route path={"/emergency"}>
-        {user ? <Emergency /> : <UserLogin />}
+        <RoleGate><Emergency /></RoleGate>
       </Route>
       <Route path={"/track"}>
-        {user ? <UserTrackFlow /> : <UserLogin />}
+        <RoleGate><UserTrackFlow /></RoleGate>
       </Route>
       <Route path={"/safety"}>
-        {user ? <UserSafety /> : <UserLogin />}
+        <RoleGate><UserSafety /></RoleGate>
       </Route>
       <Route path={"/more"}>
-        {user ? <UserMore /> : <UserLogin />}
+        <RoleGate><UserMore /></RoleGate>
       </Route>
       <Route path={"/hospital/register"}>
-        {user ? <UserHospitalRegister /> : <UserLogin />}
+        <RoleGate><UserHospitalRegister /></RoleGate>
       </Route>
 
       {/* Operational Wings */}
       <Route path={"/medical/:rest*"}>
-        {user ? <UserMedical /> : <UserLogin />}
+        <RoleGate roles={["medical", "admin"]}><UserMedical /></RoleGate>
       </Route>
       <Route path={"/medical"}>
-        {user ? <UserMedical /> : <UserLogin />}
+        <RoleGate roles={["medical", "admin"]}><UserMedical /></RoleGate>
       </Route>
       <Route path={"/responder/:rest*"}>
-        {user ? <UserResponder /> : <UserLogin />}
+        <RoleGate roles={["rescuer", "admin"]}><UserResponder /></RoleGate>
       </Route>
       <Route path={"/responder"}>
-        {user ? <UserResponder /> : <UserLogin />}
+        <RoleGate roles={["rescuer", "admin"]}><UserResponder /></RoleGate>
       </Route>
 
       {/* Admin Section Routes - Restricted in Mobile Native App */}
       <Route path={"/command/:rest*"}>
-        {native ? <MobileCommandRestricted /> : user?.role === "admin" ? <AdminCommand /> : <AdminLogin />}
+        {native ? <MobileCommandRestricted /> : <RoleGate roles={["admin"]}><AdminCommand /></RoleGate>}
       </Route>
       <Route path={"/command"}>
-        {native ? <MobileCommandRestricted /> : user?.role === "admin" ? <AdminCommand /> : <AdminLogin />}
+        {native ? <MobileCommandRestricted /> : <RoleGate roles={["admin"]}><AdminCommand /></RoleGate>}
       </Route>
 
       {/* Fallback Routes */}

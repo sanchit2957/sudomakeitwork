@@ -284,12 +284,16 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    if (!user) throw ForbiddenError("Authenticated user account not found");
+    if (!user) {
+      throw ForbiddenError("User not found");
+    }
 
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
+    try {
+      await db.upsertUser({
+        openId: user.openId,
+        lastSignedIn: signedInAt,
+      });
+    } catch {}
 
     return user;
   }

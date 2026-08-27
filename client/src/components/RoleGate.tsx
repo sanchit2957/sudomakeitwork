@@ -1,7 +1,6 @@
 import React from "react";
-import { useEffect } from "react";
-import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { Redirect } from "wouter";
 
 // Theme support classes: dark:bg-[#242426] dark:text-[#d4d4d8]
 export function RoleGate({
@@ -12,14 +11,24 @@ export function RoleGate({
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
-  const [, setLocation] = useLocation();
-  const destination = user?.role === "admin" ? "/command" : user?.role === "rescuer" ? "/responder" : user?.role === "medical" ? "/medical" : "/";
 
-  useEffect(() => {
-    if (!loading && !user) setLocation(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
-    else if (!loading && user && roles && !roles.includes(user.role)) setLocation(destination);
-  }, [destination, loading, roles, setLocation, user]);
+  if (loading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center p-8">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent" />
+      </div>
+    );
+  }
 
-  if (loading || !user || (roles && !roles.includes(user.role))) return null;
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
+
+  if (roles && roles.length > 0 && !roles.includes(user.role)) {
+    // If the user's role is not in the allowed list, send them to their role dashboard
+    const dashboard = user.role === "admin" ? "/command" : user.role === "medical" ? "/medical" : user.role === "rescuer" ? "/responder" : "/";
+    return <Redirect to={dashboard} />;
+  }
+
   return <>{children}</>;
 }

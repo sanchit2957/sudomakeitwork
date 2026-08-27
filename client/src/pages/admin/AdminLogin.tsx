@@ -15,7 +15,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import React, { FormEvent, useEffect, useState } from "react";
+import React, { FormEvent, useState } from "react";
 import { useLocation } from "wouter";
 
 export default function AdminLogin() {
@@ -23,13 +23,8 @@ export default function AdminLogin() {
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
 
-  useEffect(() => {
-    if (!user || user.role === "admin") return;
-    setLocation(user.role === "rescuer" ? "/responder" : user.role === "medical" ? "/medical" : "/");
-  }, [setLocation, user]);
-
-  const [email, setEmail] = useState("admin@assamrescue.gov.in");
-  const [password, setPassword] = useState("admin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -44,11 +39,11 @@ export default function AdminLogin() {
       });
 
       const role = res.user?.role;
-      if (role === "admin") {
-        setLocation("/command");
-      } else {
-        setLocation(role === "rescuer" ? "/responder" : role === "medical" ? "/medical" : "/");
+      if (role !== "admin") {
+        await logout();
+        throw new Error("This account is not authorized for the Administrator Portal.");
       }
+      setLocation("/command");
     } catch (err: any) {
       setErrorMessage(err?.message || "Administrator authentication failed. Please verify your credentials.");
     } finally {
@@ -176,7 +171,6 @@ export default function AdminLogin() {
                   type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@assamrescue.gov.in"
                   className="mt-1.5 h-11 rounded-xl"
                   required
                 />
@@ -189,7 +183,6 @@ export default function AdminLogin() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
                   className="mt-1.5 h-11 rounded-xl"
                   required
                 />
@@ -209,18 +202,6 @@ export default function AdminLogin() {
           </div>
 
           {/* Quick Prefill Bar */}
-          <div className="border-t border-black/5 bg-[#f8faf9] p-4 text-center dark:border-white/5 dark:bg-[#16181b]">
-            <button
-              type="button"
-              onClick={() => {
-                setEmail("admin@assamrescue.gov.in");
-                setPassword("admin");
-              }}
-              className="rounded-lg border border-black/5 bg-white px-3 py-1.5 text-xs font-semibold hover:bg-black/5 dark:border-white/5 dark:bg-[#1e2024]"
-            >
-              👑 Fill Admin Credentials (`admin` / `admin`)
-            </button>
-          </div>
         </div>
 
         {/* User Portal Link */}

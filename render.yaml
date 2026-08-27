@@ -16,6 +16,6 @@ services:
       - key: VAPID_SUBJECT
         value: mailto:admin@assamrescue.gov.in
       - key: VAPID_PUBLIC_KEY
-        sync:false
+        value: BBuEYw8dKqeUa1GM_zeq1eZAnr2PZrTrt93PAk_2rlk4mOLAOsawhWLfsNI8ioEMLkiel279rkG20aZMwsPRls0
       - key: VAPID_PRIVATE_KEY
-        sync:false
+        value: 6fAok1f93tPFGAOW7U27tez6gHe4Gc5jnh7FFSLAVaQ
