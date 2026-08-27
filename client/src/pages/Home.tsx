@@ -22,11 +22,37 @@ export default function Home() {
   const { user, loading: authLoading } = useAuth();
   const [online, setOnline] = useState(() => navigator.onLine);
   const [position, setPosition] = useState<Point | null>(null);
+  const [manualLocation, setManualLocation] = useState<{ name: string; lat: number; lng: number } | null>(null);
+  const [isGpsActive, setIsGpsActive] = useState(true);
   const [locationStatus, setLocationStatus] = useState<"finding" | "ready" | "unavailable">("finding");
   const [rapidStatus, setRapidStatus] = useState<"idle" | "locating" | "sending" | "queued" | "error">("idle");
   const [rapidNotice, setRapidNotice] = useState("");
-  const conditions = trpc.rescue.emergency.conditions.useQuery(position ? { latitude: position.latitude, longitude: position.longitude } : {}, { refetchInterval: 15 * 60_000, refetchOnWindowFocus: true });
+
+  const activeWeatherCoords = manualLocation
+    ? { latitude: manualLocation.lat, longitude: manualLocation.lng }
+    : position
+    ? { latitude: position.latitude, longitude: position.longitude }
+    : undefined;
+
+  const conditions = trpc.rescue.emergency.conditions.useQuery(activeWeatherCoords || {}, { refetchInterval: 15 * 60_000, refetchOnWindowFocus: true });
   const createSos = trpc.rescue.emergency.create.useMutation();
+
+  const handleLocationChange = (lat: number, lng: number, name: string) => {
+    setManualLocation({ name, lat, lng });
+    setIsGpsActive(false);
+  };
+
+  const handleGpsLocate = () => {
+    setManualLocation(null);
+    setIsGpsActive(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        result => { setPosition({ latitude: result.coords.latitude, longitude: result.coords.longitude }); setLocationStatus("ready"); },
+        () => setLocationStatus("unavailable"),
+        { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+      );
+    }
+  };
 
   useEffect(() => {
     const sync = () => setOnline(navigator.onLine);
@@ -122,7 +148,15 @@ export default function Home() {
 
     <VoiceNoteCard />
     <LocationPreview point={activePoint} state={locationStatus} />
-    <FloodConditionsPanel conditions={conditions.data} loading={conditions.isLoading} />
+    <FloodConditionsPanel
+      conditions={conditions.data}
+      loading={conditions.isLoading}
+      onRefresh={() => conditions.refetch()}
+      onLocationChange={handleLocationChange}
+      selectedLocationName={manualLocation?.name}
+      isGpsActive={isGpsActive}
+      onGpsLocate={handleGpsLocate}
+    />
   </main><VictimNavigation current="home" /></div>;
 }
 

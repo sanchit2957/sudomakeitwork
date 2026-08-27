@@ -23,7 +23,7 @@ import {
 import { getDb } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
-import { getComprehensiveWeather } from "../weather.service";
+import { ASSAM_DISTRICT_LOCATIONS, getComprehensiveWeather, weatherProviderManager } from "../weather.service";
 import {
   adminProcedure,
   medicalOperationsProcedure,
@@ -321,14 +321,23 @@ export const rescueRouter = router({
           updatedAt: new Date(weather.updatedAt),
           risk: weather.floodRisk.riskLevel,
           activeFloodZones: activeZones.length,
+          location: weather.location,
           current: {
             temperatureC: weather.current.temperatureC,
             precipitationMm: weather.current.precipitationMm,
             windKmh: weather.current.windKmh,
+            windDirectionDeg: weather.current.windDirectionDeg,
+            windGustsKmh: weather.current.windGustsKmh,
+            visibilityKm: weather.current.visibilityKm,
+            cloudCoverPercent: weather.current.cloudCoverPercent,
+            pressureHpa: weather.current.pressureHpa,
             weatherCode: weather.current.weatherCode,
             feelsLikeC: weather.current.feelsLikeC,
             humidityPercent: weather.current.humidityPercent,
             condition: weather.current.condition,
+            category: weather.current.category,
+            icon: weather.current.icon,
+            uvIndex: weather.current.uvIndex,
           },
           forecast: {
             rainChance: weather.forecast.rainChance,
@@ -340,9 +349,11 @@ export const rescueRouter = router({
             source: weather.trend.source,
             days: weather.trend.pastDays7,
           },
+          alerts: weather.alerts,
           floodRisk: weather.floodRisk,
           airQuality: weather.airQuality,
           river: weather.river,
+          dataSource: weather.source,
         };
       }),
     create: protectedProcedure
@@ -697,6 +708,45 @@ export const rescueRouter = router({
           airQuality: weather.airQuality,
         };
       }),
+    alerts: publicProcedure
+      .input(
+        z
+          .object({
+            latitude: z.number().min(-90).max(90).optional(),
+            longitude: z.number().min(-180).max(180).optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        const latitude = input?.latitude ?? 26.1445;
+        const longitude = input?.longitude ?? 91.7362;
+        const weather = await getComprehensiveWeather(latitude, longitude);
+        return {
+          available: weather.available,
+          updatedAt: weather.updatedAt,
+          alerts: weather.alerts,
+        };
+      }),
+    comprehensive: publicProcedure
+      .input(
+        z
+          .object({
+            latitude: z.number().min(-90).max(90).optional(),
+            longitude: z.number().min(-180).max(180).optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        const latitude = input?.latitude ?? 26.1445;
+        const longitude = input?.longitude ?? 91.7362;
+        return getComprehensiveWeather(latitude, longitude);
+      }),
+    locations: publicProcedure.query(() => {
+      return ASSAM_DISTRICT_LOCATIONS;
+    }),
+    providerHealth: publicProcedure.query(() => {
+      return weatherProviderManager.getHealthReport();
+    }),
   }),
 
   safety: router({
