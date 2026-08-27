@@ -14,6 +14,7 @@ import {
   users,
 } from "../drizzle/schema";
 import { getDb, _memoryUsers } from "./db";
+export { _memoryUsers };
 
 export interface MemoryShelter {
   id: number;
@@ -697,10 +698,32 @@ export async function getRescuerRoster() {
 export async function getRescuerProfile(userId: number) {
   try {
     const db = await database();
-    return (await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1))[0];
-  } catch {
-    return _memoryRescueProfiles.get(userId) || null;
+    if (db) {
+      const res = (await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1))[0];
+      if (res) return res;
+    }
+  } catch {}
+  let profile = _memoryRescueProfiles.get(userId);
+  if (!profile) {
+    const user = Array.from(_memoryUsers.values()).find(u => u.id === userId);
+    profile = {
+      id: _memoryRescueProfiles.size + 1,
+      userId,
+      callSign: user?.name ? `${user.name} (Field Unit)` : `Rescuer #${userId}`,
+      phone: null,
+      photoKey: null,
+      photoUrl: null,
+      contactSharing: "no",
+      locationSharing: "no",
+      availability: "available",
+      lastLatitude: 26.1445,
+      lastLongitude: 91.7362,
+      locationUpdatedAt: new Date(),
+      updatedAt: new Date(),
+    };
+    _memoryRescueProfiles.set(userId, profile);
   }
+  return profile;
 }
 
 export async function listRescuerRegistrationRequests() {

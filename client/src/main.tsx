@@ -27,7 +27,6 @@ if ("serviceWorker" in navigator) {
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
-  if (import.meta.env.DEV) return; // TEMPORARY DEMO BYPASS — don't redirect to login in dev
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
 
@@ -58,23 +57,6 @@ const trpcClient = trpc.createClient({
       url: getApiUrl("/api/trpc"),
       transformer: superjson,
       headers() {
-        // Preview / Mobile WebView auto-login fallback: when the browser blocks
-        // iframe cookies (Safari ITP / private browsing / Android WebView), the runtime
-        // mirrors the session into storage so we can forward it as a Bearer token.
-        // The regular OAuth cookie flow keeps working and takes priority server-side.
-        try {
-          const raw = sessionStorage.getItem("app-session-cookie") || localStorage.getItem("app-session-cookie");
-          if (raw) {
-            const prefix = `${COOKIE_NAME}=`;
-            const pair = raw.split(";").find(s => s.trim().startsWith(prefix));
-            const token = pair?.trim().slice(prefix.length);
-            if (token) {
-              return { Authorization: `Bearer ${token}` };
-            }
-          }
-        } catch {
-          // storage unavailable
-        }
         return {};
       },
       fetch(input, init) {

@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { ENV } from "./_core/env";
+import { hashPassword } from "./auth.password";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _dbChecked = false;
@@ -18,12 +19,26 @@ export async function getDb() {
     try {
       _db = drizzle(process.env.DATABASE_URL);
     } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("The operational database is disconnected. Cannot safely process request.");
+      }
       console.warn("[Database] Failed to connect MySQL, falling back to local memory store:", error);
       _db = null;
     }
   }
+
+  if (!_db && process.env.NODE_ENV === "production") {
+    throw new Error("The operational database is disconnected. Cannot safely process request.");
+  }
+
   return _db;
 }
+
+// Default development seed accounts with salted scrypt hashed passwords
+const defaultAdminHash = hashPassword("admin");
+const defaultRescuerHash = hashPassword("rescuer");
+const defaultMedicalHash = hashPassword("medical");
+const defaultCitizenHash = hashPassword("citizen");
 
 export const _memoryUsers: Map<string, any> = new Map([
   [
@@ -33,7 +48,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-admin",
       name: "Superadmin",
       email: "admin@assamrescue.gov.in",
-      password: "admin",
+      password: defaultAdminHash,
       role: "admin",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -48,7 +63,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-admin",
       name: "Superadmin",
       email: "admin@assamrescue.gov.in",
-      password: "admin",
+      password: defaultAdminHash,
       role: "admin",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -63,7 +78,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-rescuer",
       name: "Inspector Barua",
       email: "rescuer@assamrescue.gov.in",
-      password: "rescuer",
+      password: defaultRescuerHash,
       role: "rescuer",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -78,7 +93,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-rescuer",
       name: "Inspector Barua",
       email: "rescuer@assamrescue.gov.in",
-      password: "rescuer",
+      password: defaultRescuerHash,
       role: "rescuer",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -93,7 +108,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-medical",
       name: "Dr. Hazarika",
       email: "medical@assamrescue.gov.in",
-      password: "medical",
+      password: defaultMedicalHash,
       role: "medical",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -108,7 +123,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-medical",
       name: "Dr. Hazarika",
       email: "medical@assamrescue.gov.in",
-      password: "medical",
+      password: defaultMedicalHash,
       role: "medical",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -123,7 +138,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-citizen",
       name: "Anamika Das",
       email: "citizen@assamrescue.gov.in",
-      password: "citizen",
+      password: defaultCitizenHash,
       role: "user",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -138,7 +153,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       openId: "user-citizen",
       name: "Anamika Das",
       email: "citizen@assamrescue.gov.in",
-      password: "citizen",
+      password: defaultCitizenHash,
       role: "user",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -153,28 +168,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     throw new Error("User openId is required for upsert");
   }
 
-  // Update memory cache
-  const existingMem = _memoryUsers.get(user.openId) || {};
-  const merged = {
-    id: existingMem.id || (_memoryUsers.size + 1),
-    ...existingMem,
-    ...user,
-    role: user.role || existingMem.role || "user",
-    lastSignedIn: user.lastSignedIn || new Date(),
-    updatedAt: new Date(),
-    createdAt: existingMem.createdAt || new Date(),
-  };
-  _memoryUsers.set(user.openId, merged);
-  if (user.email) {
-    _memoryUsers.set(user.email.toLowerCase(), merged);
-  }
-
   const db = await getDb();
-  if (!db) {
-    return;
-  }
-
-  try {
+  if (db) {
     const values: InsertUser = {
       openId: user.openId,
     };
@@ -209,47 +204,79 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
-  } catch (error) {
-    console.warn("[Database] MySQL sync skipped, using local memory store:", error);
+    try {
+      await db.insert(users).values(values).onDuplicateKeyUpdate({
+        set: updateSet,
+      });
+      return;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database user update failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL sync skipped, updating local development store:", error);
+    }
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("The authoritative database is unavailable. User operations cannot proceed in production.");
+  }
+
+  // Update memory cache in non-production environments
+  const existingMem = _memoryUsers.get(user.openId) || {};
+  const merged = {
+    id: existingMem.id || (_memoryUsers.size + 1),
+    ...existingMem,
+    ...user,
+    role: user.role || existingMem.role || "user",
+    lastSignedIn: user.lastSignedIn || new Date(),
+    updatedAt: new Date(),
+    createdAt: existingMem.createdAt || new Date(),
+  };
+  _memoryUsers.set(user.openId, merged);
+  if (user.email) {
+    _memoryUsers.set(user.email.toLowerCase(), merged);
   }
 }
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (db) {
-    try {
-      const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-      if (result.length > 0) return result[0];
-    } catch {}
+    const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+    if (result.length > 0) return result[0];
+    return null;
   }
-  return _memoryUsers.get(openId);
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
+  }
+  return _memoryUsers.get(openId) || null;
 }
 
 export async function getUserByEmail(emailOrUsername: string) {
   const db = await getDb();
   if (db) {
-    try {
-      const result = await db.select().from(users).where(eq(users.email, emailOrUsername)).limit(1);
-      if (result.length > 0) return result[0];
-    } catch {}
+    const result = await db.select().from(users).where(eq(users.email, emailOrUsername)).limit(1);
+    if (result.length > 0) return result[0];
+    return null;
   }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
+  }
+  const lower = emailOrUsername.toLowerCase();
   return (
-    _memoryUsers.get(emailOrUsername.toLowerCase()) ||
+    _memoryUsers.get(lower) ||
     Array.from(_memoryUsers.values()).find(
-      u => u.email?.toLowerCase() === emailOrUsername.toLowerCase() || u.openId === `user-${emailOrUsername.toLowerCase()}`
-    )
+      u => u.email?.toLowerCase() === lower || u.openId === `user-${lower}`
+    ) || null
   );
 }
 
 export async function getAllUsers() {
   const db = await getDb();
   if (db) {
-    try {
-      return await db.select().from(users).orderBy(users.id);
-    } catch {}
+    return await db.select().from(users).orderBy(users.id);
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
   }
   const uniqueUsers = Array.from(new Set(Array.from(_memoryUsers.values())));
   return uniqueUsers;
@@ -258,25 +285,27 @@ export async function getAllUsers() {
 export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat 4") {
   const db = await getDb();
   if (db) {
-    try {
-      const { rescueProfiles } = await import("../drizzle/schema");
-      const existing = await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1);
-      if (!existing.length) {
-        await db.insert(rescueProfiles).values({
-          userId,
-          callSign,
-          phone: "+91 94350 11223",
-          contactSharing: "yes",
-          locationSharing: "yes",
-          availability: "available",
-          lastLatitude: 26.1445,
-          lastLongitude: 91.7362,
-          locationUpdatedAt: new Date(),
-        });
-      }
-    } catch {}
+    const { rescueProfiles } = await import("../drizzle/schema");
+    const existing = await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1);
+    if (!existing.length) {
+      await db.insert(rescueProfiles).values({
+        userId,
+        callSign,
+        phone: "+91 94350 11223",
+        contactSharing: "yes",
+        locationSharing: "yes",
+        availability: "available",
+        lastLatitude: 26.1445,
+        lastLongitude: 91.7362,
+        locationUpdatedAt: new Date(),
+      });
+    }
+    return;
   }
-  // Also register into rescue memory
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
+  }
+  // Register into rescue memory in development/test
   try {
     const { registerMemoryRescuerProfile } = await import("./rescue.db");
     registerMemoryRescuerProfile({
@@ -295,40 +324,42 @@ export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat
 export async function ensureHospitalStaffProfile(userId: number) {
   const db = await getDb();
   if (db) {
-    try {
-      const { hospitalStaffProfiles, hospitals } = await import("../drizzle/schema");
-      const existing = await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, userId)).limit(1);
-      if (!existing.length) {
-        let hospitalList = await db.select().from(hospitals).limit(1);
-        let hospitalId: number;
-        if (!hospitalList.length) {
-          const [newHospital] = await db.insert(hospitals).values({
-            name: "Gauhati Medical College & Hospital (GMCH)",
-            address: "Bhangagarh, Guwahati, Assam 781032",
-            contactPhone: "+91 361 2529457",
-            latitude: 26.1558,
-            longitude: 91.7645,
-            totalEmergencyBeds: 120,
-            availableEmergencyBeds: 34,
-            totalIcuBeds: 45,
-            availableIcuBeds: 12,
-            oxygenCylinderCount: 85,
-            bloodUnitCount: 140,
-            ambulanceCount: 14,
-            status: "open",
-          });
-          hospitalId = newHospital.insertId;
-        } else {
-          hospitalId = hospitalList[0].id;
-        }
-
-        await db.insert(hospitalStaffProfiles).values({
-          userId,
-          hospitalId,
-          designation: "Emergency Medical Coordinator",
+    const { hospitalStaffProfiles, hospitals } = await import("../drizzle/schema");
+    const existing = await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, userId)).limit(1);
+    if (!existing.length) {
+      let hospitalList = await db.select().from(hospitals).limit(1);
+      let hospitalId: number;
+      if (!hospitalList.length) {
+        const [newHospital] = await db.insert(hospitals).values({
+          name: "Gauhati Medical College & Hospital (GMCH)",
+          address: "Bhangagarh, Guwahati, Assam 781032",
+          contactPhone: "+91 361 2529457",
+          latitude: 26.1558,
+          longitude: 91.7645,
+          totalEmergencyBeds: 120,
+          availableEmergencyBeds: 34,
+          totalIcuBeds: 45,
+          availableIcuBeds: 12,
+          oxygenCylinderCount: 85,
+          bloodUnitCount: 140,
+          ambulanceCount: 14,
+          status: "open",
         });
+        hospitalId = newHospital.insertId;
+      } else {
+        hospitalId = hospitalList[0].id;
       }
-    } catch {}
+
+      await db.insert(hospitalStaffProfiles).values({
+        userId,
+        hospitalId,
+        designation: "Emergency Medical Coordinator",
+      });
+    }
+    return;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
   }
   try {
     const { registerMemoryHospitalStaffProfile } = await import("./rescue.db");

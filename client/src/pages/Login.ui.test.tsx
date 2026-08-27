@@ -24,6 +24,7 @@ vi.mock("@/_core/hooks/useAuth", () => ({
 const mockSetLocation = vi.fn();
 vi.mock("wouter", () => ({
   useLocation: () => ["/login", mockSetLocation],
+  Redirect: ({ to }: { to: string }) => <div data-testid="redirect" data-to={to}>Redirecting to {to}</div>,
 }));
 
 function renderWithProviders(ui: React.ReactElement) {
@@ -81,7 +82,7 @@ describe("Login UI & Role Access Gate", () => {
     expect(screen.getByText("Enter ADMIN Workspace")).toBeTruthy();
   });
 
-  it("allows all workspaces to render through RoleGate without restriction", () => {
+  it("blocks unauthorized workspaces through RoleGate and redirects", () => {
     mockUser = {
       id: 2,
       openId: "test-rescuer",
@@ -95,6 +96,9 @@ describe("Login UI & Role Access Gate", () => {
       </RoleGate>
     );
 
-    expect(screen.getByText("Open Command Centre")).toBeTruthy();
+    // It should render the Redirect mock instead of the children
+    expect(screen.queryByText("Open Command Centre")).toBeNull();
+    expect(screen.getByTestId("redirect")).toBeTruthy();
+    expect(screen.getByTestId("redirect").getAttribute("data-to")).toBe("/responder");
   });
 });

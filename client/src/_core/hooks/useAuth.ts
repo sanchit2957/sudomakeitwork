@@ -8,18 +8,6 @@ type UseAuthOptions = {
   redirectPath?: string;
 };
 
-const DEFAULT_USER = {
-  id: 1,
-  openId: "user-admin",
-  name: "Command Administrator",
-  email: "admin@assamrescue.gov.in",
-  role: "admin" as const,
-  loginMethod: "platform-login",
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  lastSignedIn: new Date(),
-};
-
 export function useAuth(options?: UseAuthOptions) {
   const { redirectOnUnauthenticated = false, redirectPath } = options ?? {};
   const utils = trpc.useUtils();
@@ -32,12 +20,6 @@ export function useAuth(options?: UseAuthOptions) {
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async (data) => {
       utils.auth.me.setData(undefined, data.user as any);
-      if (data.sessionToken) {
-        try {
-          sessionStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
-          localStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
-        } catch {}
-      }
       await utils.auth.me.invalidate();
     },
   });
@@ -66,12 +48,6 @@ export function useAuth(options?: UseAuthOptions) {
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: async (data) => {
       utils.auth.me.setData(undefined, data.user as any);
-      if (data.sessionToken) {
-        try {
-          sessionStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
-          localStorage.setItem("app-session-cookie", `app_session_id=${data.sessionToken}`);
-        } catch {}
-      }
       await utils.auth.me.invalidate();
     },
   });
@@ -106,8 +82,6 @@ export function useAuth(options?: UseAuthOptions) {
       throw error;
     } finally {
       try {
-        sessionStorage.removeItem("app-session-cookie");
-        localStorage.removeItem("app-session-cookie");
         localStorage.removeItem("app-runtime-user-info");
       } catch {}
       utils.auth.me.setData(undefined, null);

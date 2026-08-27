@@ -6,6 +6,6 @@ export function reconcileMissionStatus<T extends { mission: { id: number; status
   return rows?.map(row => row.mission.id === missionId ? { ...row, mission: { ...row.mission, status }, incident: { ...row.incident, status: status as T["incident"]["status"] } } : row);
 }
 
-export function reconcileAvailability<T extends { availability: string }>(profile: T | null | undefined, availability: T["availability"]) {
-  return profile ? { ...profile, availability } : profile;
+export function reconcileAvailability<T extends { availability: string }>(profile: T | null | undefined, availability: T["availability"]): T | undefined {
+  return profile ? { ...profile, availability } : undefined;
 }

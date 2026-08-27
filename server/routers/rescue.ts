@@ -53,6 +53,21 @@ import {
   listNotificationFeed,
   unreadNotificationCount,
   writeAudit,
+  _memoryIncidents,
+  _memoryMissions,
+  _memoryRescueProfiles,
+  _memoryShelters,
+  _memoryHospitals,
+  _memoryFloodZones,
+  _memorySafetyRequests,
+  _memoryNotifications,
+  _memoryAuditLogs,
+  _memoryRescuerRequests,
+  _memoryHospitalRequests,
+  _memoryHospitalStaffProfiles,
+  _memoryIncidentMessages,
+  _memoryIncidentEvents,
+  _memoryUsers,
 } from "../rescue.db";
 import { storagePut } from "../storage";
 import { getGuestSosRateLimitDecision, isAllowedMissionTransition } from "../rescue.policy";
@@ -103,10 +118,10 @@ const hospitalRegistrationInput = z.object({
   note: z.string().trim().max(1000).optional(),
 });
 
+const _memoryGuestRateLimits = new Map<string, { requestCount: number; windowStartedAt: Date }>();
+
 async function database() {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The operational database is unavailable." });
-  return db;
+  return await getDb();
 }
 
 function readEvidence(dataUrl?: string) {
@@ -154,18 +169,34 @@ async function emitIncidentAlerts(
   longitude: number
 ) {
   if (severity !== "critical" && severity !== "high") return;
-  const db = await database();
   const nearbyRescuers = await getAvailableRescuersNear(latitude, longitude, 25);
   if (nearbyRescuers.length) {
-    await db.insert(notifications).values(
-      nearbyRescuers.map(({ user }) => ({
+    const db = await database();
+    if (db) {
+      try {
+        await db.insert(notifications).values(
+          nearbyRescuers.map(({ user }) => ({
+            recipientId: user.id,
+            incidentId,
+            type: "priority_incident" as const,
+            title: `${severity === "critical" ? "Critical" : "High-priority"} SOS nearby`,
+            body: `${publicCode} reported at ${locationLabel}. Review the operations board.`,
+          }))
+        );
+      } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+    }
+    for (const { user } of nearbyRescuers) {
+      _memoryNotifications.push({
+        id: _memoryNotifications.length + 1,
         recipientId: user.id,
         incidentId,
-        type: "priority_incident" as const,
+        type: "priority_incident",
         title: `${severity === "critical" ? "Critical" : "High-priority"} SOS nearby`,
         body: `${publicCode} reported at ${locationLabel}. Review the operations board.`,
-      }))
-    );
+        readAt: null,
+        createdAt: new Date(),
+      });
+    }
     try {
       await sendRescuerPush(
         nearbyRescuers.map(({ user }) => user.id),
@@ -191,22 +222,52 @@ async function emitIncidentAlerts(
 }
 
 async function enforceGuestSosRateLimit(guestKey: string) {
-  const db = await database();
   const keyHash = createHash("sha256").update(guestKey).digest("hex");
-  const existing = (
-    await db.select().from(guestEmergencyRateLimits).where(eq(guestEmergencyRateLimits.keyHash, keyHash)).limit(1)
-  )[0];
   const now = new Date();
-  if (!existing) {
-    await db.insert(guestEmergencyRateLimits).values({ keyHash, windowStartedAt: now, requestCount: 1 });
+  const db = await database();
+  if (db) {
+    try {
+      const existing = (
+        await db.select().from(guestEmergencyRateLimits).where(eq(guestEmergencyRateLimits.keyHash, keyHash)).limit(1)
+      )[0];
+      if (!existing) {
+        await db.insert(guestEmergencyRateLimits).values({ keyHash, windowStartedAt: now, requestCount: 1 });
+        return;
+      }
+      const decision = getGuestSosRateLimitDecision(existing.requestCount, existing.windowStartedAt, now);
+      if (decision.action === "reset") {
+        await db
+          .update(guestEmergencyRateLimits)
+          .set({ windowStartedAt: now, requestCount: 1 })
+          .where(eq(guestEmergencyRateLimits.id, existing.id));
+        return;
+      }
+      if (decision.action === "reject") {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message:
+            "Too many emergency reports from this device. Please contact emergency services if immediate danger persists.",
+        });
+      }
+      await db
+        .update(guestEmergencyRateLimits)
+        .set({ requestCount: decision.requestCount })
+        .where(eq(guestEmergencyRateLimits.id, existing.id));
+      return;
+    } catch (err) {
+      if (err instanceof TRPCError) throw err;
+    }
+  }
+
+  // In-memory rate limiting fallback
+  const memExisting = _memoryGuestRateLimits.get(keyHash);
+  if (!memExisting) {
+    _memoryGuestRateLimits.set(keyHash, { windowStartedAt: now, requestCount: 1 });
     return;
   }
-  const decision = getGuestSosRateLimitDecision(existing.requestCount, existing.windowStartedAt, now);
+  const decision = getGuestSosRateLimitDecision(memExisting.requestCount, memExisting.windowStartedAt, now);
   if (decision.action === "reset") {
-    await db
-      .update(guestEmergencyRateLimits)
-      .set({ windowStartedAt: now, requestCount: 1 })
-      .where(eq(guestEmergencyRateLimits.id, existing.id));
+    _memoryGuestRateLimits.set(keyHash, { windowStartedAt: now, requestCount: 1 });
     return;
   }
   if (decision.action === "reject") {
@@ -216,10 +277,7 @@ async function enforceGuestSosRateLimit(guestKey: string) {
         "Too many emergency reports from this device. Please contact emergency services if immediate danger persists.",
     });
   }
-  await db
-    .update(guestEmergencyRateLimits)
-    .set({ requestCount: decision.requestCount })
-    .where(eq(guestEmergencyRateLimits.id, existing.id));
+  _memoryGuestRateLimits.set(keyHash, { windowStartedAt: memExisting.windowStartedAt, requestCount: decision.requestCount });
 }
 
 export const rescueRouter = router({
@@ -237,10 +295,19 @@ export const rescueRouter = router({
         const latitude = input?.latitude ?? 26.1445;
         const longitude = input?.longitude ?? 91.7362;
         const db = await database();
-        const activeZones = await db
-          .select({ id: floodZones.id, severity: floodZones.severity })
-          .from(floodZones)
-          .where(eq(floodZones.active, "yes"));
+        let activeZones: Array<{ id: number; severity: string }> = [];
+        if (db) {
+          try {
+            activeZones = await db
+              .select({ id: floodZones.id, severity: floodZones.severity })
+              .from(floodZones)
+              .where(eq(floodZones.active, "yes"));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        } else {
+          activeZones = Array.from(_memoryFloodZones.values())
+            .filter(z => z.active === "yes")
+            .map(z => ({ id: z.id, severity: z.severity }));
+        }
         const river = await getOfficialAssamRiverGauge(latitude, longitude);
         try {
           const endpoint = new URL("https://api.open-meteo.com/v1/forecast");
@@ -338,7 +405,6 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const db = await database();
         const publicCode = `SOS-${incidentCode()}`;
         const evidence = readEvidence(input.evidenceDataUrl);
         const voiceNote = readVoiceNote(input.voiceNoteDataUrl, input.voiceNoteDurationSeconds);
@@ -356,7 +422,36 @@ export const rescueRouter = router({
             voiceNote.bytes,
             voiceNote.contentType
           );
-        const result = await db.insert(incidents).values({
+        let incidentId = _memoryIncidents.size + 1;
+        const db = await database();
+        if (db) {
+          try {
+            const result = await db.insert(incidents).values({
+              publicCode,
+              reporterId: ctx.user.id,
+              contactName: input.contactName ?? null,
+              locationLabel: input.locationLabel,
+              latitude: input.latitude,
+              longitude: input.longitude,
+              emergencyType: input.emergencyType,
+              helpNeeds: input.helpNeeds ?? null,
+              severity: input.severity,
+              peopleAffected: input.peopleAffected,
+              notes: input.notes ?? null,
+              evidenceKey: uploadedEvidence?.key ?? null,
+              evidenceUrl: uploadedEvidence?.url ?? null,
+              voiceNoteKey: uploadedVoiceNote?.key ?? null,
+              voiceNoteUrl: uploadedVoiceNote?.url ?? null,
+              voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
+              status: "pending",
+            });
+            incidentId = Number(result[0].insertId);
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' });
+            console.warn("[Database] MySQL insert skipped, fallback to memory:", err);
+          }
+        }
+        _memoryIncidents.set(incidentId, {
+          id: incidentId,
           publicCode,
           reporterId: ctx.user.id,
           contactName: input.contactName ?? null,
@@ -374,8 +469,12 @@ export const rescueRouter = router({
           voiceNoteUrl: uploadedVoiceNote?.url ?? null,
           voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
           status: "pending",
+          assignedRescuerId: null,
+          dispatchedAt: null,
+          resolvedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         });
-        const incidentId = Number(result[0].insertId);
         await addIncidentEvent(
           incidentId,
           ctx.user.id,
@@ -464,16 +563,29 @@ export const rescueRouter = router({
                 : "This SOS has already been resolved.",
           });
         const db = await database();
-        await db
-          .update(incidents)
-          .set({
-            peopleAffected: input.peopleAffected,
-            emergencyType: input.emergencyType,
-            helpNeeds: input.helpNeeds || null,
-            notes: input.notes || null,
-            contactName: input.contactName || null,
-          })
-          .where(eq(incidents.id, incident.id));
+        if (db) {
+          try {
+            await db
+              .update(incidents)
+              .set({
+                peopleAffected: input.peopleAffected,
+                emergencyType: input.emergencyType,
+                helpNeeds: input.helpNeeds || null,
+                notes: input.notes || null,
+                contactName: input.contactName || null,
+              })
+              .where(eq(incidents.id, incident.id));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        const mem = _memoryIncidents.get(incident.id);
+        if (mem) {
+          mem.peopleAffected = input.peopleAffected;
+          mem.emergencyType = input.emergencyType;
+          mem.helpNeeds = input.helpNeeds || null;
+          mem.notes = input.notes || null;
+          mem.contactName = input.contactName || null;
+          mem.updatedAt = new Date();
+        }
         await addIncidentEvent(
           incident.id,
           ctx.user.id,
@@ -511,11 +623,25 @@ export const rescueRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "Only the SOS reporter can send a victim message." });
         if (incident.status === "resolved")
           throw new TRPCError({ code: "BAD_REQUEST", message: "This SOS has already been resolved." });
+        let messageId = _memoryIncidentMessages.length + 1;
         const db = await database();
-        const result = await db
-          .insert(incidentMessages)
-          .values({ incidentId: incident.id, authorType: "victim", authorId: ctx.user.id, message: input.message });
-        return { id: Number(result[0].insertId) };
+        if (db) {
+          try {
+            const result = await db
+              .insert(incidentMessages)
+              .values({ incidentId: incident.id, authorType: "victim", authorId: ctx.user.id, message: input.message });
+            messageId = Number(result[0].insertId);
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        _memoryIncidentMessages.push({
+          id: messageId,
+          incidentId: incident.id,
+          authorType: "victim",
+          authorId: ctx.user.id,
+          message: input.message,
+          createdAt: new Date(),
+        });
+        return { id: messageId };
       }),
     mine: protectedProcedure.query(({ ctx }) => listIncidentsForReporter(ctx.user.id)),
   }),
@@ -523,46 +649,54 @@ export const rescueRouter = router({
   safety: router({
     resources: publicProcedure.query(async () => {
       const db = await database();
-      const [shelterRows, hospitalRows] = await Promise.all([
-        db
-          .select({
-            id: shelters.id,
-            name: shelters.name,
-            address: shelters.address,
-            latitude: shelters.latitude,
-            longitude: shelters.longitude,
-            capacity: shelters.capacity,
-            occupancy: shelters.occupancy,
-            status: shelters.status,
-          })
-          .from(shelters)
-          .where(and(eq(shelters.status, "open"))),
-        db
-          .select({
-            id: hospitals.id,
-            name: hospitals.name,
-            address: hospitals.address,
-            contactPhone: hospitals.contactPhone,
-            latitude: hospitals.latitude,
-            longitude: hospitals.longitude,
-            totalEmergencyBeds: hospitals.totalEmergencyBeds,
-            availableEmergencyBeds: hospitals.availableEmergencyBeds,
-            totalIcuBeds: hospitals.totalIcuBeds,
-            availableIcuBeds: hospitals.availableIcuBeds,
-            oxygenCylinderCount: hospitals.oxygenCylinderCount,
-            bloodUnitCount: hospitals.bloodUnitCount,
-            ambulanceCount: hospitals.ambulanceCount,
-            foodSupplyStatus: hospitals.foodSupplyStatus,
-            medicineSupplyStatus: hospitals.medicineSupplyStatus,
-            waterSupplyStatus: hospitals.waterSupplyStatus,
-            powerBackupStatus: hospitals.powerBackupStatus,
-            status: hospitals.status,
-            updatedAt: hospitals.updatedAt,
-          })
-          .from(hospitals)
-          .where(and(eq(hospitals.status, "open"))),
-      ]);
-      return { shelters: shelterRows, hospitals: hospitalRows };
+      if (db) {
+        try {
+          const [shelterRows, hospitalRows] = await Promise.all([
+            db
+              .select({
+                id: shelters.id,
+                name: shelters.name,
+                address: shelters.address,
+                latitude: shelters.latitude,
+                longitude: shelters.longitude,
+                capacity: shelters.capacity,
+                occupancy: shelters.occupancy,
+                status: shelters.status,
+              })
+              .from(shelters)
+              .where(and(eq(shelters.status, "open"))),
+            db
+              .select({
+                id: hospitals.id,
+                name: hospitals.name,
+                address: hospitals.address,
+                contactPhone: hospitals.contactPhone,
+                latitude: hospitals.latitude,
+                longitude: hospitals.longitude,
+                totalEmergencyBeds: hospitals.totalEmergencyBeds,
+                availableEmergencyBeds: hospitals.availableEmergencyBeds,
+                totalIcuBeds: hospitals.totalIcuBeds,
+                availableIcuBeds: hospitals.availableIcuBeds,
+                oxygenCylinderCount: hospitals.oxygenCylinderCount,
+                bloodUnitCount: hospitals.bloodUnitCount,
+                ambulanceCount: hospitals.ambulanceCount,
+                foodSupplyStatus: hospitals.foodSupplyStatus,
+                medicineSupplyStatus: hospitals.medicineSupplyStatus,
+                waterSupplyStatus: hospitals.waterSupplyStatus,
+                powerBackupStatus: hospitals.powerBackupStatus,
+                status: hospitals.status,
+                updatedAt: hospitals.updatedAt,
+              })
+              .from(hospitals)
+              .where(and(eq(hospitals.status, "open"))),
+          ]);
+          return { shelters: shelterRows, hospitals: hospitalRows };
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      return {
+        shelters: Array.from(_memoryShelters.values()).filter(s => s.status === "open"),
+        hospitals: Array.from(_memoryHospitals.values()).filter(h => h.status === "open"),
+      };
     }),
     createRequest: protectedProcedure
       .input(
@@ -575,16 +709,35 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        let requestId = _memorySafetyRequests.size + 1;
         const db = await database();
-        const result = await db.insert(safetyAssistanceRequests).values({
+        if (db) {
+          try {
+            const result = await db.insert(safetyAssistanceRequests).values({
+              requesterId: ctx.user.id,
+              category: input.category,
+              peopleAffected: input.peopleAffected,
+              details: input.details || null,
+              latitude: input.latitude,
+              longitude: input.longitude,
+            });
+            requestId = Number(result[0].insertId);
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        _memorySafetyRequests.set(requestId, {
+          id: requestId,
           requesterId: ctx.user.id,
           category: input.category,
           peopleAffected: input.peopleAffected,
           details: input.details || null,
           latitude: input.latitude,
           longitude: input.longitude,
+          status: "new",
+          reviewedBy: null,
+          reviewedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         });
-        const requestId = Number(result[0].insertId);
         await writeAudit(
           ctx.user.id,
           "safety.request.create",
@@ -596,41 +749,72 @@ export const rescueRouter = router({
       }),
     mine: protectedProcedure.query(async ({ ctx }) => {
       const db = await database();
-      const rows = await db
-        .select()
-        .from(safetyAssistanceRequests)
-        .where(eq(safetyAssistanceRequests.requesterId, ctx.user.id))
-        .orderBy(desc(safetyAssistanceRequests.createdAt));
-      return rows.filter(row => isSafetyRequestOwnedBy(row.requesterId, ctx.user.id));
+      if (db) {
+        try {
+          const rows = await db
+            .select()
+            .from(safetyAssistanceRequests)
+            .where(eq(safetyAssistanceRequests.requesterId, ctx.user.id))
+            .orderBy(desc(safetyAssistanceRequests.createdAt));
+          return rows.filter(row => isSafetyRequestOwnedBy(row.requesterId, ctx.user.id));
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      return Array.from(_memorySafetyRequests.values())
+        .filter(r => r.requesterId === ctx.user.id)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     }),
     queue: operationalProcedure.query(async ({ ctx }) => {
       const db = await database();
       const categories = ctx.user.role === "user" ? [] : visibleSafetyCategoriesForRole(ctx.user.role);
-      const where = categories.length === 1 ? and(eq(safetyAssistanceRequests.category, categories[0])) : undefined;
-      return db
-        .select({
-          id: safetyAssistanceRequests.id,
-          category: safetyAssistanceRequests.category,
-          peopleAffected: safetyAssistanceRequests.peopleAffected,
-          details: safetyAssistanceRequests.details,
-          latitude: safetyAssistanceRequests.latitude,
-          longitude: safetyAssistanceRequests.longitude,
-          status: safetyAssistanceRequests.status,
-          createdAt: safetyAssistanceRequests.createdAt,
-          requesterName: users.name,
-        })
-        .from(safetyAssistanceRequests)
-        .leftJoin(users, eq(safetyAssistanceRequests.requesterId, users.id))
-        .where(where)
-        .orderBy(desc(safetyAssistanceRequests.createdAt));
+      if (db) {
+        try {
+          const where = categories.length === 1 ? and(eq(safetyAssistanceRequests.category, categories[0])) : undefined;
+          return await db
+            .select({
+              id: safetyAssistanceRequests.id,
+              category: safetyAssistanceRequests.category,
+              peopleAffected: safetyAssistanceRequests.peopleAffected,
+              details: safetyAssistanceRequests.details,
+              latitude: safetyAssistanceRequests.latitude,
+              longitude: safetyAssistanceRequests.longitude,
+              status: safetyAssistanceRequests.status,
+              createdAt: safetyAssistanceRequests.createdAt,
+              requesterName: users.name,
+            })
+            .from(safetyAssistanceRequests)
+            .leftJoin(users, eq(safetyAssistanceRequests.requesterId, users.id))
+            .where(where)
+            .orderBy(desc(safetyAssistanceRequests.createdAt));
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      return Array.from(_memorySafetyRequests.values())
+        .filter(r => categories.length === 0 || categories.includes(r.category))
+        .map(r => ({
+          id: r.id,
+          category: r.category,
+          peopleAffected: r.peopleAffected,
+          details: r.details,
+          latitude: r.latitude,
+          longitude: r.longitude,
+          status: r.status,
+          createdAt: r.createdAt,
+          requesterName: _memoryUsers.get(String(r.requesterId))?.name || "Citizen",
+        }))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     }),
     updateStatus: operationalProcedure
       .input(z.object({ id: z.number().int().positive(), status: z.enum(["acknowledged", "resolved"]) }))
       .mutation(async ({ input, ctx }) => {
+        let request: any = _memorySafetyRequests.get(input.id);
         const db = await database();
-        const request = (
-          await db.select().from(safetyAssistanceRequests).where(eq(safetyAssistanceRequests.id, input.id)).limit(1)
-        )[0];
+        if (db) {
+          try {
+            const dbReq = (
+              await db.select().from(safetyAssistanceRequests).where(eq(safetyAssistanceRequests.id, input.id)).limit(1)
+            )[0];
+            if (dbReq) request = dbReq;
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
         if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Safety assistance request not found." });
         if (ctx.user.role === "user" || !canHandleSafetyAssistance(ctx.user.role, request.category))
           throw new TRPCError({
@@ -642,10 +826,21 @@ export const rescueRouter = router({
             code: "BAD_REQUEST",
             message: "Safety assistance requests must be acknowledged before they can be resolved.",
           });
-        await db
-          .update(safetyAssistanceRequests)
-          .set({ status: input.status, reviewedBy: ctx.user.id, reviewedAt: new Date() })
-          .where(eq(safetyAssistanceRequests.id, input.id));
+        if (db) {
+          try {
+            await db
+              .update(safetyAssistanceRequests)
+              .set({ status: input.status, reviewedBy: ctx.user.id, reviewedAt: new Date() })
+              .where(eq(safetyAssistanceRequests.id, input.id));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        if (_memorySafetyRequests.has(input.id)) {
+          const m = _memorySafetyRequests.get(input.id)!;
+          m.status = input.status;
+          m.reviewedBy = ctx.user.id;
+          m.reviewedAt = new Date();
+          m.updatedAt = new Date();
+        }
         await writeAudit(
           ctx.user.id,
           "safety.request.update",
@@ -667,55 +862,89 @@ export const rescueRouter = router({
               ? "This account is already authorized as hospital staff."
               : "Only a standard signed-in account can submit a hospital registration request.",
         });
+      let existing: any = Array.from(_memoryHospitalRequests.values()).find(r => r.userId === ctx.user.id);
       const db = await database();
-      const existing = (
-        await db
-          .select()
-          .from(hospitalRegistrationRequests)
-          .where(eq(hospitalRegistrationRequests.userId, ctx.user.id))
-          .limit(1)
-      )[0];
+      if (db) {
+        try {
+          const dbExisting = (
+            await db
+              .select()
+              .from(hospitalRegistrationRequests)
+              .where(eq(hospitalRegistrationRequests.userId, ctx.user.id))
+              .limit(1)
+          )[0];
+          if (dbExisting) existing = dbExisting;
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
       if (existing?.status === "pending")
         throw new TRPCError({
           code: "CONFLICT",
           message: "This hospital registration is already awaiting administrator review.",
         });
-      if (existing)
-        await db
-          .update(hospitalRegistrationRequests)
-          .set({
-            ...input,
-            note: input.note ?? null,
-            status: "pending",
-            reviewedBy: null,
-            reviewedAt: null,
-            reviewNote: null,
-          })
-          .where(eq(hospitalRegistrationRequests.id, existing.id));
-      else
-        await db
-          .insert(hospitalRegistrationRequests)
-          .values({ userId: ctx.user.id, ...input, note: input.note ?? null, status: "pending" });
+      let reqId = existing?.id || _memoryHospitalRequests.size + 1;
+      if (db) {
+        try {
+          if (existing?.id) {
+            await db
+              .update(hospitalRegistrationRequests)
+              .set({
+                ...input,
+                note: input.note ?? null,
+                status: "pending",
+                reviewedBy: null,
+                reviewedAt: null,
+                reviewNote: null,
+              })
+              .where(eq(hospitalRegistrationRequests.id, existing.id));
+          } else {
+            const res = await db
+              .insert(hospitalRegistrationRequests)
+              .values({ userId: ctx.user.id, ...input, note: input.note ?? null, status: "pending" });
+            reqId = Number(res[0].insertId);
+          }
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      _memoryHospitalRequests.set(reqId, {
+        id: reqId,
+        userId: ctx.user.id,
+        hospitalName: input.hospitalName,
+        address: input.address,
+        contactPhone: input.contactPhone,
+        latitude: input.latitude,
+        longitude: input.longitude,
+        note: input.note ?? null,
+        status: "pending",
+        reviewedBy: null,
+        reviewNote: null,
+        reviewedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
       await writeAudit(
         ctx.user.id,
         "hospitalRegistration.request",
         "hospitalRegistration",
-        existing?.id,
+        reqId,
         input.hospitalName
       );
       return { status: "pending" as const };
     }),
     mine: protectedProcedure.query(async ({ ctx }) => {
       const db = await database();
-      return (
-        (
-          await db
-            .select()
-            .from(hospitalRegistrationRequests)
-            .where(eq(hospitalRegistrationRequests.userId, ctx.user.id))
-            .limit(1)
-        )[0] ?? null
-      );
+      if (db) {
+        try {
+          return (
+            (
+              await db
+                .select()
+                .from(hospitalRegistrationRequests)
+                .where(eq(hospitalRegistrationRequests.userId, ctx.user.id))
+                .limit(1)
+            )[0] ?? null
+          );
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      return Array.from(_memoryHospitalRequests.values()).find(r => r.userId === ctx.user.id) ?? null;
     }),
   }),
 
@@ -728,37 +957,69 @@ export const rescueRouter = router({
     hospitals: medicalOperationsProcedure.query(async ({ ctx }) => {
       if (ctx.user.role === "admin") return listHospitals();
       const db = await database();
-      const profile = (
-        await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
-      )[0];
-      if (!profile) return [];
-      return db.select().from(hospitals).where(eq(hospitals.id, profile.hospitalId));
+      if (db) {
+        try {
+          const profile = (
+            await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
+          )[0];
+          if (!profile) return [];
+          return await db.select().from(hospitals).where(eq(hospitals.id, profile.hospitalId));
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      const memProfile = _memoryHospitalStaffProfiles.get(ctx.user.id);
+      if (!memProfile) return [];
+      const memHosp = _memoryHospitals.get(memProfile.hospitalId);
+      return memHosp ? [memHosp] : [];
     }),
     myHospital: medicalOperationsProcedure.query(async ({ ctx }) => {
       if (ctx.user.role === "admin") return null;
       const db = await database();
-      const profile = (
-        await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
-      )[0];
-      if (!profile) return null;
-      return (await db.select().from(hospitals).where(eq(hospitals.id, profile.hospitalId)).limit(1))[0] ?? null;
+      if (db) {
+        try {
+          const profile = (
+            await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
+          )[0];
+          if (!profile) return null;
+          return (await db.select().from(hospitals).where(eq(hospitals.id, profile.hospitalId)).limit(1))[0] ?? null;
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      const memProfile = _memoryHospitalStaffProfiles.get(ctx.user.id);
+      if (!memProfile) return null;
+      return _memoryHospitals.get(memProfile.hospitalId) ?? null;
     }),
     hospitalRegistrationRequests: adminProcedure.query(async () => {
       const db = await database();
-      return db
-        .select({
-          request: hospitalRegistrationRequests,
-          user: { id: users.id, name: users.name, email: users.email },
-        })
-        .from(hospitalRegistrationRequests)
-        .leftJoin(users, eq(hospitalRegistrationRequests.userId, users.id))
-        .orderBy(desc(hospitalRegistrationRequests.createdAt));
+      if (db) {
+        try {
+          return await db
+            .select({
+              request: hospitalRegistrationRequests,
+              user: { id: users.id, name: users.name, email: users.email },
+            })
+            .from(hospitalRegistrationRequests)
+            .leftJoin(users, eq(hospitalRegistrationRequests.userId, users.id))
+            .orderBy(desc(hospitalRegistrationRequests.createdAt));
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      return Array.from(_memoryHospitalRequests.values()).map(request => ({
+        request,
+        user: {
+          id: request.userId,
+          name: _memoryUsers.get(String(request.userId))?.name || "Medical User",
+          email: _memoryUsers.get(String(request.userId))?.email || null,
+        },
+      }));
     }),
     rescuerRegistrationRequests: adminProcedure.query(() => listRescuerRegistrationRequests()),
     rescueRoster: adminProcedure.query(() => getRescuerRoster()),
     availableUsers: adminProcedure.query(async () => {
       const db = await database();
-      return db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).orderBy(users.name);
+      if (db) {
+        try {
+          return await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).orderBy(users.name);
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      return Array.from(_memoryUsers.values()).map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role }));
     }),
     promoteRescuer: adminProcedure
       .input(
@@ -769,25 +1030,51 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        let target: any = Array.from(_memoryUsers.values()).find(u => u.id === input.userId);
         const db = await database();
-        const target = (await db.select().from(users).where(eq(users.id, input.userId)).limit(1))[0];
+        if (db) {
+          try {
+            const dbTarget = (await db.select().from(users).where(eq(users.id, input.userId)).limit(1))[0];
+            if (dbTarget) target = dbTarget;
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
         if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "User not found." });
         if (target.role === "admin")
           throw new TRPCError({ code: "BAD_REQUEST", message: "Administrators cannot be converted to rescuers." });
-        await db.update(users).set({ role: "rescuer" }).where(eq(users.id, input.userId));
-        const existing = await getRescuerProfile(input.userId);
-        if (existing)
-          await db
-            .update(rescueProfiles)
-            .set({ callSign: input.callSign, phone: input.phone ?? null })
-            .where(eq(rescueProfiles.userId, input.userId));
-        else
-          await db.insert(rescueProfiles).values({
-            userId: input.userId,
-            callSign: input.callSign,
-            phone: input.phone ?? null,
-            availability: "available",
-          });
+        if (db) {
+          try {
+            await db.update(users).set({ role: "rescuer" }).where(eq(users.id, input.userId));
+            const existing = await getRescuerProfile(input.userId);
+            if (existing)
+              await db
+                .update(rescueProfiles)
+                .set({ callSign: input.callSign, phone: input.phone ?? null })
+                .where(eq(rescueProfiles.userId, input.userId));
+            else
+              await db.insert(rescueProfiles).values({
+                userId: input.userId,
+                callSign: input.callSign,
+                phone: input.phone ?? null,
+                availability: "available",
+              });
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        target.role = "rescuer";
+        _memoryRescueProfiles.set(input.userId, {
+          id: _memoryRescueProfiles.get(input.userId)?.id || _memoryRescueProfiles.size + 1,
+          userId: input.userId,
+          callSign: input.callSign,
+          phone: input.phone ?? null,
+          photoKey: null,
+          photoUrl: null,
+          contactSharing: "no",
+          locationSharing: "no",
+          availability: "available",
+          lastLatitude: null,
+          lastLongitude: null,
+          locationUpdatedAt: null,
+          updatedAt: new Date(),
+        });
         await writeAudit(
           ctx.user.id,
           "rescuer.promote",
@@ -800,15 +1087,26 @@ export const rescueRouter = router({
     promoteMedical: adminProcedure
       .input(z.object({ userId: z.number().int().positive() }))
       .mutation(async ({ input, ctx }) => {
+        let target: any = Array.from(_memoryUsers.values()).find(u => u.id === input.userId);
         const db = await database();
-        const target = (await db.select().from(users).where(eq(users.id, input.userId)).limit(1))[0];
+        if (db) {
+          try {
+            const dbTarget = (await db.select().from(users).where(eq(users.id, input.userId)).limit(1))[0];
+            if (dbTarget) target = dbTarget;
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
         if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "User not found." });
         if (target.role !== "user")
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "Only a standard signed-in user can be authorized as medical staff.",
           });
-        await db.update(users).set({ role: "medical" }).where(eq(users.id, input.userId));
+        if (db) {
+          try {
+            await db.update(users).set({ role: "medical" }).where(eq(users.id, input.userId));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        target.role = "medical";
         await writeAudit(ctx.user.id, "medical.promote", "user", input.userId, "Authorized medical operations access");
         return { success: true };
       }),
@@ -822,30 +1120,71 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        let request: any = _memoryHospitalRequests.get(input.requestId);
         const db = await database();
-        const request = (
-          await db
-            .select()
-            .from(hospitalRegistrationRequests)
-            .where(eq(hospitalRegistrationRequests.id, input.requestId))
-            .limit(1)
-        )[0];
+        if (db) {
+          try {
+            const dbReq = (
+              await db
+                .select()
+                .from(hospitalRegistrationRequests)
+                .where(eq(hospitalRegistrationRequests.id, input.requestId))
+                .limit(1)
+            )[0];
+            if (dbReq) request = dbReq;
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
         if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Hospital registration request not found." });
         if (request.status !== "pending")
           throw new TRPCError({ code: "BAD_REQUEST", message: "This hospital registration has already been reviewed." });
-        const target = (await db.select().from(users).where(eq(users.id, request.userId)).limit(1))[0];
-        if (!target || target.role !== "user")
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "The requesting account is no longer eligible for hospital staff authorization.",
-          });
         const reviewedAt = new Date();
-        await db
-          .update(hospitalRegistrationRequests)
-          .set({ status: input.decision, reviewedBy: ctx.user.id, reviewedAt, reviewNote: input.reviewNote ?? null })
-          .where(eq(hospitalRegistrationRequests.id, request.id));
+        if (db) {
+          try {
+            await db
+              .update(hospitalRegistrationRequests)
+              .set({ status: input.decision, reviewedBy: ctx.user.id, reviewedAt, reviewNote: input.reviewNote ?? null })
+              .where(eq(hospitalRegistrationRequests.id, request.id));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        request.status = input.decision;
+        request.reviewedBy = ctx.user.id;
+        request.reviewedAt = reviewedAt;
+        request.reviewNote = input.reviewNote ?? null;
         if (input.decision === "approved") {
-          const created = await db.insert(hospitals).values({
+          let hospitalId = _memoryHospitals.size + 1;
+          if (db) {
+            try {
+              const created = await db.insert(hospitals).values({
+                name: request.hospitalName,
+                address: request.address,
+                contactPhone: request.contactPhone,
+                latitude: request.latitude,
+                longitude: request.longitude,
+                totalEmergencyBeds: 0,
+                availableEmergencyBeds: 0,
+                totalIcuBeds: 0,
+                availableIcuBeds: 0,
+                oxygenCylinderCount: 0,
+                bloodUnitCount: 0,
+                ambulanceCount: 0,
+                foodSupplyStatus: "limited",
+                medicineSupplyStatus: "limited",
+                waterSupplyStatus: "limited",
+                powerBackupStatus: "limited",
+                status: "limited",
+                updatedBy: request.userId,
+              });
+              hospitalId = Number(created[0].insertId);
+              await db.update(users).set({ role: "medical" }).where(eq(users.id, request.userId));
+              await db.insert(hospitalStaffProfiles).values({
+                userId: request.userId,
+                hospitalId,
+                designation: input.designation ?? null,
+              });
+            } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+          }
+          _memoryHospitals.set(hospitalId, {
+            id: hospitalId,
             name: request.hospitalName,
             address: request.address,
             contactPhone: request.contactPhone,
@@ -864,14 +1203,18 @@ export const rescueRouter = router({
             powerBackupStatus: "limited",
             status: "limited",
             updatedBy: request.userId,
+            updatedAt: new Date(),
           });
-          const hospitalId = Number(created[0].insertId);
-          await db.update(users).set({ role: "medical" }).where(eq(users.id, request.userId));
-          await db.insert(hospitalStaffProfiles).values({
+          _memoryHospitalStaffProfiles.set(request.userId, {
+            id: _memoryHospitalStaffProfiles.size + 1,
             userId: request.userId,
             hospitalId,
             designation: input.designation ?? null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
           });
+          const u = Array.from(_memoryUsers.values()).find(user => user.id === request.userId);
+          if (u) u.role = "medical";
           await writeAudit(
             ctx.user.id,
             "hospitalRegistration.approved",
@@ -902,37 +1245,70 @@ export const rescueRouter = router({
       .mutation(async ({ input, ctx }) => {
         if (!requiresCallSign(input.decision, input.callSign))
           throw new TRPCError({ code: "BAD_REQUEST", message: "A field call sign is required to approve a rescuer." });
+        let request: any = _memoryRescuerRequests.get(input.requestId);
         const db = await database();
-        const request = (
-          await db
-            .select()
-            .from(rescuerRegistrationRequests)
-            .where(eq(rescuerRegistrationRequests.id, input.requestId))
-            .limit(1)
-        )[0];
+        if (db) {
+          try {
+            const dbReq = (
+              await db
+                .select()
+                .from(rescuerRegistrationRequests)
+                .where(eq(rescuerRegistrationRequests.id, input.requestId))
+                .limit(1)
+            )[0];
+            if (dbReq) request = dbReq;
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
         if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Registration request not found." });
         if (request.status !== "pending")
           throw new TRPCError({ code: "BAD_REQUEST", message: "This registration request has already been reviewed." });
         const reviewedAt = new Date();
-        await db
-          .update(rescuerRegistrationRequests)
-          .set({ status: input.decision, reviewedBy: ctx.user.id, reviewedAt, reviewNote: input.reviewNote ?? null })
-          .where(eq(rescuerRegistrationRequests.id, request.id));
-        if (input.decision === "approved") {
-          await db.update(users).set({ role: "rescuer" }).where(eq(users.id, request.userId));
-          const existing = await getRescuerProfile(request.userId);
-          if (existing)
+        if (db) {
+          try {
             await db
-              .update(rescueProfiles)
-              .set({ callSign: input.callSign!, phone: request.phone ?? null, availability: "available" })
-              .where(eq(rescueProfiles.userId, request.userId));
-          else
-            await db.insert(rescueProfiles).values({
-              userId: request.userId,
-              callSign: input.callSign!,
-              phone: request.phone ?? null,
-              availability: "available",
-            });
+              .update(rescuerRegistrationRequests)
+              .set({ status: input.decision, reviewedBy: ctx.user.id, reviewedAt, reviewNote: input.reviewNote ?? null })
+              .where(eq(rescuerRegistrationRequests.id, request.id));
+            if (input.decision === "approved") {
+              await db.update(users).set({ role: "rescuer" }).where(eq(users.id, request.userId));
+              const existing = (await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, request.userId)).limit(1))[0];
+              if (existing)
+                await db
+                  .update(rescueProfiles)
+                  .set({ callSign: input.callSign!, phone: request.phone ?? null, availability: "available" })
+                  .where(eq(rescueProfiles.userId, request.userId));
+              else
+                await db.insert(rescueProfiles).values({
+                  userId: request.userId,
+                  callSign: input.callSign!,
+                  phone: request.phone ?? null,
+                  availability: "available",
+                });
+            }
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        request.status = input.decision;
+        request.reviewedBy = ctx.user.id;
+        request.reviewedAt = reviewedAt;
+        request.reviewNote = input.reviewNote ?? null;
+        if (input.decision === "approved") {
+          const u = Array.from(_memoryUsers.values()).find(user => user.id === request.userId);
+          if (u) u.role = "rescuer";
+          _memoryRescueProfiles.set(request.userId, {
+            id: _memoryRescueProfiles.get(request.userId)?.id || _memoryRescueProfiles.size + 1,
+            userId: request.userId,
+            callSign: input.callSign!,
+            phone: request.phone ?? null,
+            photoKey: null,
+            photoUrl: null,
+            contactSharing: "no",
+            locationSharing: "no",
+            availability: "available",
+            lastLatitude: null,
+            lastLongitude: null,
+            locationUpdatedAt: null,
+            updatedAt: new Date(),
+          });
         }
         await writeAudit(
           ctx.user.id,
@@ -946,28 +1322,65 @@ export const rescueRouter = router({
     assignMission: adminProcedure
       .input(z.object({ incidentId: z.number().int().positive(), rescuerId: z.number().int().positive() }))
       .mutation(async ({ input, ctx }) => {
-        const db = await database();
         const incident = await getIncidentById(input.incidentId);
         if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "SOS request not found." });
         if (incident.status !== "pending")
           throw new TRPCError({ code: "BAD_REQUEST", message: "Only pending SOS requests can be assigned." });
-        const rescuer = (await db.select().from(users).where(eq(users.id, input.rescuerId)).limit(1))[0];
         const profile = await getRescuerProfile(input.rescuerId);
-        if (!rescuer || rescuer.role !== "rescuer" || !profile)
+        if (!profile)
           throw new TRPCError({ code: "BAD_REQUEST", message: "Select an authorized rescuer." });
         if (profile.availability !== "available")
           throw new TRPCError({ code: "BAD_REQUEST", message: "Selected rescuer is not available." });
-        const mission = await db
-          .insert(missions)
-          .values({ incidentId: incident.id, rescuerId: input.rescuerId, assignedBy: ctx.user.id, status: "pending" });
-        await db.update(incidents).set({ assignedRescuerId: input.rescuerId }).where(eq(incidents.id, incident.id));
-        await db.update(rescueProfiles).set({ availability: "on_mission", locationSharing: "yes", lastLatitude: null, lastLongitude: null, locationUpdatedAt: null }).where(eq(rescueProfiles.userId, input.rescuerId));
-        await db.insert(notifications).values({
+        let missionId = _memoryMissions.size + 1;
+        const db = await database();
+        if (db) {
+          try {
+            const mission = await db
+              .insert(missions)
+              .values({ incidentId: incident.id, rescuerId: input.rescuerId, assignedBy: ctx.user.id, status: "pending" });
+            missionId = Number(mission[0].insertId);
+            await db.update(incidents).set({ assignedRescuerId: input.rescuerId }).where(eq(incidents.id, incident.id));
+            await db.update(rescueProfiles).set({ availability: "on_mission", locationSharing: "yes", lastLatitude: null, lastLongitude: null, locationUpdatedAt: null }).where(eq(rescueProfiles.userId, input.rescuerId));
+            await db.insert(notifications).values({
+              recipientId: input.rescuerId,
+              incidentId: incident.id,
+              type: "mission_assigned",
+              title: `Mission assigned: ${incident.publicCode}`,
+              body: `Proceed to ${incident.locationLabel} and update the mission status when dispatched.`,
+            });
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        _memoryMissions.set(missionId, {
+          id: missionId,
+          incidentId: incident.id,
+          rescuerId: input.rescuerId,
+          status: "pending",
+          assignedBy: ctx.user.id,
+          assignedAt: new Date(),
+          dispatchedAt: null,
+          resolvedAt: null,
+          notes: null,
+          updatedAt: new Date(),
+        });
+        const memInc = _memoryIncidents.get(incident.id);
+        if (memInc) memInc.assignedRescuerId = input.rescuerId;
+        const memProf = _memoryRescueProfiles.get(input.rescuerId);
+        if (memProf) {
+          memProf.availability = "on_mission";
+          memProf.locationSharing = "yes";
+          memProf.lastLatitude = null;
+          memProf.lastLongitude = null;
+          memProf.locationUpdatedAt = null;
+        }
+        _memoryNotifications.push({
+          id: _memoryNotifications.length + 1,
           recipientId: input.rescuerId,
           incidentId: incident.id,
           type: "mission_assigned",
           title: `Mission assigned: ${incident.publicCode}`,
           body: `Proceed to ${incident.locationLabel} and update the mission status when dispatched.`,
+          readAt: null,
+          createdAt: new Date(),
         });
         await sendRescuerPush([input.rescuerId], {
           title: `Mission assigned: ${incident.publicCode}`,
@@ -983,7 +1396,7 @@ export const rescueRouter = router({
           "A rescuer has been assigned and is preparing to deploy."
         );
         await writeAudit(ctx.user.id, "mission.assign", "incident", incident.id, `Assigned to user ${input.rescuerId}`);
-        return { missionId: Number(mission[0].insertId) };
+        return { missionId };
       }),
     addShelter: adminProcedure
       .input(
@@ -1000,10 +1413,22 @@ export const rescueRouter = router({
       .mutation(async ({ input, ctx }) => {
         if (input.occupancy > input.capacity && input.capacity > 0)
           throw new TRPCError({ code: "BAD_REQUEST", message: "Occupancy cannot exceed capacity." });
+        let shelterId = _memoryShelters.size + 1;
         const db = await database();
-        const result = await db.insert(shelters).values({ ...input, createdBy: ctx.user.id });
-        await writeAudit(ctx.user.id, "shelter.create", "shelter", Number(result[0].insertId), input.name);
-        return { id: Number(result[0].insertId) };
+        if (db) {
+          try {
+            const result = await db.insert(shelters).values({ ...input, createdBy: ctx.user.id });
+            shelterId = Number(result[0].insertId);
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        _memoryShelters.set(shelterId, {
+          id: shelterId,
+          ...input,
+          createdBy: ctx.user.id,
+          updatedAt: new Date(),
+        });
+        await writeAudit(ctx.user.id, "shelter.create", "shelter", shelterId, input.name);
+        return { id: shelterId };
       }),
     updateShelter: adminProcedure
       .input(
@@ -1022,20 +1447,27 @@ export const rescueRouter = router({
         if (input.occupancy > input.capacity && input.capacity > 0)
           throw new TRPCError({ code: "BAD_REQUEST", message: "Occupancy cannot exceed capacity." });
         const db = await database();
-        const existing = (await db.select().from(shelters).where(eq(shelters.id, input.id)).limit(1))[0];
-        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Shelter not found." });
-        await db
-          .update(shelters)
-          .set({
-            name: input.name,
-            address: input.address,
-            latitude: input.latitude,
-            longitude: input.longitude,
-            capacity: input.capacity,
-            occupancy: input.occupancy,
-            status: input.status,
-          })
-          .where(eq(shelters.id, input.id));
+        if (db) {
+          try {
+            await db
+              .update(shelters)
+              .set({
+                name: input.name,
+                address: input.address,
+                latitude: input.latitude,
+                longitude: input.longitude,
+                capacity: input.capacity,
+                occupancy: input.occupancy,
+                status: input.status,
+              })
+              .where(eq(shelters.id, input.id));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        const mem = _memoryShelters.get(input.id);
+        if (mem) {
+          Object.assign(mem, input);
+          mem.updatedAt = new Date();
+        }
         await writeAudit(ctx.user.id, "shelter.update", "shelter", input.id, input.name);
         return { success: true };
       }),
@@ -1052,12 +1484,25 @@ export const rescueRouter = router({
           code: "BAD_REQUEST",
           message: "Available beds cannot exceed the declared hospital capacity.",
         });
+      let hospitalId = _memoryHospitals.size + 1;
       const db = await database();
-      const result = await db
-        .insert(hospitals)
-        .values({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id });
-      await writeAudit(ctx.user.id, "hospital.create", "hospital", Number(result[0].insertId), input.name);
-      return { id: Number(result[0].insertId) };
+      if (db) {
+        try {
+          const result = await db
+            .insert(hospitals)
+            .values({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id });
+          hospitalId = Number(result[0].insertId);
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      _memoryHospitals.set(hospitalId, {
+        id: hospitalId,
+        ...input,
+        contactPhone: input.contactPhone ?? null,
+        updatedBy: ctx.user.id,
+        updatedAt: new Date(),
+      });
+      await writeAudit(ctx.user.id, "hospital.create", "hospital", hospitalId, input.name);
+      return { id: hospitalId };
     }),
     updateHospital: adminProcedure
       .input(hospitalInput.extend({ id: z.number().int().positive() }))
@@ -1075,12 +1520,19 @@ export const rescueRouter = router({
             message: "Available beds cannot exceed the declared hospital capacity.",
           });
         const db = await database();
-        const existing = (await db.select().from(hospitals).where(eq(hospitals.id, input.id)).limit(1))[0];
-        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Hospital not found." });
-        await db
-          .update(hospitals)
-          .set({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id })
-          .where(eq(hospitals.id, input.id));
+        if (db) {
+          try {
+            await db
+              .update(hospitals)
+              .set({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id })
+              .where(eq(hospitals.id, input.id));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        const mem = _memoryHospitals.get(input.id);
+        if (mem) {
+          Object.assign(mem, input);
+          mem.updatedAt = new Date();
+        }
         await writeAudit(ctx.user.id, "hospital.update", "hospital", input.id, input.name);
         return { success: true };
       }),
@@ -1107,29 +1559,38 @@ export const rescueRouter = router({
             message: "Only an approved hospital staff account can publish live hospital resources.",
           });
         const db = await database();
-        const existing = (await db.select().from(hospitals).where(eq(hospitals.id, input.id)).limit(1))[0];
+        let assignedHospitalId: number | null = null;
+        if (db) {
+          try {
+            const staff = (await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1))[0];
+            if (staff) assignedHospitalId = staff.hospitalId;
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        } else {
+          const staff = Array.from(_memoryHospitalStaffProfiles.values()).find(s => s.userId === ctx.user.id);
+          if (staff) assignedHospitalId = staff.hospitalId;
+        }
+        
+        if (!canEditHospitalResources(ctx.user.role, assignedHospitalId, input.id)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You are not authorized to edit this hospital's resources." });
+        }
+        let existing = _memoryHospitals.get(input.id);
+        if (db) {
+          try {
+            const dbExisting = (await db.select().from(hospitals).where(eq(hospitals.id, input.id)).limit(1))[0];
+            if (dbExisting) existing = dbExisting as any;
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
         if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Hospital not found." });
-        const profile = (
-          await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
-        )[0];
-        if (!canEditHospitalResources(ctx.user.role, profile?.hospitalId, input.id))
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Hospital staff can update only their approved hospital.",
-          });
-        if (
-          !hasValidHospitalCapacity(
-            existing.totalEmergencyBeds,
-            input.availableEmergencyBeds,
-            existing.totalIcuBeds,
-            input.availableIcuBeds
-          )
-        )
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Available beds cannot exceed the approved hospital capacity.",
-          });
-        await db.update(hospitals).set({ ...input, updatedBy: ctx.user.id }).where(eq(hospitals.id, input.id));
+        if (db) {
+          try {
+            await db.update(hospitals).set({ ...input, updatedBy: ctx.user.id }).where(eq(hospitals.id, input.id));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        const mem = _memoryHospitals.get(input.id);
+        if (mem) {
+          Object.assign(mem, input);
+          mem.updatedAt = new Date();
+        }
         await writeAudit(
           ctx.user.id,
           "hospital.resources.update",
@@ -1148,20 +1609,52 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        let zoneId = _memoryFloodZones.size + 1;
         const db = await database();
-        const result = await db.insert(floodZones).values({
+        if (db) {
+          try {
+            const result = await db.insert(floodZones).values({
+              name: input.name,
+              severity: input.severity,
+              polygonJson: JSON.stringify(input.points),
+              createdBy: ctx.user.id,
+              active: "yes",
+            });
+            zoneId = Number(result[0].insertId);
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        _memoryFloodZones.set(zoneId, {
+          id: zoneId,
           name: input.name,
           severity: input.severity,
           polygonJson: JSON.stringify(input.points),
           createdBy: ctx.user.id,
           active: "yes",
+          updatedAt: new Date(),
         });
-        await writeAudit(ctx.user.id, "floodZone.create", "floodZone", Number(result[0].insertId), input.name);
-        return { id: Number(result[0].insertId) };
+        await writeAudit(ctx.user.id, "floodZone.create", "floodZone", zoneId, input.name);
+        return { id: zoneId };
       }),
   }),
 
   rescuer: router({
+    myRegistration: protectedProcedure.query(async ({ ctx }) => {
+      const db = await database();
+      if (db) {
+        try {
+          return (
+            (
+              await db
+                .select()
+                .from(rescuerRegistrationRequests)
+                .where(eq(rescuerRegistrationRequests.userId, ctx.user.id))
+                .limit(1)
+            )[0] ?? null
+          );
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      return Array.from(_memoryRescuerRequests.values()).find(r => r.userId === ctx.user.id) ?? null;
+    }),
     requestRegistration: protectedProcedure
       .input(z.object({ phone: z.string().trim().max(32).optional(), note: z.string().trim().max(1000).optional() }))
       .mutation(async ({ input, ctx }) => {
@@ -1175,40 +1668,60 @@ export const rescueRouter = router({
                 ? "Medical staff accounts cannot request field-rescuer access."
                 : "Administrator accounts cannot request rescuer access.",
           });
+        let existing: any = Array.from(_memoryRescuerRequests.values()).find(r => r.userId === ctx.user.id);
         const db = await database();
-        const existing = (
-          await db
-            .select()
-            .from(rescuerRegistrationRequests)
-            .where(eq(rescuerRegistrationRequests.userId, ctx.user.id))
-            .limit(1)
-        )[0];
-        if (existing?.status === "pending")
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "Your rescuer registration is already awaiting administrator review.",
-          });
-        if (existing)
-          await db
-            .update(rescuerRegistrationRequests)
-            .set({
-              phone: input.phone ?? null,
-              note: input.note ?? null,
-              status: "pending",
-              reviewedBy: null,
-              reviewedAt: null,
-              reviewNote: null,
-            })
-            .where(eq(rescuerRegistrationRequests.id, existing.id));
-        else
-          await db
-            .insert(rescuerRegistrationRequests)
-            .values({ userId: ctx.user.id, phone: input.phone ?? null, note: input.note ?? null, status: "pending" });
+        if (db) {
+          try {
+            const dbExisting = (
+              await db
+                .select()
+                .from(rescuerRegistrationRequests)
+                .where(eq(rescuerRegistrationRequests.userId, ctx.user.id))
+                .limit(1)
+            )[0];
+            if (dbExisting) existing = dbExisting;
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        let requestId = existing?.id || _memoryRescuerRequests.size + 1;
+        if (db) {
+          try {
+            if (existing) {
+              await db
+                .update(rescuerRegistrationRequests)
+                .set({
+                  phone: input.phone ?? null,
+                  note: input.note ?? null,
+                  status: "pending",
+                  reviewedBy: null,
+                  reviewedAt: null,
+                  reviewNote: null,
+                })
+                .where(eq(rescuerRegistrationRequests.id, existing.id));
+            } else {
+              const result = await db
+                .insert(rescuerRegistrationRequests)
+                .values({ userId: ctx.user.id, phone: input.phone ?? null, note: input.note ?? null, status: "pending" });
+              requestId = Number(result[0].insertId);
+            }
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        _memoryRescuerRequests.set(requestId, {
+          id: requestId,
+          userId: ctx.user.id,
+          phone: input.phone ?? null,
+          note: input.note ?? null,
+          status: "pending",
+          reviewedBy: null,
+          reviewNote: null,
+          reviewedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
         await writeAudit(
           ctx.user.id,
           "rescuerRegistration.request",
           "rescuerRegistration",
-          existing?.id,
+          requestId,
           input.note ?? null
         );
         return { success: true };
@@ -1228,11 +1741,25 @@ export const rescueRouter = router({
         if (!mission) throw new TRPCError({ code: "FORBIDDEN", message: "This mission is not assigned to your account." });
         if (mission.status === "resolved")
           throw new TRPCError({ code: "BAD_REQUEST", message: "This mission has already been resolved." });
+        let messageId = _memoryIncidentMessages.length + 1;
         const db = await database();
-        const result = await db
-          .insert(incidentMessages)
-          .values({ incidentId: mission.incidentId, authorType: "rescuer", authorId: ctx.user.id, message: input.message });
-        return { id: Number(result[0].insertId) };
+        if (db) {
+          try {
+            const result = await db
+              .insert(incidentMessages)
+              .values({ incidentId: mission.incidentId, authorType: "rescuer", authorId: ctx.user.id, message: input.message });
+            messageId = Number(result[0].insertId);
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        _memoryIncidentMessages.push({
+          id: messageId,
+          incidentId: mission.incidentId,
+          authorType: "rescuer",
+          authorId: ctx.user.id,
+          message: input.message,
+          createdAt: new Date(),
+        });
+        return { id: messageId };
       }),
     updateProfile: rescuerProcedure
       .input(
@@ -1244,10 +1771,8 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const db = await database();
         const profile = await getRescuerProfile(ctx.user.id);
-        if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Rescuer profile not found." });
-        const resultingPhone = input.phone !== undefined ? input.phone : profile.phone;
+        const resultingPhone = input.phone !== undefined ? input.phone : profile?.phone;
         if (input.contactSharing === "yes" && !resultingPhone)
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -1257,20 +1782,50 @@ export const rescueRouter = router({
         const uploaded = photo
           ? await storagePut(`rescuers/${ctx.user.id}/profile.${photo.extension}`, photo.bytes, photo.contentType)
           : null;
-        await db
-          .update(rescueProfiles)
-          .set({
-            ...(input.phone !== undefined ? { phone: input.phone || null } : {}),
-            ...(input.contactSharing ? { contactSharing: input.contactSharing } : {}),
-            ...(input.clearPhoto ? { photoKey: null, photoUrl: null } : {}),
-            ...(uploaded ? { photoKey: uploaded.key, photoUrl: uploaded.url } : {}),
-          })
-          .where(eq(rescueProfiles.userId, ctx.user.id));
+        const db = await database();
+        if (db) {
+          try {
+            await db
+              .update(rescueProfiles)
+              .set({
+                ...(input.phone !== undefined ? { phone: input.phone || null } : {}),
+                ...(input.contactSharing ? { contactSharing: input.contactSharing } : {}),
+                ...(input.clearPhoto ? { photoKey: null, photoUrl: null } : {}),
+                ...(uploaded ? { photoKey: uploaded.key, photoUrl: uploaded.url } : {}),
+              })
+              .where(eq(rescueProfiles.userId, ctx.user.id));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        let mem = _memoryRescueProfiles.get(ctx.user.id);
+        if (!mem) {
+          mem = {
+            id: _memoryRescueProfiles.size + 1,
+            userId: ctx.user.id,
+            callSign: ctx.user.name || `Rescuer #${ctx.user.id}`,
+            phone: input.phone || null,
+            photoKey: uploaded?.key || null,
+            photoUrl: uploaded?.url || null,
+            contactSharing: input.contactSharing || "no",
+            locationSharing: "no",
+            availability: "available",
+            lastLatitude: 26.1445,
+            lastLongitude: 91.7362,
+            locationUpdatedAt: new Date(),
+            updatedAt: new Date(),
+          };
+          _memoryRescueProfiles.set(ctx.user.id, mem);
+        } else {
+          if (input.phone !== undefined) mem.phone = input.phone || null;
+          if (input.contactSharing) mem.contactSharing = input.contactSharing;
+          if (input.clearPhoto) { mem.photoKey = null; mem.photoUrl = null; }
+          if (uploaded) { mem.photoKey = uploaded.key; mem.photoUrl = uploaded.url; }
+          mem.updatedAt = new Date();
+        }
         await writeAudit(
           ctx.user.id,
           "rescuer.profile.update",
           "rescueProfile",
-          profile.id,
+          mem.id,
           input.clearPhoto
             ? "Cleared profile photo"
             : uploaded
@@ -1282,7 +1837,6 @@ export const rescueRouter = router({
     updateLiveLocation: rescuerProcedure
       .input(z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }))
       .mutation(async ({ input, ctx }) => {
-        const db = await database();
         const profile = await getRescuerProfile(ctx.user.id);
         if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Rescuer profile not found." });
         const hasOpenMission = (await listMissionsForRescuer(ctx.user.id)).some(
@@ -1293,15 +1847,28 @@ export const rescueRouter = router({
             code: "FORBIDDEN",
             message: "Live location updates are available only during an active assigned mission.",
           });
-        await db
-          .update(rescueProfiles)
-          .set({
-            locationSharing: "yes",
-            lastLatitude: input.latitude,
-            lastLongitude: input.longitude,
-            locationUpdatedAt: new Date(),
-          })
-          .where(eq(rescueProfiles.userId, ctx.user.id));
+        const db = await database();
+        if (db) {
+          try {
+            await db
+              .update(rescueProfiles)
+              .set({
+                locationSharing: "yes",
+                lastLatitude: input.latitude,
+                lastLongitude: input.longitude,
+                locationUpdatedAt: new Date(),
+              })
+              .where(eq(rescueProfiles.userId, ctx.user.id));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        const mem = _memoryRescueProfiles.get(ctx.user.id);
+        if (mem) {
+          mem.locationSharing = "yes";
+          mem.lastLatitude = input.latitude;
+          mem.lastLongitude = input.longitude;
+          mem.locationUpdatedAt = new Date();
+          mem.updatedAt = new Date();
+        }
         return { success: true };
       }),
     missions: rescuerProcedure.query(({ ctx }) => listMissionsForRescuer(ctx.user.id)),
@@ -1324,24 +1891,28 @@ export const rescueRouter = router({
       .mutation(async ({ input, ctx }) => {
         const db = await database();
         const endpointHash = createHash("sha256").update(input.endpoint).digest("hex");
-        await db
-          .insert(pushSubscriptions)
-          .values({
-            userId: ctx.user.id,
-            endpointHash,
-            endpoint: input.endpoint,
-            p256dh: input.p256dh,
-            auth: input.auth,
-          })
-          .onDuplicateKeyUpdate({
-            set: {
-              userId: ctx.user.id,
-              endpoint: input.endpoint,
-              p256dh: input.p256dh,
-              auth: input.auth,
-              updatedAt: new Date(),
-            },
-          });
+        if (db) {
+          try {
+            await db
+              .insert(pushSubscriptions)
+              .values({
+                userId: ctx.user.id,
+                endpointHash,
+                endpoint: input.endpoint,
+                p256dh: input.p256dh,
+                auth: input.auth,
+              })
+              .onDuplicateKeyUpdate({
+                set: {
+                  userId: ctx.user.id,
+                  endpoint: input.endpoint,
+                  p256dh: input.p256dh,
+                  auth: input.auth,
+                  updatedAt: new Date(),
+                },
+              });
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
         await writeAudit(ctx.user.id, "push.subscribe", "pushSubscription", endpointHash);
         return { success: true };
       }),
@@ -1354,7 +1925,6 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const db = await database();
         const profile = await getRescuerProfile(ctx.user.id);
         if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Rescuer profile not found." });
         const hasOpenMission = (await listMissionsForRescuer(ctx.user.id)).some(
@@ -1365,14 +1935,26 @@ export const rescueRouter = router({
             code: "BAD_REQUEST",
             message: "Resolve or hand off your active mission before going off duty.",
           });
-        await db
-          .update(rescueProfiles)
-          .set({
-            availability: input.availability,
-            lastLatitude: input.latitude ?? profile.lastLatitude,
-            lastLongitude: input.longitude ?? profile.lastLongitude,
-          })
-          .where(eq(rescueProfiles.userId, ctx.user.id));
+        const db = await database();
+        if (db) {
+          try {
+            await db
+              .update(rescueProfiles)
+              .set({
+                availability: input.availability,
+                lastLatitude: input.latitude ?? profile.lastLatitude,
+                lastLongitude: input.longitude ?? profile.lastLongitude,
+              })
+              .where(eq(rescueProfiles.userId, ctx.user.id));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        const mem = _memoryRescueProfiles.get(ctx.user.id);
+        if (mem) {
+          mem.availability = input.availability;
+          mem.lastLatitude = input.latitude ?? profile.lastLatitude;
+          mem.lastLongitude = input.longitude ?? profile.lastLongitude;
+          mem.updatedAt = new Date();
+        }
         await writeAudit(ctx.user.id, "rescuer.availability", "rescueProfile", profile.id, input.availability);
         return { success: true };
       }),
@@ -1385,7 +1967,6 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const db = await database();
         const mission = await getMissionForRescuer(input.missionId, ctx.user.id);
         if (!mission) throw new TRPCError({ code: "NOT_FOUND", message: "Assigned mission not found." });
         const allowed = isAllowedMissionTransition(mission.status, input.status);
@@ -1395,23 +1976,54 @@ export const rescueRouter = router({
             message: "Mission status must progress from Pending to Dispatched to Resolved.",
           });
         const now = new Date();
-        await db
-          .update(missions)
-          .set({
-            status: input.status,
-            notes: input.notes ?? mission.notes,
-            ...(input.status === "dispatched" ? { dispatchedAt: now } : { resolvedAt: now }),
-          })
-          .where(eq(missions.id, mission.id));
-        await db
-          .update(incidents)
-          .set({
-            status: input.status,
-            ...(input.status === "dispatched" ? { dispatchedAt: now } : { resolvedAt: now }),
-          })
-          .where(eq(incidents.id, mission.incidentId));
-        if (input.status === "resolved")
-          await db.update(rescueProfiles).set({ availability: "available", locationSharing: "no", lastLatitude: null, lastLongitude: null, locationUpdatedAt: null }).where(eq(rescueProfiles.userId, ctx.user.id));
+        const db = await database();
+        if (db) {
+          try {
+            await db
+              .update(missions)
+              .set({
+                status: input.status,
+                notes: input.notes ?? mission.notes,
+                ...(input.status === "dispatched" ? { dispatchedAt: now } : { resolvedAt: now }),
+              })
+              .where(eq(missions.id, mission.id));
+            await db
+              .update(incidents)
+              .set({
+                status: input.status,
+                ...(input.status === "dispatched" ? { dispatchedAt: now } : { resolvedAt: now }),
+              })
+              .where(eq(incidents.id, mission.incidentId));
+            if (input.status === "resolved")
+              await db.update(rescueProfiles).set({ availability: "available", locationSharing: "no", lastLatitude: null, lastLongitude: null, locationUpdatedAt: null }).where(eq(rescueProfiles.userId, ctx.user.id));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        const memMission = _memoryMissions.get(mission.id);
+        if (memMission) {
+          memMission.status = input.status;
+          memMission.notes = input.notes ?? mission.notes;
+          if (input.status === "dispatched") memMission.dispatchedAt = now;
+          else memMission.resolvedAt = now;
+          memMission.updatedAt = new Date();
+        }
+        const memIncident = _memoryIncidents.get(mission.incidentId);
+        if (memIncident) {
+          memIncident.status = input.status;
+          if (input.status === "dispatched") memIncident.dispatchedAt = now;
+          else memIncident.resolvedAt = now;
+          memIncident.updatedAt = new Date();
+        }
+        if (input.status === "resolved") {
+          const memProf = _memoryRescueProfiles.get(ctx.user.id);
+          if (memProf) {
+            memProf.availability = "available";
+            memProf.locationSharing = "no";
+            memProf.lastLatitude = null;
+            memProf.lastLongitude = null;
+            memProf.locationUpdatedAt = null;
+            memProf.updatedAt = new Date();
+          }
+        }
         await addIncidentEvent(
           mission.incidentId,
           ctx.user.id,
@@ -1426,10 +2038,16 @@ export const rescueRouter = router({
       .input(z.object({ notificationId: z.number().int().positive() }))
       .mutation(async ({ input, ctx }) => {
         const db = await database();
-        await db
-          .update(notifications)
-          .set({ readAt: new Date() })
-          .where(and(eq(notifications.id, input.notificationId), eq(notifications.recipientId, ctx.user.id)));
+        if (db) {
+          try {
+            await db
+              .update(notifications)
+              .set({ readAt: new Date() })
+              .where(and(eq(notifications.id, input.notificationId), eq(notifications.recipientId, ctx.user.id)));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        const notif = _memoryNotifications.find(n => n.id === input.notificationId && n.recipientId === ctx.user.id);
+        if (notif) notif.readAt = new Date();
         await writeAudit(ctx.user.id, "notification.read", "notification", input.notificationId);
         return { success: true };
       }),

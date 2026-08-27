@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
 }));
 
-vi.mock("./db", () => ({ getDb: mocks.getDb }));
+vi.mock("./db", async (importOriginal) => ({ ...(await importOriginal<any>()), getDb: mocks.getDb }));
 
 const { appRouter } = await import("./routers");
 

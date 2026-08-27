@@ -41,9 +41,12 @@ export default function AdminLogin() {
       const role = res.user?.role;
       if (role === "admin") {
         setLocation("/command");
+      } else if (role === "rescuer") {
+        setLocation("/responder");
+      } else if (role === "medical") {
+        setLocation("/medical");
       } else {
-        // If logged in as another role, still take to appropriate place or command
-        setLocation("/command");
+        setLocation("/");
       }
     } catch (err: any) {
       setErrorMessage(err?.message || "Administrator authentication failed. Please verify your credentials.");

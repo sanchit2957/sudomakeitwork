@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { hashPassword, verifyPassword } from "./auth.password";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
@@ -15,10 +16,16 @@ import {
 } from "./db";
 import { rescueRouter } from "./routers/rescue";
 
+function sanitizeUser<T extends Record<string, any>>(user: T | null): Omit<T, "password"> | null {
+  if (!user) return null;
+  const { password, ...safeUser } = user;
+  return safeUser;
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => sanitizeUser(opts.ctx.user)),
     login: publicProcedure
       .input(
         z.object({
@@ -30,49 +37,19 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        let dbUser;
-        const emailInput = (input.email || "").trim().toLowerCase();
-        const role = input.role || (emailInput === "admin" ? "admin" : "user");
-
-        if (input.password !== undefined) {
-          // Credential-based login
-          if ((emailInput === "admin" || emailInput === "admin@assamrescue.gov.in") && input.password === "admin") {
-            const openId = "user-admin";
-            await upsertUser({
-              openId,
-              name: input.name || "Superadmin",
-              email: "admin@assamrescue.gov.in",
-              password: input.password,
-              role: "admin",
-              loginMethod: "platform-login",
-              lastSignedIn: new Date(),
-            });
-            dbUser = await getUserByEmail("admin@assamrescue.gov.in");
-          } else {
-            const user = await getUserByEmail(emailInput);
-            if (!user || user.password !== input.password) {
-              throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid username, email, or password." });
-            }
-            await upsertUser({ ...user, lastSignedIn: new Date() });
-            dbUser = user;
-          }
-        } else {
-          // Role-based or test login
-          const openId = emailInput ? `user-${emailInput.replace(/[^a-z0-9]/g, "-")}` : `test-${role}-01`;
-          await upsertUser({
-            openId,
-            name: input.name || `Test ${role}`,
-            email: emailInput || `${role}@assamrescue.gov.in`,
-            role,
-            loginMethod: "platform-login",
-            lastSignedIn: new Date(),
-          });
-          dbUser = await getUserByOpenId(openId);
+        if (!input.email || !input.password) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Email and password are required." });
         }
-
-        if (!dbUser) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "User account could not be loaded." });
+        
+        const emailInput = input.email.trim().toLowerCase();
+        const user = await getUserByEmail(emailInput);
+        
+        if (!user || !verifyPassword(input.password, user.password)) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
         }
+        
+        await upsertUser({ ...user, lastSignedIn: new Date() });
+        const dbUser = user;
 
         const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User" });
         const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -80,7 +57,7 @@ export const appRouter = router({
 
         return {
           success: true,
-          user: dbUser,
+          user: sanitizeUser(dbUser),
           sessionToken,
         };
       }),
@@ -102,12 +79,13 @@ export const appRouter = router({
           throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
         }
         const openId = `user-${emailVal.replace(/[^a-z0-9]/g, "-")}`;
+        const hashedPassword = hashPassword(input.password.trim());
         await upsertUser({
           openId,
           name: input.name.trim(),
           email: emailVal,
-          password: input.password.trim(),
-          role: input.role,
+          password: hashedPassword,
+          role: "user", // Registration always sets role to user; approval grants privileges
           loginMethod: "platform-login",
           lastSignedIn: new Date(),
         });
@@ -125,7 +103,7 @@ export const appRouter = router({
         ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
         return {
           success: true,
-          user: dbUser,
+          user: sanitizeUser(dbUser),
           sessionToken,
         };
       }),
@@ -142,11 +120,12 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const emailVal = input.email.trim();
         const openId = `user-${emailVal.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+        const hashedPassword = hashPassword(input.password.trim());
         await upsertUser({
           openId,
           name: input.name.trim(),
           email: emailVal,
-          password: input.password.trim(),
+          password: hashedPassword,
           role: input.role,
           loginMethod: "platform-login",
         });
@@ -159,10 +138,11 @@ export const appRouter = router({
             await ensureHospitalStaffProfile(dbUser.id);
           }
         }
-        return { success: true, user: dbUser };
+        return { success: true, user: sanitizeUser(dbUser) };
       }),
     listUsers: adminProcedure.query(async () => {
-      return await getAllUsers();
+      const all = await getAllUsers();
+      return all.map(u => sanitizeUser(u));
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);

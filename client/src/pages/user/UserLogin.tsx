@@ -75,8 +75,7 @@ export default function UserLogin() {
       else if (role === "rescuer") defaultDestination = "/responder";
       else if (role === "medical") defaultDestination = "/medical";
 
-      const dest = redirectParam || defaultDestination;
-      setLocation(dest);
+      setLocation(defaultDestination);
     } catch (err: any) {
       setErrorMessage(err?.message || "Authentication failed. Please check your credentials.");
     } finally {
@@ -578,47 +577,6 @@ export default function UserLogin() {
               </form>
             )}
           </div>
-
-          {/* Quick Prefill Bar for Local Testing */}
-          {authMode === "signin" && (
-            <div className="border-t border-black/5 bg-[#f8faf9] p-4 text-center dark:border-white/5 dark:bg-[#16181b]">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                ⚡ Instant Quick-Fill Test Accounts
-              </p>
-              <div className="mt-2.5 flex flex-wrap justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail("citizen@assamrescue.gov.in");
-                    setPassword("citizen");
-                  }}
-                  className="rounded-lg border border-black/5 bg-white px-2.5 py-1 text-xs font-semibold hover:bg-black/5 dark:border-white/5 dark:bg-[#1e2024]"
-                >
-                  👤 Citizen (`citizen` / `citizen`)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail("rescuer@assamrescue.gov.in");
-                    setPassword("rescuer");
-                  }}
-                  className="rounded-lg border border-black/5 bg-white px-2.5 py-1 text-xs font-semibold hover:bg-black/5 dark:border-white/5 dark:bg-[#1e2024]"
-                >
-                  🚤 Rescuer (`rescuer` / `rescuer`)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail("medical@assamrescue.gov.in");
-                    setPassword("medical");
-                  }}
-                  className="rounded-lg border border-black/5 bg-white px-2.5 py-1 text-xs font-semibold hover:bg-black/5 dark:border-white/5 dark:bg-[#1e2024]"
-                >
-                  🏥 Medical (`medical` / `medical`)
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Link to Admin Portal */}

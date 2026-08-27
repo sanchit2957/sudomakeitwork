@@ -166,7 +166,13 @@ export function ResponderProfileCard({ profile, hasActiveMission, saving, onSave
   const [contactSharing, setContactSharing] = useState<"yes" | "no">(profile?.contactSharing ?? "no");
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState("");
-  useEffect(() => { setPhone(profile?.phone ?? ""); setContactSharing(profile?.contactSharing ?? "no"); }, [profile?.phone, profile?.contactSharing]);
+  const [savedNotice, setSavedNotice] = useState(false);
+
+  useEffect(() => {
+    if (profile?.phone !== undefined) setPhone(profile?.phone ?? "");
+    if (profile?.contactSharing !== undefined) setContactSharing(profile?.contactSharing ?? "no");
+  }, [profile?.phone, profile?.contactSharing]);
+
   const choosePhoto = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -175,11 +181,204 @@ export function ResponderProfileCard({ profile, hasActiveMission, saving, onSave
     reader.onload = () => { setPhotoDataUrl(String(reader.result)); setPhotoError(""); };
     reader.readAsDataURL(file);
   };
+
+  const handleSave = () => {
+    onSave({
+      phone: phone.trim() || null,
+      contactSharing,
+      ...(photoDataUrl ? { photoDataUrl } : {}),
+    });
+    setSavedNotice(true);
+    setTimeout(() => setSavedNotice(false), 4000);
+  };
+
   const preview = photoDataUrl || profile?.photoUrl;
-  return <section className="rounded-3xl border bg-white p-5 shadow-sm md:p-6"><div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between"><div className="flex min-w-0 items-center gap-4"><div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#e7f7ee] text-primary">{preview ? <img src={preview} alt="" className="h-full w-full object-cover" /> : <Camera className="h-7 w-7" />}</div><div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{t("Your field profile")}</p><h2 className="mt-1 text-xl font-extrabold">{profile?.callSign || t("responder.profilePending")}</h2><p className="mt-1 text-sm leading-5 text-muted-foreground">{t("Your contact details are shown only to the person linked to an active mission when you choose to share them.")}</p></div></div><label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#91cbbb] px-4 py-2.5 text-sm font-bold text-primary hover:bg-[#effaf6]"><Camera className="h-4 w-4" /> {t("Add or change photo")}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={choosePhoto} className="sr-only" /></label></div><div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]"><div className="grid gap-2"><Label htmlFor="rescuer-phone">{t("Assignment contact number")}</Label><div className="flex gap-2"><Phone className="mt-3 h-4 w-4 shrink-0 text-primary" /><Input id="rescuer-phone" inputMode="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder={t("Phone number for active assignments")} /></div></div><label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-[#f0faf6] px-4 py-3 text-sm font-semibold text-[#285f55]"><input type="checkbox" checked={contactSharing === "yes"} onChange={event => setContactSharing(event.target.checked ? "yes" : "no")} className="h-4 w-4 accent-primary" />{t("Show my phone number to my active assignment")}</label></div>{photoError && <p className="mt-3 text-xs font-semibold text-destructive">{photoError}</p>}<div className="mt-4 flex flex-wrap gap-2"><Button type="button" onClick={() => onSave({ phone: phone.trim() || null, contactSharing, ...(photoDataUrl ? { photoDataUrl } : {}) })} disabled={saving || !profile} className="rounded-xl">{saving ? t("responder.updating") : t("Save profile and contact settings")}</Button>{preview && <Button type="button" variant="outline" onClick={() => { setPhotoDataUrl(null); onSave({ clearPhoto: true }); }} disabled={saving}>{t("Remove photo")}</Button>}</div><div className={`mt-6 rounded-2xl border p-4 ${hasActiveMission ? "border-[#b8ded4] bg-[#f8fcfa]" : "border-border bg-muted/40"}`}><div className="flex gap-3"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${hasActiveMission ? "bg-primary text-white" : "bg-secondary text-primary"}`}><LocateFixed className="h-5 w-5" /></span><div><h3 className="font-extrabold">Automatic mission location</h3><p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">{hasActiveMission ? "Your location is shared automatically with the person linked to your active SOS and refreshes every 5 seconds. It stops and clears automatically when the mission is resolved." : "Location sharing starts automatically when Command assigns you an active SOS mission."}</p>{hasActiveMission && <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#e7f6ef] px-3 py-1.5 text-xs font-bold text-[#19755f]"><Radio className="h-3.5 w-3.5 animate-pulse" />Sharing automatically every 5 seconds</span>}</div></div></div></section>;
+  return (
+    <section className="rounded-3xl border bg-white p-5 shadow-sm md:p-6">
+      <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#e7f7ee] text-primary">
+            {preview ? <img src={preview} alt="" className="h-full w-full object-cover" /> : <Camera className="h-7 w-7" />}
+          </div>
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{t("Your field profile")}</p>
+            <h2 className="mt-1 text-xl font-extrabold">{profile?.callSign || t("responder.profilePending")}</h2>
+            <p className="mt-1 text-sm leading-5 text-muted-foreground">
+              {t("Your contact details are shown only to the person linked to an active mission when you choose to share them.")}
+            </p>
+          </div>
+        </div>
+        <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#91cbbb] px-4 py-2.5 text-sm font-bold text-primary hover:bg-[#effaf6]">
+          <Camera className="h-4 w-4" /> {t("Add or change photo")}
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={choosePhoto} className="sr-only" />
+        </label>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]">
+        <div className="grid gap-2">
+          <Label htmlFor="rescuer-phone">{t("Assignment contact number")}</Label>
+          <div className="flex gap-2">
+            <Phone className="mt-3 h-4 w-4 shrink-0 text-primary" />
+            <Input
+              id="rescuer-phone"
+              inputMode="tel"
+              value={phone}
+              onChange={event => setPhone(event.target.value)}
+              placeholder={t("Phone number for active assignments")}
+            />
+          </div>
+        </div>
+        <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-[#f0faf6] px-4 py-3 text-sm font-semibold text-[#285f55]">
+          <input
+            type="checkbox"
+            checked={contactSharing === "yes"}
+            onChange={event => setContactSharing(event.target.checked ? "yes" : "no")}
+            className="h-4 w-4 accent-primary"
+          />
+          {t("Show my phone number to my active assignment")}
+        </label>
+      </div>
+
+      {photoError && <p className="mt-3 text-xs font-semibold text-destructive">{photoError}</p>}
+      {savedNotice && <p className="mt-3 rounded-xl bg-[#e7f7ee] p-2.5 text-xs font-bold text-[#19755f]">✓ Details and contact preferences saved successfully!</p>}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-xl"
+        >
+          {saving ? t("responder.updating") : t("Save profile and contact settings")}
+        </Button>
+        {preview && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setPhotoDataUrl(null);
+              onSave({ clearPhoto: true });
+            }}
+            disabled={saving}
+          >
+            {t("Remove photo")}
+          </Button>
+        )}
+      </div>
+
+      <div className={`mt-6 rounded-2xl border p-4 ${hasActiveMission ? "border-[#b8ded4] bg-[#f8fcfa]" : "border-border bg-muted/40"}`}>
+        <div className="flex gap-3">
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${hasActiveMission ? "bg-primary text-white" : "bg-secondary text-primary"}`}>
+            <LocateFixed className="h-5 w-5" />
+          </span>
+          <div>
+            <h3 className="font-extrabold">Automatic mission location</h3>
+            <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">
+              {hasActiveMission
+                ? "Your location is shared automatically with the person linked to your active SOS and refreshes every 5 seconds. It stops and clears automatically when the mission is resolved."
+                : "Location sharing starts automatically when Command assigns you an active SOS mission."}
+            </p>
+            {hasActiveMission && (
+              <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#e7f6ef] px-3 py-1.5 text-xs font-bold text-[#19755f]">
+                <Radio className="h-3.5 w-3.5 animate-pulse" />
+                Sharing automatically every 5 seconds
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
-function RescuerRegistration() { const [, setLocation] = useLocation(); const { t } = useLanguage(); const [phone, setPhone] = useState(""); const [note, setNote] = useState(""); const request = trpc.rescue.rescuer.requestRegistration.useMutation(); return <div className="relative min-h-screen app-grid flex items-center justify-center p-5"><div className="absolute right-4 top-4"><LanguageSelector compact /></div><section className="w-full max-w-lg rounded-[2rem] border bg-white p-6 shadow-xl"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e7f7ee] text-primary"><ClipboardPenLine className="h-6 w-6" /></span><p className="mt-5 font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{t("Join the field team")}</p><h1 className="mt-1 text-2xl font-extrabold tracking-tight">{t("Request rescuer access")}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{t("Send your details to the Command Centre. An administrator will review and assign a secure field call sign before missions can be shown.")}</p><div className="mt-6 grid gap-4"><div className="grid gap-2"><Label htmlFor="phone">{t("Phone")}</Label><Input id="phone" value={phone} onChange={event => setPhone(event.target.value)} placeholder={t("Optional field contact")} /></div><div className="grid gap-2"><Label htmlFor="note">{t("Experience or availability note")}</Label><Textarea id="note" value={note} onChange={event => setNote(event.target.value)} placeholder={t("Example: trained boat operator, medical volunteer, local area knowledge…")} /></div></div><Button disabled={request.isPending} onClick={() => request.mutate({ phone: phone.trim() || undefined, note: note.trim() || undefined })} className="mt-6 w-full rounded-xl">{request.isPending ? t("Sending request…") : t("Request rescuer access")}</Button>{request.isSuccess && <p className="mt-4 rounded-xl bg-[#e7f7ee] p-3 text-sm font-semibold text-[#19755f]">{t("Request sent. Wait for Command Centre approval, then refresh this page.")}</p>}{request.error && <p className="mt-4 text-sm font-semibold text-destructive">{request.error.message}</p>}<Button variant="outline" onClick={() => setLocation("/")} className="mt-3 w-full rounded-xl">{t("Return to safety hub")}</Button></section></div>; }
+function RescuerRegistration() {
+  const [, setLocation] = useLocation();
+  const { t } = useLanguage();
+  const [phone, setPhone] = useState("");
+  const [note, setNote] = useState("");
+  const myReq = trpc.rescue.rescuer.myRegistration.useQuery();
+  const request = trpc.rescue.rescuer.requestRegistration.useMutation({
+    onSuccess: () => {
+      void myReq.refetch();
+    },
+  });
+
+  useEffect(() => {
+    if (myReq.data) {
+      if (myReq.data.phone && !phone) setPhone(myReq.data.phone);
+      if (myReq.data.note && !note) setNote(myReq.data.note);
+    }
+  }, [myReq.data]);
+
+  const isPendingReview = myReq.data?.status === "pending";
+
+  return (
+    <div className="relative min-h-screen app-grid flex items-center justify-center p-5">
+      <div className="absolute right-4 top-4">
+        <LanguageSelector compact />
+      </div>
+      <section className="w-full max-w-lg rounded-[2rem] border bg-white p-6 shadow-xl">
+        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e7f7ee] text-primary">
+          <ClipboardPenLine className="h-6 w-6" />
+        </span>
+        <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{t("Join the field team")}</p>
+        <h1 className="mt-1 text-2xl font-extrabold tracking-tight">{t("Request rescuer access")}</h1>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          {t("Send your details to the Command Centre. An administrator will review and assign a secure field call sign before missions can be shown.")}
+        </p>
+
+        {isPendingReview && (
+          <div className="mt-4 rounded-2xl border border-[#b8dfd5] bg-[#eff9f6] p-4 text-xs leading-5 text-[#185348]">
+            <p className="font-bold">✓ Application Awaiting Review</p>
+            <p className="mt-1">
+              Your rescuer registration request is currently under review by the Command Centre. You can update your phone or notes below at any time.
+            </p>
+          </div>
+        )}
+
+        <div className="mt-6 grid gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="phone">{t("Phone")}</Label>
+            <Input
+              id="phone"
+              inputMode="tel"
+              value={phone}
+              onChange={event => setPhone(event.target.value)}
+              placeholder={t("Optional field contact")}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="note">{t("Experience or availability note")}</Label>
+            <Textarea
+              id="note"
+              value={note}
+              onChange={event => setNote(event.target.value)}
+              placeholder={t("Example: trained boat operator, medical volunteer, local area knowledge…")}
+            />
+          </div>
+        </div>
+
+        <Button
+          disabled={request.isPending}
+          onClick={() => request.mutate({ phone: phone.trim() || undefined, note: note.trim() || undefined })}
+          className="mt-6 w-full rounded-xl"
+        >
+          {request.isPending ? t("Sending request…") : isPendingReview ? "Update registration details" : t("Request rescuer access")}
+        </Button>
+
+        {request.isSuccess && (
+          <p className="mt-4 rounded-xl bg-[#e7f7ee] p-3 text-sm font-semibold text-[#19755f]">
+            {t("Request sent. Wait for Command Centre approval, then refresh this page.")}
+          </p>
+        )}
+        {request.error && <p className="mt-4 text-sm font-semibold text-destructive">{request.error.message}</p>}
+        <Button variant="outline" onClick={() => setLocation("/")} className="mt-3 w-full rounded-xl">
+          {t("Return to safety hub")}
+        </Button>
+      </section>
+    </div>
+  );
+}
 
 function AlertsView({ items, onRead }: { items: Array<{ id: number; title: string; body: string; readAt: Date | null }>; onRead: (id: number) => void }) { const { t } = useLanguage(); return <section><PageHeading eyebrow={t("responder.missionAlerts")} title={t("responder.operationalNotifications")} /><div className="grid gap-3">{items.length ? items.map(alert => <button key={alert.id} onClick={() => !alert.readAt && onRead(alert.id)} className={`rounded-2xl border p-4 text-left transition hover:border-[#83c5b4] ${alert.readAt ? "bg-white" : "bg-[#effaf6]"}`}><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-extrabold">{alert.title}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{alert.body}</p></div>{!alert.readAt && <span className="h-2.5 w-2.5 rounded-full bg-[#c94b45]" />}</div></button>) : <Empty text={t("responder.noAlerts")} />}</div></section>; }
 function base64UrlToUint8Array(value: string) { const padded = `${value}${"=".repeat((4 - value.length % 4) % 4)}`.replace(/-/g, "+").replace(/_/g, "/"); const raw = atob(padded); return Uint8Array.from(raw, character => character.charCodeAt(0)); }

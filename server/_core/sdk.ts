@@ -285,42 +285,15 @@ class SDKServer {
     let user = await db.getUserByOpenId(sessionUserId);
 
     if (!user) {
-      if (sessionUserId === "user-admin" || sessionUserId.includes("admin")) {
-        user = {
-          id: 1,
-          openId: sessionUserId,
-          name: session.name || "Superadmin",
-          email: "admin@assamrescue.gov.in",
-          password: "admin",
-          loginMethod: "platform-login",
-          role: "admin",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          lastSignedIn: new Date(),
-        };
-      } else {
-        user = {
-          id: Math.floor(Math.random() * 1000) + 10,
-          openId: sessionUserId,
-          name: session.name || "User",
-          email: null,
-          password: null,
-          loginMethod: "platform-login",
-          role: "user",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          lastSignedIn: new Date(),
-        };
-      }
-      try {
-        await db.upsertUser(user);
-      } catch {}
+      throw ForbiddenError("User not found");
     }
 
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
+    try {
+      await db.upsertUser({
+        openId: user.openId,
+        lastSignedIn: signedInAt,
+      });
+    } catch {}
 
     return user;
   }
