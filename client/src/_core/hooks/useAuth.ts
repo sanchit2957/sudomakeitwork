@@ -19,6 +19,12 @@ export function useAuth(options?: UseAuthOptions) {
 
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async (data) => {
+      if (data.sessionToken) {
+        try {
+          localStorage.setItem("app-runtime-session-token", data.sessionToken);
+          localStorage.setItem("app-runtime-user-info", JSON.stringify(data.user));
+        } catch {}
+      }
       utils.auth.me.setData(undefined, data.user as any);
       await utils.auth.me.invalidate();
     },
@@ -36,6 +42,12 @@ export function useAuth(options?: UseAuthOptions) {
       password: string;
     }) => {
       const res = await loginMutation.mutateAsync(params);
+      if (res.sessionToken) {
+        try {
+          localStorage.setItem("app-runtime-session-token", res.sessionToken);
+          localStorage.setItem("app-runtime-user-info", JSON.stringify(res.user));
+        } catch {}
+      }
       utils.auth.me.setData(undefined, res.user as any);
       await utils.auth.me.invalidate();
       return res;
@@ -47,6 +59,12 @@ export function useAuth(options?: UseAuthOptions) {
 
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: async (data) => {
+      if (data.sessionToken) {
+        try {
+          localStorage.setItem("app-runtime-session-token", data.sessionToken);
+          localStorage.setItem("app-runtime-user-info", JSON.stringify(data.user));
+        } catch {}
+      }
       utils.auth.me.setData(undefined, data.user as any);
       await utils.auth.me.invalidate();
     },
@@ -62,6 +80,12 @@ export function useAuth(options?: UseAuthOptions) {
       callSign?: string;
     }) => {
       const res = await registerMutation.mutateAsync(params);
+      if (res.sessionToken) {
+        try {
+          localStorage.setItem("app-runtime-session-token", res.sessionToken);
+          localStorage.setItem("app-runtime-user-info", JSON.stringify(res.user));
+        } catch {}
+      }
       utils.auth.me.setData(undefined, res.user as any);
       await utils.auth.me.invalidate();
       return res;
@@ -82,6 +106,7 @@ export function useAuth(options?: UseAuthOptions) {
       throw error;
     } finally {
       try {
+        localStorage.removeItem("app-runtime-session-token");
         localStorage.removeItem("app-runtime-user-info");
       } catch {}
       utils.auth.me.setData(undefined, null);
