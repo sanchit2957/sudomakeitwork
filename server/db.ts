@@ -241,9 +241,16 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (db) {
-    const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-    if (result.length > 0) return result[0];
-    return null;
+    try {
+      const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+      if (result.length > 0) return result[0];
+      return null;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL read skipped, checking local development store:", error);
+    }
   }
   if (process.env.NODE_ENV === "production") {
     throw new Error("Authoritative database is unavailable.");
@@ -254,9 +261,16 @@ export async function getUserByOpenId(openId: string) {
 export async function getUserByEmail(emailOrUsername: string) {
   const db = await getDb();
   if (db) {
-    const result = await db.select().from(users).where(eq(users.email, emailOrUsername)).limit(1);
-    if (result.length > 0) return result[0];
-    return null;
+    try {
+      const result = await db.select().from(users).where(eq(users.email, emailOrUsername)).limit(1);
+      if (result.length > 0) return result[0];
+      return null;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL read skipped, checking local development store:", error);
+    }
   }
   if (process.env.NODE_ENV === "production") {
     throw new Error("Authoritative database is unavailable.");
@@ -273,7 +287,14 @@ export async function getUserByEmail(emailOrUsername: string) {
 export async function getAllUsers() {
   const db = await getDb();
   if (db) {
-    return await db.select().from(users).orderBy(users.id);
+    try {
+      return await db.select().from(users).orderBy(users.id);
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL read skipped, returning local development store:", error);
+    }
   }
   if (process.env.NODE_ENV === "production") {
     throw new Error("Authoritative database is unavailable.");
@@ -285,22 +306,29 @@ export async function getAllUsers() {
 export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat 4") {
   const db = await getDb();
   if (db) {
-    const { rescueProfiles } = await import("../drizzle/schema");
-    const existing = await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1);
-    if (!existing.length) {
-      await db.insert(rescueProfiles).values({
-        userId,
-        callSign,
-        phone: "+91 94350 11223",
-        contactSharing: "yes",
-        locationSharing: "yes",
-        availability: "available",
-        lastLatitude: 26.1445,
-        lastLongitude: 91.7362,
-        locationUpdatedAt: new Date(),
-      });
+    try {
+      const { rescueProfiles } = await import("../drizzle/schema");
+      const existing = await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1);
+      if (!existing.length) {
+        await db.insert(rescueProfiles).values({
+          userId,
+          callSign,
+          phone: "+91 94350 11223",
+          contactSharing: "yes",
+          locationSharing: "yes",
+          availability: "available",
+          lastLatitude: 26.1445,
+          lastLongitude: 91.7362,
+          locationUpdatedAt: new Date(),
+        });
+      }
+      return;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database rescuer profile failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL sync skipped, updating local development store:", error);
     }
-    return;
   }
   if (process.env.NODE_ENV === "production") {
     throw new Error("Authoritative database is unavailable.");
@@ -324,39 +352,46 @@ export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat
 export async function ensureHospitalStaffProfile(userId: number) {
   const db = await getDb();
   if (db) {
-    const { hospitalStaffProfiles, hospitals } = await import("../drizzle/schema");
-    const existing = await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, userId)).limit(1);
-    if (!existing.length) {
-      let hospitalList = await db.select().from(hospitals).limit(1);
-      let hospitalId: number;
-      if (!hospitalList.length) {
-        const [newHospital] = await db.insert(hospitals).values({
-          name: "Gauhati Medical College & Hospital (GMCH)",
-          address: "Bhangagarh, Guwahati, Assam 781032",
-          contactPhone: "+91 361 2529457",
-          latitude: 26.1558,
-          longitude: 91.7645,
-          totalEmergencyBeds: 120,
-          availableEmergencyBeds: 34,
-          totalIcuBeds: 45,
-          availableIcuBeds: 12,
-          oxygenCylinderCount: 85,
-          bloodUnitCount: 140,
-          ambulanceCount: 14,
-          status: "open",
-        });
-        hospitalId = newHospital.insertId;
-      } else {
-        hospitalId = hospitalList[0].id;
-      }
+    try {
+      const { hospitalStaffProfiles, hospitals } = await import("../drizzle/schema");
+      const existing = await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, userId)).limit(1);
+      if (!existing.length) {
+        let hospitalList = await db.select().from(hospitals).limit(1);
+        let hospitalId: number;
+        if (!hospitalList.length) {
+          const [newHospital] = await db.insert(hospitals).values({
+            name: "Gauhati Medical College & Hospital (GMCH)",
+            address: "Bhangagarh, Guwahati, Assam 781032",
+            contactPhone: "+91 361 2529457",
+            latitude: 26.1558,
+            longitude: 91.7645,
+            totalEmergencyBeds: 120,
+            availableEmergencyBeds: 34,
+            totalIcuBeds: 45,
+            availableIcuBeds: 12,
+            oxygenCylinderCount: 85,
+            bloodUnitCount: 140,
+            ambulanceCount: 14,
+            status: "open",
+          });
+          hospitalId = newHospital.insertId;
+        } else {
+          hospitalId = hospitalList[0].id;
+        }
 
-      await db.insert(hospitalStaffProfiles).values({
-        userId,
-        hospitalId,
-        designation: "Emergency Medical Coordinator",
-      });
+        await db.insert(hospitalStaffProfiles).values({
+          userId,
+          hospitalId,
+          designation: "Emergency Medical Coordinator",
+        });
+      }
+      return;
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database hospital staff profile failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      console.warn("[Database] MySQL sync skipped, updating local development store:", error);
     }
-    return;
   }
   if (process.env.NODE_ENV === "production") {
     throw new Error("Authoritative database is unavailable.");
