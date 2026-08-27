@@ -1,32 +1,29 @@
 /**
  * MAP FRONTEND INTEGRATION
- * Supports Leaflet (OpenStreetMap / CartoDB) out of the box with zero API keys,
- * and seamlessly falls back to Google Maps when configured.
+ * Supports Google Maps API with dynamic loader and native map features,
+ * with seamless fallback to Leaflet / CartoDB Voyager tiles.
  * 
- * Available Libraries and Core Features:
- * 📍 MARKER (from `marker` library)
- * 🏢 PLACES (from `places` library)
- * 🧭 GEOCODER (from `geocoding` library)
- * 📐 GEOMETRY (from `geometry` library)
- * 🛣️ ROUTES (from `routes` library)
- * 
+ * Available Libraries:
  * libraries=marker,places,geocoding,geometry,routes
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import L from "leaflet";
 import { cn } from "@/lib/utils";
+import { loadGoogleMaps, isGoogleMapsLoaded } from "@/lib/googleMaps";
 
 declare global {
   namespace google {
     namespace maps {
       type Map = any;
       type LatLngLiteral = { lat: number; lng: number };
+      type Marker = any;
       namespace marker {
         type AdvancedMarkerElement = any;
         type PinElement = any;
       }
       type Polyline = any;
+      type Polygon = any;
+      type InfoWindow = any;
       type DirectionsService = any;
       type DirectionsRenderer = any;
       type TravelMode = any;
@@ -34,6 +31,7 @@ declare global {
   }
   interface Window {
     google?: any;
+    __GOOGLE_MAPS_API_KEY__?: string;
   }
 }
 
@@ -44,6 +42,7 @@ interface MapViewProps {
   onMapReady?: (map: google.maps.Map | any) => void;
   onLeafletReady?: (map: any) => void;
   onMapError?: () => void;
+  onPickLocation?: (point: { lat: number; lng: number }) => void;
 }
 
 export function MapView({
@@ -53,42 +52,127 @@ export function MapView({
   onMapReady,
   onLeafletReady,
   onMapError,
+  onPickLocation,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
   const googleMapRef = useRef<google.maps.Map | null>(null);
+  const googleMarkerRef = useRef<any>(null);
   const [loadError, setLoadError] = useState(false);
+  const [mapEngine, setMapEngine] = useState<"google" | "leaflet" | "none">("none");
 
   useEffect(() => {
     if (!mapContainer.current) return;
+    let isMounted = true;
 
-    // Check if Google Maps is present (e.g., in test mocks or with active script)
+    // Fast path: Synchronous Google Maps initialization if already present on window
     if (typeof window !== "undefined" && (window as any).google?.maps?.Map) {
       try {
-        const gMap = new (window as any).google.maps.Map(mapContainer.current, {
+        const gMaps = (window as any).google.maps;
+        const map = new gMaps.Map(mapContainer.current, {
           zoom: initialZoom,
-          center: initialCenter,
+          center: { lat: initialCenter.lat, lng: initialCenter.lng },
           mapTypeControl: true,
           fullscreenControl: true,
           zoomControl: true,
-          streetViewControl: true,
-          mapId: "DEMO_MAP_ID",
+          streetViewControl: false,
         });
-        googleMapRef.current = gMap;
-        onMapReady?.(gMap);
+
+        googleMapRef.current = map;
+        setMapEngine("google");
+
+        if (gMaps.Marker) {
+          const marker = new gMaps.Marker({
+            position: { lat: initialCenter.lat, lng: initialCenter.lng },
+            map,
+            title: "Selected Location",
+          });
+          googleMarkerRef.current = marker;
+        }
+
+        if (onPickLocation && map.addListener) {
+          map.addListener("click", (e: any) => {
+            if (e.latLng) {
+              const lat = e.latLng.lat();
+              const lng = e.latLng.lng();
+              if (googleMarkerRef.current?.setPosition) {
+                googleMarkerRef.current.setPosition({ lat, lng });
+              }
+              onPickLocation({ lat, lng });
+            }
+          });
+        }
+
+        onMapReady?.(map);
+
         return () => {
+          if (googleMarkerRef.current?.setMap) {
+            googleMarkerRef.current.setMap(null);
+            googleMarkerRef.current = null;
+          }
           googleMapRef.current = null;
         };
       } catch (err) {
-        console.warn("[GoogleMap] Init error, falling back to Leaflet:", err);
+        console.warn("[GoogleMap] Sync init error, falling back to Leaflet:", err);
       }
     }
 
-    // Default: Initialize OpenStreetMap / CartoDB via Leaflet on the client
-    if (typeof window === "undefined") return;
+    async function initMap() {
+      // 1. Try loading and initializing Google Maps
+      try {
+        const gMaps = await loadGoogleMaps();
+        if (!isMounted || !mapContainer.current) return;
 
-    let isMounted = true;
-    (async () => {
+        if (gMaps && gMaps.Map) {
+          const map = new gMaps.Map(mapContainer.current, {
+            zoom: initialZoom,
+            center: { lat: initialCenter.lat, lng: initialCenter.lng },
+            mapTypeControl: true,
+            mapTypeControlOptions: {
+              style: (window as any).google?.maps?.MapTypeControlStyle?.HORIZONTAL_BAR,
+            },
+            fullscreenControl: true,
+            zoomControl: true,
+            streetViewControl: false,
+          });
+
+          googleMapRef.current = map;
+          setMapEngine("google");
+
+          // Add default location pin
+          if (gMaps.Marker || (window as any).google?.maps?.Marker) {
+            const MarkerClass = gMaps.Marker || (window as any).google.maps.Marker;
+            const marker = new MarkerClass({
+              position: { lat: initialCenter.lat, lng: initialCenter.lng },
+              map,
+              title: "Selected Location",
+              animation: (window as any).google?.maps?.Animation?.DROP,
+            });
+            googleMarkerRef.current = marker;
+          }
+
+          // Handle click to pick location
+          if (onPickLocation && map.addListener) {
+            map.addListener("click", (e: any) => {
+              if (e.latLng) {
+                const lat = e.latLng.lat();
+                const lng = e.latLng.lng();
+                if (googleMarkerRef.current?.setPosition) {
+                  googleMarkerRef.current.setPosition({ lat, lng });
+                }
+                onPickLocation({ lat, lng });
+              }
+            });
+          }
+
+          onMapReady?.(map);
+          return;
+        }
+      } catch (gErr) {
+        console.warn("[GoogleMaps] Init failed, falling back to Leaflet:", gErr);
+      }
+
+      // 2. Fallback: Initialize Leaflet
       try {
         const L = (await import("leaflet")).default;
         if (!isMounted || !mapContainer.current) return;
@@ -116,21 +200,40 @@ export function MapView({
           }
         ).addTo(lMap);
 
+        const marker = L.marker([initialCenter.lat, initialCenter.lng]).addTo(lMap);
+
+        if (onPickLocation) {
+          lMap.on("click", (e: any) => {
+            marker.setLatLng(e.latlng);
+            onPickLocation({ lat: e.latlng.lat, lng: e.latlng.lng });
+          });
+        }
+
         leafletMapRef.current = lMap;
+        setMapEngine("leaflet");
         onLeafletReady?.(lMap);
 
         setTimeout(() => {
           if (isMounted) lMap.invalidateSize();
         }, 100);
       } catch (err) {
-        console.error("[Leaflet] Map init failed:", err);
-        setLoadError(true);
-        onMapError?.();
+        console.error("[Map] Leaflet initialization failed:", err);
+        if (isMounted) {
+          setLoadError(true);
+          onMapError?.();
+        }
       }
-    })();
+    }
+
+    void initMap();
 
     return () => {
       isMounted = false;
+      if (googleMarkerRef.current?.setMap) {
+        googleMarkerRef.current.setMap(null);
+        googleMarkerRef.current = null;
+      }
+      googleMapRef.current = null;
       if (leafletMapRef.current) {
         leafletMapRef.current.remove();
         leafletMapRef.current = null;
@@ -140,8 +243,11 @@ export function MapView({
 
   useEffect(() => {
     if (googleMapRef.current) {
-      googleMapRef.current.setCenter(initialCenter);
+      googleMapRef.current.setCenter({ lat: initialCenter.lat, lng: initialCenter.lng });
       googleMapRef.current.setZoom(initialZoom);
+      if (googleMarkerRef.current) {
+        googleMarkerRef.current.setPosition({ lat: initialCenter.lat, lng: initialCenter.lng });
+      }
     }
     if (leafletMapRef.current) {
       leafletMapRef.current.setView([initialCenter.lat, initialCenter.lng], initialZoom);
@@ -168,3 +274,4 @@ export function MapView({
     </div>
   );
 }
+
