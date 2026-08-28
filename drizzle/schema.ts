@@ -241,6 +241,36 @@ export const hospitalStaffProfiles = mysqlTable(
   table => [uniqueIndex("hospitalStaffProfiles_userId_unique").on(table.userId), index("hospitalStaffProfiles_hospitalId_idx").on(table.hospitalId)],
 );
 
+export const hospitalCaseNotifications = mysqlTable(
+  "hospitalCaseNotifications",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    incidentId: int("incidentId").notNull().references(() => incidents.id),
+    hospitalId: int("hospitalId").notNull().references(() => hospitals.id),
+    rescuerId: int("rescuerId").notNull().references(() => users.id),
+    severity: mysqlEnum("severity", ["critical", "high", "medium", "low"]).default("high").notNull(),
+    patientCount: int("patientCount").default(1).notNull(),
+    estimatedArrivalMinutes: int("estimatedArrivalMinutes").default(15).notNull(),
+    requiredDepartment: varchar("requiredDepartment", { length: 120 }).default("Emergency & Trauma").notNull(),
+    icuRequired: mysqlEnum("icuRequired", ["yes", "no"]).default("no").notNull(),
+    oxygenRequired: mysqlEnum("oxygenRequired", ["yes", "no"]).default("no").notNull(),
+    notes: text("notes"),
+    status: mysqlEnum("status", ["notified", "acknowledged", "preparing", "ready", "received", "completed"])
+      .default("notified")
+      .notNull(),
+    hospitalNotes: text("hospitalNotes"),
+    acknowledgedAt: timestamp("acknowledgedAt"),
+    receivedAt: timestamp("receivedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("hospitalCaseNotifications_hospitalId_status_idx").on(table.hospitalId, table.status),
+    index("hospitalCaseNotifications_incidentId_idx").on(table.incidentId),
+    index("hospitalCaseNotifications_rescuerId_idx").on(table.rescuerId),
+  ],
+);
+
 export const floodZones = mysqlTable(
   "floodZones",
   {
@@ -337,3 +367,5 @@ export type Incident = typeof incidents.$inferSelect;
 export type Mission = typeof missions.$inferSelect;
 export type EmergencyContact = typeof emergencyContacts.$inferSelect;
 export type InsertEmergencyContact = typeof emergencyContacts.$inferInsert;
+export type HospitalCaseNotification = typeof hospitalCaseNotifications.$inferSelect;
+export type InsertHospitalCaseNotification = typeof hospitalCaseNotifications.$inferInsert;

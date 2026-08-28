@@ -211,6 +211,28 @@ export interface MemoryHospitalStaffProfile {
   updatedAt: Date;
 }
 
+export interface MemoryHospitalCaseNotification {
+  id: number;
+  incidentId: number;
+  hospitalId: number;
+  rescuerId: number;
+  severity: "critical" | "high" | "medium" | "low";
+  patientCount: number;
+  estimatedArrivalMinutes: number;
+  requiredDepartment: string;
+  icuRequired: "yes" | "no";
+  oxygenRequired: "yes" | "no";
+  notes: string | null;
+  status: "notified" | "acknowledged" | "preparing" | "ready" | "received" | "completed";
+  hospitalNotes: string | null;
+  acknowledgedAt: Date | null;
+  receivedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const _memoryHospitalCaseNotifications: Map<number, MemoryHospitalCaseNotification> = new Map();
+
 export const _memoryShelters: Map<number, MemoryShelter> = new Map([
   [
     1,
@@ -880,3 +902,157 @@ export async function unreadNotificationCount(recipientId: number) {
     return _memoryNotifications.filter(n => n.recipientId === recipientId && !n.readAt).length;
   }
 }
+
+let _nextHospitalNotificationId = 1;
+
+export async function createHospitalCaseNotification(data: {
+  incidentId: number;
+  hospitalId: number;
+  rescuerId: number;
+  severity: "critical" | "high" | "medium" | "low";
+  patientCount: number;
+  estimatedArrivalMinutes: number;
+  requiredDepartment: string;
+  icuRequired: "yes" | "no";
+  oxygenRequired: "yes" | "no";
+  notes?: string | null;
+}) {
+  try {
+    const db = await database();
+    const { hospitalCaseNotifications } = await import("../drizzle/schema");
+    const [inserted] = await db.insert(hospitalCaseNotifications).values({
+      incidentId: data.incidentId,
+      hospitalId: data.hospitalId,
+      rescuerId: data.rescuerId,
+      severity: data.severity,
+      patientCount: data.patientCount,
+      estimatedArrivalMinutes: data.estimatedArrivalMinutes,
+      requiredDepartment: data.requiredDepartment,
+      icuRequired: data.icuRequired,
+      oxygenRequired: data.oxygenRequired,
+      notes: data.notes || null,
+      status: "notified",
+    });
+    const created = await db.select().from(hospitalCaseNotifications).where(eq(hospitalCaseNotifications.id, inserted.insertId)).limit(1);
+    if (created.length > 0) return created[0];
+  } catch {
+    // Fallback to memory
+  }
+
+  const id = _nextHospitalNotificationId++;
+  const record: MemoryHospitalCaseNotification = {
+    id,
+    incidentId: data.incidentId,
+    hospitalId: data.hospitalId,
+    rescuerId: data.rescuerId,
+    severity: data.severity,
+    patientCount: data.patientCount,
+    estimatedArrivalMinutes: data.estimatedArrivalMinutes,
+    requiredDepartment: data.requiredDepartment,
+    icuRequired: data.icuRequired,
+    oxygenRequired: data.oxygenRequired,
+    notes: data.notes || null,
+    status: "notified",
+    hospitalNotes: null,
+    acknowledgedAt: null,
+    receivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  _memoryHospitalCaseNotifications.set(id, record);
+  return record;
+}
+
+export async function listHospitalCaseNotifications(hospitalId: number) {
+  try {
+    const db = await database();
+    const { hospitalCaseNotifications } = await import("../drizzle/schema");
+    return await db
+      .select({
+        notification: hospitalCaseNotifications,
+        incident: incidents,
+        rescuer: { id: users.id, name: users.name },
+      })
+      .from(hospitalCaseNotifications)
+      .innerJoin(incidents, eq(hospitalCaseNotifications.incidentId, incidents.id))
+      .innerJoin(users, eq(hospitalCaseNotifications.rescuerId, users.id))
+      .where(eq(hospitalCaseNotifications.hospitalId, hospitalId))
+      .orderBy(desc(hospitalCaseNotifications.createdAt));
+  } catch {
+    const list = Array.from(_memoryHospitalCaseNotifications.values())
+      .filter(n => n.hospitalId === hospitalId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return list.map(notification => {
+      const incident = _memoryIncidents.get(notification.incidentId) || {
+        id: notification.incidentId,
+        publicCode: `CASE-${notification.incidentId}`,
+        emergencyType: "flood",
+        locationLabel: "Assam Rescue Sector",
+        latitude: 26.1445,
+        longitude: 91.7362,
+        severity: notification.severity,
+        peopleAffected: notification.patientCount,
+        notes: notification.notes,
+        status: "dispatched",
+        createdAt: notification.createdAt,
+      };
+      const rescuerUser = Array.from(_memoryUsers.values()).find(u => u.id === notification.rescuerId) || {
+        id: notification.rescuerId,
+        name: "NDRF Field Unit",
+      };
+      const rescuerProfile = Array.from(_memoryRescueProfiles.values()).find(p => p.userId === notification.rescuerId);
+
+      return {
+        notification,
+        incident,
+        rescuer: {
+          id: rescuerUser.id,
+          name: rescuerUser.name,
+          callSign: rescuerProfile?.callSign || "Field Rescuer",
+        },
+      };
+    });
+  }
+}
+
+export async function updateHospitalCaseStatus(
+  notificationId: number,
+  status: "notified" | "acknowledged" | "preparing" | "ready" | "received" | "completed",
+  hospitalNotes?: string
+) {
+  try {
+    const db = await database();
+    const { hospitalCaseNotifications } = await import("../drizzle/schema");
+    const updateValues: any = {
+      status,
+      updatedAt: new Date(),
+    };
+    if (hospitalNotes !== undefined) updateValues.hospitalNotes = hospitalNotes;
+    if (status === "acknowledged") updateValues.acknowledgedAt = new Date();
+    if (status === "received") updateValues.receivedAt = new Date();
+
+    await db
+      .update(hospitalCaseNotifications)
+      .set(updateValues)
+      .where(eq(hospitalCaseNotifications.id, notificationId));
+
+    const updated = await db.select().from(hospitalCaseNotifications).where(eq(hospitalCaseNotifications.id, notificationId)).limit(1);
+    if (updated.length > 0) return updated[0];
+  } catch {
+    // Fallback to memory
+  }
+
+  const existing = _memoryHospitalCaseNotifications.get(notificationId);
+  if (existing) {
+    existing.status = status;
+    if (hospitalNotes !== undefined) existing.hospitalNotes = hospitalNotes;
+    if (status === "acknowledged") existing.acknowledgedAt = new Date();
+    if (status === "received") existing.receivedAt = new Date();
+    existing.updatedAt = new Date();
+    _memoryHospitalCaseNotifications.set(notificationId, existing);
+    return existing;
+  }
+  return null;
+}
+

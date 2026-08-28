@@ -19,6 +19,16 @@ import {
 } from "./db";
 import { rescueRouter } from "./routers/rescue";
 
+// The sole admin email — hardcoded for security, not from user_metadata
+const ADMIN_EMAIL = "sanchitpandit30@yahoo.com";
+
+function resolveRole(email: string, existingRole?: string): "user" | "rescuer" | "medical" | "admin" {
+  if (email.toLowerCase().trim() === ADMIN_EMAIL) return "admin";
+  // Preserve existing elevated roles (rescuer/medical) that were granted by admin approval
+  if (existingRole === "rescuer" || existingRole === "medical" || existingRole === "admin") return existingRole;
+  return "user";
+}
+
 function sanitizeUser<T extends Record<string, any>>(user: T | null): Omit<T, "password"> | null {
   if (!user) return null;
   const { password, ...safeUser } = user;
@@ -45,7 +55,7 @@ export const appRouter = router({
           if (sbUser && sbUser.email) {
             const emailVal = sbUser.email.trim().toLowerCase();
             let dbUser = (await getUserByOpenId(sbUser.id)) || (await getUserByEmail(emailVal));
-            const roleVal = (sbUser.user_metadata?.role as "user" | "rescuer" | "medical" | "admin") || dbUser?.role || "user";
+            const roleVal = resolveRole(emailVal, dbUser?.role);
             if (!dbUser) {
               const nameVal = sbUser.user_metadata?.name || sbUser.user_metadata?.full_name || emailVal.split("@")[0];
               await upsertUser({
@@ -126,12 +136,13 @@ export const appRouter = router({
         }
         const openId = input.supabaseUserId || `user-${emailVal.replace(/[^a-z0-9]/g, "-")}`;
         const hashedPassword = hashPassword(input.password.trim());
+        const registrationRole = resolveRole(emailVal);
         await upsertUser({
           openId,
           name: input.name.trim(),
           email: emailVal,
           password: hashedPassword,
-          role: "user", // Registration always sets role to user; approval grants privileges
+          role: registrationRole,
           loginMethod: input.supabaseUserId ? "supabase-auth" : "platform-login",
           lastSignedIn: new Date(),
         });

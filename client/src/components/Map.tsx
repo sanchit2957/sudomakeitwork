@@ -213,9 +213,24 @@ export function MapView({
         setMapEngine("leaflet");
         onLeafletReady?.(lMap);
 
-        setTimeout(() => {
-          if (isMounted) lMap.invalidateSize();
-        }, 100);
+        // Multi-stage invalidation to prevent grey tile glitch on mobile WebView / animations
+        const timers = [
+          setTimeout(() => { if (isMounted) lMap.invalidateSize(); }, 50),
+          setTimeout(() => { if (isMounted) lMap.invalidateSize(); }, 250),
+          setTimeout(() => { if (isMounted) lMap.invalidateSize(); }, 750),
+        ];
+
+        const handleResize = () => {
+          if (isMounted && leafletMapRef.current) {
+            leafletMapRef.current.invalidateSize();
+          }
+        };
+        window.addEventListener("resize", handleResize);
+
+        return () => {
+          timers.forEach(t => clearTimeout(t));
+          window.removeEventListener("resize", handleResize);
+        };
       } catch (err) {
         console.error("[Map] Leaflet initialization failed:", err);
         if (isMounted) {

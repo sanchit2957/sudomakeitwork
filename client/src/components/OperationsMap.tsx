@@ -182,9 +182,24 @@ export default function OperationsMap({
           });
         }
 
-        setTimeout(() => {
-          if (isMounted) map.invalidateSize();
-        }, 100);
+        // Multi-stage invalidation to eliminate grey tile loading issues on mobile WebView
+        const timers = [
+          setTimeout(() => { if (isMounted) map.invalidateSize(); }, 50),
+          setTimeout(() => { if (isMounted) map.invalidateSize(); }, 250),
+          setTimeout(() => { if (isMounted) map.invalidateSize(); }, 750),
+        ];
+
+        const handleResize = () => {
+          if (isMounted && leafletMapRef.current) {
+            leafletMapRef.current.invalidateSize();
+          }
+        };
+        window.addEventListener("resize", handleResize);
+
+        return () => {
+          timers.forEach(t => clearTimeout(t));
+          window.removeEventListener("resize", handleResize);
+        };
       } catch (err) {
         console.error("[OperationsMap] Leaflet init error:", err);
       }

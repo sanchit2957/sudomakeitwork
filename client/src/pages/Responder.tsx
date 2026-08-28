@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { showNotification } from "@/lib/nativeNotifications";
 import { reconcileAvailability, reconcileMissionStatus } from "@/lib/operationalSync";
-import { Bell, Camera, CheckCircle2, ClipboardList, ClipboardPenLine, LocateFixed, MapPinned, MessageCircle, Navigation, Phone, Radio, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { Bell, Camera, CheckCircle2, ClipboardList, ClipboardPenLine, Hospital, LocateFixed, MapPinned, MessageCircle, Navigation, Phone, Radio, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import React, { ChangeEvent, useEffect, useState } from "react";
@@ -118,14 +118,15 @@ function ResponderWorkspace() {
       if (!registration.active) throw new Error("The alert service is still starting. Wait a moment, refresh this page, and try again.");
       const subscription = await registration.pushManager.getSubscription()
         || await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToUint8Array(pushConfig.data.publicKey) });
-      const payload = subscription.toJSON();
-      if (!payload.endpoint || !payload.keys?.p256dh || !payload.keys.auth) throw new Error("The browser returned an incomplete push subscription.");
-      await subscribePush.mutateAsync({ endpoint: payload.endpoint, p256dh: payload.keys.p256dh, auth: payload.keys.auth });
+      await subscribePush.mutateAsync({
+        endpoint: subscription.endpoint,
+        p256dh: subscription.toJSON().keys?.p256dh || "",
+        auth: subscription.toJSON().keys?.auth || "",
+      });
       setPushState("subscribed");
-      setPushDetail(t("This device is registered for mission assignment and nearby priority SOS alerts."));
+      setPushDetail(t("Secure browser alerts are active. You will receive immediate assignment updates."));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      if (/could not retrieve the public key/i.test(message)) {
+      if (error instanceof DOMException && error.name === "InvalidStateError") {
         try {
           await resetPushRegistration();
           setPushState("permission_granted");
@@ -150,9 +151,315 @@ function ResponderWorkspace() {
   return <DashboardLayout navItems={nav} workspace={t("responder.workspace")} roleLabel={t("responder.role")}><div className="space-y-6">
     {location === "/responder/map" ? <section><PageHeading eyebrow={t("responder.map")} title={t("responder.mapTitle")} /><OperationsMap layers={layers.data} /></section>
       : location === "/responder/safety" ? <SafetyAssistanceQueue title="Safety assistance requests" description="Review shelter, food, medical, and protection needs shared by people who are not reporting immediate SOS danger. Acknowledge only when you or the command team can begin a response." guidance={["Check current weather, flood-zone, and route conditions on the Operations Map before travelling.", "Use the SOS mission board for immediate danger; do not replace an active SOS assignment with a safety request.", "Acknowledge only after confirming a safe response route, team capacity, or command handoff."]} />
-      : location === "/responder/alerts" ? <AlertsView items={alerts.data?.items ?? []} onRead={id => markRead.mutate({ notificationId: id })} />
-          : <><section className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]"><div className="rounded-3xl bg-[#174e46] p-6 text-white shadow-[0_20px_60px_-30px_rgb(21_78_70/0.75)]"><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b1dbd1]">{t("responder.readiness")}</p><h1 className="mt-2 text-2xl font-extrabold tracking-tight">{profile.data?.callSign || t("responder.profilePending")}</h1><p className="mt-2 max-w-lg text-sm leading-6 text-[#c2e1d9]">{t("responder.readinessCopy")}</p><div className="mt-5 flex flex-wrap gap-2">{([['available',t('responder.available')],['on_mission',t('responder.onMission')],['off_duty',t('responder.offDuty')]] as const).map(([value, label]) => <button key={value} onClick={() => withCurrentLocation(value)} disabled={setAvailability.isPending || !profile.data} className={`rounded-xl px-4 py-2.5 text-sm font-extrabold transition ${profile.data?.availability === value ? 'bg-white text-[#174e46]' : 'bg-white/10 text-[#d8eee8] hover:bg-white/20'}`}>{setAvailability.isPending ? t("responder.updating") : label}</button>)}</div></div><AlertSetup unread={alerts.data?.unread ?? 0} state={pushState} detail={pushDetail} disabled={subscribePush.isPending || pushState === "subscribed"} onEnable={enableAlerts} /></section><ResponderProfileCard profile={profile.data ?? null} hasActiveMission={hasActiveMission} saving={updateProfile.isPending} onSave={input => updateProfile.mutate(input)} /><section><PageHeading eyebrow={t("responder.board")} title={t("responder.boardTitle")} /><div className="grid gap-3">{missions.data?.length ? missions.data.map(({ mission, incident }) => <article key={mission.id} className="grid gap-4 rounded-2xl border bg-white p-5 shadow-sm md:grid-cols-[1fr_auto]"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs font-medium text-primary">{incident.publicCode}</span><StatusBadge status={mission.status} /></div><h2 className="mt-2 text-lg font-extrabold">{incident.locationLabel}</h2><p className="mt-1 text-sm text-muted-foreground">{incident.peopleAffected} {t("responder.people")} · {incident.emergencyType} · <strong className={incident.severity === "critical" ? "text-destructive" : ""}>{incident.severity}</strong> {t("responder.priority")}</p>{mission.notes && <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">{mission.notes}</p>}</div><div className="flex items-center md:justify-end">{mission.status === "resolved" ? <span className="flex items-center gap-2 text-sm font-bold text-[#19755f]"><CheckCircle2 className="h-5 w-5" /> {t("responder.completed")}</span> : <Button disabled={updateMission.isPending} onClick={() => updateMission.mutate({ missionId: mission.id, status: mission.status === "pending" ? "dispatched" : "resolved" })} className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">{updateMission.isPending ? t("responder.updating") : mission.status === "pending" ? <><Navigation className="mr-2 h-4 w-4" /> {t("responder.dispatched")}</> : <><CheckCircle2 className="mr-2 h-4 w-4" /> {t("responder.resolved")}</>}</Button>}</div></article>) : <Empty text={t("responder.noMission")} />}</div></section></>}
-  <ResponderMissionChat missions={missions.data ?? []} /></div></DashboardLayout>;
+      : location === "/responder/alerts" ? (
+        <AlertsView items={alerts.data?.items ?? []} onRead={id => markRead.mutate({ notificationId: id })} />
+      ) : (
+        <>
+          <section className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
+            <div className="rounded-3xl bg-[#174e46] p-6 text-white shadow-[0_20px_60px_-30px_rgb(21_78_70/0.75)]">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b1dbd1]">{t("responder.readiness")}</p>
+              <h1 className="mt-2 text-2xl font-extrabold tracking-tight">{profile.data?.callSign || t("responder.profilePending")}</h1>
+              <p className="mt-2 max-w-lg text-sm leading-6 text-[#c2e1d9]">{t("responder.readinessCopy")}</p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {([['available', t('responder.available')], ['on_mission', t('responder.onMission')], ['off_duty', t('responder.offDuty')]] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    onClick={() => withCurrentLocation(value)}
+                    disabled={setAvailability.isPending || !profile.data}
+                    className={`rounded-xl px-4 py-2.5 text-sm font-extrabold transition ${profile.data?.availability === value ? 'bg-white text-[#174e46]' : 'bg-white/10 text-[#d8eee8] hover:bg-white/20'}`}
+                  >
+                    {setAvailability.isPending ? t("responder.updating") : label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <AlertSetup unread={alerts.data?.unread ?? 0} state={pushState} detail={pushDetail} disabled={subscribePush.isPending || pushState === "subscribed"} onEnable={enableAlerts} />
+          </section>
+          <ResponderProfileCard profile={profile.data ?? null} hasActiveMission={hasActiveMission} saving={updateProfile.isPending} onSave={input => updateProfile.mutate(input)} />
+          <section>
+            <PageHeading eyebrow={t("responder.board")} title={t("responder.boardTitle")} />
+            <div className="grid gap-3">
+              {missions.data?.length ? (
+                missions.data.map(({ mission, incident }) => (
+                  <RescuerMissionCard
+                    key={mission.id}
+                    mission={mission}
+                    incident={incident}
+                    hospitals={layers.data?.hospitals ?? []}
+                    onUpdateStatus={status => updateMission.mutate({ missionId: mission.id, status })}
+                    isUpdating={updateMission.isPending}
+                  />
+                ))
+              ) : (
+                <Empty text={t("responder.noMission")} />
+              )}
+            </div>
+          </section>
+        </>
+      )}
+    <ResponderMissionChat missions={missions.data ?? []} />
+  </div>
+</DashboardLayout>;
+}
+
+function RescuerMissionCard({
+  mission,
+  incident,
+  hospitals,
+  onUpdateStatus,
+  isUpdating,
+}: {
+  mission: any;
+  incident: any;
+  hospitals: Array<{ id: number; name: string; address: string; status: string }>;
+  onUpdateStatus: (status: "dispatched" | "resolved") => void;
+  isUpdating: boolean;
+}) {
+  const { t } = useLanguage();
+  const [showHospitalDialog, setShowHospitalDialog] = useState(false);
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string>(hospitals[0]?.id ? String(hospitals[0].id) : "");
+  const [patientCount, setPatientCount] = useState(incident.peopleAffected || 1);
+  const [etaMinutes, setEtaMinutes] = useState(15);
+  const [department, setDepartment] = useState("Emergency & Trauma");
+  const [icuRequired, setIcuRequired] = useState<"yes" | "no">(incident.severity === "critical" ? "yes" : "no");
+  const [oxygenRequired, setOxygenRequired] = useState<"yes" | "no">("no");
+  const [notes, setNotes] = useState("");
+  const [notifiedNotice, setNotifiedNotice] = useState(false);
+
+  const notifyHospital = trpc.rescue.rescuer.notifyHospital.useMutation({
+    onSuccess: () => {
+      setNotifiedNotice(true);
+      setTimeout(() => {
+        setNotifiedNotice(false);
+        setShowHospitalDialog(false);
+      }, 3000);
+    },
+  });
+
+  const handleSendHospitalAlert = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedHospitalId) return;
+    notifyHospital.mutate({
+      incidentId: incident.id,
+      hospitalId: Number(selectedHospitalId),
+      severity: incident.severity || "high",
+      patientCount: Number(patientCount) || 1,
+      estimatedArrivalMinutes: Number(etaMinutes) || 15,
+      requiredDepartment: department,
+      icuRequired,
+      oxygenRequired,
+      notes: notes.trim() || undefined,
+    });
+  };
+
+  return (
+    <article className="grid gap-4 rounded-2xl border bg-white p-5 shadow-sm md:grid-cols-[1fr_auto]">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-xs font-medium text-primary">{incident.publicCode}</span>
+          <StatusBadge status={mission.status} />
+        </div>
+        <h2 className="mt-2 text-lg font-extrabold">{incident.locationLabel}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {incident.peopleAffected} {t("responder.people")} · {incident.emergencyType} ·{" "}
+          <strong className={incident.severity === "critical" ? "text-destructive" : ""}>
+            {incident.severity}
+          </strong>{" "}
+          {t("responder.priority")}
+        </p>
+        {mission.notes && (
+          <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+            {mission.notes}
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col items-start gap-2 md:items-end md:justify-center">
+        <div className="flex flex-wrap items-center gap-2">
+          {mission.status !== "resolved" && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowHospitalDialog(true)}
+              className="rounded-xl border-[#0f766e]/40 bg-[#0f766e]/10 text-xs font-bold text-[#0f766e] hover:bg-[#0f766e]/20"
+            >
+              <Hospital className="mr-1.5 h-3.5 w-3.5" />
+              Notify Hospital
+            </Button>
+          )}
+
+          {mission.status === "resolved" ? (
+            <span className="flex items-center gap-2 text-sm font-bold text-[#19755f]">
+              <CheckCircle2 className="h-5 w-5" /> {t("responder.completed")}
+            </span>
+          ) : (
+            <Button
+              disabled={isUpdating}
+              onClick={() => onUpdateStatus(mission.status === "pending" ? "dispatched" : "resolved")}
+              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {isUpdating ? (
+                t("responder.updating")
+              ) : mission.status === "pending" ? (
+                <>
+                  <Navigation className="mr-2 h-4 w-4" /> {t("responder.dispatched")}
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> {t("responder.resolved")}
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* NOTIFY HOSPITAL MODAL DIALOG */}
+      {showHospitalDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <Hospital className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold">Notify Hospital for Inbound Case</h3>
+                  <p className="text-xs text-muted-foreground">Case #{incident.publicCode}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHospitalDialog(false)}
+                className="rounded-lg p-1 text-muted-foreground hover:bg-muted"
+              >
+                ✕
+              </button>
+            </div>
+
+            {notifiedNotice && (
+              <div className="rounded-xl bg-emerald-500/10 p-3 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                ✓ Hospital notified successfully! Inbound telemetry broadcasted to medical triage desk.
+              </div>
+            )}
+
+            <form onSubmit={handleSendHospitalAlert} className="space-y-3">
+              <div>
+                <Label className="text-xs font-bold">Select Destination Hospital</Label>
+                <select
+                  value={selectedHospitalId}
+                  onChange={e => setSelectedHospitalId(e.target.value)}
+                  className="mt-1.5 h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-bold"
+                  required
+                >
+                  {hospitals.length ? (
+                    hospitals.map(h => (
+                      <option key={h.id} value={h.id}>
+                        {h.name} ({h.address})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No verified hospitals found</option>
+                  )}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-bold">Patients Count</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={patientCount}
+                    onChange={e => setPatientCount(Number(e.target.value))}
+                    className="mt-1.5 h-10 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold">Estimated Arrival (Minutes)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="180"
+                    value={etaMinutes}
+                    onChange={e => setEtaMinutes(Number(e.target.value))}
+                    className="mt-1.5 h-10 text-xs font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold">Required Department</Label>
+                <select
+                  value={department}
+                  onChange={e => setDepartment(e.target.value)}
+                  className="mt-1.5 h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-bold"
+                >
+                  <option value="Emergency & Trauma">Emergency & Trauma</option>
+                  <option value="ICU Critical Care">ICU Critical Care</option>
+                  <option value="Pediatrics Emergency">Pediatrics Emergency</option>
+                  <option value="Burn & Triage Ward">Burn & Triage Ward</option>
+                  <option value="General Medical Evacuation">General Medical Evacuation</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex items-center gap-2 rounded-xl border bg-muted/40 p-2.5 text-xs font-bold">
+                  <input
+                    type="checkbox"
+                    checked={icuRequired === "yes"}
+                    onChange={e => setIcuRequired(e.target.checked ? "yes" : "no")}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  ICU Bed Required
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border bg-muted/40 p-2.5 text-xs font-bold">
+                  <input
+                    type="checkbox"
+                    checked={oxygenRequired === "yes"}
+                    onChange={e => setOxygenRequired(e.target.checked ? "yes" : "no")}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  Oxygen Support
+                </label>
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold">Special Field Notes (Optional)</Label>
+                <Textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="e.g. Hypothermia, severe flood lacerations, elderly patient..."
+                  rows={2}
+                  className="mt-1.5 text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowHospitalDialog(false)}
+                  className="rounded-xl text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={notifyHospital.isPending || !selectedHospitalId}
+                  className="rounded-xl bg-primary text-xs font-bold text-white"
+                >
+                  {notifyHospital.isPending ? "Notifying Facility…" : "Send Inbound Alert"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </article>
+  );
 }
 
 function AlertSetup({ unread, state, detail, disabled: _disabled, onEnable }: { unread: number; state: PushState; detail: string; disabled: boolean; onEnable: () => void }) { const { t } = useLanguage(); const label = state === "subscribed" ? t("Browser alerts active") : state === "permission_granted" ? t("Finish browser alert setup") : state === "unsupported" ? t("Background alerts unavailable") : t("responder.enableAlerts"); const isLocked = state === "subscribed" || state === "unsupported"; return <div className="rounded-3xl border bg-white p-6"><div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><Bell className="h-5 w-5" /></span><span className="rounded-full bg-[#fff0ee] px-2.5 py-1 font-mono text-[10px] font-bold text-[#b44742]">{unread} {t("general.new")}</span></div><h2 className="mt-5 text-lg font-extrabold">{t("responder.assignmentAlerts")}</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">{t("responder.alertCopy")}</p><button type="button" onClick={onEnable} disabled={isLocked} className="mt-4 w-full rounded-xl border border-[#91cbbb] px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-[#effaf6] disabled:cursor-not-allowed disabled:opacity-50">{label}</button>{detail && <p className={`mt-3 text-xs leading-5 ${state === "failed" ? "text-destructive" : state === "subscribed" ? "text-[#19755f]" : "text-muted-foreground"}`}>{detail}</p>}{!isLocked && <button type="button" onClick={onEnable} className="mt-2 w-full text-xs font-bold text-primary underline underline-offset-4">{t("responder.retryAlerts")}</button>}</div>; }

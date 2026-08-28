@@ -79,17 +79,23 @@ function Router() {
       </Route>
 
       {/* Operational Wings */}
+      <Route path={"/hospital/:rest*"}>
+        <UserMedical />
+      </Route>
+      <Route path={"/hospital"}>
+        <UserMedical />
+      </Route>
       <Route path={"/medical/:rest*"}>
-        <RoleGate roles={["medical", "admin"]}><UserMedical /></RoleGate>
+        <UserMedical />
       </Route>
       <Route path={"/medical"}>
-        <RoleGate roles={["medical", "admin"]}><UserMedical /></RoleGate>
+        <UserMedical />
       </Route>
       <Route path={"/responder/:rest*"}>
-        <RoleGate roles={["rescuer", "admin"]}><UserResponder /></RoleGate>
+        <UserResponder />
       </Route>
       <Route path={"/responder"}>
-        <RoleGate roles={["rescuer", "admin"]}><UserResponder /></RoleGate>
+        <UserResponder />
       </Route>
 
       {/* Admin Section Routes - Restricted in Mobile Native App */}

@@ -1,11 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { createHash } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { z } from "zod";
 import {
+  auditLogs,
   floodZones,
   guestEmergencyRateLimits,
+  hospitalCaseNotifications,
   hospitalRegistrationRequests,
   hospitalStaffProfiles,
   hospitals,
@@ -20,7 +22,7 @@ import {
   shelters,
   users,
 } from "../../drizzle/schema";
-import { getDb, getEmergencyContactsByUserId, upsertEmergencyContact, deleteEmergencyContact, getUserByOpenId, upsertUser } from "../db";
+import { getDb, getEmergencyContactsByUserId, upsertEmergencyContact, deleteEmergencyContact, getUserByOpenId, upsertUser, getAllUsers } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
 import { ASSAM_DISTRICT_LOCATIONS, getComprehensiveWeather, weatherProviderManager } from "../weather.service";
@@ -53,6 +55,9 @@ import {
   listMissionsForRescuer,
   listNotificationFeed,
   unreadNotificationCount,
+  createHospitalCaseNotification,
+  listHospitalCaseNotifications,
+  updateHospitalCaseStatus,
   writeAudit,
   _memoryIncidents,
   _memoryMissions,
@@ -990,6 +995,221 @@ export const rescueRouter = router({
       if (!memProfile) return null;
       return _memoryHospitals.get(memProfile.hospitalId) ?? null;
     }),
+    myHospitalRegistration: protectedProcedure.query(async ({ ctx }) => {
+      const db = await database();
+      if (db) {
+        try {
+          return (
+            await db
+              .select()
+              .from(hospitalRegistrationRequests)
+              .where(eq(hospitalRegistrationRequests.userId, ctx.user.id))
+              .limit(1)
+          )[0] ?? null;
+        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      }
+      return Array.from(_memoryHospitalRequests.values()).find(r => r.userId === ctx.user.id) ?? null;
+    }),
+    hospitalCases: medicalOperationsProcedure.query(async ({ ctx }) => {
+      let hospitalId: number | null = null;
+      if (ctx.user.role === "medical") {
+        const db = await database();
+        if (db) {
+          try {
+            const profile = (
+              await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
+            )[0];
+            if (profile) hospitalId = profile.hospitalId;
+          } catch {}
+        }
+        if (!hospitalId) {
+          const memProfile = _memoryHospitalStaffProfiles.get(ctx.user.id);
+          if (memProfile) hospitalId = memProfile.hospitalId;
+        }
+      }
+
+      if (!hospitalId && ctx.user.role === "admin") {
+        // Admin sees all cases across all hospitals
+        const allHospitals = await listHospitals();
+        const results = [];
+        for (const h of allHospitals) {
+          const cases = await listHospitalCaseNotifications(h.id);
+          results.push(...cases);
+        }
+        return results;
+      }
+
+      if (!hospitalId) return [];
+      return await listHospitalCaseNotifications(hospitalId);
+    }),
+    updateHospitalCaseStatus: medicalOperationsProcedure
+      .input(
+        z.object({
+          notificationId: z.number().int().positive(),
+          status: z.enum(["notified", "acknowledged", "preparing", "ready", "received", "completed"]),
+          hospitalNotes: z.string().trim().max(1000).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const updated = await updateHospitalCaseStatus(input.notificationId, input.status, input.hospitalNotes);
+        if (!updated) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Hospital notification record not found." });
+        }
+
+        const incident = await getIncidentById(updated.incidentId);
+        const hospital = (await listHospitals()).find(h => h.id === updated.hospitalId);
+        const hospitalName = hospital?.name || `Hospital #${updated.hospitalId}`;
+
+        // Add incident timeline event
+        const statusDescriptions: Record<string, string> = {
+          acknowledged: "Acknowledged inbound emergency case",
+          preparing: "Preparing ER & Trauma team",
+          ready: "Confirmed ready to receive patient(s)",
+          received: "Patient(s) received at triage",
+          completed: "Emergency case admission finalized",
+        };
+        const description = statusDescriptions[input.status] || `Status updated to ${input.status}`;
+
+        await addIncidentEvent(
+          updated.incidentId,
+          ctx.user.id,
+          `hospital_${input.status}`,
+          `${hospitalName}: ${description}`,
+          input.hospitalNotes || undefined
+        );
+
+        await writeAudit(
+          ctx.user.id,
+          "hospital.caseStatus",
+          "hospitalCaseNotification",
+          input.notificationId,
+          `Updated case status to ${input.status} (${hospitalName})`
+        );
+
+        return { success: true, notification: updated };
+      }),
+    sendHospitalCoordinationMessage: medicalOperationsProcedure
+      .input(
+        z.object({
+          hospitalId: z.number().int().positive(),
+          category: z.enum([
+            "additional_ambulance",
+            "icu_critical",
+            "oxygen_low",
+            "critical_cases_hold",
+            "additional_staff",
+            "hospital_offline",
+            "general_assistance",
+          ]),
+          message: z.string().trim().min(5).max(1000),
+          urgency: z.enum(["critical", "high", "normal"]).default("high"),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const hospital = (await listHospitals()).find(h => h.id === input.hospitalId);
+        const hospitalName = hospital?.name || `Hospital #${input.hospitalId}`;
+
+        const categoryLabels: Record<string, string> = {
+          additional_ambulance: "Request: Additional Ambulance Dispatch",
+          icu_critical: "Alert: ICU Capacity Critically Low",
+          oxygen_low: "Alert: Oxygen Supply Running Low",
+          critical_cases_hold: "Notice: Unable to Accept New Critical Cases",
+          additional_staff: "Request: Additional Medical Personnel",
+          hospital_offline: "Notice: Facility Temporarily Offline",
+          general_assistance: "State Assistance Coordination Request",
+        };
+        const title = `${categoryLabels[input.category] || "Hospital Alert"} — ${hospitalName}`;
+
+        await writeAudit(
+          ctx.user.id,
+          "hospital.coordinationMessage",
+          "hospital",
+          input.hospitalId,
+          `[${input.urgency.toUpperCase()}] ${title}: ${input.message}`
+        );
+
+        // Notify admins / operations
+        const adminUsers = (await getAllUsers()).filter(u => u.role === "admin");
+        for (const admin of adminUsers) {
+          try {
+            const db = await database();
+            if (db) {
+              await db.insert(notifications).values({
+                recipientId: admin.id,
+                type: "priority_incident",
+                title,
+                body: input.message,
+              });
+            } else {
+              _memoryNotifications.push({
+                id: _memoryNotifications.length + 1,
+                recipientId: admin.id,
+                incidentId: null,
+                type: "priority_incident",
+                title,
+                body: input.message,
+                readAt: null,
+                createdAt: new Date(),
+              });
+            }
+          } catch {}
+        }
+
+        return { success: true };
+      }),
+    hospitalActivityTimeline: medicalOperationsProcedure.query(async ({ ctx }) => {
+      let hospitalId: number | null = null;
+      if (ctx.user.role === "medical") {
+        const db = await database();
+        if (db) {
+          try {
+            const profile = (
+              await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
+            )[0];
+            if (profile) hospitalId = profile.hospitalId;
+          } catch {}
+        }
+        if (!hospitalId) {
+          const memProfile = _memoryHospitalStaffProfiles.get(ctx.user.id);
+          if (memProfile) hospitalId = memProfile.hospitalId;
+        }
+      }
+
+      // Return recent audit events related to hospital operations
+      try {
+        const db = await database();
+        if (db) {
+          const rows = await db
+            .select({
+              id: auditLogs.id,
+              action: auditLogs.action,
+              detail: auditLogs.detail,
+              createdAt: auditLogs.createdAt,
+              actor: { id: users.id, name: users.name },
+            })
+            .from(auditLogs)
+            .leftJoin(users, eq(auditLogs.actorId, users.id))
+            .where(or(eq(auditLogs.resourceType, "hospital"), eq(auditLogs.resourceType, "hospitalCaseNotification")))
+            .orderBy(desc(auditLogs.createdAt))
+            .limit(20);
+          if (rows.length > 0) return rows;
+        }
+      } catch {}
+
+      const memLogs = Array.from(_memoryAuditLogs)
+        .filter(l => l.resourceType === "hospital" || l.resourceType === "hospitalCaseNotification")
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, 20)
+        .map(l => ({
+          id: l.id,
+          action: l.action,
+          detail: l.detail,
+          createdAt: l.createdAt,
+          actor: { id: l.actorId || 0, name: _memoryUsers.get(String(l.actorId))?.name || "Staff Member" },
+        }));
+
+      return memLogs;
+    }),
     hospitalRegistrationRequests: adminProcedure.query(async () => {
       const db = await database();
       if (db) {
@@ -1873,6 +2093,58 @@ export const rescueRouter = router({
           mem.updatedAt = new Date();
         }
         return { success: true };
+      }),
+    notifyHospital: rescuerProcedure
+      .input(
+        z.object({
+          incidentId: z.number().int().positive(),
+          hospitalId: z.number().int().positive(),
+          severity: z.enum(["critical", "high", "medium", "low"]).default("high"),
+          patientCount: z.number().int().min(1).max(100).default(1),
+          estimatedArrivalMinutes: z.number().int().min(1).max(300).default(15),
+          requiredDepartment: z.string().trim().min(1).max(120).default("Emergency & Trauma"),
+          icuRequired: z.enum(["yes", "no"]).default("no"),
+          oxygenRequired: z.enum(["yes", "no"]).default("no"),
+          notes: z.string().trim().max(1000).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const hospital = (await listHospitals()).find(h => h.id === input.hospitalId);
+        const hospitalName = hospital?.name || `Hospital #${input.hospitalId}`;
+        const incident = await getIncidentById(input.incidentId);
+
+        const record = await createHospitalCaseNotification({
+          incidentId: input.incidentId,
+          hospitalId: input.hospitalId,
+          rescuerId: ctx.user.id,
+          severity: input.severity,
+          patientCount: input.patientCount,
+          estimatedArrivalMinutes: input.estimatedArrivalMinutes,
+          requiredDepartment: input.requiredDepartment,
+          icuRequired: input.icuRequired,
+          oxygenRequired: input.oxygenRequired,
+          notes: input.notes,
+        });
+
+        // Add to incident events timeline
+        await addIncidentEvent(
+          input.incidentId,
+          ctx.user.id,
+          "hospital_notified",
+          `Hospital Inbound Alert: ${hospitalName}`,
+          `Field Unit notified ${hospitalName} — Inbound with ${input.patientCount} patient(s). ETA: ${input.estimatedArrivalMinutes} mins. Department: ${input.requiredDepartment}${input.icuRequired === "yes" ? " [ICU Required]" : ""}${input.oxygenRequired === "yes" ? " [Oxygen Required]" : ""}.`
+        );
+
+        // Add audit log
+        await writeAudit(
+          ctx.user.id,
+          "hospital.notified",
+          "incident",
+          input.incidentId,
+          `Notified ${hospitalName} of incoming case (ETA: ${input.estimatedArrivalMinutes} min)`
+        );
+
+        return { success: true, notification: record };
       }),
     missions: rescuerProcedure.query(({ ctx }) => listMissionsForRescuer(ctx.user.id)),
     notifications: rescuerProcedure.query(async ({ ctx }) => ({
