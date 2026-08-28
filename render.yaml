@@ -4,19 +4,14 @@ services:
     env: node
     plan: free
     buildCommand: npm install && npm run build
-    preDeployCommand: npm run db:push && npm run db:seed
     startCommand: npm start
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URL
-        sync: false
       - key: VITE_APP_TITLE
         value: sudo MakeItWork
       - key: JWT_SECRET
-        generateValue: true
-      - key: ADMIN_INITIAL_PASSWORD
         generateValue: true
       - key: VAPID_SUBJECT
         value: mailto:admin@assamrescue.gov.in

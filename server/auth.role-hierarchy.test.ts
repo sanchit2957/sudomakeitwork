@@ -67,19 +67,20 @@ describe("Role Hierarchy & Isolation", () => {
     expect(cookiesSet.length).toBeGreaterThan(0);
     expect(cookiesSet[0].name).toBe(COOKIE_NAME);
 
-    // We register a new user first
-    const uniqueRescuerEmail = `ndrf-${Date.now()}@assamrescue.gov.in`;
+    // We must register the rescuer first since bypass is gone
     const rescuerRegistration = await caller.auth.register({
       name: "NDRF Lead",
-      email: uniqueRescuerEmail,
+      email: "ndrf@assamrescue.gov.in",
       password: "password123",
-      role: "rescuer", // This safely defaults to "user" by the secure register flow
+      role: "rescuer", // This actually gets downgraded to "user" by the secure register flow now
       callSign: "NDRF Boat 4",
     });
     expect(rescuerRegistration.success).toBe(true);
     
+    // So the secure flow will make the user a "user", we can manually update them for testing purposes via db if needed,
+    // but the test name says "login with session cookie creation" so let's just assert login works.
     const rescuerLogin = await caller.auth.login({
-      email: uniqueRescuerEmail,
+      email: "ndrf@assamrescue.gov.in",
       password: "password123",
     });
     expect(rescuerLogin.success).toBe(true);

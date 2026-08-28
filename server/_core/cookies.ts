@@ -1,4 +1,3 @@
-import { ONE_YEAR_MS } from "@shared/const";
 import type { CookieOptions, Request } from "express";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
@@ -24,13 +23,12 @@ function isSecureRequest(req: Request) {
 
 export function getSessionCookieOptions(
   req: Request
-): CookieOptions {
+): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
   const isSecure = isSecureRequest(req);
   return {
     httpOnly: true,
     path: "/",
     sameSite: isSecure ? "none" : "lax",
     secure: isSecure,
-    maxAge: ONE_YEAR_MS,
   };
 }

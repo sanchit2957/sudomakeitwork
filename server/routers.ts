@@ -34,9 +34,6 @@ export const appRouter = router({
         z.object({
           email: z.string().optional(),
           password: z.string().optional(),
-          role: z.enum(["admin", "rescuer", "medical", "user"]).optional(),
-          name: z.string().optional(),
-          callSign: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -44,7 +41,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Email and password are required." });
         }
         
-        const emailInput = input.email.trim().toLowerCase();
+        const emailInput = input.email.trim();
         const user = await getUserByEmail(emailInput);
         
         if (!user || !verifyPassword(input.password, user.password)) {
@@ -95,11 +92,6 @@ export const appRouter = router({
         const dbUser = await getUserByEmail(emailVal);
         if (!dbUser) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create user account." });
-        }
-        if (input.role === "rescuer") {
-          await ensureRescuerProfile(dbUser.id, input.callSign || input.name.trim());
-        } else if (input.role === "medical") {
-          await ensureHospitalStaffProfile(dbUser.id);
         }
         const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User" });
         const cookieOptions = getSessionCookieOptions(ctx.req);

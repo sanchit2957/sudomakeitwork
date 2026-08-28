@@ -1,5 +1,4 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getApiUrl } from "@/lib/apiConfig";
 import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,12 +24,15 @@ import {
 import React, { FormEvent, useState } from "react";
 import { useLocation } from "wouter";
 
-type UserRoleOption = "user" | "rescuer" | "medical";
-
 export default function UserLogin() {
   const { user, login, register, logout } = useAuth();
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
+  const portalRole = typeof window !== "undefined"
+    ? window.location.pathname === "/responder/login" ? "rescuer"
+      : window.location.pathname === "/medical/login" ? "medical"
+        : null
+    : null;
 
   const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const redirectParam = searchParams.get("redirect") || "";
@@ -46,7 +48,7 @@ export default function UserLogin() {
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
-  const [regRole, setRegRole] = useState<UserRoleOption>("user");
+  const regRole: "user" | "rescuer" | "medical" = "user";
   const [regPhone, setRegPhone] = useState("");
   const [regUnit, setRegUnit] = useState("");
   const [regSkills, setRegSkills] = useState("");
@@ -70,6 +72,10 @@ export default function UserLogin() {
       });
 
       const role = res.user?.role;
+      if (portalRole && role !== portalRole && role !== "admin") {
+        await logout();
+        throw new Error(`This account is not authorized for the ${portalRole === "rescuer" ? "Rescuer" : "Medical"} Portal.`);
+      }
       let defaultDestination = "/";
       if (role === "admin") defaultDestination = "/command";
       else if (role === "rescuer") defaultDestination = "/responder";
@@ -94,9 +100,7 @@ export default function UserLogin() {
           name: regName.trim(),
           email: regEmail.trim(),
           password: regPassword.trim(),
-          role: regRole,
           phone: regPhone.trim() || undefined,
-          callSign: regUnit.trim() || undefined,
         });
       } else {
         await login({
@@ -105,42 +109,7 @@ export default function UserLogin() {
         });
       }
 
-      if (regRole === "rescuer") {
-        const combinedNote = [
-          regUnit ? `Unit: ${regUnit}` : "",
-          regSkills ? `Skills: ${regSkills}` : "",
-        ].filter(Boolean).join(" | ");
-
-        await fetch(getApiUrl("/api/trpc/rescue.rescuer.requestRegistration"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            phone: regPhone.trim() || undefined,
-            note: combinedNote || undefined,
-          }),
-        }).catch(() => null);
-
-        setRegistrationSubmitted(true);
-        setSuccessMessage("Account created! Your Rescuer application has been forwarded to State Operations Command for review.");
-      } else if (regRole === "medical") {
-        await fetch(getApiUrl("/api/trpc/rescue.hospital.requestRegistration"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            hospitalName: regHospitalName.trim() || `${regName.trim()}'s Facility`,
-            address: regHospitalAddress.trim() || "Assam District Facility",
-            contactPhone: regPhone.trim() || "+91 94350 00000",
-            latitude: 26.1445,
-            longitude: 91.7362,
-            note: regDesignation ? `Designation: ${regDesignation}` : undefined,
-          }),
-        }).catch(() => null);
-
-        setRegistrationSubmitted(true);
-        setSuccessMessage("Account created! Your Hospital facility registration has been forwarded to Command for verification.");
-      } else {
-        setLocation("/");
-      }
+      setLocation("/");
     } catch (err: any) {
       setErrorMessage(err?.message || "Registration failed. Please try again.");
     } finally {
@@ -191,6 +160,8 @@ export default function UserLogin() {
               <Shield className="h-3.5 w-3.5" />
               Admin Portal
             </button>
+            <button onClick={() => setLocation("/responder/login")} className="hidden rounded-xl border border-black/10 px-3 py-1.5 text-xs font-bold sm:block">Rescuer</button>
+            <button onClick={() => setLocation("/medical/login")} className="hidden rounded-xl border border-black/10 px-3 py-1.5 text-xs font-bold sm:block">Medical</button>
             <LanguageSelector compact />
           </div>
         </div>
@@ -311,7 +282,6 @@ export default function UserLogin() {
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@assamrescue.gov.in"
                     className="mt-1.5 h-11 rounded-xl"
                     required
                   />
@@ -324,7 +294,6 @@ export default function UserLogin() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
                     className="mt-1.5 h-11 rounded-xl"
                     required
                   />
@@ -378,7 +347,6 @@ export default function UserLogin() {
                     type="text"
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    placeholder="e.g. Sanchit Sharma"
                     className="mt-1 h-10 rounded-xl"
                     required
                   />
@@ -392,7 +360,6 @@ export default function UserLogin() {
                       type="email"
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="name@gmail.com"
                       className="mt-1 h-10 rounded-xl"
                       required
                     />
@@ -404,165 +371,15 @@ export default function UserLogin() {
                       type="password"
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="••••••••"
                       className="mt-1 h-10 rounded-xl"
                       required
                     />
                   </div>
                 </div>
 
-                {/* Role selection for registration */}
-                <div className="pt-2">
-                  <Label className="text-xs font-bold">Select Account / Operational Type</Label>
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRegRole("user")}
-                      className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-center transition ${
-                        regRole === "user"
-                          ? "border-[#0f766e] bg-[#0f766e]/10 text-[#0f766e] ring-2 ring-[#0f766e]/30 dark:text-emerald-400"
-                          : "border-black/5 bg-black/5 text-muted-foreground hover:text-foreground dark:border-white/5 dark:bg-white/5"
-                      }`}
-                    >
-                      <User className="h-5 w-5" />
-                      <span className="text-[11px] font-extrabold">1. Citizen</span>
-                      <span className="text-[9px] text-muted-foreground">Instant Access</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRegRole("rescuer")}
-                      className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-center transition ${
-                        regRole === "rescuer"
-                          ? "border-[#0f766e] bg-[#0f766e]/10 text-[#0f766e] ring-2 ring-[#0f766e]/30 dark:text-emerald-400"
-                          : "border-black/5 bg-black/5 text-muted-foreground hover:text-foreground dark:border-white/5 dark:bg-white/5"
-                      }`}
-                    >
-                      <Radio className="h-5 w-5" />
-                      <span className="text-[11px] font-extrabold">2. Rescuer</span>
-                      <span className="text-[9px] text-amber-600 dark:text-amber-400">Needs Approval</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRegRole("medical")}
-                      className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-center transition ${
-                        regRole === "medical"
-                          ? "border-[#0f766e] bg-[#0f766e]/10 text-[#0f766e] ring-2 ring-[#0f766e]/30 dark:text-emerald-400"
-                          : "border-black/5 bg-black/5 text-muted-foreground hover:text-foreground dark:border-white/5 dark:bg-white/5"
-                      }`}
-                    >
-                      <Building2 className="h-5 w-5" />
-                      <span className="text-[11px] font-extrabold">3. Hospital</span>
-                      <span className="text-[9px] text-blue-600 dark:text-blue-400">Needs Approval</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Dynamic fields based on role */}
-                {regRole === "rescuer" && (
-                  <div className="space-y-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs">
-                    <p className="font-bold text-amber-800 dark:text-amber-300">
-                      ⚠️ Rescuer details will be sent to the State Command Centre for Call Sign assignment:
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="reg-phone" className="text-xs font-bold">Phone Number</Label>
-                        <Input
-                          id="reg-phone"
-                          type="tel"
-                          value={regPhone}
-                          onChange={(e) => setRegPhone(e.target.value)}
-                          placeholder="+91 94350 XXXXX"
-                          className="mt-1 h-9 rounded-xl bg-white dark:bg-[#1a1c20]"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="reg-unit" className="text-xs font-bold">Unit / District</Label>
-                        <Input
-                          id="reg-unit"
-                          type="text"
-                          value={regUnit}
-                          onChange={(e) => setRegUnit(e.target.value)}
-                          placeholder="e.g. NDRF 1st Bn / Kamrup"
-                          className="mt-1 h-9 rounded-xl bg-white dark:bg-[#1a1c20]"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="reg-skills" className="text-xs font-bold">Certifications & Skills</Label>
-                      <Input
-                        id="reg-skills"
-                        type="text"
-                        value={regSkills}
-                        onChange={(e) => setRegSkills(e.target.value)}
-                        placeholder="e.g. Motor boat operator, scuba diver, medical first responder"
-                        className="mt-1 h-9 rounded-xl bg-white dark:bg-[#1a1c20]"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {regRole === "medical" && (
-                  <div className="space-y-3 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 text-xs">
-                    <p className="font-bold text-blue-800 dark:text-blue-300">
-                      ⚠️ Facility details will be sent to State Medical Command for verification:
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="reg-hosp-name" className="text-xs font-bold">Hospital Name</Label>
-                        <Input
-                          id="reg-hosp-name"
-                          type="text"
-                          value={regHospitalName}
-                          onChange={(e) => setRegHospitalName(e.target.value)}
-                          placeholder="e.g. Silchar Civil Hospital"
-                          className="mt-1 h-9 rounded-xl bg-white dark:bg-[#1a1c20]"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="reg-hosp-addr" className="text-xs font-bold">District / Address</Label>
-                        <Input
-                          id="reg-hosp-addr"
-                          type="text"
-                          value={regHospitalAddress}
-                          onChange={(e) => setRegHospitalAddress(e.target.value)}
-                          placeholder="e.g. Cachar District, Assam"
-                          className="mt-1 h-9 rounded-xl bg-white dark:bg-[#1a1c20]"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="reg-hosp-phone" className="text-xs font-bold">Emergency Phone</Label>
-                        <Input
-                          id="reg-hosp-phone"
-                          type="tel"
-                          value={regPhone}
-                          onChange={(e) => setRegPhone(e.target.value)}
-                          placeholder="+91 3842 XXXXXX"
-                          className="mt-1 h-9 rounded-xl bg-white dark:bg-[#1a1c20]"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="reg-desig" className="text-xs font-bold">Your Designation</Label>
-                        <Input
-                          id="reg-desig"
-                          type="text"
-                          value={regDesignation}
-                          onChange={(e) => setRegDesignation(e.target.value)}
-                          placeholder="e.g. Duty Officer / Superintendent"
-                          className="mt-1 h-9 rounded-xl bg-white dark:bg-[#1a1c20]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <p className="rounded-xl bg-[#f0faf6] p-3 text-xs font-semibold text-[#285f55]">
+                  New public accounts are created as User accounts. Rescuer, Medical, and Administrator access is granted only by the backend after approval.
+                </p>
 
                 <div className="pt-3">
                   <Button

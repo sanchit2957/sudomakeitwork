@@ -28,21 +28,9 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
 
-  const pathname = window.location.pathname;
-  if (pathname.startsWith("/login") || pathname.startsWith("/admin/login") || pathname.startsWith("/user/login")) {
-    return;
-  }
-
-  const isUnauthorized =
-    error.message === UNAUTHED_ERR_MSG ||
-    error.data?.code === "UNAUTHORIZED";
+  const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
 
   if (!isUnauthorized) return;
-
-  try {
-    localStorage.removeItem("app-runtime-session-token");
-    localStorage.removeItem("app-runtime-user-info");
-  } catch {}
 
   startLogin();
 };
@@ -69,14 +57,7 @@ const trpcClient = trpc.createClient({
       url: getApiUrl("/api/trpc"),
       transformer: superjson,
       headers() {
-        const headers: Record<string, string> = {};
-        try {
-          const token = localStorage.getItem("app-runtime-session-token");
-          if (token) {
-            headers["Authorization"] = `Bearer ${token}`;
-          }
-        } catch {}
-        return headers;
+        return {};
       },
       fetch(input, init) {
         return globalThis.fetch(input, {

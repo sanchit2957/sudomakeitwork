@@ -1,12 +1,11 @@
-import mysql from "mysql2/promise";
-import { and, eq } from "drizzle-orm";
-import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
+import { and, eq, or } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/mysql2";
 import { emergencyContacts, EmergencyContact, InsertEmergencyContact, InsertUser, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { hashPassword } from "./auth.password";
 
-let _pool: mysql.Pool | null = null;
-let _db: MySql2Database<any> | null = null;
+let _db: ReturnType<typeof drizzle> | null = null;
+let _dbChecked = false;
 
 export function planRoleSync(role: InsertUser["role"] | undefined, isProjectOwner: boolean) {
   if (role !== undefined) return { insertRole: role, updateRole: role };
@@ -14,25 +13,11 @@ export function planRoleSync(role: InsertUser["role"] | undefined, isProjectOwne
   return { insertRole: undefined, updateRole: undefined };
 }
 
-export function createDatabasePool(connectionUri: string): mysql.Pool {
-  const isRemoteOrTiDB = connectionUri.includes("tidbcloud.com") || connectionUri.includes("ssl=") || !connectionUri.includes("localhost");
-  return mysql.createPool({
-    uri: connectionUri,
-    ssl: isRemoteOrTiDB ? { minVersion: "TLSv1.2", rejectUnauthorized: true } : undefined,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-  });
-}
-
 // Lazily create the drizzle instance so local tooling can run without a DB or with a local DB.
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db && process.env.DATABASE_URL && !_dbChecked) {
     try {
-      if (!_pool) {
-        _pool = createDatabasePool(process.env.DATABASE_URL);
-      }
-      _db = drizzle(_pool);
+      _db = drizzle(process.env.DATABASE_URL);
     } catch (error) {
       if (process.env.NODE_ENV === "production") {
         throw new Error("The operational database is disconnected. Cannot safely process request.");
@@ -277,7 +262,11 @@ export async function getUserByEmail(emailOrUsername: string) {
   const db = await getDb();
   if (db) {
     try {
-      const result = await db.select().from(users).where(eq(users.email, emailOrUsername)).limit(1);
+      const result = await db
+        .select()
+        .from(users)
+        .where(or(eq(users.email, emailOrUsername), eq(users.name, emailOrUsername)))
+        .limit(1);
       if (result.length > 0) return result[0];
       return null;
     } catch (error) {
@@ -294,7 +283,7 @@ export async function getUserByEmail(emailOrUsername: string) {
   return (
     _memoryUsers.get(lower) ||
     Array.from(_memoryUsers.values()).find(
-      u => u.email?.toLowerCase() === lower || u.openId === `user-${lower}`
+      u => u.email?.toLowerCase() === lower || u.name?.toLowerCase() === lower || u.openId === `user-${lower}`
     ) || null
   );
 }
@@ -558,3 +547,4 @@ export async function deleteEmergencyContact(id: number, userId: number): Promis
   }
   return false;
 }
+

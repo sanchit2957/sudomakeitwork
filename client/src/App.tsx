@@ -29,6 +29,7 @@ import { useMobileLifecycle } from "./hooks/useMobileLifecycle";
 
 import { isNativeApp } from "./lib/apiConfig";
 import MobileCommandRestricted from "./components/MobileCommandRestricted";
+import { MedicalLogin, RescuerLogin } from "./pages/RoleLogin";
 
 function Router() {
   useMobileLifecycle();
@@ -57,6 +58,8 @@ function Router() {
       <Route path={"/admin"}>
         {native ? <MobileCommandRestricted /> : <AdminLogin />}
       </Route>
+      <Route path={"/responder/login"} component={RescuerLogin} />
+      <Route path={"/medical/login"} component={MedicalLogin} />
 
       {/* Main Entry: Registration & Sign In first if not logged in */}
       <Route path={"/"}>
