@@ -45,23 +45,30 @@ export const appRouter = router({
           if (sbUser && sbUser.email) {
             const emailVal = sbUser.email.trim().toLowerCase();
             let dbUser = (await getUserByOpenId(sbUser.id)) || (await getUserByEmail(emailVal));
+            const roleVal = (sbUser.user_metadata?.role as "user" | "rescuer" | "medical" | "admin") || dbUser?.role || "user";
             if (!dbUser) {
               const nameVal = sbUser.user_metadata?.name || sbUser.user_metadata?.full_name || emailVal.split("@")[0];
               await upsertUser({
                 openId: sbUser.id,
                 name: nameVal,
                 email: emailVal,
-                role: "user",
+                role: roleVal,
                 loginMethod: "supabase-auth",
                 lastSignedIn: new Date(),
               });
               dbUser = await getUserByEmail(emailVal);
             } else {
-              await upsertUser({ ...dbUser, openId: sbUser.id, lastSignedIn: new Date() });
+              await upsertUser({ ...dbUser, openId: sbUser.id, role: roleVal, lastSignedIn: new Date() });
               dbUser = await getUserByEmail(emailVal);
             }
 
             if (dbUser) {
+              if (roleVal === "rescuer") {
+                await ensureRescuerProfile(dbUser.id, sbUser.user_metadata?.callSign || "Field Unit");
+              } else if (roleVal === "medical") {
+                await ensureHospitalStaffProfile(dbUser.id);
+              }
+
               const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User" });
               const cookieOptions = getSessionCookieOptions(ctx.req);
               ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
