@@ -59,9 +59,9 @@ export default function UserLogin() {
   const [otpCode, setOtpCode] = useState("");
   const [otpCountdown, setOtpCountdown] = useState(0);
 
-  // Sign In fields
-  const [email, setEmail] = useState("citizen@assamrescue.gov.in");
-  const [password, setPassword] = useState("citizen");
+  // Sign In fields - empty by default (no demo accounts)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   // Register fields
@@ -83,6 +83,28 @@ export default function UserLogin() {
       return () => clearTimeout(timer);
     }
   }, [otpCountdown]);
+
+  const handleLogout = async () => {
+    setIsSubmitting(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      await logout();
+      setEmail("");
+      setPassword("");
+      setRegName("");
+      setRegEmail("");
+      setRegPassword("");
+      setRegPhone("");
+      setOtpStep("input");
+      setOtpCode("");
+      setSuccessMessage("Signed out successfully.");
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Failed to sign out.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSignIn = async (e: FormEvent) => {
     e.preventDefault();
@@ -251,93 +273,98 @@ export default function UserLogin() {
       </header>
 
       <main className="mx-auto max-w-lg px-4 py-6 sm:py-10">
-        {/* Title Header */}
-        <div className="text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-3.5 py-1 font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0f766e] dark:text-emerald-400">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Citizen Emergency Portal
-          </div>
-          <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl md:text-4xl">
-            {authMode === "signin" ? "Sign In" : "Create Account"}
-          </h1>
-          <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-muted-foreground sm:text-sm">
-            {authMode === "signin"
-              ? "Access your citizen safety profile, live disaster tracking, and instant SOS alerts."
-              : "Register a citizen account for rapid SOS dispatch and emergency contacts management."}
-          </p>
-        </div>
-
-        {/* Top Sign In / Register Switcher */}
-        <div className="mt-6 grid grid-cols-2 rounded-2xl bg-black/5 p-1.5 dark:bg-white/5">
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode("signin");
-              setErrorMessage("");
-              setSuccessMessage("");
-            }}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
-              authMode === "signin"
-                ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Lock className="h-3.5 w-3.5" />
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode("register");
-              setErrorMessage("");
-              setSuccessMessage("");
-            }}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
-              authMode === "register"
-                ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <UserPlus className="h-3.5 w-3.5" />
-            Register
-          </button>
-        </div>
-
         {/* Active Session Card if already logged in */}
-        {user && (
-          <div className="mt-5 overflow-hidden rounded-3xl border border-[#0f766e]/30 bg-white p-4 shadow-sm dark:border-emerald-500/20 dark:bg-[#151718] sm:p-5">
-            <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#0f766e] text-white shadow-md">
-                <User className="h-5 w-5" />
+        {user ? (
+          <div className="mt-8 overflow-hidden rounded-3xl border border-[#0f766e]/30 bg-white p-6 shadow-md dark:border-emerald-500/20 dark:bg-[#151718] sm:p-8">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <span className="grid h-16 w-16 place-items-center rounded-3xl bg-[#0f766e] text-white shadow-lg">
+                <User className="h-8 w-8" />
               </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                  <span className="truncate text-sm font-black sm:text-base">{user.name || user.email}</span>
-                  <span className="rounded-md bg-[#0f766e]/15 px-2 py-0.5 font-mono text-[9px] font-extrabold uppercase text-[#0f766e] dark:text-emerald-400">
-                    Role: {user.role}
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <h2 className="text-xl font-black sm:text-2xl">
+                    Hi, {user.name ? user.name.trim().split(/\s+/)[0] : (user.email ? user.email.split("@")[0] : "Citizen")}
+                  </h2>
+                  <span className="rounded-md bg-[#0f766e]/15 px-2.5 py-0.5 font-mono text-[10px] font-extrabold uppercase text-[#0f766e] dark:text-emerald-400">
+                    {user.role}
                   </span>
                 </div>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">{user.email || "Active Session"}</p>
+                {user.name && <p className="mt-0.5 text-xs font-semibold text-foreground">{user.name}</p>}
+                <p className="mt-0.5 text-xs text-muted-foreground">{user.email || "Active User Session"}</p>
               </div>
 
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <div className="mt-4 flex w-full max-w-sm flex-col gap-3">
                 <Button
                   onClick={() => setLocation(getDashboardDestinationForRole(user.role))}
-                  className="h-10 rounded-xl bg-[#0f766e] text-xs font-bold text-white hover:bg-[#0f766e]/90"
+                  className="h-12 rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md hover:bg-[#0f766e]/90"
                 >
-                  Enter {user.role.toUpperCase()} Workspace
+                  {user.role === "user" ? "Enter Citizen SOS Hub" : `Enter ${user.role.toUpperCase()} Workspace`}
                 </Button>
                 <Button
-                  onClick={() => logout()}
+                  onClick={handleLogout}
+                  disabled={isSubmitting}
                   variant="outline"
-                  className="h-10 rounded-xl text-xs font-semibold"
+                  className="h-11 rounded-xl text-xs font-semibold text-destructive hover:bg-destructive/10"
                 >
-                  <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign Out
+                  <LogOut className="mr-2 h-4 w-4" />
+                  {isSubmitting ? "Signing Out…" : "Sign Out"}
                 </Button>
               </div>
             </div>
           </div>
-        )}
+        ) : (
+          <>
+            {/* Title Header */}
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-3.5 py-1 font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0f766e] dark:text-emerald-400">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Citizen Emergency Portal
+              </div>
+              <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl md:text-4xl">
+                {authMode === "signin" ? "Sign In" : "Create Account"}
+              </h1>
+              <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                {authMode === "signin"
+                  ? "Access your citizen safety profile, live disaster tracking, and instant SOS alerts."
+                  : "Register a citizen account for rapid SOS dispatch and emergency contacts management."}
+              </p>
+            </div>
+
+            {/* Top Sign In / Register Switcher */}
+            <div className="mt-6 grid grid-cols-2 rounded-2xl bg-black/5 p-1.5 dark:bg-white/5">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("signin");
+                  setErrorMessage("");
+                  setSuccessMessage("");
+                }}
+                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
+                  authMode === "signin"
+                    ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Lock className="h-3.5 w-3.5" />
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("register");
+                  setErrorMessage("");
+                  setSuccessMessage("");
+                }}
+                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
+                  authMode === "register"
+                    ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Register
+              </button>
+            </div>
 
         {/* Main Auth Container */}
         <div className="mt-5 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#141517]">
@@ -722,6 +749,8 @@ export default function UserLogin() {
             </span>
           </button>
         </div>
+          </>
+        )}
       </main>
     </div>
   );

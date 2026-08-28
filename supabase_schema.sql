@@ -263,11 +263,3 @@ CREATE INDEX IF NOT EXISTS "idx_incidents_rescuer" ON incidents("assignedRescuer
 CREATE INDEX IF NOT EXISTS "idx_emergencyContacts_user" ON "emergencyContacts"("userId");
 CREATE INDEX IF NOT EXISTS "idx_notifications_recipient" ON notifications("recipientId", "readAt");
 
--- Initial Seed Accounts for Demo / Operational Roles
-INSERT INTO users ("openId", name, email, role, "loginMethod")
-VALUES 
-  ('user-admin', 'Superadmin', 'admin@assamrescue.gov.in', 'admin', 'platform-login'),
-  ('user-rescuer', 'Inspector Barua (SDRF)', 'rescuer@assamrescue.gov.in', 'rescuer', 'platform-login'),
-  ('user-medical', 'Dr. Sharma (GMCH)', 'medical@assamrescue.gov.in', 'medical', 'platform-login'),
-  ('user-citizen', 'Rahul Das', 'citizen@assamrescue.gov.in', 'user', 'platform-login')
-ON CONFLICT ("openId") DO NOTHING;
