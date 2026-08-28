@@ -1,7 +1,7 @@
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   isSupabaseConfigured,
   supabase,
@@ -23,6 +23,12 @@ export function useAuth(options: UseAuthOptions = {}) {
     redirectPath = "/login",
   } = options;
   const utils = trpc.useUtils();
+
+  const [initTimeoutReached, setInitTimeoutReached] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setInitTimeoutReached(true), 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
@@ -275,11 +281,11 @@ export function useAuth(options: UseAuthOptions = {}) {
     }
     return {
       user: effectiveUser,
-      loading: meQuery.isLoading && !effectiveUser,
+      loading: !initTimeoutReached && meQuery.isLoading && !effectiveUser,
       error: meQuery.error ?? null,
       isAuthenticated: Boolean(effectiveUser),
     };
-  }, [meQuery.data, meQuery.isLoading, meQuery.isFetching, meQuery.error]);
+  }, [meQuery.data, meQuery.isLoading, meQuery.isFetching, meQuery.error, initTimeoutReached]);
 
   const updateProfileMutation = trpc.auth.updateProfile.useMutation({
     onSuccess: async (data) => {

@@ -33,19 +33,8 @@ import { MedicalLogin, RescuerLogin } from "./pages/RoleLogin";
 
 function Router() {
   useMobileLifecycle();
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   const native = isNativeApp();
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f6f8f7] text-[#122824] dark:bg-[#090a0a] dark:text-[#f3f4f6]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent" />
-          <p className="font-mono text-xs font-bold text-muted-foreground">Initializing portal…</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <Switch>
