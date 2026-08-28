@@ -20,7 +20,11 @@ export function createDatabasePool(connectionUri: string): mysql.Pool {
     uri: connectionUri,
     ssl: isRemoteOrTiDB ? { minVersion: "TLSv1.2", rejectUnauthorized: true } : undefined,
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 15,
+    maxIdle: 8,
+    idleTimeout: 60000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
     queueLimit: 0,
   });
 }

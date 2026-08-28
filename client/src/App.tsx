@@ -1,3 +1,4 @@
+import React, { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -9,29 +10,35 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
 import { RoleGate } from "./components/RoleGate";
 
-// Admin Section Pages
-import { AdminLogin, AdminCommand } from "./pages/admin";
-
-// User & Operational Section Pages
-import {
-  UserHome,
-  UserLogin,
-  UserTrackFlow,
-  UserSafety,
-  UserResponder,
-  UserMedical,
-  UserHospitalRegister,
-  UserMore,
-  UserProfile,
-} from "./pages/user";
-import Emergency from "./pages/Emergency";
-import { useMobileLifecycle } from "./hooks/useMobileLifecycle";
-
+// Critical synchronous core auth routes
+import { AdminLogin } from "./pages/admin";
+import { UserHome, UserLogin } from "./pages/user";
+import { HospitalLogin, RescuerLogin } from "./pages/RoleLogin";
 import { isNativeApp } from "./lib/apiConfig";
 import MobileCommandRestricted from "./components/MobileCommandRestricted";
-import { HospitalLogin, MedicalLogin, RescuerLogin } from "./pages/RoleLogin";
+import { useMobileLifecycle } from "./hooks/useMobileLifecycle";
 
-import HospitalPortal from "./pages/HospitalPortal";
+// Code-split heavy operational workspaces
+const AdminCommand = lazy(() => import("./pages/admin/AdminCommand"));
+const HospitalPortal = lazy(() => import("./pages/HospitalPortal"));
+const UserResponder = lazy(() => import("./pages/user/UserResponder"));
+const Emergency = lazy(() => import("./pages/Emergency"));
+const UserSafety = lazy(() => import("./pages/user/UserSafety"));
+const UserTrackFlow = lazy(() => import("./pages/user/UserTrackFlow"));
+const UserHospitalRegister = lazy(() => import("./pages/user/UserHospitalRegister"));
+const UserMore = lazy(() => import("./pages/user/UserMore"));
+const UserProfile = lazy(() => import("./pages/user/UserProfile"));
+
+function RouteLoadingFallback() {
+  return (
+    <div className="flex min-h-[60vh] w-full flex-col items-center justify-center p-6 text-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-3 border-[#0f766e] border-t-transparent dark:border-emerald-400 dark:border-t-transparent" />
+      <p className="mt-3 font-mono text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        Loading module…
+      </p>
+    </div>
+  );
+}
 
 function Router() {
   useMobileLifecycle();
@@ -39,24 +46,25 @@ function Router() {
   const native = isNativeApp();
 
   return (
-    <Switch>
-      {/* Auth Routes */}
-      <Route path={"/login"} component={UserLogin} />
-      <Route path={"/user/login"} component={UserLogin} />
-      <Route path={"/admin/login"}>
-        {native ? <MobileCommandRestricted /> : <AdminLogin />}
-      </Route>
-      <Route path={"/admin"}>
-        {native ? <MobileCommandRestricted /> : <AdminLogin />}
-      </Route>
-      <Route path={"/responder/login"} component={RescuerLogin} />
-      <Route path={"/hospital/login"} component={HospitalLogin} />
-      <Route path={"/medical/login"} component={HospitalLogin} />
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Switch>
+        {/* Auth Routes */}
+        <Route path={"/login"} component={UserLogin} />
+        <Route path={"/user/login"} component={UserLogin} />
+        <Route path={"/admin/login"}>
+          {native ? <MobileCommandRestricted /> : <AdminLogin />}
+        </Route>
+        <Route path={"/admin"}>
+          {native ? <MobileCommandRestricted /> : <AdminLogin />}
+        </Route>
+        <Route path={"/responder/login"} component={RescuerLogin} />
+        <Route path={"/hospital/login"} component={HospitalLogin} />
+        <Route path={"/medical/login"} component={HospitalLogin} />
 
-      {/* Main Entry: Registration & Sign In first if not logged in */}
-      <Route path={"/"}>
-        {user ? <UserHome /> : <UserLogin />}
-      </Route>
+        {/* Main Entry: Registration & Sign In first if not logged in */}
+        <Route path={"/"}>
+          {user ? <UserHome /> : <UserLogin />}
+        </Route>
 
       {/* User Section Routes */}
       <Route path={"/emergency"}>
@@ -115,6 +123,7 @@ function Router() {
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
   );
 }
 

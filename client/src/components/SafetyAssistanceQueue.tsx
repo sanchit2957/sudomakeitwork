@@ -24,8 +24,8 @@ export function SafetyAssistanceQueue({
 }) {
   const utils = trpc.useUtils();
   const queue = trpc.rescue.safety.queue.useQuery(undefined, {
-    refetchInterval: 3_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 8_000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
   const update = trpc.rescue.safety.updateStatus.useMutation({

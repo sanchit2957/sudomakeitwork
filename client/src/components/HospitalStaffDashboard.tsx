@@ -109,12 +109,13 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
   const [coordUrgency, setCoordUrgency] = useState<"critical" | "high" | "normal">("high");
   const [coordSuccess, setCoordSuccess] = useState("");
 
-  const live = { refetchInterval: 3_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
+  const liveCases = { refetchInterval: 4_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
+  const liveLayers = { refetchInterval: 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
 
   // Live queries
-  const incomingCases = trpc.rescue.operations.hospitalCases.useQuery(undefined, live);
-  const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, live);
-  const timeline = trpc.rescue.operations.hospitalActivityTimeline.useQuery(undefined, live);
+  const incomingCases = trpc.rescue.operations.hospitalCases.useQuery(undefined, liveCases);
+  const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, liveLayers);
+  const timeline = trpc.rescue.operations.hospitalActivityTimeline.useQuery(undefined, liveLayers);
 
   // Mutations
   const updateResources = trpc.rescue.operations.updateMyHospitalResources.useMutation({

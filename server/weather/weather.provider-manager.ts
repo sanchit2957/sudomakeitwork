@@ -122,6 +122,10 @@ export class WeatherProviderManager {
 
     try {
       const report = await fetchPromise;
+      if (this.cache.size >= 50) {
+        const oldestKey = this.cache.keys().next().value;
+        if (oldestKey) this.cache.delete(oldestKey);
+      }
       this.cache.set(cacheKey, { timestamp: Date.now(), data: report });
       return report;
     } finally {

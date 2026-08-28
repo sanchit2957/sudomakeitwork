@@ -36,11 +36,13 @@ function ResponderWorkspace() {
   const utils = trpc.useUtils();
   const [pushState, setPushState] = useState<PushState>("not_requested");
   const [pushDetail, setPushDetail] = useState("");
-  const liveQuery = { refetchInterval: 1_500, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
-  const profile = trpc.rescue.rescuer.profile.useQuery(undefined, liveQuery);
-  const missions = trpc.rescue.rescuer.missions.useQuery(undefined, liveQuery);
-  const alerts = trpc.rescue.rescuer.notifications.useQuery(undefined, liveQuery);
-  const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, liveQuery);
+  const liveMissionQuery = { refetchInterval: 4_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
+  const liveLayersQuery = { refetchInterval: 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const liveProfileQuery = { refetchInterval: 15_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const profile = trpc.rescue.rescuer.profile.useQuery(undefined, liveProfileQuery);
+  const missions = trpc.rescue.rescuer.missions.useQuery(undefined, liveMissionQuery);
+  const alerts = trpc.rescue.rescuer.notifications.useQuery(undefined, liveMissionQuery);
+  const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, liveLayersQuery);
   const pushConfig = trpc.rescue.rescuer.pushConfig.useQuery();
   const subscribePush = trpc.rescue.rescuer.subscribePush.useMutation();
   const refreshOperationalState = () => { void utils.rescue.rescuer.profile.invalidate(); void utils.rescue.rescuer.missions.invalidate(); void utils.rescue.rescuer.notifications.invalidate(); void utils.rescue.operations.mapLayers.invalidate(); };
