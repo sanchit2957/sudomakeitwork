@@ -34,9 +34,46 @@ export const appRouter = router({
         z.object({
           email: z.string().optional(),
           password: z.string().optional(),
+          supabaseToken: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
+        // If Supabase token is provided, verify and sync
+        if (input.supabaseToken) {
+          const { verifySupabaseToken } = await import("./_core/supabase");
+          const sbUser = await verifySupabaseToken(input.supabaseToken);
+          if (sbUser && sbUser.email) {
+            const emailVal = sbUser.email.trim().toLowerCase();
+            let dbUser = (await getUserByOpenId(sbUser.id)) || (await getUserByEmail(emailVal));
+            if (!dbUser) {
+              const nameVal = sbUser.user_metadata?.name || sbUser.user_metadata?.full_name || emailVal.split("@")[0];
+              await upsertUser({
+                openId: sbUser.id,
+                name: nameVal,
+                email: emailVal,
+                role: "user",
+                loginMethod: "supabase-auth",
+                lastSignedIn: new Date(),
+              });
+              dbUser = await getUserByEmail(emailVal);
+            } else {
+              await upsertUser({ ...dbUser, openId: sbUser.id, lastSignedIn: new Date() });
+              dbUser = await getUserByEmail(emailVal);
+            }
+
+            if (dbUser) {
+              const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User" });
+              const cookieOptions = getSessionCookieOptions(ctx.req);
+              ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
+              return {
+                success: true,
+                user: sanitizeUser(dbUser),
+                sessionToken,
+              };
+            }
+          }
+        }
+
         if (!input.email || !input.password) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Email and password are required." });
         }

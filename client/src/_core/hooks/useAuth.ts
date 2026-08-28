@@ -2,19 +2,28 @@ import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
+import {
+  isSupabaseConfigured,
+  supabaseSignIn,
+  supabaseSignOut,
+  supabaseSignUp,
+} from "@/lib/supabase";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
   redirectPath?: string;
 };
 
-export function useAuth(options?: UseAuthOptions) {
-  const { redirectOnUnauthenticated = false, redirectPath } = options ?? {};
+export function useAuth(options: UseAuthOptions = {}) {
+  const {
+    redirectOnUnauthenticated = false,
+    redirectPath = "/login",
+  } = options;
   const utils = trpc.useUtils();
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   const loginMutation = trpc.auth.login.useMutation({
@@ -40,7 +49,19 @@ export function useAuth(options?: UseAuthOptions) {
     async (params: {
       email: string;
       password: string;
+      supabaseToken?: string;
     }) => {
+      if (isSupabaseConfigured() && !params.supabaseToken) {
+        try {
+          const sbRes = await supabaseSignIn(params.email, params.password);
+          if (sbRes?.session?.access_token) {
+            params.supabaseToken = sbRes.session.access_token;
+          }
+        } catch (sbErr) {
+          console.warn("[Supabase Auth] Direct sign-in note:", sbErr);
+        }
+      }
+
       const res = await loginMutation.mutateAsync(params);
       if (res.sessionToken) {
         try {
@@ -79,6 +100,14 @@ export function useAuth(options?: UseAuthOptions) {
       phone?: string;
       callSign?: string;
     }) => {
+      if (isSupabaseConfigured()) {
+        try {
+          await supabaseSignUp(params.email, params.password, { name: params.name, phone: params.phone });
+        } catch (sbErr) {
+          console.warn("[Supabase Auth] Direct sign-up note:", sbErr);
+        }
+      }
+
       const res = await registerMutation.mutateAsync(params);
       if (res.sessionToken) {
         try {
@@ -95,6 +124,7 @@ export function useAuth(options?: UseAuthOptions) {
 
   const logout = useCallback(async () => {
     try {
+      await supabaseSignOut();
       await logoutMutation.mutateAsync();
     } catch (error: unknown) {
       if (
