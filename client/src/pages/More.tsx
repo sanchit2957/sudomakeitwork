@@ -2,13 +2,17 @@ import React from "react";
 import LanguageSelector from "@/components/LanguageSelector";
 import { VictimNavigation } from "@/pages/Home";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   ChevronRight,
   ClipboardCheck,
   Edit3,
   Hospital,
   MapPin,
+  Phone,
+  Shield,
   ShieldCheck,
+  User,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -16,6 +20,7 @@ import { useLocation } from "wouter";
 
 export default function More() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [, setLocation] = useLocation();
 
   const roleLabel =
@@ -28,6 +33,7 @@ export default function More() {
       : "Citizen";
 
   const userDistrict = (user as any)?.homeDistrict;
+  const userPhone = (user as any)?.phone;
   const bloodGroup = (user as any)?.bloodGroup;
 
   return (
@@ -35,8 +41,8 @@ export default function More() {
       <main className="victim-main mx-auto min-h-screen max-w-lg bg-[#fcfdfd] px-5 pb-28 pt-6 transition-colors dark:bg-[#111214] md:my-6 md:min-h-[850px] md:rounded-[2.75rem] md:border dark:md:border-white/10">
         <header className="flex items-start justify-between">
           <div>
-            <p className="text-2xl font-black tracking-[-.06em] text-[#122824] dark:text-white">More</p>
-            <p className="mt-1 text-[10px] font-bold text-[#6b8780] dark:text-[#8a9f99]">Profile & Operations Gateways</p>
+            <p className="text-2xl font-black tracking-[-.06em] text-[#122824] dark:text-white">{t("More")}</p>
+            <p className="mt-1 text-[10px] font-bold text-[#6b8780] dark:text-[#8a9f99]">{t("Profile & Operations Gateways")}</p>
           </div>
           <LanguageSelector compact />
         </header>
@@ -53,23 +59,23 @@ export default function More() {
               </span>
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-lg font-black leading-tight text-white">{user?.name || "Assam Safety Network"}</p>
+                  <p className="text-lg font-black leading-tight text-white">{user?.name || t("Assam Safety Network")}</p>
                 </div>
-                <p className="mt-0.5 text-xs text-[#c2e2db]">{user?.email || "Citizen Account"}</p>
+                <p className="mt-0.5 text-xs text-[#c2e2db]">{user?.email || t("Citizen Account")}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#e6f7f3]">
                     <ShieldCheck className="h-3 w-3 text-[#5eead4]" />
-                    {roleLabel}
+                    {t(roleLabel)}
                   </span>
                   {userDistrict && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-semibold text-[#d3eee6]">
                       <MapPin className="h-2.5 w-2.5" />
-                      {userDistrict}
+                      {t(userDistrict)}
                     </span>
                   )}
                   {bloodGroup && (
                     <span className="inline-flex items-center rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-200">
-                      {bloodGroup}
+                      {bloodGroup === "Not specified" ? t("Not specified") : bloodGroup}
                     </span>
                   )}
                 </div>
@@ -84,7 +90,7 @@ export default function More() {
           <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-xs font-semibold text-[#d3eee6]">
             <span className="flex items-center gap-1.5">
               <Edit3 className="h-3.5 w-3.5 text-[#5eead4]" />
-              Tap to customize safety profile & emergency contacts
+              {t("Tap to customize safety profile & emergency contacts")}
             </span>
             <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </div>
@@ -99,9 +105,9 @@ export default function More() {
             <ClipboardCheck className="h-5 w-5" />
           </span>
           <span>
-            <span className="block text-sm font-black text-[#234b77] dark:text-blue-300">Hospital registration</span>
+            <span className="block text-sm font-black text-[#234b77] dark:text-blue-300">{t("Hospital registration")}</span>
             <span className="mt-1 block text-xs leading-5 text-[#58738f] dark:text-blue-200/70">
-              Hospitals can request verified staff access and publish live resource information.
+              {t("Hospitals can request verified staff access and publish live resource information.")}
             </span>
           </span>
         </button>
@@ -109,13 +115,13 @@ export default function More() {
         {/* Protected Operations Wing */}
         <section className="mt-5 rounded-[1.55rem] border border-[#d7e8e2] bg-[#f7fcfa] p-4 dark:border-white/10 dark:bg-[#16171a]">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#277b6b] dark:text-[#5eead4]">
-            Protected Operations App
+            {t("Protected Operations App")}
           </p>
-          <p className="mt-1 text-sm font-black text-[#122824] dark:text-white">For authorized response teams</p>
+          <p className="mt-1 text-sm font-black text-[#122824] dark:text-white">{t("For authorized response teams")}</p>
           <div className="mt-3 grid grid-cols-3 gap-2">
-            <AccessButton icon={ShieldCheck} label="Government" onClick={() => setLocation("/command")} />
-            <AccessButton icon={Hospital} label="Medical" onClick={() => setLocation("/medical")} />
-            <AccessButton icon={UsersRound} label="Rescuer" onClick={() => setLocation("/responder")} />
+            <AccessButton icon={ShieldCheck} label={t("Government")} onClick={() => setLocation("/command")} />
+            <AccessButton icon={Hospital} label={t("Medical")} onClick={() => setLocation("/medical")} />
+            <AccessButton icon={UsersRound} label={t("Rescuer")} onClick={() => setLocation("/responder")} />
           </div>
         </section>
       </main>

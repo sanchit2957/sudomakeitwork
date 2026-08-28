@@ -24,18 +24,23 @@ export function getApiBaseUrl(): string {
     }
   }
 
-  // 2. Check build-time environment variable
+  // 2. In browser development mode on localhost, always use local relative URLs
+  if (typeof window !== "undefined" && !Capacitor.isNativePlatform() && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+    return "";
+  }
+
+  // 3. Check build-time environment variable (for remote production or native builds)
   const envUrl = import.meta.env.VITE_API_URL;
   if (typeof envUrl === "string" && envUrl.trim().length > 0) {
     return envUrl.trim().replace(/\/+$/, "");
   }
 
-  // 3. Native fallback: default production API if running in native app
+  // 4. Native fallback: default production API if running in native app
   if (Capacitor.isNativePlatform()) {
     return DEFAULT_PRODUCTION_API_URL;
   }
 
-  // 4. Default web behavior: relative URLs
+  // 5. Default web behavior: relative URLs
   return "";
 }
 

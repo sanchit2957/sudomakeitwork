@@ -568,38 +568,130 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, [locale]);
 
   useEffect(() => {
+    if (typeof document === "undefined") return;
+
     const terms = { ...currentInterfaceTerms[locale], ...operationalTerms[locale] };
-    if (!terms || !Object.keys(terms).length) return;
+    const hasTerms = Boolean(terms && Object.keys(terms).length > 0);
+
+    const isIgnoredElement = (el: Element): boolean => {
+      const tag = el.tagName;
+      if (tag === "SCRIPT" || tag === "STYLE" || tag === "SVG" || tag === "CANVAS" || tag === "NOSCRIPT") return true;
+      if (el.hasAttribute("data-no-operational-translation") || el.getAttribute("contenteditable") === "true") return true;
+      if (el.classList && (el.classList.contains("leaflet-container") || el.classList.contains("leaflet-pane"))) return true;
+      return false;
+    };
+
     const applyText = (node: Text) => {
       const parent = node.parentElement;
-      if (!parent || parent.closest("script, style, [contenteditable=true], [data-no-operational-translation]")) return;
-      const source = originalText.get(node) ?? node.nodeValue ?? "";
+      if (!parent || isIgnoredElement(parent)) return;
+      const raw = node.nodeValue;
+      if (!raw || !raw.trim()) return;
+
+      const source = originalText.get(node) ?? raw;
       originalText.set(node, source);
-      const translated = terms[source];
-      if (translated && node.nodeValue !== translated) node.nodeValue = translated;
+
+      const target = hasTerms ? (terms[source] ?? (locale === "en" ? source : undefined)) : (locale === "en" ? source : undefined);
+      if (target && node.nodeValue !== target) {
+        node.nodeValue = target;
+      }
     };
+
     const applyElement = (element: Element) => {
-      if (element.closest("[data-no-operational-translation]")) return;
+      if (isIgnoredElement(element)) return;
       const attributes = originalAttributes.get(element) ?? new Map<string, string>();
       for (const name of ["placeholder", "title", "aria-label"]) {
-        const value = attributes.get(name) ?? element.getAttribute(name);
-        if (!value) continue;
-        attributes.set(name, value);
-        if (terms[value]) element.setAttribute(name, terms[value]);
+        const currentAttr = element.getAttribute(name);
+        const source = attributes.get(name) ?? currentAttr;
+        if (!source) continue;
+        attributes.set(name, source);
+        const target = hasTerms ? (terms[source] ?? (locale === "en" ? source : undefined)) : (locale === "en" ? source : undefined);
+        if (target && currentAttr !== target) {
+          element.setAttribute(name, target);
+        }
       }
       originalAttributes.set(element, attributes);
     };
-    const applyTree = (root: Node) => {
-      if (root.nodeType === Node.TEXT_NODE) applyText(root as Text);
-      if (root.nodeType === Node.ELEMENT_NODE) applyElement(root as Element);
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
-      let node: Node | null;
-      while ((node = walker.nextNode())) node.nodeType === Node.TEXT_NODE ? applyText(node as Text) : applyElement(node as Element);
+
+    const filterNode = (node: Node): number => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (isIgnoredElement(node as Element)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+      if (node.nodeType === Node.TEXT_NODE) {
+        const val = node.nodeValue;
+        if (!val || !val.trim()) return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (parent && isIgnoredElement(parent)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+      return NodeFilter.FILTER_SKIP;
     };
+
+    const applyTree = (root: Node) => {
+      if (root.nodeType === Node.TEXT_NODE) {
+        applyText(root as Text);
+        return;
+      }
+      if (root.nodeType === Node.ELEMENT_NODE) {
+        const el = root as Element;
+        if (isIgnoredElement(el)) return;
+        applyElement(el);
+      }
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+        acceptNode: filterNode,
+      });
+      let current: Node | null;
+      while ((current = walker.nextNode())) {
+        if (current.nodeType === Node.TEXT_NODE) {
+          applyText(current as Text);
+        } else if (current.nodeType === Node.ELEMENT_NODE) {
+          applyElement(current as Element);
+        }
+      }
+    };
+
     applyTree(document.body);
-    const observer = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(applyTree)));
+
+    if (!hasTerms && locale === "en") return;
+
+    let pendingNodes: Node[] = [];
+    let frameId: number | null = null;
+
+    const processPending = () => {
+      frameId = null;
+      const nodes = pendingNodes;
+      pendingNodes = [];
+      for (const node of nodes) {
+        if (document.body.contains(node)) {
+          applyTree(node);
+        }
+      }
+    };
+
+    const observer = new MutationObserver(records => {
+      for (const record of records) {
+        record.addedNodes.forEach(node => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            if (isIgnoredElement(node as Element)) return;
+          }
+          pendingNodes.push(node);
+        });
+      }
+      if (pendingNodes.length > 0 && frameId === null) {
+        frameId = typeof window !== "undefined" && window.requestAnimationFrame
+          ? window.requestAnimationFrame(processPending)
+          : (setTimeout(processPending, 0) as any);
+      }
+    });
+
     observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    return () => {
+      if (frameId !== null) {
+        if (typeof window !== "undefined" && window.cancelAnimationFrame) window.cancelAnimationFrame(frameId);
+        else clearTimeout(frameId);
+      }
+      observer.disconnect();
+    };
   }, [locale, operationalTerms]);
 
   const t = useCallback((key: string, values?: Record<string, string | number>) => translate(locale, key, values, operationalTerms), [locale, operationalTerms]);

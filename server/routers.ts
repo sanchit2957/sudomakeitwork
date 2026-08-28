@@ -19,6 +19,7 @@ import {
 } from "./db";
 import { rescueRouter } from "./routers/rescue";
 import { ENV } from "./_core/env";
+import { aiRouter } from "./routers/ai";
 
 function resolveVerifiedRole(email: string, existingRole?: string): "user" | "rescuer" | "hospital" | "admin" {
   // Only grant admin if ADMIN_EMAIL environment variable is explicitly configured on the server
@@ -43,6 +44,7 @@ function sanitizeUser<T extends Record<string, any>>(user: T | null): Omit<T, "p
 
 export const appRouter = router({
   system: systemRouter,
+  ai: aiRouter,
   auth: router({
     me: publicProcedure.query(opts => sanitizeUser(opts.ctx.user)),
     login: publicProcedure

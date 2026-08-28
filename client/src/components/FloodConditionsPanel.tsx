@@ -288,7 +288,7 @@ export function FloodConditionsPanel({
 
           {conditions?.dataSource?.isCached && (
             <span className="rounded-md bg-[#f1f5f4] px-1.5 py-0.5 text-[9px] font-bold text-[#627c73] dark:bg-[#28282b] dark:text-[#a5c0b7]">
-              Cached data
+              {t("Cached data")}
             </span>
           )}
         </div>
@@ -318,7 +318,7 @@ export function FloodConditionsPanel({
             }`}
           >
             <Navigation className="h-3 w-3" />
-            <span>{isGpsActive ? "GPS Active" : "Use GPS"}</span>
+            <span>{isGpsActive ? t("GPS Active") : t("Use GPS")}</span>
           </button>
         )}
       </div>
@@ -327,7 +327,7 @@ export function FloodConditionsPanel({
       {showLocationPicker && (
         <div className="mt-2 rounded-xl border border-[#d8eae2] bg-[#fbfdfc] p-2.5 dark:border-[#353538] dark:bg-[#1e1e21]">
           <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#698a81] dark:text-[#9bb7ad]">
-            Select Assam Location:
+            {t("Select Assam Location:")}
           </p>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             {POPULAR_ASSAM_LOCATIONS.map((loc) => (
@@ -362,7 +362,7 @@ export function FloodConditionsPanel({
                   {alert.description}
                 </p>
                 <p className="mt-1 text-[9px] font-bold text-[#a75553] dark:text-[#b87d7b]">
-                  Source: {alert.source}
+                  {t("Source:")} {alert.source}
                 </p>
               </div>
             </div>
@@ -383,7 +383,7 @@ export function FloodConditionsPanel({
               <span className="text-sm font-black">{Math.round(conditions.current.temperatureC)}°C</span>
             )}
             {conditions.current.feelsLikeC !== null && conditions.current.feelsLikeC !== undefined && (
-              <span>Feels like {Math.round(conditions.current.feelsLikeC)}°C</span>
+              <span>{t("Feels like")} {Math.round(conditions.current.feelsLikeC)}°C</span>
             )}
           </div>
         </div>
@@ -456,25 +456,25 @@ export function FloodConditionsPanel({
         <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
           {conditions.current.humidityPercent != null && (
             <div className="rounded-xl border border-[#e8f0ec] bg-[#fafcfb] p-2 dark:border-[#323236] dark:bg-[#202023]">
-              <span className="text-[#6d8a81] dark:text-[#a4bebc]">Humidity</span>
+              <span className="text-[#6d8a81] dark:text-[#a4bebc]">{t("Humidity")}</span>
               <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{conditions.current.humidityPercent}%</p>
             </div>
           )}
           {conditions.current.pressureHpa != null && (
             <div className="rounded-xl border border-[#e8f0ec] bg-[#fafcfb] p-2 dark:border-[#323236] dark:bg-[#202023]">
-              <span className="text-[#6d8a81] dark:text-[#a4bebc]">Pressure</span>
+              <span className="text-[#6d8a81] dark:text-[#a4bebc]">{t("Pressure")}</span>
               <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{Math.round(conditions.current.pressureHpa)} hPa</p>
             </div>
           )}
           {conditions.current.visibilityKm != null && (
             <div className="rounded-xl border border-[#e8f0ec] bg-[#fafcfb] p-2 dark:border-[#323236] dark:bg-[#202023]">
-              <span className="text-[#6d8a81] dark:text-[#a4bebc]">Visibility</span>
+              <span className="text-[#6d8a81] dark:text-[#a4bebc]">{t("Visibility")}</span>
               <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{conditions.current.visibilityKm} km</p>
             </div>
           )}
           {conditions.current.uvIndex != null && (
             <div className="rounded-xl border border-[#e8f0ec] bg-[#fafcfb] p-2 dark:border-[#323236] dark:bg-[#202023]">
-              <span className="text-[#6d8a81] dark:text-[#a4bebc]">UV Index</span>
+              <span className="text-[#6d8a81] dark:text-[#a4bebc]">{t("UV Index")}</span>
               <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{conditions.current.uvIndex}</p>
             </div>
           )}
@@ -487,7 +487,7 @@ export function FloodConditionsPanel({
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-[#277b6b] dark:text-[#7fd6bb]" />
             <h3 className="text-xs font-black text-[#234b42] dark:text-[#d5e9e1]">
-              Hourly Forecast (Next 24h)
+              {t("Hourly Forecast (Next 24h)")}
             </h3>
           </div>
           <div className="mt-2.5 flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
@@ -520,7 +520,7 @@ export function FloodConditionsPanel({
         <div className="mt-3 flex items-center justify-between rounded-xl border border-[#e2ede8] bg-[#f8fcfb] px-3.5 py-2 text-xs font-semibold dark:border-[#37373c] dark:bg-[#202023]">
           <span className="flex items-center gap-2 text-[#43655d] dark:text-[#b5cdc5]">
             <Compass className="h-4 w-4 text-[#277b6b] dark:text-[#7fd6bb]" />
-            Air Quality: <strong className="text-[#1d4c42] dark:text-[#e4f5ef]">{conditions.airQuality.category}</strong> (AQI {conditions.airQuality.aqiUs})
+            {t("Air Quality:")} <strong className="text-[#1d4c42] dark:text-[#e4f5ef]">{conditions.airQuality.category}</strong> (AQI {conditions.airQuality.aqiUs})
           </span>
           {conditions.airQuality.pm25 !== null && (
             <span className="text-[10px] text-[#718d84] dark:text-[#a3b8b1]">

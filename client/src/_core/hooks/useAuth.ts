@@ -1,5 +1,6 @@
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
+import { triggerPostAuthMicPermission } from "@/lib/micPermission";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -46,6 +47,7 @@ export function useAuth(options: UseAuthOptions = {}) {
       }
       utils.auth.me.setData(undefined, data.user as any);
       await utils.auth.me.invalidate();
+      void triggerPostAuthMicPermission();
     },
   });
 
@@ -98,6 +100,7 @@ export function useAuth(options: UseAuthOptions = {}) {
       }
       utils.auth.me.setData(undefined, data.user as any);
       await utils.auth.me.invalidate();
+      void triggerPostAuthMicPermission();
     },
   });
 
