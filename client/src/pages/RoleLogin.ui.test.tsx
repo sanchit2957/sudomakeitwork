@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MedicalLogin, RescuerLogin } from "./RoleLogin";
+import { HospitalLogin, RescuerLogin } from "./RoleLogin";
 
 const runtime = vi.hoisted(() => ({ login: vi.fn(), logout: vi.fn(), navigate: vi.fn() }));
 
@@ -16,7 +16,7 @@ afterEach(() => cleanup());
 describe("dedicated operational portal login", () => {
   it.each([
     ["rescuer", RescuerLogin, { role: "rescuer" }, "/responder"],
-    ["medical", MedicalLogin, { role: "medical" }, "/medical"],
+    ["hospital", HospitalLogin, { role: "hospital" }, "/hospital"],
   ] as const)("%s accepts only its trusted role", async (_name, Component, user, destination) => {
     runtime.login.mockResolvedValueOnce({ user });
     render(<Component />);
@@ -28,9 +28,9 @@ describe("dedicated operational portal login", () => {
 
   it.each([
     ["rescuer", RescuerLogin, { role: "user" }],
-    ["medical", MedicalLogin, { role: "user" }],
-    ["medical", MedicalLogin, { role: "rescuer" }],
-    ["rescuer", RescuerLogin, { role: "medical" }],
+    ["hospital", HospitalLogin, { role: "user" }],
+    ["hospital", HospitalLogin, { role: "rescuer" }],
+    ["rescuer", RescuerLogin, { role: "hospital" }],
   ] as const)("%s denies a different trusted role and clears the session", async (_name, Component, user) => {
     runtime.login.mockResolvedValueOnce({ user });
     runtime.logout.mockResolvedValueOnce({});
@@ -40,6 +40,6 @@ describe("dedicated operational portal login", () => {
     fireEvent.click(screen.getByRole("button", { name: new RegExp(`Sign In to ${_name}`, "i") }));
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/not authorized/i));
     expect(runtime.logout).toHaveBeenCalled();
-    expect(runtime.navigate).not.toHaveBeenCalledWith(_name === "rescuer" ? "/responder" : "/medical");
+    expect(runtime.navigate).not.toHaveBeenCalledWith(_name === "rescuer" ? "/responder" : "/hospital");
   });
 });

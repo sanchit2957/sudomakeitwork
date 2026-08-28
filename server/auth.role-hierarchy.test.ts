@@ -10,7 +10,7 @@ type CookieCall = {
   options: Record<string, unknown>;
 };
 
-function createMockContext(role?: "admin" | "rescuer" | "medical" | "user"): {
+function createMockContext(role?: "admin" | "rescuer" | "hospital" | "medical" | "user"): {
   ctx: TrpcContext;
   cookiesSet: CookieCall[];
   cookiesCleared: CookieCall[];
@@ -112,7 +112,25 @@ describe("Role Hierarchy & Isolation", () => {
     });
   });
 
-  it("medical staff is restricted to hospital portal and blocked from rescuer and command portals", async () => {
+  it("hospital staff is restricted to hospital portal and blocked from rescuer and command portals", async () => {
+    const { ctx } = createMockContext("hospital");
+    const caller = appRouter.createCaller(ctx);
+
+    // Hospital staff is FORBIDDEN from rescuer configuration
+    await expect(caller.rescue.rescuer.pushConfig()).rejects.toMatchObject<Partial<TRPCError>>({
+      code: "FORBIDDEN",
+    });
+
+    // Hospital staff is FORBIDDEN from command centre operations
+    await expect(caller.rescue.operations.analytics()).rejects.toMatchObject<Partial<TRPCError>>({
+      code: "FORBIDDEN",
+    });
+    await expect(caller.rescue.operations.rescueRoster()).rejects.toMatchObject<Partial<TRPCError>>({
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("medical staff (legacy) is restricted to hospital portal and blocked from rescuer and command portals", async () => {
     const { ctx } = createMockContext("medical");
     const caller = appRouter.createCaller(ctx);
 

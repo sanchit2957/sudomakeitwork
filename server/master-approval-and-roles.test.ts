@@ -213,7 +213,7 @@ describe("Master Implementation — Approval Lifecycle, Role Hierarchy & Securit
       expect(myReq?.hospitalName).toBe("Dispur Emergency Trauma Center");
 
       // 2. While PENDING, applicant cannot access protected hospital operations
-      await expect(applicantCaller.rescue.operations.hospitals()).rejects.toThrow(/medical operations access is required/i);
+      await expect(applicantCaller.rescue.operations.hospitals()).rejects.toThrow(/hospital operations access is required/i);
 
       // 3. Admin reviews and approves Hospital registration
       const adminLogin = await publicCaller.auth.login({
@@ -239,12 +239,12 @@ describe("Master Implementation — Approval Lifecycle, Role Hierarchy & Securit
       expect(approval.success).toBe(true);
       expect(approval.hospitalId).toBeDefined();
 
-      // 4. After approval, user re-authenticates to get their updated role (ACTIVE medical)
+      // 4. After approval, user re-authenticates to get their updated role (ACTIVE hospital)
       const refreshedMedicalLogin = await publicCaller.auth.login({
         email: uniqueEmail,
         password: "password123",
       });
-      expect(refreshedMedicalLogin.user?.role).toBe("medical");
+      expect(refreshedMedicalLogin.user?.role).toBe("hospital");
 
       const activeMedicalCaller = appRouter.createCaller({
         req: { headers: {} } as any,
@@ -295,25 +295,25 @@ describe("Master Implementation — Approval Lifecycle, Role Hierarchy & Securit
       await expect(rescuerCaller.rescue.operations.analytics()).rejects.toThrow();
     });
 
-    it("blocks Medical staff from calling Admin procedures", async () => {
-      const medicalCaller = appRouter.createCaller({
+    it("blocks Hospital staff from calling Admin procedures", async () => {
+      const hospitalCaller = appRouter.createCaller({
         req: { headers: {} } as any,
         res: { cookie: vi.fn(), clearCookie: vi.fn() } as any,
-        user: { id: 3, openId: "user-medical", role: "medical" } as any,
+        user: { id: 3, openId: "user-medical", role: "hospital" } as any,
       });
 
-      await expect(medicalCaller.rescue.operations.rescueRoster()).rejects.toThrow();
+      await expect(hospitalCaller.rescue.operations.rescueRoster()).rejects.toThrow();
     });
 
-    it("prevents Hospital IDOR: Medical staff cannot modify unauthorized hospital resources", () => {
+    it("prevents Hospital IDOR: Hospital staff cannot modify unauthorized hospital resources", () => {
       const myHospitalId = 1;
       const otherHospitalId = 2;
 
       // Authorized on assigned hospital
-      expect(canEditHospitalResources("medical", myHospitalId, myHospitalId)).toBe(true);
+      expect(canEditHospitalResources("hospital", myHospitalId, myHospitalId)).toBe(true);
 
       // Blocked on other hospital
-      expect(canEditHospitalResources("medical", myHospitalId, otherHospitalId)).toBe(false);
+      expect(canEditHospitalResources("hospital", myHospitalId, otherHospitalId)).toBe(false);
 
       // Blocked for standard citizen
       expect(canEditHospitalResources("user", myHospitalId, myHospitalId)).toBe(false);

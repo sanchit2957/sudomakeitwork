@@ -29,7 +29,9 @@ import { useMobileLifecycle } from "./hooks/useMobileLifecycle";
 
 import { isNativeApp } from "./lib/apiConfig";
 import MobileCommandRestricted from "./components/MobileCommandRestricted";
-import { MedicalLogin, RescuerLogin } from "./pages/RoleLogin";
+import { HospitalLogin, MedicalLogin, RescuerLogin } from "./pages/RoleLogin";
+
+import HospitalPortal from "./pages/HospitalPortal";
 
 function Router() {
   useMobileLifecycle();
@@ -48,7 +50,8 @@ function Router() {
         {native ? <MobileCommandRestricted /> : <AdminLogin />}
       </Route>
       <Route path={"/responder/login"} component={RescuerLogin} />
-      <Route path={"/medical/login"} component={MedicalLogin} />
+      <Route path={"/hospital/login"} component={HospitalLogin} />
+      <Route path={"/medical/login"} component={HospitalLogin} />
 
       {/* Main Entry: Registration & Sign In first if not logged in */}
       <Route path={"/"}>
@@ -78,19 +81,21 @@ function Router() {
         <RoleGate><UserHospitalRegister /></RoleGate>
       </Route>
 
-      {/* Operational Wings */}
+      {/* Single Canonical Hospital Operations Portal */}
       <Route path={"/hospital/:rest*"}>
-        <UserMedical />
+        <HospitalPortal />
       </Route>
       <Route path={"/hospital"}>
-        <UserMedical />
+        <HospitalPortal />
       </Route>
       <Route path={"/medical/:rest*"}>
-        <UserMedical />
+        <HospitalPortal />
       </Route>
       <Route path={"/medical"}>
-        <UserMedical />
+        <HospitalPortal />
       </Route>
+
+      {/* Rescuer Portal */}
       <Route path={"/responder/:rest*"}>
         <UserResponder />
       </Route>

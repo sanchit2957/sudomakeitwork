@@ -13,17 +13,17 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Hospital,
   Lock,
   Mail,
   Radio,
   RefreshCw,
   ShieldAlert,
-  Stethoscope,
 } from "lucide-react";
 import React, { FormEvent, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
-type PortalRole = "rescuer" | "medical";
+type PortalRole = "rescuer" | "hospital";
 
 const portalConfig = {
   rescuer: {
@@ -34,13 +34,13 @@ const portalConfig = {
     destination: "/responder",
     icon: Radio,
   },
-  medical: {
-    title: "Medical Portal",
-    heading: "Medical Login",
-    description: "Restricted access for authorized hospital staff & triage centers.",
-    prompt: "Enter your verified medical credentials or Email OTP",
-    destination: "/medical",
-    icon: Stethoscope,
+  hospital: {
+    title: "Hospital Portal",
+    heading: "Hospital Login",
+    description: "Restricted access for authorized hospital operations staff & triage centers.",
+    prompt: "Enter your verified hospital credentials or Email OTP",
+    destination: "/hospital",
+    icon: Hospital,
   },
 } as const;
 
@@ -77,10 +77,12 @@ export function RoleLogin({ role }: { role: PortalRole }) {
     setErrorMessage("");
     try {
       const result = await login({ email: email.trim(), password });
-      if (result.user?.role !== role && result.user?.role !== "admin") {
+      const userRole = result.user?.role;
+      const isAuthorized = userRole === role || userRole === "admin" || (role === "hospital" && userRole === "medical");
+      if (!isAuthorized) {
         await logout();
         throw new Error(
-          `This account is not authorized for the ${role === "rescuer" ? "Rescuer" : "Medical"} Portal.`
+          `This account is not authorized for the ${role === "rescuer" ? "Rescuer" : "Hospital"} Portal.`
         );
       }
       setLocation(config.destination);
@@ -113,9 +115,10 @@ export function RoleLogin({ role }: { role: PortalRole }) {
     }
   };
 
-  const handleVerifyOtp = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!otpCode || otpCode.length < 6) {
+  const handleVerifyOtp = async (codeToVerify?: string, e?: FormEvent) => {
+    if (e) e.preventDefault();
+    const code = (typeof codeToVerify === "string" ? codeToVerify : otpCode).trim();
+    if (!code || code.length < 6) {
       setErrorMessage("Please enter the complete 6-digit code.");
       return;
     }
@@ -125,12 +128,14 @@ export function RoleLogin({ role }: { role: PortalRole }) {
       if (verifyEmailOtp) {
         const res = await verifyEmailOtp({
           email: email.trim(),
-          token: otpCode,
+          token: code,
         });
-        if (res.user?.role !== role && res.user?.role !== "admin") {
+        const userRole = res.user?.role;
+        const isAuthorized = userRole === role || userRole === "admin" || (role === "hospital" && userRole === "medical");
+        if (!isAuthorized) {
           await logout();
           throw new Error(
-            `This account is not authorized for the ${role === "rescuer" ? "Rescuer" : "Medical"} Portal.`
+            `This account is not authorized for the ${role === "rescuer" ? "Rescuer" : "Hospital"} Portal.`
           );
         }
       }
@@ -173,7 +178,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
             {successMessage && <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><div>{successMessage}</div></div>}
 
             {otpStep === "verify" ? (
-              <form onSubmit={handleVerifyOtp} className="space-y-5 text-center">
+              <form onSubmit={(e) => handleVerifyOtp(otpCode, e)} className="space-y-5 text-center">
                 <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-[#0f766e]/10 text-[#0f766e] dark:text-emerald-400">
                   <Mail className="h-5 w-5" />
                 </div>
@@ -183,7 +188,19 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                 </div>
 
                 <div className="flex justify-center">
-                  <InputOTP maxLength={6} value={otpCode} onChange={setOtpCode} autoFocus>
+                  <InputOTP
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(val) => {
+                      const clean = val.replace(/\D/g, "");
+                      setOtpCode(clean);
+                      setErrorMessage("");
+                      if (clean.length === 6 && !isSubmitting) {
+                        void handleVerifyOtp(clean);
+                      }
+                    }}
+                    autoFocus
+                  >
                     <InputOTPGroup>
                       <InputOTPSlot index={0} className="h-11 w-9 text-sm font-bold sm:h-12 sm:w-11" />
                       <InputOTPSlot index={1} className="h-11 w-9 text-sm font-bold sm:h-12 sm:w-11" />
@@ -219,7 +236,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div><Label htmlFor={`${role}-email`} className="text-xs font-bold">Email or Username</Label><Input id={`${role}-email`} type="text" value={email} onChange={event => setEmail(event.target.value)} className="mt-1.5 h-11 rounded-xl" required /></div>
                     <div><Label htmlFor={`${role}-password`} className="text-xs font-bold">Password</Label><div className="relative mt-1.5"><Input id={`${role}-password`} type={showPassword ? "text" : "password"} value={password} onChange={event => setPassword(event.target.value)} className="h-11 rounded-xl pr-11" required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(value => !value)} className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>
-                    <Button type="submit" disabled={isSubmitting} className="h-12 w-full rounded-xl bg-[#0f766e] font-bold text-white shadow-md hover:bg-[#0f766e]/90"><Icon className="mr-2 h-4 w-4" />{isSubmitting ? "Authenticating…" : `Sign In to ${role === "rescuer" ? "Rescuer" : "Medical"}`}</Button>
+                    <Button type="submit" disabled={isSubmitting} className="h-12 w-full rounded-xl bg-[#0f766e] font-bold text-white shadow-md hover:bg-[#0f766e]/90"><Icon className="mr-2 h-4 w-4" />{isSubmitting ? "Authenticating…" : `Sign In to ${role === "rescuer" ? "Rescuer" : "Hospital"}`}</Button>
                   </form>
                 ) : (
                   <form onSubmit={handleSendOtp} className="space-y-4">
@@ -245,7 +262,8 @@ export function RescuerLogin() {
   return <RoleLogin role="rescuer" />;
 }
 
-export function MedicalLogin() {
-  return <RoleLogin role="medical" />;
+export function HospitalLogin() {
+  return <RoleLogin role="hospital" />;
 }
 
+export const MedicalLogin = HospitalLogin;

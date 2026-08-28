@@ -34,6 +34,7 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
     pathname.startsWith("/admin/login") ||
     pathname.startsWith("/user/login") ||
     pathname.startsWith("/responder/login") ||
+    pathname.startsWith("/hospital/login") ||
     pathname.startsWith("/medical/login")
   ) {
     return;

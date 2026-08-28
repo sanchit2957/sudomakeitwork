@@ -18,14 +18,20 @@ import {
   upsertUser,
 } from "./db";
 import { rescueRouter } from "./routers/rescue";
+import { ENV } from "./_core/env";
 
-// The sole admin email — hardcoded for security, not from user_metadata
-const ADMIN_EMAIL = "sanchitpandit30@yahoo.com";
-
-function resolveRole(email: string, existingRole?: string): "user" | "rescuer" | "medical" | "admin" {
-  if (email.toLowerCase().trim() === ADMIN_EMAIL) return "admin";
-  // Preserve existing elevated roles (rescuer/medical) that were granted by admin approval
-  if (existingRole === "rescuer" || existingRole === "medical" || existingRole === "admin") return existingRole;
+function resolveVerifiedRole(email: string, existingRole?: string): "user" | "rescuer" | "hospital" | "admin" {
+  // Only grant admin if ADMIN_EMAIL environment variable is explicitly configured on the server
+  if (ENV.adminEmail && ENV.adminEmail.trim() !== "" && email.toLowerCase().trim() === ENV.adminEmail.toLowerCase().trim()) {
+    return "admin";
+  }
+  // Canonicalize legacy 'medical' role to 'hospital'
+  if (existingRole === "medical" || existingRole === "hospital") {
+    return "hospital";
+  }
+  if (existingRole === "rescuer" || existingRole === "admin") {
+    return existingRole;
+  }
   return "user";
 }
 
@@ -48,14 +54,14 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        // If Supabase token is provided, verify and sync
+        // If Supabase token is provided, verify against Supabase server-side
         if (input.supabaseToken) {
           const { verifySupabaseToken } = await import("./_core/supabase");
           const sbUser = await verifySupabaseToken(input.supabaseToken);
           if (sbUser && sbUser.email) {
             const emailVal = sbUser.email.trim().toLowerCase();
             let dbUser = (await getUserByOpenId(sbUser.id)) || (await getUserByEmail(emailVal));
-            const roleVal = resolveRole(emailVal, dbUser?.role);
+            const roleVal = resolveVerifiedRole(emailVal, dbUser?.role);
             if (!dbUser) {
               const nameVal = sbUser.user_metadata?.name || sbUser.user_metadata?.full_name || emailVal.split("@")[0];
               await upsertUser({
@@ -75,7 +81,7 @@ export const appRouter = router({
             if (dbUser) {
               if (roleVal === "rescuer") {
                 await ensureRescuerProfile(dbUser.id, sbUser.user_metadata?.callSign || "Field Unit");
-              } else if (roleVal === "medical") {
+              } else if (roleVal === "hospital") {
                 await ensureHospitalStaffProfile(dbUser.id);
               }
 
@@ -89,29 +95,39 @@ export const appRouter = router({
               };
             }
           }
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid or expired OTP verification token." });
         }
 
         if (!input.email || !input.password) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Email and password are required." });
         }
         
-        const emailInput = input.email.trim();
+        const emailInput = input.email.trim().toLowerCase();
         const user = await getUserByEmail(emailInput);
-        
-        if (!user || !verifyPassword(input.password, user.password)) {
+        if (!user || !user.password) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
         }
-        
-        await upsertUser({ ...user, lastSignedIn: new Date() });
-        const dbUser = user;
 
-        const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User" });
+        const isValid = verifyPassword(input.password.trim(), user.password);
+        if (!isValid) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+        }
+
+        // Canonicalize legacy medical role
+        if (user.role === "medical") {
+          user.role = "hospital" as any;
+          await upsertUser({ ...user, role: "hospital" as any });
+        }
+
+        await upsertUser({ ...user, lastSignedIn: new Date() });
+
+        const sessionToken = await sdk.createSessionToken(user.openId, { name: user.name || "User" });
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
 
         return {
           success: true,
-          user: sanitizeUser(dbUser),
+          user: sanitizeUser(user),
           sessionToken,
         };
       }),
@@ -136,13 +152,12 @@ export const appRouter = router({
         }
         const openId = input.supabaseUserId || `user-${emailVal.replace(/[^a-z0-9]/g, "-")}`;
         const hashedPassword = hashPassword(input.password.trim());
-        const registrationRole = resolveRole(emailVal);
         await upsertUser({
           openId,
           name: input.name.trim(),
           email: emailVal,
           password: hashedPassword,
-          role: registrationRole,
+          role: "user", // Public registration ALWAYS assigns role: user
           loginMethod: input.supabaseUserId ? "supabase-auth" : "platform-login",
           lastSignedIn: new Date(),
         });

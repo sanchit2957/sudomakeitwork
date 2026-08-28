@@ -866,7 +866,7 @@ export const rescueRouter = router({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message:
-            ctx.user.role === "medical"
+            ctx.user.role === "hospital" || ctx.user.role === "medical"
               ? "This account is already authorized as hospital staff."
               : "Only a standard signed-in account can submit a hospital registration request.",
         });
@@ -1012,7 +1012,7 @@ export const rescueRouter = router({
     }),
     hospitalCases: medicalOperationsProcedure.query(async ({ ctx }) => {
       let hospitalId: number | null = null;
-      if (ctx.user.role === "medical") {
+      if (ctx.user.role === "hospital" || ctx.user.role === "medical") {
         const db = await database();
         if (db) {
           try {
@@ -1159,7 +1159,7 @@ export const rescueRouter = router({
       }),
     hospitalActivityTimeline: medicalOperationsProcedure.query(async ({ ctx }) => {
       let hospitalId: number | null = null;
-      if (ctx.user.role === "medical") {
+      if (ctx.user.role === "hospital" || ctx.user.role === "medical") {
         const db = await database();
         if (db) {
           try {
@@ -1333,6 +1333,32 @@ export const rescueRouter = router({
         await writeAudit(ctx.user.id, "medical.promote", "user", input.userId, "Authorized medical operations access");
         return { success: true };
       }),
+    promoteHospital: adminProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        let target: any = Array.from(_memoryUsers.values()).find(u => u.id === input.userId);
+        const db = await database();
+        if (db) {
+          try {
+            const dbTarget = (await db.select().from(users).where(eq(users.id, input.userId)).limit(1))[0];
+            if (dbTarget) target = dbTarget;
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "User not found." });
+        if (target.role !== "user")
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Only a standard signed-in user can be authorized as hospital staff.",
+          });
+        if (db) {
+          try {
+            await db.update(users).set({ role: "hospital" }).where(eq(users.id, input.userId));
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        }
+        target.role = "hospital";
+        await writeAudit(ctx.user.id, "hospital.promote", "user", input.userId, "Authorized hospital operations access");
+        return { success: true };
+      }),
     reviewHospitalRegistration: adminProcedure
       .input(
         z.object({
@@ -1398,7 +1424,7 @@ export const rescueRouter = router({
                 updatedBy: request.userId,
               });
               hospitalId = Number(created[0].insertId);
-              await db.update(users).set({ role: "medical" }).where(eq(users.id, request.userId));
+              await db.update(users).set({ role: "hospital" }).where(eq(users.id, request.userId));
               await db.insert(hospitalStaffProfiles).values({
                 userId: request.userId,
                 hospitalId,
@@ -1437,7 +1463,7 @@ export const rescueRouter = router({
             updatedAt: new Date(),
           });
           const u = Array.from(_memoryUsers.values()).find(user => user.id === request.userId);
-          if (u) u.role = "medical";
+          if (u) u.role = "hospital";
           await writeAudit(
             ctx.user.id,
             "hospitalRegistration.approved",
@@ -1776,7 +1802,7 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        if (ctx.user.role !== "medical")
+        if (ctx.user.role !== "hospital" && ctx.user.role !== "medical")
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "Only an approved hospital staff account can publish live hospital resources.",
@@ -2541,15 +2567,15 @@ export const rescueRouter = router({
     getForUser: publicProcedure
       .input(z.object({ userId: z.number() }))
       .query(async ({ input, ctx }) => {
-        if (!ctx.user || (ctx.user.role !== "admin" && ctx.user.role !== "rescuer" && ctx.user.role !== "medical" && ctx.user.id !== input.userId)) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access restricted to emergency personnel (Admin, Rescuer, Medical)." });
+        if (!ctx.user || (ctx.user.role !== "admin" && ctx.user.role !== "rescuer" && ctx.user.role !== "hospital" && ctx.user.role !== "medical" && ctx.user.id !== input.userId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access restricted to emergency personnel (Admin, Rescuer, Hospital)." });
         }
         return await getEmergencyContactsByUserId(input.userId);
       }),
     getForIncident: publicProcedure
       .input(z.object({ incidentId: z.number() }))
       .query(async ({ input, ctx }) => {
-        if (!ctx.user || (ctx.user.role !== "admin" && ctx.user.role !== "rescuer" && ctx.user.role !== "medical")) {
+        if (!ctx.user || (ctx.user.role !== "admin" && ctx.user.role !== "rescuer" && ctx.user.role !== "hospital" && ctx.user.role !== "medical")) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Access restricted to emergency response personnel." });
         }
         const incident = await getIncidentById(input.incidentId);

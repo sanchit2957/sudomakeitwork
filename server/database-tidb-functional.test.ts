@@ -28,13 +28,13 @@ describe("Real Database Functionality & Workflows", () => {
     expect(rescuerLogin.user?.role).toBe("rescuer");
     expect(rescuerLogin.user?.email).toBe("rescuer@assamrescue.gov.in");
 
-    // 3. Medical login
+    // 3. Hospital login
     const medicalLogin = await caller.auth.login({
       email: "medical@assamrescue.gov.in",
       password: "medical",
     });
     expect(medicalLogin.success).toBe(true);
-    expect(medicalLogin.user?.role).toBe("medical");
+    expect(medicalLogin.user?.role).toBe("hospital");
     expect(medicalLogin.user?.email).toBe("medical@assamrescue.gov.in");
 
     // 4. Admin login

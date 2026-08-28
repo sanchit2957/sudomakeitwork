@@ -10,6 +10,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   supabaseVerifyOtp,
+  getSupabaseSession,
 } from "@/lib/supabase";
 
 type UseAuthOptions = {
@@ -162,10 +163,14 @@ export function useAuth(options: UseAuthOptions = {}) {
       token: string;
       name?: string;
       phone?: string;
-      role?: "user" | "rescuer" | "medical" | "admin";
+      role?: "user" | "rescuer" | "hospital" | "medical" | "admin";
     }) => {
       const sbRes = await supabaseVerifyOtp(params.email, params.token, "email");
-      const sbToken = sbRes?.session?.access_token;
+      let sbToken = sbRes?.session?.access_token;
+      if (!sbToken) {
+        const session = await getSupabaseSession();
+        sbToken = session?.access_token;
+      }
       const res = await loginMutation.mutateAsync({
         email: params.email,
         password: "supabase-otp-verified",
@@ -261,6 +266,7 @@ export function useAuth(options: UseAuthOptions = {}) {
       pathname.startsWith("/admin/login") ||
       pathname.startsWith("/user/login") ||
       pathname.startsWith("/responder/login") ||
+      pathname.startsWith("/hospital/login") ||
       pathname.startsWith("/medical/login")
     ) {
       return;

@@ -9,11 +9,12 @@ describe("safety assistance handling policy", () => {
     }
   });
 
-  it("limits medical staff to medical assistance", () => {
+  it("limits hospital and medical staff to medical assistance", () => {
+    expect(canHandleSafetyAssistance("hospital", "medical")).toBe(true);
+    expect(canHandleSafetyAssistance("hospital", "shelter")).toBe(false);
+    expect(canHandleSafetyAssistance("hospital", "food")).toBe(false);
+    expect(canHandleSafetyAssistance("hospital", "protection")).toBe(false);
     expect(canHandleSafetyAssistance("medical", "medical")).toBe(true);
-    expect(canHandleSafetyAssistance("medical", "shelter")).toBe(false);
-    expect(canHandleSafetyAssistance("medical", "food")).toBe(false);
-    expect(canHandleSafetyAssistance("medical", "protection")).toBe(false);
   });
 
   it("permits only an auditable new-to-acknowledged-to-resolved workflow", () => {
@@ -24,7 +25,8 @@ describe("safety assistance handling policy", () => {
     expect(canTransitionSafetyAssistance("resolved", "resolved")).toBe(false);
   });
 
-  it("filters medical queues to medical requests while government and field queues can see every category", () => {
+  it("filters hospital and medical queues to medical requests while government and field queues can see every category", () => {
+    expect(visibleSafetyCategoriesForRole("hospital")).toEqual(["medical"]);
     expect(visibleSafetyCategoriesForRole("medical")).toEqual(["medical"]);
     expect(visibleSafetyCategoriesForRole("admin")).toEqual(["shelter", "food", "medical", "protection"]);
     expect(visibleSafetyCategoriesForRole("rescuer")).toEqual(["shelter", "food", "medical", "protection"]);

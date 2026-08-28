@@ -125,9 +125,10 @@ export default function UserLogin() {
     }
   };
 
-  const handleVerifyOtp = async (e?: FormEvent) => {
+  const handleVerifyOtp = async (codeToVerify?: string, e?: FormEvent) => {
     if (e) e.preventDefault();
-    if (!otpCode || otpCode.length < 6) {
+    const code = (typeof codeToVerify === "string" ? codeToVerify : otpCode).trim();
+    if (!code || code.length < 6) {
       setErrorMessage("Please enter the complete 6-digit verification code.");
       return;
     }
@@ -135,17 +136,19 @@ export default function UserLogin() {
     setErrorMessage("");
     try {
       if (verifyEmailOtp) {
-        await verifyEmailOtp({
+        const res = await verifyEmailOtp({
           email: otpEmail,
-          token: otpCode,
+          token: code,
           name: regName.trim() || undefined,
           phone: regPhone.trim() || undefined,
         });
+        setSuccessMessage("Email verified successfully! Establishing session…");
+        const targetRole = res?.user?.role || "user";
+        const destination = getDashboardDestinationForRole(targetRole);
+        setLocation(destination);
       }
-      setSuccessMessage("Email verified successfully!");
-      setLocation("/");
     } catch (err: any) {
-      setErrorMessage(err?.message || "Invalid or expired OTP. Please try again.");
+      setErrorMessage(err?.message || "Invalid or expired OTP. Please check your code and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -166,8 +169,9 @@ export default function UserLogin() {
         return "/command";
       case "rescuer":
         return "/responder";
+      case "hospital":
       case "medical":
-        return "/medical";
+        return "/hospital";
       default:
         return "/";
     }
@@ -338,12 +342,19 @@ export default function UserLogin() {
                   💡 <strong>Tip:</strong> You can enter the 6-digit code below <strong>or</strong> just click the login link in your email to sign in instantly!
                 </div>
 
-                <form onSubmit={handleVerifyOtp} className="mt-5 space-y-5">
+                <form onSubmit={(e) => handleVerifyOtp(otpCode, e)} className="mt-5 space-y-5">
                   <div className="flex justify-center">
                     <InputOTP
                       maxLength={6}
                       value={otpCode}
-                      onChange={(val) => setOtpCode(val)}
+                      onChange={(val) => {
+                        const clean = val.replace(/\D/g, "");
+                        setOtpCode(clean);
+                        setErrorMessage("");
+                        if (clean.length === 6 && !isSubmitting) {
+                          void handleVerifyOtp(clean);
+                        }
+                      }}
                       autoFocus
                     >
                       <InputOTPGroup>
@@ -562,19 +573,19 @@ export default function UserLogin() {
               <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#0f766e] group-hover:translate-x-0.5 transition-all" />
             </button>
 
-            {/* Hospital & Medical Card */}
+            {/* Hospital Portal Card */}
             <button
               type="button"
-              onClick={() => setLocation("/medical/login")}
+              onClick={() => setLocation("/hospital/login")}
               className="group flex items-center justify-between rounded-2xl border border-black/10 bg-white p-3.5 text-left shadow-sm transition hover:border-[#0f766e]/40 hover:shadow-md dark:border-white/10 dark:bg-[#141517] dark:hover:border-emerald-500/40"
             >
               <div className="flex items-center gap-3">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 group-hover:scale-105 transition-transform">
-                  <Stethoscope className="h-5 w-5" />
+                  <Building2 className="h-5 w-5" />
                 </span>
                 <div>
-                  <h4 className="text-xs font-black text-foreground">Hospital & Medical</h4>
-                  <p className="text-[11px] text-muted-foreground">Duty Doctors & Bed Coordinators</p>
+                  <h4 className="text-xs font-black text-foreground">Hospital Portal</h4>
+                  <p className="text-[11px] text-muted-foreground">Emergency Bed & Resource Desk</p>
                 </div>
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#0f766e] group-hover:translate-x-0.5 transition-all" />

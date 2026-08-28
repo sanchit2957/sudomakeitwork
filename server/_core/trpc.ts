@@ -55,20 +55,23 @@ export const rescuerProcedure = protectedProcedure.use(
   }),
 );
 
-export const medicalOperationsProcedure = protectedProcedure.use(
+export const hospitalProcedure = protectedProcedure.use(
   t.middleware(async opts => {
     const user = opts.ctx.user;
-    if (!user || (user.role !== "medical" && user.role !== "admin")) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Authorized medical operations access is required." });
+    if (!user || (user.role !== "hospital" && user.role !== "medical" && user.role !== "admin")) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Authorized hospital operations access is required." });
     }
     return opts.next({ ctx: { ...opts.ctx, user } });
   }),
 );
 
+export const hospitalOperationsProcedure = hospitalProcedure;
+export const medicalOperationsProcedure = hospitalProcedure;
+
 export const operationalProcedure = protectedProcedure.use(
   t.middleware(async opts => {
     const user = opts.ctx.user;
-    if (!user || (user.role !== "rescuer" && user.role !== "medical" && user.role !== "admin")) {
+    if (!user || (user.role !== "rescuer" && user.role !== "hospital" && user.role !== "medical" && user.role !== "admin")) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Operational access is required." });
     }
     return opts.next({ ctx: { ...opts.ctx, user } });

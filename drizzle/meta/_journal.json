@@ -99,6 +99,13 @@
       "when": 1787509656271,
       "tag": "0013_gorgeous_wonder_man",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1787600000000,
+      "tag": "0014_hospital_case_notifications",
+      "breakpoints": true
     }
   ]
 }

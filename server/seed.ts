@@ -23,7 +23,7 @@ export interface SeedResult {
   alreadyInitialized: boolean;
 }
 
-export function getInitialSeedPassword(role: "admin" | "rescuer" | "medical" | "user", defaultDev: string): string {
+export function getInitialSeedPassword(role: "admin" | "rescuer" | "hospital" | "medical" | "user", defaultDev: string): string {
   const isProduction = process.env.NODE_ENV === "production";
   if (!isProduction) {
     return defaultDev;
@@ -34,8 +34,8 @@ export function getInitialSeedPassword(role: "admin" | "rescuer" | "medical" | "
   if (role === "rescuer") {
     return process.env.RESCUER_INITIAL_PASSWORD || crypto.randomBytes(16).toString("hex");
   }
-  if (role === "medical") {
-    return process.env.MEDICAL_INITIAL_PASSWORD || crypto.randomBytes(16).toString("hex");
+  if (role === "hospital" || role === "medical") {
+    return process.env.HOSPITAL_INITIAL_PASSWORD || process.env.MEDICAL_INITIAL_PASSWORD || crypto.randomBytes(16).toString("hex");
   }
   return process.env.CITIZEN_INITIAL_PASSWORD || crypto.randomBytes(16).toString("hex");
 }

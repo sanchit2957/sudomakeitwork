@@ -5,6 +5,8 @@ describe("rescuer registration policy", () => {
   it("allows ordinary accounts to request field authorization but prevents role escalation by responders and administrators", () => {
     expect(canRequestRescuerRegistration("user")).toBe(true);
     expect(canRequestRescuerRegistration("rescuer")).toBe(false);
+    expect(canRequestRescuerRegistration("hospital")).toBe(false);
+    expect(canRequestRescuerRegistration("medical")).toBe(false);
     expect(canRequestRescuerRegistration("admin")).toBe(false);
   });
 

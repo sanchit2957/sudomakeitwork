@@ -48,7 +48,7 @@ describe("Database Seed & Account Integrity", () => {
     const medical = await getUserByEmail("medical@assamrescue.gov.in");
     expect(medical).toBeDefined();
     expect(verifyPassword("medical", medical?.password)).toBe(true);
-    expect(medical?.role).toBe("medical");
+    expect(medical?.role).toBe("hospital");
 
     const admin = await getUserByEmail("admin@assamrescue.gov.in");
     expect(admin).toBeDefined();

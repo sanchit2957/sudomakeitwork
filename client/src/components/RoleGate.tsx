@@ -7,7 +7,7 @@ export function RoleGate({
   roles,
   children,
 }: {
-  roles?: Array<"user" | "rescuer" | "medical" | "admin">;
+  roles?: Array<"user" | "rescuer" | "hospital" | "medical" | "admin">;
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
@@ -26,7 +26,14 @@ export function RoleGate({
 
   if (roles && roles.length > 0 && !roles.includes(user.role)) {
     // If the user's role is not in the allowed list, send them to their role dashboard
-    const dashboard = user.role === "admin" ? "/command" : user.role === "medical" ? "/medical" : user.role === "rescuer" ? "/responder" : "/";
+    const dashboard =
+      user.role === "admin"
+        ? "/command"
+        : user.role === "hospital" || user.role === "medical"
+        ? "/hospital"
+        : user.role === "rescuer"
+        ? "/responder"
+        : "/";
     return <Redirect to={dashboard} />;
   }
 

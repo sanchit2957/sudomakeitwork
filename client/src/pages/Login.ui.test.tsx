@@ -90,16 +90,16 @@ describe("Login UI & Role Access Gate", () => {
 
     expect(screen.getByText("Emergency Personnel Portals")).toBeTruthy();
     const rescuerCard = screen.getByRole("button", { name: /Field Rescuer/i });
-    const medicalCard = screen.getByRole("button", { name: /Hospital & Medical/i });
+    const hospitalCard = screen.getByRole("button", { name: /Hospital Portal/i });
 
     expect(rescuerCard).toBeTruthy();
-    expect(medicalCard).toBeTruthy();
+    expect(hospitalCard).toBeTruthy();
 
     fireEvent.click(rescuerCard);
     expect(mockSetLocation).toHaveBeenCalledWith("/responder/login");
 
-    fireEvent.click(medicalCard);
-    expect(mockSetLocation).toHaveBeenCalledWith("/medical/login");
+    fireEvent.click(hospitalCard);
+    expect(mockSetLocation).toHaveBeenCalledWith("/hospital/login");
   });
 
   it("displays active session status banner when user is logged in", () => {

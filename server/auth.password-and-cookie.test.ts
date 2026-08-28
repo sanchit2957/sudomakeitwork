@@ -152,4 +152,18 @@ describe("User Sanitization & Authentication Security", () => {
 
     await expect(sdk.authenticateRequest(mockReq)).rejects.toThrow();
   });
+
+  it("rejects login with invalid or unverified supabaseToken", async () => {
+    const { ctx } = createTestContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.auth.login({
+        email: "user@example.com",
+        supabaseToken: "invalid-token-12345",
+      })
+    ).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+  });
 });

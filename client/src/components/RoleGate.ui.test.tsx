@@ -27,10 +27,10 @@ describe("RoleGate strict access portals", () => {
   });
 
   it("allows access when role matches", () => {
-    mockUser = { role: "medical" };
-    const medical = render(<RoleGate roles={["medical"]}><span>Medical Workspace Content</span></RoleGate>);
-    expect(medical.getByText("Medical Workspace Content")).toBeTruthy();
-    expect(medical.queryByTestId("redirect")).toBeNull();
-    medical.unmount();
+    mockUser = { role: "hospital" };
+    const hospital = render(<RoleGate roles={["hospital"]}><span>Hospital Workspace Content</span></RoleGate>);
+    expect(hospital.getByText("Hospital Workspace Content")).toBeTruthy();
+    expect(hospital.queryByTestId("redirect")).toBeNull();
+    hospital.unmount();
   });
 });
