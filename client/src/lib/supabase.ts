@@ -58,6 +58,62 @@ export async function supabaseSignUp(email: string, password: string, metadata?:
   return data;
 }
 
+export async function supabaseSendOtp(email: string, options?: { shouldCreateUser?: boolean; metadata?: Record<string, any> }) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+  }
+  const { data, error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: {
+      shouldCreateUser: options?.shouldCreateUser ?? true,
+      data: options?.metadata,
+    },
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function supabaseVerifyOtp(email: string, token: string, type: "email" | "signup" = "email") {
+  if (!supabase) {
+    throw new Error("Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+  }
+  // Try with email type first, or fallback to signup
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: token.trim(),
+      type,
+    });
+    if (error) {
+      if (type === "email") {
+        const retry = await supabase.auth.verifyOtp({
+          email: email.trim(),
+          token: token.trim(),
+          type: "signup",
+        });
+        if (retry.error) throw retry.error;
+        return retry.data;
+      }
+      throw error;
+    }
+    return data;
+  } catch (err: any) {
+    throw err;
+  }
+}
+
+export async function supabaseResendOtp(email: string, type: "signup" | "email_change" = "signup") {
+  if (!supabase) {
+    throw new Error("Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+  }
+  const { data, error } = await supabase.auth.resend({
+    type,
+    email: email.trim(),
+  });
+  if (error) throw error;
+  return data;
+}
+
 export async function supabaseSignOut() {
   if (!supabase) return;
   const { error } = await supabase.auth.signOut();
@@ -71,3 +127,4 @@ export async function getSupabaseSession() {
   const { data } = await supabase.auth.getSession();
   return data.session;
 }
+

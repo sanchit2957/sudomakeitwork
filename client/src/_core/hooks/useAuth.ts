@@ -4,9 +4,11 @@ import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
 import {
   isSupabaseConfigured,
+  supabaseSendOtp,
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp,
+  supabaseVerifyOtp,
 } from "@/lib/supabase";
 
 type UseAuthOptions = {
@@ -143,6 +145,38 @@ export function useAuth(options: UseAuthOptions = {}) {
     [registerMutation, utils]
   );
 
+  const sendEmailOtp = useCallback(async (email: string, metadata?: Record<string, any>) => {
+    return await supabaseSendOtp(email, { metadata });
+  }, []);
+
+  const verifyEmailOtp = useCallback(
+    async (params: {
+      email: string;
+      token: string;
+      name?: string;
+      phone?: string;
+      role?: "user" | "rescuer" | "medical" | "admin";
+    }) => {
+      const sbRes = await supabaseVerifyOtp(params.email, params.token, "email");
+      const sbToken = sbRes?.session?.access_token;
+      const res = await loginMutation.mutateAsync({
+        email: params.email,
+        password: "supabase-otp-verified",
+        supabaseToken: sbToken,
+      });
+      if (res.sessionToken) {
+        try {
+          localStorage.setItem("app-runtime-session-token", res.sessionToken);
+          localStorage.setItem("app-runtime-user-info", JSON.stringify(res.user));
+        } catch {}
+      }
+      utils.auth.me.setData(undefined, res.user as any);
+      await utils.auth.me.invalidate();
+      return res;
+    },
+    [loginMutation, utils]
+  );
+
   const logout = useCallback(async () => {
     try {
       await supabaseSignOut();
@@ -245,6 +279,8 @@ export function useAuth(options: UseAuthOptions = {}) {
     login,
     loginAsRole,
     register,
+    sendEmailOtp,
+    verifyEmailOtp,
     updateProfile,
     logout,
   };

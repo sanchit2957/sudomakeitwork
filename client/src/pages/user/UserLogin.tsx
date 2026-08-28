@@ -3,6 +3,11 @@ import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { isNativeApp } from "@/lib/apiConfig";
 import {
@@ -12,10 +17,13 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  KeyRound,
   LifeBuoy,
   Lock,
   LogOut,
+  Mail,
   Radio,
+  RefreshCw,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -24,11 +32,11 @@ import {
   UserCheck,
   UserPlus,
 } from "lucide-react";
-import React, { FormEvent, useState } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
 export default function UserLogin() {
-  const { user, login, register, logout } = useAuth();
+  const { user, login, register, sendEmailOtp, verifyEmailOtp, logout } = useAuth();
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
   const isMobileApp = isNativeApp();
@@ -41,6 +49,15 @@ export default function UserLogin() {
 
   // Top level auth mode: "signin" or "register"
   const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
+  
+  // Sign in method: "password" or "otp"
+  const [signInMethod, setSignInMethod] = useState<"password" | "otp">("password");
+
+  // OTP Verification flow state
+  const [otpStep, setOtpStep] = useState<"input" | "verify">("input");
+  const [otpEmail, setOtpEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpCountdown, setOtpCountdown] = useState(0);
 
   // Sign In fields
   const [email, setEmail] = useState("citizen@assamrescue.gov.in");
@@ -58,6 +75,14 @@ export default function UserLogin() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [registrationSubmitted, setRegistrationSubmitted] = useState(false);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCountdown]);
 
   const handleSignIn = async (e: FormEvent) => {
     e.preventDefault();
@@ -87,6 +112,55 @@ export default function UserLogin() {
     }
   };
 
+  const handleSendOtp = async (targetEmail: string) => {
+    if (!targetEmail || !targetEmail.includes("@")) {
+      setErrorMessage("Please enter a valid email address.");
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      if (sendEmailOtp) {
+        await sendEmailOtp(targetEmail.trim());
+      }
+      setOtpEmail(targetEmail.trim());
+      setOtpStep("verify");
+      setOtpCountdown(60);
+      setSuccessMessage(`A 6-digit verification code was sent to ${targetEmail.trim()}. Check your inbox.`);
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Failed to send verification code. Please verify your Supabase settings.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
+    if (!otpCode || otpCode.length < 6) {
+      setErrorMessage("Please enter the complete 6-digit verification code.");
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      if (verifyEmailOtp) {
+        await verifyEmailOtp({
+          email: otpEmail,
+          token: otpCode,
+          name: regName.trim() || undefined,
+          phone: regPhone.trim() || undefined,
+        });
+      }
+      setSuccessMessage("Email verified successfully!");
+      setLocation("/");
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Invalid or expired OTP. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -107,9 +181,18 @@ export default function UserLogin() {
         });
       }
 
-      setLocation("/");
+      setRegistrationSubmitted(true);
+      setSuccessMessage("Account created successfully!");
     } catch (err: any) {
-      setErrorMessage(err?.message || "Registration failed. Please try again.");
+      // If error indicates email confirmation required, offer OTP flow
+      if (err?.message?.toLowerCase().includes("email") || err?.message?.toLowerCase().includes("confirm") || err?.message?.toLowerCase().includes("otp")) {
+        setOtpEmail(regEmail.trim());
+        setOtpStep("verify");
+        setOtpCountdown(60);
+        setSuccessMessage(`Verification code sent to ${regEmail.trim()}! Enter it below.`);
+      } else {
+        setErrorMessage(err?.message || "Registration failed. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -273,60 +356,194 @@ export default function UserLogin() {
               </div>
             )}
 
-            {authMode === "signin" ? (
-              /* CITIZEN SIGN IN FORM */
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div>
-                  <Label htmlFor="email" className="text-xs font-bold text-foreground">Email or Username</Label>
-                  <Input
-                    id="email"
-                    type="text"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email or username"
-                    className="mt-1.5 h-11 rounded-xl text-sm"
-                    autoComplete="username"
-                    required
-                  />
+            {/* STEP: OTP VERIFICATION VIEW */}
+            {otpStep === "verify" ? (
+              <div className="py-2 text-center">
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#0f766e]/10 text-[#0f766e] dark:text-emerald-400">
+                  <Mail className="h-6 w-6" />
                 </div>
+                <h3 className="mt-3 text-lg font-black tracking-tight">Enter Verification Code</h3>
+                <p className="mx-auto mt-1.5 max-w-xs text-xs text-muted-foreground">
+                  We sent a 6-digit verification OTP to <span className="font-bold text-foreground">{otpEmail}</span>
+                </p>
 
-                <div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-xs font-bold text-foreground">Password</Label>
+                <form onSubmit={handleVerifyOtp} className="mt-6 space-y-5">
+                  <div className="flex justify-center">
+                    <InputOTP
+                      maxLength={6}
+                      value={otpCode}
+                      onChange={(val) => setOtpCode(val)}
+                      autoFocus
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} className="h-12 w-10 text-base font-bold sm:h-14 sm:w-12" />
+                        <InputOTPSlot index={1} className="h-12 w-10 text-base font-bold sm:h-14 sm:w-12" />
+                        <InputOTPSlot index={2} className="h-12 w-10 text-base font-bold sm:h-14 sm:w-12" />
+                        <InputOTPSlot index={3} className="h-12 w-10 text-base font-bold sm:h-14 sm:w-12" />
+                        <InputOTPSlot index={4} className="h-12 w-10 text-base font-bold sm:h-14 sm:w-12" />
+                        <InputOTPSlot index={5} className="h-12 w-10 text-base font-bold sm:h-14 sm:w-12" />
+                      </InputOTPGroup>
+                    </InputOTP>
                   </div>
-                  <div className="relative mt-1.5">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="h-11 rounded-xl pr-10 text-sm"
-                      autoComplete="current-password"
-                      required
-                    />
+
+                  <div className="flex items-center justify-between text-xs px-2">
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      onClick={() => {
+                        setOtpStep("input");
+                        setOtpCode("");
+                        setErrorMessage("");
+                      }}
+                      className="font-medium text-muted-foreground hover:text-foreground hover:underline"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      Change Email
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={otpCountdown > 0 || isSubmitting}
+                      onClick={() => handleSendOtp(otpEmail)}
+                      className={`flex items-center gap-1 font-bold ${
+                        otpCountdown > 0
+                          ? "cursor-not-allowed text-muted-foreground"
+                          : "text-[#0f766e] hover:underline dark:text-emerald-400"
+                      }`}
+                    >
+                      <RefreshCw className={`h-3 w-3 ${otpCountdown > 0 ? "animate-spin" : ""}`} />
+                      {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Resend OTP"}
                     </button>
                   </div>
-                </div>
 
-                <div className="pt-2">
                   <Button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || otpCode.length < 6}
                     className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
                   >
-                    <Lock className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Authenticating…" : "Sign in"}
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    {isSubmitting ? "Verifying…" : "Verify & Sign In"}
                   </Button>
+                </form>
+              </div>
+            ) : authMode === "signin" ? (
+              /* CITIZEN SIGN IN FORM */
+              <div className="space-y-4">
+                {/* Method Toggle: Password vs OTP */}
+                <div className="flex rounded-xl bg-black/5 p-1 dark:bg-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setSignInMethod("password")}
+                    className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${
+                      signInMethod === "password"
+                        ? "bg-white text-foreground shadow-xs dark:bg-[#1f2126]"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Password
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSignInMethod("otp")}
+                    className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${
+                      signInMethod === "otp"
+                        ? "bg-white text-foreground shadow-xs dark:bg-[#1f2126]"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Email OTP
+                  </button>
                 </div>
-              </form>
+
+                {signInMethod === "password" ? (
+                  <form onSubmit={handleSignIn} className="space-y-4">
+                    <div>
+                      <Label htmlFor="email" className="text-xs font-bold text-foreground">Email or Username</Label>
+                      <Input
+                        id="email"
+                        type="text"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Enter your email or username"
+                        className="mt-1.5 h-11 rounded-xl text-sm"
+                        autoComplete="username"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="password" className="text-xs font-bold text-foreground">Password</Label>
+                      </div>
+                      <div className="relative mt-1.5">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="h-11 rounded-xl pr-10 text-sm"
+                          autoComplete="current-password"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                      >
+                        <Lock className="mr-2 h-4 w-4" />
+                        {isSubmitting ? "Authenticating…" : "Sign In with Password"}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSendOtp(email);
+                    }}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <Label htmlFor="otp-email" className="text-xs font-bold text-foreground">Email Address</Label>
+                      <Input
+                        id="otp-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="name@example.com"
+                        className="mt-1.5 h-11 rounded-xl text-sm"
+                        autoComplete="email"
+                        required
+                      />
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        We will send a 6-digit temporary one-time password to your email.
+                      </p>
+                    </div>
+
+                    <div className="pt-2">
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                      >
+                        <Mail className="mr-2 h-4 w-4" />
+                        {isSubmitting ? "Sending OTP…" : "Send 6-Digit OTP"}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </div>
             ) : registrationSubmitted ? (
               /* REGISTRATION SUCCESS NOTICE */
               <div className="py-2 text-center">
