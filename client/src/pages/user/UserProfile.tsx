@@ -143,7 +143,7 @@ export default function UserProfile() {
       setContactError("");
     },
     onError: (err) => {
-      setContactError(err.message || "Failed to save emergency contact.");
+      setContactError(err.message || t("Failed to save emergency contact."));
     },
   });
 
@@ -191,7 +191,7 @@ export default function UserProfile() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to update profile. Please try again.");
+      setErrorMessage(err?.message || t("Failed to update profile. Please try again."));
     } finally {
       setIsSaving(false);
     }
@@ -200,7 +200,7 @@ export default function UserProfile() {
   const handleAddEmergencyContact = async (e: FormEvent) => {
     e.preventDefault();
     if (!cName.trim() || !cPhone.trim()) {
-      setContactError("Contact name and phone number are required.");
+      setContactError(t("Contact name and phone number are required."));
       return;
     }
 
@@ -223,7 +223,7 @@ export default function UserProfile() {
   };
 
   const handleDeleteContact = async (id: number) => {
-    if (confirm("Remove this emergency contact?")) {
+    if (confirm(t("Remove this emergency contact?"))) {
       await deleteContactMutation.mutateAsync({ id });
     }
   };
@@ -239,12 +239,12 @@ export default function UserProfile() {
 
   const roleLabel =
     user?.role === "admin"
-      ? "Superadmin"
+      ? t("Superadmin")
       : user?.role === "rescuer"
-      ? "Verified Rescuer"
+      ? t("Verified Rescuer")
       : user?.role === "medical"
-      ? "Medical Officer"
-      : "Verified Citizen";
+      ? t("Medical Officer")
+      : t("Verified Citizen");
 
   const savedContacts = contactsQuery.data || [];
 
@@ -257,13 +257,13 @@ export default function UserProfile() {
             <button
               onClick={() => setLocation("/more")}
               className="grid h-10 w-10 place-items-center rounded-2xl border border-black/5 bg-white text-[#122824] shadow-sm transition hover:bg-[#f0f4f3] active:scale-95 dark:border-white/10 dark:bg-[#1a1b1e] dark:text-white dark:hover:bg-[#232428]"
-              aria-label="Back to More"
+              aria-label={t("Back to More")}
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div>
-              <h1 className="text-xl font-black tracking-tight text-[#122824] dark:text-white">Profile Customization</h1>
-              <p className="text-[11px] font-bold text-[#6b8780] dark:text-[#90a4a0]">Personal & emergency rescue details</p>
+              <h1 className="text-xl font-black tracking-tight text-[#122824] dark:text-white">{t("Profile Customization")}</h1>
+              <p className="text-[11px] font-bold text-[#6b8780] dark:text-[#90a4a0]">{t("Personal & emergency rescue details")}</p>
             </div>
           </div>
           <LanguageSelector compact />
@@ -280,8 +280,8 @@ export default function UserProfile() {
                 </span>
               </span>
               <div>
-                <p className="text-lg font-black leading-tight text-white">{name || user?.name || "Assam Citizen"}</p>
-                <p className="mt-0.5 text-xs text-[#c2e2db]">{user?.email || "Account verified"}</p>
+                <p className="text-lg font-black leading-tight text-white">{name || user?.name || t("Assam Citizen")}</p>
+                <p className="mt-0.5 text-xs text-[#c2e2db]">{user?.email || t("Account verified")}</p>
                 <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#e6f7f3]">
                   <ShieldCheck className="h-3 w-3 text-[#5eead4]" />
                   {roleLabel}
@@ -296,8 +296,8 @@ export default function UserProfile() {
           <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-50 p-4 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
             <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
             <div className="text-xs font-semibold">
-              <p className="font-bold">Profile updated successfully!</p>
-              <p className="text-[11px] opacity-90">Your customized rescue details have been securely synchronized to the database.</p>
+              <p className="font-bold">{t("Profile updated successfully!")}</p>
+              <p className="text-[11px] opacity-90">{t("Your customized rescue details have been securely synchronized to the database.")}</p>
             </div>
           </div>
         )}
@@ -314,7 +314,7 @@ export default function UserProfile() {
           <div className="flex items-center justify-between border-b border-amber-200/60 pb-3 dark:border-amber-900/40">
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-300">
               <Users className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <span>Emergency Contacts (Rescue & Hospital Sync)</span>
+              <span>{t("Emergency Contacts (Rescue & Hospital Sync)")}</span>
             </div>
             <button
               type="button"
@@ -322,19 +322,18 @@ export default function UserProfile() {
               className="inline-flex items-center gap-1 rounded-xl bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white shadow transition hover:bg-amber-700 active:scale-95"
             >
               <Plus className="h-3.5 w-3.5" />
-              {showAddContact ? "Close" : "Add Contact"}
+              {showAddContact ? t("Close") : t("Add Contact")}
             </button>
           </div>
 
           <div className="mt-2.5 text-[11px] font-medium text-amber-900/80 dark:text-amber-200/80">
-            Contacts saved here are automatically made available to <strong>State Command Admins</strong>,{" "}
-            <strong>SDRF/NDRF Boat Rescuers</strong>, and <strong>Hospital Emergency Staff</strong> during active incidents.
+            {t("Contacts saved here are automatically made available to State Command Admins, SDRF/NDRF Boat Rescuers, and Hospital Emergency Staff during active incidents.")}
           </div>
 
           {/* Add Contact Form Accordion */}
           {showAddContact && (
             <form onSubmit={handleAddEmergencyContact} className="mt-4 rounded-2xl border border-amber-300 bg-white p-4 shadow dark:border-amber-800 dark:bg-[#1a1b1f]">
-              <p className="text-xs font-black uppercase tracking-wider text-[#122824] dark:text-white">New Emergency Contact</p>
+              <p className="text-xs font-black uppercase tracking-wider text-[#122824] dark:text-white">{t("New Emergency Contact")}</p>
 
               {contactError && (
                 <div className="mt-2 rounded-xl bg-rose-50 p-2 text-xs font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
@@ -345,17 +344,17 @@ export default function UserProfile() {
               <div className="mt-3 space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label className="text-[11px] font-bold">Contact Name *</Label>
+                    <Label className="text-[11px] font-bold">{t("Contact Name *")}</Label>
                     <Input
                       value={cName}
                       onChange={(e) => setCName(e.target.value)}
-                      placeholder="e.g. Rahul Sharma"
+                      placeholder={t("e.g. Rahul Sharma")}
                       required
                       className="mt-1 rounded-xl text-xs"
                     />
                   </div>
                   <div>
-                    <Label className="text-[11px] font-bold">Relationship *</Label>
+                    <Label className="text-[11px] font-bold">{t("Relationship *")}</Label>
                     <select
                       value={cRelation}
                       onChange={(e) => setCRelation(e.target.value)}
@@ -363,7 +362,7 @@ export default function UserProfile() {
                     >
                       {RELATION_OPTIONS.map((r) => (
                         <option key={r} value={r}>
-                          {r}
+                          {t(r)}
                         </option>
                       ))}
                     </select>
@@ -372,32 +371,32 @@ export default function UserProfile() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label className="text-[11px] font-bold">Primary Phone *</Label>
+                    <Label className="text-[11px] font-bold">{t("Primary Phone *")}</Label>
                     <Input
                       value={cPhone}
                       onChange={(e) => setCPhone(e.target.value)}
-                      placeholder="+91 94350 12345"
+                      placeholder={t("+91 94350 12345")}
                       required
                       className="mt-1 rounded-xl text-xs"
                     />
                   </div>
                   <div>
-                    <Label className="text-[11px] font-bold">Alternate Phone</Label>
+                    <Label className="text-[11px] font-bold">{t("Alternate Phone")}</Label>
                     <Input
                       value={cAltPhone}
                       onChange={(e) => setCAltPhone(e.target.value)}
-                      placeholder="Optional phone"
+                      placeholder={t("Optional phone")}
                       className="mt-1 rounded-xl text-xs"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-[11px] font-bold">Notes / Location Details</Label>
+                  <Label className="text-[11px] font-bold">{t("Notes / Location Details")}</Label>
                   <Input
                     value={cNotes}
                     onChange={(e) => setCNotes(e.target.value)}
-                    placeholder="e.g. Has 2nd floor shelter and boat access"
+                    placeholder={t("e.g. Has 2nd floor shelter and boat access")}
                     className="mt-1 rounded-xl text-xs"
                   />
                 </div>
@@ -411,7 +410,7 @@ export default function UserProfile() {
                     className="h-4 w-4 rounded border-gray-300 text-amber-600"
                   />
                   <Label htmlFor="isPrimaryContact" className="cursor-pointer text-xs font-semibold">
-                    Set as Primary Next-of-Kin
+                    {t("Set as Primary Next-of-Kin")}
                   </Label>
                 </div>
 
@@ -421,7 +420,7 @@ export default function UserProfile() {
                   className="w-full gap-2 rounded-xl bg-amber-600 py-2 text-xs font-bold text-white hover:bg-amber-700"
                 >
                   {isSavingContact ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Save Emergency Contact
+                  {t("Save Emergency Contact")}
                 </Button>
               </div>
             </form>
@@ -435,7 +434,7 @@ export default function UserProfile() {
               </div>
             ) : savedContacts.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-amber-300 p-4 text-center text-xs text-amber-900/70 dark:border-amber-800 dark:text-amber-300/70">
-                No emergency contacts added yet. Tap <strong>Add Contact</strong> above to register family or next-of-kin.
+                {t("No emergency contacts added yet. Tap Add Contact above to register family or next-of-kin.")}
               </div>
             ) : (
               savedContacts.map((contact) => (
@@ -447,12 +446,12 @@ export default function UserProfile() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black text-[#122824] dark:text-white">{contact.name}</span>
                       <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                        {contact.relation}
+                        {t(contact.relation)}
                       </span>
                       {contact.isPrimary === "yes" && (
                         <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                           <Star className="h-2.5 w-2.5 fill-emerald-600 text-emerald-600" />
-                          Primary
+                          {t("Primary")}
                         </span>
                       )}
                     </div>
@@ -475,7 +474,7 @@ export default function UserProfile() {
                     type="button"
                     onClick={() => handleDeleteContact(contact.id)}
                     className="rounded-xl p-1.5 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 active:scale-95 dark:hover:bg-rose-950/40"
-                    title="Delete contact"
+                    title={t("Delete contact")}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -491,19 +490,19 @@ export default function UserProfile() {
           <div className="rounded-[1.6rem] border border-black/5 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#16171a]">
             <div className="flex items-center gap-2 border-b border-black/5 pb-3 text-xs font-black uppercase tracking-wider text-[#237563] dark:border-white/10 dark:text-[#5eead4]">
               <User className="h-4 w-4" />
-              <span>Personal Identity & Phone</span>
+              <span>{t("Personal Identity & Phone")}</span>
             </div>
 
             <div className="mt-4 space-y-3.5">
               <div>
                 <Label htmlFor="prof-name" className="text-xs font-bold text-[#122824] dark:text-[#f3f4f6]">
-                  Full Name / Display Name
+                  {t("Full Name / Display Name")}
                 </Label>
                 <Input
                   id="prof-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Anupam Deka"
+                  placeholder={t("e.g. Anupam Deka")}
                   required
                   className="mt-1 rounded-xl border-black/10 bg-[#f9faf9] text-xs font-semibold dark:border-white/10 dark:bg-[#1c1d22]"
                 />
@@ -511,7 +510,7 @@ export default function UserProfile() {
 
               <div>
                 <Label htmlFor="prof-email" className="text-xs font-bold text-[#122824] dark:text-[#f3f4f6]">
-                  Email Address
+                  {t("Email Address")}
                 </Label>
                 <Input
                   id="prof-email"
@@ -519,12 +518,12 @@ export default function UserProfile() {
                   disabled
                   className="mt-1 cursor-not-allowed rounded-xl border-black/10 bg-[#f0f2f1] text-xs font-semibold text-muted-foreground opacity-80 dark:border-white/10 dark:bg-[#18191c]"
                 />
-                <p className="mt-1 text-[10px] text-muted-foreground">Primary login address (locked).</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">{t("Primary login address (locked).")}</p>
               </div>
 
               <div>
                 <Label htmlFor="prof-phone" className="text-xs font-bold text-[#122824] dark:text-[#f3f4f6]">
-                  Primary Citizen Phone Number
+                  {t("Primary Citizen Phone Number")}
                 </Label>
                 <div className="relative mt-1">
                   <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
@@ -534,11 +533,11 @@ export default function UserProfile() {
                     id="prof-phone"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91 98640 12345"
+                    placeholder={t("+91 98640 12345")}
                     className="rounded-xl border-black/10 bg-[#f9faf9] pl-9 text-xs font-semibold dark:border-white/10 dark:bg-[#1c1d22]"
                   />
                 </div>
-                <p className="mt-1 text-[10px] text-muted-foreground">Direct citizen contact number for rescue operations.</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">{t("Direct citizen contact number for rescue operations.")}</p>
               </div>
             </div>
           </div>
@@ -547,13 +546,13 @@ export default function UserProfile() {
           <div className="rounded-[1.6rem] border border-black/5 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#16171a]">
             <div className="flex items-center gap-2 border-b border-black/5 pb-3 text-xs font-black uppercase tracking-wider text-rose-600 dark:border-white/10 dark:text-rose-400">
               <HeartPulse className="h-4 w-4" />
-              <span>Medical & Disaster Assistance</span>
+              <span>{t("Medical & Disaster Assistance")}</span>
             </div>
 
             <div className="mt-4 space-y-3.5">
               <div>
                 <Label htmlFor="prof-blood" className="text-xs font-bold text-[#122824] dark:text-[#f3f4f6]">
-                  Blood Group
+                  {t("Blood Group")}
                 </Label>
                 <select
                   id="prof-blood"
@@ -563,7 +562,7 @@ export default function UserProfile() {
                 >
                   {BLOOD_GROUPS.map((bg) => (
                     <option key={bg} value={bg}>
-                      {bg}
+                      {bg === "Not specified" ? t("Not specified") : bg}
                     </option>
                   ))}
                 </select>
@@ -571,18 +570,18 @@ export default function UserProfile() {
 
               <div>
                 <Label htmlFor="prof-med" className="text-xs font-bold text-[#122824] dark:text-[#f3f4f6]">
-                  Medical Notes & Special Evacuation Needs
+                  {t("Medical Notes & Special Evacuation Needs")}
                 </Label>
                 <Textarea
                   id="prof-med"
                   value={medicalNotes}
                   onChange={(e) => setMedicalNotes(e.target.value)}
-                  placeholder="e.g. Diabetic requiring insulin refrigeration, wheelchair user, 1 elder person (age 78) requiring boat evacuation..."
+                  placeholder={t("e.g. Diabetic requiring insulin refrigeration, wheelchair user, 1 elder person (age 78) requiring boat evacuation...")}
                   rows={3}
                   className="mt-1 rounded-xl border-black/10 bg-[#f9faf9] text-xs font-medium dark:border-white/10 dark:bg-[#1c1d22]"
                 />
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  Shared confidentially with hospital medical responders and boat dispatch units.
+                  {t("Shared confidentially with hospital medical responders and boat dispatch units.")}
                 </p>
               </div>
             </div>
@@ -592,13 +591,13 @@ export default function UserProfile() {
           <div className="rounded-[1.6rem] border border-black/5 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#16171a]">
             <div className="flex items-center gap-2 border-b border-black/5 pb-3 text-xs font-black uppercase tracking-wider text-[#0f766e] dark:border-white/10 dark:text-[#2dd4bf]">
               <MapPin className="h-4 w-4" />
-              <span>Assam District & Locality</span>
+              <span>{t("Assam District & Locality")}</span>
             </div>
 
             <div className="mt-4 space-y-3.5">
               <div>
                 <Label htmlFor="prof-district" className="text-xs font-bold text-[#122824] dark:text-[#f3f4f6]">
-                  Home District in Assam
+                  {t("Home District in Assam")}
                 </Label>
                 <select
                   id="prof-district"
@@ -608,24 +607,24 @@ export default function UserProfile() {
                 >
                   {ASSAM_DISTRICTS.map((dist) => (
                     <option key={dist} value={dist}>
-                      {dist}
+                      {t(dist)}
                     </option>
                   ))}
                 </select>
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  Configures default weather forecast & local flood alerts for your area.
+                  {t("Configures default weather forecast & local flood alerts for your area.")}
                 </p>
               </div>
 
               <div>
                 <Label htmlFor="prof-address" className="text-xs font-bold text-[#122824] dark:text-[#f3f4f6]">
-                  Home Address / Village / Ward
+                  {t("Home Address / Village / Ward")}
                 </Label>
                 <Input
                   id="prof-address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="e.g. House 42, Ward 12, Lachit Nagar, Guwahati"
+                  placeholder={t("e.g. House 42, Ward 12, Lachit Nagar, Guwahati")}
                   className="mt-1 rounded-xl border-black/10 bg-[#f9faf9] text-xs font-semibold dark:border-white/10 dark:bg-[#1c1d22]"
                 />
               </div>
@@ -636,13 +635,13 @@ export default function UserProfile() {
           <div className="rounded-[1.6rem] border border-black/5 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#16171a]">
             <div className="flex items-center gap-2 border-b border-black/5 pb-3 text-xs font-black uppercase tracking-wider text-[#6366f1] dark:border-white/10 dark:text-[#a5b4fc]">
               <Languages className="h-4 w-4" />
-              <span>Language & Broadcasts</span>
+              <span>{t("Language & Broadcasts")}</span>
             </div>
 
             <div className="mt-4 space-y-3.5">
               <div>
                 <Label htmlFor="prof-lang" className="text-xs font-bold text-[#122824] dark:text-[#f3f4f6]">
-                  Preferred Language
+                  {t("Preferred Language")}
                 </Label>
                 <select
                   id="prof-lang"
@@ -664,8 +663,8 @@ export default function UserProfile() {
                     <Bell className="h-4 w-4" />
                   </span>
                   <div>
-                    <p className="text-xs font-bold text-[#122824] dark:text-white">Emergency Broadcasts</p>
-                    <p className="text-[10px] text-muted-foreground">Receive red alert warnings & flood advisories</p>
+                    <p className="text-xs font-bold text-[#122824] dark:text-white">{t("Emergency Broadcasts")}</p>
+                    <p className="text-[10px] text-muted-foreground">{t("Receive red alert warnings & flood advisories")}</p>
                   </div>
                 </div>
                 <input
@@ -688,12 +687,12 @@ export default function UserProfile() {
               {isSaving ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Saving Changes…
+                  {t("Saving Changes…")}
                 </>
               ) : (
                 <>
                   <Save className="h-5 w-5" />
-                  Save Profile Changes
+                  {t("Save Profile Changes")}
                 </>
               )}
             </Button>
@@ -704,7 +703,7 @@ export default function UserProfile() {
               className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50/50 py-3.5 text-xs font-black text-rose-700 transition hover:bg-rose-100/70 active:scale-[.99] dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300"
             >
               <LogOut className="h-4 w-4" />
-              Sign Out of Account
+              {t("Sign Out of Account")}
             </button>
           </div>
         </form>
