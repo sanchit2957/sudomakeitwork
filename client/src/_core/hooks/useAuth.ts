@@ -99,16 +99,37 @@ export function useAuth(options: UseAuthOptions = {}) {
       role?: "user" | "rescuer" | "medical" | "admin";
       phone?: string;
       callSign?: string;
+      supabaseUserId?: string;
+      supabaseToken?: string;
     }) => {
+      let sbUserId: string | undefined;
+      let sbToken: string | undefined;
+
       if (isSupabaseConfigured()) {
         try {
-          await supabaseSignUp(params.email, params.password, { name: params.name, phone: params.phone });
-        } catch (sbErr) {
+          const sbRes = await supabaseSignUp(params.email, params.password, {
+            name: params.name,
+            phone: params.phone,
+            role: params.role || "user",
+          });
+          if (sbRes?.user?.id) {
+            sbUserId = sbRes.user.id;
+          }
+          if (sbRes?.session?.access_token) {
+            sbToken = sbRes.session.access_token;
+          }
+        } catch (sbErr: any) {
           console.warn("[Supabase Auth] Direct sign-up note:", sbErr);
+          throw new Error(sbErr?.message || "Supabase registration failed.");
         }
       }
 
-      const res = await registerMutation.mutateAsync(params);
+      const res = await registerMutation.mutateAsync({
+        ...params,
+        supabaseUserId: sbUserId,
+        supabaseToken: sbToken,
+      });
+
       if (res.sessionToken) {
         try {
           localStorage.setItem("app-runtime-session-token", res.sessionToken);

@@ -114,6 +114,8 @@ export const appRouter = router({
           role: z.enum(["admin", "rescuer", "medical", "user"]).default("user"),
           phone: z.string().optional(),
           callSign: z.string().optional(),
+          supabaseUserId: z.string().optional(),
+          supabaseToken: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -122,7 +124,7 @@ export const appRouter = router({
         if (existing) {
           throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
         }
-        const openId = `user-${emailVal.replace(/[^a-z0-9]/g, "-")}`;
+        const openId = input.supabaseUserId || `user-${emailVal.replace(/[^a-z0-9]/g, "-")}`;
         const hashedPassword = hashPassword(input.password.trim());
         await upsertUser({
           openId,
@@ -130,7 +132,7 @@ export const appRouter = router({
           email: emailVal,
           password: hashedPassword,
           role: "user", // Registration always sets role to user; approval grants privileges
-          loginMethod: "platform-login",
+          loginMethod: input.supabaseUserId ? "supabase-auth" : "platform-login",
           lastSignedIn: new Date(),
         });
         const dbUser = await getUserByEmail(emailVal);
