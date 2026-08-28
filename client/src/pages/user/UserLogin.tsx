@@ -112,7 +112,14 @@ export default function UserLogin() {
       setOtpCountdown(60);
       setSuccessMessage(`A 6-digit verification code was sent to ${targetEmail.trim()}. Check your inbox.`);
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to send verification code. Please verify your Supabase settings.");
+      const msg = err?.message || "";
+      if (msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("rate_limit")) {
+        setErrorMessage(
+          "Supabase default email rate limit reached (max 3-4 emails/hour on free shared pool). Please wait a few minutes, check your inbox for an earlier email link, or configure a custom SMTP (e.g. Resend/Brevo) in your Supabase dashboard."
+        );
+      } else {
+        setErrorMessage(msg || "Failed to send verification code. Please check your Supabase settings.");
+      }
     } finally {
       setIsSubmitting(false);
     }
