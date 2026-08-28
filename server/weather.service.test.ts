@@ -26,7 +26,7 @@ describe("Comprehensive Weather & Open-Meteo Integration", () => {
     expect(report.floodRisk.activeFloodZonesCount).toBe(1);
     expect(report.airQuality).toBeDefined();
     expect(report.river).toBeDefined();
-  });
+  }, 15000);
 
   it("serves dedicated weather procedures via tRPC router", async () => {
     const caller = appRouter.createCaller({

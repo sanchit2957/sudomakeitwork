@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Login from "./Login";
 import { RoleGate } from "@/components/RoleGate";
 import { LanguageProvider } from "@/contexts/LanguageContext";
@@ -36,23 +36,30 @@ function renderWithProviders(ui: React.ReactElement) {
 }
 
 describe("Login UI & Role Access Gate", () => {
-  it("renders the sign in form with email and password inputs", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("renders the sign in form with email and password inputs and top toggle", () => {
     mockUser = null;
     renderWithProviders(<Login />);
 
-    expect(screen.getByText("Sign In")).toBeTruthy();
+    expect(screen.getAllByText("Sign In").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /^Register$/i })).toBeTruthy();
     expect(screen.getByLabelText(/Email or Username/i)).toBeTruthy();
-    expect(screen.getByLabelText(/Password/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^Password$/i)).toBeTruthy();
   });
 
   it("handles credential submission and triggers login", async () => {
     mockUser = null;
-    renderWithProviders(<Login />);
+    const { container } = renderWithProviders(<Login />);
 
     const emailInput = screen.getByLabelText(/Email or Username/i);
-    const passwordInput = screen.getByLabelText(/Password/i);
-    const submitBtn = screen.getAllByRole("button", { name: /Sign in/i })[0];
+    const passwordInput = screen.getByLabelText(/^Password$/i);
+    const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
 
+    expect(submitBtn).toBeTruthy();
     fireEvent.change(emailInput, { target: { value: "admin" } });
     fireEvent.change(passwordInput, { target: { value: "admin" } });
     fireEvent.click(submitBtn);
@@ -65,6 +72,36 @@ describe("Login UI & Role Access Gate", () => {
         })
       );
     });
+  });
+
+  it("switches to registration mode when clicking Register tab", () => {
+    mockUser = null;
+    renderWithProviders(<Login />);
+
+    const registerTab = screen.getByRole("button", { name: /^Register$/i });
+    fireEvent.click(registerTab);
+
+    expect(screen.getByText("Create Account")).toBeTruthy();
+    expect(screen.getByLabelText(/Full Name/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Email Address/i)).toBeTruthy();
+  });
+
+  it("renders bottom role access portals for Field Rescuers and Hospitals", () => {
+    mockUser = null;
+    renderWithProviders(<Login />);
+
+    expect(screen.getByText("Emergency Personnel Portals")).toBeTruthy();
+    const rescuerCard = screen.getByRole("button", { name: /Field Rescuer/i });
+    const medicalCard = screen.getByRole("button", { name: /Hospital & Medical/i });
+
+    expect(rescuerCard).toBeTruthy();
+    expect(medicalCard).toBeTruthy();
+
+    fireEvent.click(rescuerCard);
+    expect(mockSetLocation).toHaveBeenCalledWith("/responder/login");
+
+    fireEvent.click(medicalCard);
+    expect(mockSetLocation).toHaveBeenCalledWith("/medical/login");
   });
 
   it("displays active session status banner when user is logged in", () => {

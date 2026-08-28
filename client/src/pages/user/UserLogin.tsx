@@ -3,12 +3,16 @@ import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { isNativeApp } from "@/lib/apiConfig";
 import {
   ArrowLeft,
+  ArrowRight,
   Building2,
   CheckCircle2,
+  Eye,
+  EyeOff,
+  LifeBuoy,
   Lock,
   LogOut,
   Radio,
@@ -19,7 +23,6 @@ import {
   User,
   UserCheck,
   UserPlus,
-  LifeBuoy,
 } from "lucide-react";
 import React, { FormEvent, useState } from "react";
 import { useLocation } from "wouter";
@@ -28,14 +31,13 @@ export default function UserLogin() {
   const { user, login, register, logout } = useAuth();
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
+  const isMobileApp = isNativeApp();
+
   const portalRole = typeof window !== "undefined"
     ? window.location.pathname === "/responder/login" ? "rescuer"
       : window.location.pathname === "/medical/login" ? "medical"
         : null
     : null;
-
-  const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-  const redirectParam = searchParams.get("redirect") || "";
 
   // Top level auth mode: "signin" or "register"
   const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
@@ -43,18 +45,14 @@ export default function UserLogin() {
   // Sign In fields
   const [email, setEmail] = useState("citizen@assamrescue.gov.in");
   const [password, setPassword] = useState("citizen");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Register fields
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
-  const regRole: "user" | "rescuer" | "medical" = "user";
   const [regPhone, setRegPhone] = useState("");
-  const [regUnit, setRegUnit] = useState("");
-  const [regSkills, setRegSkills] = useState("");
-  const [regHospitalName, setRegHospitalName] = useState("");
-  const [regHospitalAddress, setRegHospitalAddress] = useState("");
-  const [regDesignation, setRegDesignation] = useState("");
+  const [showRegPassword, setShowRegPassword] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -133,17 +131,18 @@ export default function UserLogin() {
   return (
     <div className="min-h-screen bg-[#f4f7f6] text-[#122824] transition-colors dark:bg-[#090a0a] dark:text-[#f3f4f6]">
       {/* Top Header */}
-      <header className="sticky top-0 z-30 border-b border-black/5 bg-white/85 px-4 py-3 backdrop-blur-md dark:border-white/10 dark:bg-[#111214]/85">
+      <header className="sticky top-0 z-30 border-b border-black/5 bg-white/90 px-4 py-3 backdrop-blur-md dark:border-white/10 dark:bg-[#111214]/90">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <button
             onClick={() => setLocation("/")}
-            className="flex items-center gap-2.5 text-left transition hover:opacity-80"
+            className="flex items-center gap-2.5 text-left transition hover:opacity-85 focus:outline-none"
+            aria-label="Back to home"
           >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0f766e] text-white shadow-sm">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0f766e] text-white shadow-sm transition hover:bg-[#0f766e]/90">
               <ArrowLeft className="h-4 w-4" />
             </span>
             <span>
-              <span className="block text-base font-black tracking-tight">
+              <span className="block text-base font-black tracking-tight leading-tight">
                 sudo <span className="text-[#da3e42]">MakeItWork</span>
               </span>
               <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-[#5d7c74] dark:text-[#94a3b8]">
@@ -152,40 +151,41 @@ export default function UserLogin() {
             </span>
           </button>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setLocation("/admin/login")}
-              className="flex items-center gap-1.5 rounded-xl border border-[#0f766e]/30 bg-[#0f766e]/10 px-3 py-1.5 text-xs font-bold text-[#0f766e] hover:bg-[#0f766e]/20 dark:text-emerald-400"
-            >
-              <Shield className="h-3.5 w-3.5" />
-              Admin Portal
-            </button>
-            <button onClick={() => setLocation("/responder/login")} className="hidden rounded-xl border border-black/10 px-3 py-1.5 text-xs font-bold sm:block">Rescuer</button>
-            <button onClick={() => setLocation("/medical/login")} className="hidden rounded-xl border border-black/10 px-3 py-1.5 text-xs font-bold sm:block">Medical</button>
+          <div className="flex items-center gap-2.5">
+            {/* Admin Portal Button - Hidden on Mobile App */}
+            {!isMobileApp && (
+              <button
+                onClick={() => setLocation("/admin/login")}
+                className="hidden items-center gap-1.5 rounded-xl border border-[#0f766e]/30 bg-[#0f766e]/10 px-3 py-1.5 text-xs font-bold text-[#0f766e] transition hover:bg-[#0f766e]/20 dark:text-emerald-400 sm:flex"
+              >
+                <Shield className="h-3.5 w-3.5" />
+                Admin Portal
+              </button>
+            )}
             <LanguageSelector compact />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-xl px-4 py-8 md:py-12">
-        {/* Title & Introduction */}
+      <main className="mx-auto max-w-lg px-4 py-6 sm:py-10">
+        {/* Title Header */}
         <div className="text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-4 py-1.5 font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0f766e] dark:text-emerald-400">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-3.5 py-1 font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0f766e] dark:text-emerald-400">
             <ShieldCheck className="h-3.5 w-3.5" />
-            User & Field Access Gate
+            Citizen Emergency Portal
           </div>
-          <h1 className="mt-4 text-3xl font-black tracking-tight md:text-4xl">
+          <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl md:text-4xl">
             {authMode === "signin" ? "Sign In" : "Create Account"}
           </h1>
-          <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-muted-foreground sm:text-sm">
+          <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-muted-foreground sm:text-sm">
             {authMode === "signin"
-              ? "Sign in to access your citizen dashboard, field rescuer mission board, or hospital medical updates."
-              : "Register a new citizen account or submit an application for Field Rescuer (NDRF/SDRF) or Hospital Staff access."}
+              ? "Access your citizen safety profile, live disaster tracking, and instant SOS alerts."
+              : "Register a citizen account for rapid SOS dispatch and emergency contacts management."}
           </p>
         </div>
 
-        {/* Auth Mode Toggle */}
-        <div className="mt-8 grid grid-cols-2 rounded-2xl bg-black/5 p-1 dark:bg-white/5">
+        {/* Top Sign In / Register Switcher */}
+        <div className="mt-6 grid grid-cols-2 rounded-2xl bg-black/5 p-1.5 dark:bg-white/5">
           <button
             type="button"
             onClick={() => {
@@ -193,13 +193,14 @@ export default function UserLogin() {
               setErrorMessage("");
               setSuccessMessage("");
             }}
-            className={`rounded-xl py-2.5 text-xs font-black transition ${
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
               authMode === "signin"
                 ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Access Existing Account
+            <Lock className="h-3.5 w-3.5" />
+            Sign In
           </button>
           <button
             type="button"
@@ -208,47 +209,47 @@ export default function UserLogin() {
               setErrorMessage("");
               setSuccessMessage("");
             }}
-            className={`rounded-xl py-2.5 text-xs font-black transition ${
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
               authMode === "register"
                 ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <UserPlus className="mr-1.5 inline h-3.5 w-3.5" />
-            Register / New Account
+            <UserPlus className="h-3.5 w-3.5" />
+            Register
           </button>
         </div>
 
         {/* Active Session Card if already logged in */}
         {user && (
-          <div className="mt-6 overflow-hidden rounded-3xl border border-[#0f766e]/30 bg-white p-5 shadow-sm dark:border-emerald-500/20 dark:bg-[#151718]">
-            <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#0f766e] text-white shadow-md">
-                <User className="h-6 w-6" />
+          <div className="mt-5 overflow-hidden rounded-3xl border border-[#0f766e]/30 bg-white p-4 shadow-sm dark:border-emerald-500/20 dark:bg-[#151718] sm:p-5">
+            <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#0f766e] text-white shadow-md">
+                <User className="h-5 w-5" />
               </span>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                  <span className="text-base font-black">{user.name || user.email}</span>
+                  <span className="truncate text-sm font-black sm:text-base">{user.name || user.email}</span>
                   <span className="rounded-md bg-[#0f766e]/15 px-2 py-0.5 font-mono text-[9px] font-extrabold uppercase text-[#0f766e] dark:text-emerald-400">
                     Role: {user.role}
                   </span>
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">{user.email || "Active Session"}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{user.email || "Active Session"}</p>
               </div>
 
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <Button
                   onClick={() => setLocation(getDashboardDestinationForRole(user.role))}
-                  className="rounded-xl bg-[#0f766e] font-bold text-white hover:bg-[#0f766e]/90"
+                  className="h-10 rounded-xl bg-[#0f766e] text-xs font-bold text-white hover:bg-[#0f766e]/90"
                 >
                   Enter {user.role.toUpperCase()} Workspace
                 </Button>
                 <Button
                   onClick={() => logout()}
                   variant="outline"
-                  className="rounded-xl font-semibold"
+                  className="h-10 rounded-xl text-xs font-semibold"
                 >
-                  <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                  <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign Out
                 </Button>
               </div>
             </div>
@@ -256,54 +257,70 @@ export default function UserLogin() {
         )}
 
         {/* Main Auth Container */}
-        <div className="mt-6 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#141517]">
-          <div className="p-6">
+        <div className="mt-5 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#141517]">
+          <div className="p-5 sm:p-6">
             {errorMessage && (
-              <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-semibold text-destructive">
+              <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-semibold text-destructive">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>{errorMessage}</div>
+                <div className="leading-snug">{errorMessage}</div>
               </div>
             )}
 
             {successMessage && (
-              <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+              <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                <div>{successMessage}</div>
+                <div className="leading-snug">{successMessage}</div>
               </div>
             )}
 
             {authMode === "signin" ? (
-              /* SIGN IN FORM */
+              /* CITIZEN SIGN IN FORM */
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div>
-                  <Label htmlFor="email" className="text-xs font-bold">Email or Username</Label>
+                  <Label htmlFor="email" className="text-xs font-bold text-foreground">Email or Username</Label>
                   <Input
                     id="email"
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="mt-1.5 h-11 rounded-xl"
+                    placeholder="Enter your email or username"
+                    className="mt-1.5 h-11 rounded-xl text-sm"
+                    autoComplete="username"
                     required
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="password" className="text-xs font-bold">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="mt-1.5 h-11 rounded-xl"
-                    required
-                  />
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password" className="text-xs font-bold text-foreground">Password</Label>
+                  </div>
+                  <div className="relative mt-1.5">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="h-11 rounded-xl pr-10 text-sm"
+                      autoComplete="current-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="pt-2">
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="h-12 w-full rounded-xl bg-[#0f766e] font-bold text-white shadow-md hover:bg-[#0f766e]/90"
+                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
                   >
                     <Lock className="mr-2 h-4 w-4" />
                     {isSubmitting ? "Authenticating…" : "Sign in"}
@@ -311,17 +328,17 @@ export default function UserLogin() {
                 </div>
               </form>
             ) : registrationSubmitted ? (
-              /* REGISTRATION SUCCESS / PENDING APPROVAL NOTICE */
-              <div className="text-center">
+              /* REGISTRATION SUCCESS NOTICE */
+              <div className="py-2 text-center">
                 <CheckCircle2 className="mx-auto h-12 w-12 text-[#19755f]" />
-                <h3 className="mt-3 text-lg font-black">Registration Successfully Submitted!</h3>
+                <h3 className="mt-3 text-base font-black sm:text-lg">Account Created Successfully!</h3>
                 <p className="mx-auto mt-2 text-xs leading-relaxed text-muted-foreground">
-                  Your account has been created. If you registered for <strong>Rescue Operations</strong> or <strong>Hospital Facility Staff</strong>, your application is currently queued for State Admin review.
+                  Your citizen account is now active. You can sign in and register emergency contacts or broadcast instant SOS alerts.
                 </p>
-                <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                   <Button
                     onClick={() => setLocation("/")}
-                    className="flex-1 rounded-xl bg-[#0f766e] text-white"
+                    className="flex-1 h-11 rounded-xl bg-[#0f766e] text-xs font-bold text-white hover:bg-[#0f766e]/90"
                   >
                     Go to Home & SOS Hub
                   </Button>
@@ -331,15 +348,15 @@ export default function UserLogin() {
                       setRegistrationSubmitted(false);
                       setAuthMode("signin");
                     }}
-                    className="rounded-xl"
+                    className="h-11 rounded-xl text-xs font-semibold"
                   >
                     Return to Sign In
                   </Button>
                 </div>
               </div>
             ) : (
-              /* REGISTRATION FORM */
-              <form onSubmit={handleRegister} className="space-y-4">
+              /* CITIZEN REGISTRATION FORM */
+              <form onSubmit={handleRegister} className="space-y-3.5">
                 <div>
                   <Label htmlFor="reg-name" className="text-xs font-bold">Full Name</Label>
                   <Input
@@ -347,12 +364,14 @@ export default function UserLogin() {
                     type="text"
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    className="mt-1 h-10 rounded-xl"
+                    placeholder="e.g. Rahul Sharma"
+                    className="mt-1 h-10 rounded-xl text-sm"
+                    autoComplete="name"
                     required
                   />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="reg-email" className="text-xs font-bold">Email Address</Label>
                     <Input
@@ -360,35 +379,62 @@ export default function UserLogin() {
                       type="email"
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      className="mt-1 h-10 rounded-xl"
+                      placeholder="name@example.com"
+                      className="mt-1 h-10 rounded-xl text-sm"
+                      autoComplete="email"
                       required
                     />
                   </div>
                   <div>
                     <Label htmlFor="reg-password" className="text-xs font-bold">Password</Label>
-                    <Input
-                      id="reg-password"
-                      type="password"
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      className="mt-1 h-10 rounded-xl"
-                      required
-                    />
+                    <div className="relative mt-1">
+                      <Input
+                        id="reg-password"
+                        type={showRegPassword ? "text" : "password"}
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="h-10 rounded-xl pr-10 text-sm"
+                        autoComplete="new-password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showRegPassword ? "Hide password" : "Show password"}
+                      >
+                        {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <p className="rounded-xl bg-[#f0faf6] p-3 text-xs font-semibold text-[#285f55]">
-                  New public accounts are created as User accounts. Rescuer, Medical, and Administrator access is granted only by the backend after approval.
+                <div>
+                  <Label htmlFor="reg-phone" className="text-xs font-bold">Phone Number (Optional)</Label>
+                  <Input
+                    id="reg-phone"
+                    type="tel"
+                    value={regPhone}
+                    onChange={(e) => setRegPhone(e.target.value)}
+                    placeholder="+91 98640 XXXXX"
+                    className="mt-1 h-10 rounded-xl text-sm"
+                    autoComplete="tel"
+                  />
+                </div>
+
+                <p className="rounded-xl bg-[#f0faf6] p-3 text-[11px] font-semibold leading-relaxed text-[#285f55] dark:bg-emerald-950/30 dark:text-emerald-300">
+                  🛡️ Public accounts are registered as Citizen profiles. Operational access for Rescuers & Medical facilities is assigned by State Command.
                 </p>
 
-                <div className="pt-3">
+                <div className="pt-2">
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="h-12 w-full rounded-xl bg-[#0f766e] font-bold text-white shadow-md hover:bg-[#0f766e]/90"
+                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
                   >
                     <UserPlus className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Creating Account…" : "Register New Account"}
+                    {isSubmitting ? "Creating Account…" : "Register Citizen Account"}
                   </Button>
                 </div>
               </form>
@@ -396,15 +442,68 @@ export default function UserLogin() {
           </div>
         </div>
 
-        {/* Link to Admin Portal */}
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => setLocation("/admin/login")}
-            className="text-xs font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
-          >
-            🛡️ Are you a State Disaster Management Administrator? Go to Admin Portal →
-          </button>
+        {/* Operational Personnel Section (Rescuer & Medical) */}
+        <div className="mt-8">
+          <div className="relative mb-4 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-black/10 dark:border-white/10" />
+            </div>
+            <span className="relative bg-[#f4f7f6] px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground dark:bg-[#090a0a]">
+              Emergency Personnel Portals
+            </span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* Field Rescuer Card */}
+            <button
+              type="button"
+              onClick={() => setLocation("/responder/login")}
+              className="group flex items-center justify-between rounded-2xl border border-black/10 bg-white p-3.5 text-left shadow-sm transition hover:border-[#0f766e]/40 hover:shadow-md dark:border-white/10 dark:bg-[#141517] dark:hover:border-emerald-500/40"
+            >
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 group-hover:scale-105 transition-transform">
+                  <LifeBuoy className="h-5 w-5" />
+                </span>
+                <div>
+                  <h4 className="text-xs font-black text-foreground">Field Rescuer</h4>
+                  <p className="text-[11px] text-muted-foreground">NDRF, SDRF & Quick Response</p>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#0f766e] group-hover:translate-x-0.5 transition-all" />
+            </button>
+
+            {/* Hospital & Medical Card */}
+            <button
+              type="button"
+              onClick={() => setLocation("/medical/login")}
+              className="group flex items-center justify-between rounded-2xl border border-black/10 bg-white p-3.5 text-left shadow-sm transition hover:border-[#0f766e]/40 hover:shadow-md dark:border-white/10 dark:bg-[#141517] dark:hover:border-emerald-500/40"
+            >
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 group-hover:scale-105 transition-transform">
+                  <Stethoscope className="h-5 w-5" />
+                </span>
+                <div>
+                  <h4 className="text-xs font-black text-foreground">Hospital & Medical</h4>
+                  <p className="text-[11px] text-muted-foreground">Duty Doctors & Bed Coordinators</p>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#0f766e] group-hover:translate-x-0.5 transition-all" />
+            </button>
+          </div>
         </div>
+
+        {/* Link to Admin Portal - Only shown on Desktop Web, hidden in Mobile App */}
+        {!isMobileApp && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => setLocation("/admin/login")}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
+            >
+              <Shield className="h-3.5 w-3.5" />
+              State Disaster Management Administrator Portal →
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );
