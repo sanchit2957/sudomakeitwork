@@ -58,11 +58,24 @@ export async function supabaseSignUp(email: string, password: string, metadata?:
   return data;
 }
 
+// Production site URL for magic link redirects
+const PRODUCTION_SITE_URL = import.meta.env.VITE_SITE_URL || "https://assam-rescue-platform.onrender.com";
+
+function getRedirectUrl(): string {
+  if (typeof window === "undefined") return PRODUCTION_SITE_URL;
+  const origin = window.location.origin;
+  // If running on localhost, still redirect to production so magic links work
+  if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
+    return PRODUCTION_SITE_URL;
+  }
+  return origin;
+}
+
 export async function supabaseSendOtp(email: string, options?: { shouldCreateUser?: boolean; metadata?: Record<string, any>; emailRedirectTo?: string }) {
   if (!supabase) {
     throw new Error("Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
   }
-  const emailRedirectTo = options?.emailRedirectTo || (typeof window !== "undefined" ? `${window.location.origin}/` : undefined);
+  const emailRedirectTo = options?.emailRedirectTo || getRedirectUrl();
   const { data, error } = await supabase.auth.signInWithOtp({
     email: email.trim(),
     options: {
