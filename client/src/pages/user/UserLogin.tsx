@@ -50,26 +50,17 @@ export default function UserLogin() {
   // Top level auth mode: "signin" or "register"
   const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
   
-  // Sign in method: "password" or "otp"
-  const [signInMethod, setSignInMethod] = useState<"password" | "otp">("password");
-
   // OTP Verification flow state
   const [otpStep, setOtpStep] = useState<"input" | "verify">("input");
   const [otpEmail, setOtpEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpCountdown, setOtpCountdown] = useState(0);
 
-  // Sign In fields - empty by default (no demo accounts)
+  // Citizen Sign In & Register fields
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Register fields
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
-  const [regPassword, setRegPassword] = useState("");
   const [regPhone, setRegPhone] = useState("");
-  const [showRegPassword, setShowRegPassword] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -91,44 +82,14 @@ export default function UserLogin() {
     try {
       await logout();
       setEmail("");
-      setPassword("");
       setRegName("");
       setRegEmail("");
-      setRegPassword("");
       setRegPhone("");
       setOtpStep("input");
       setOtpCode("");
       setSuccessMessage("Signed out successfully.");
     } catch (err: any) {
       setErrorMessage(err?.message || "Failed to sign out.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSignIn = async (e: FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setErrorMessage("");
-    try {
-      const res = await login({
-        email: email.trim(),
-        password: password,
-      });
-
-      const role = res.user?.role;
-      if (portalRole && role !== portalRole && role !== "admin") {
-        await logout();
-        throw new Error(`This account is not authorized for the ${portalRole === "rescuer" ? "Rescuer" : "Medical"} Portal.`);
-      }
-      let defaultDestination = "/";
-      if (role === "admin") defaultDestination = "/command";
-      else if (role === "rescuer") defaultDestination = "/responder";
-      else if (role === "medical") defaultDestination = "/medical";
-
-      setLocation(defaultDestination);
-    } catch (err: any) {
-      setErrorMessage(err?.message || "Authentication failed. Please check your credentials.");
     } finally {
       setIsSubmitting(false);
     }
@@ -185,39 +146,11 @@ export default function UserLogin() {
 
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setErrorMessage("");
-    setSuccessMessage("");
-    try {
-      if (register) {
-        await register({
-          name: regName.trim(),
-          email: regEmail.trim(),
-          password: regPassword.trim(),
-          phone: regPhone.trim() || undefined,
-        });
-      } else {
-        await login({
-          email: regEmail.trim(),
-          password: regPassword.trim(),
-        });
-      }
-
-      setRegistrationSubmitted(true);
-      setSuccessMessage("Account created successfully!");
-    } catch (err: any) {
-      // If error indicates email confirmation required, offer OTP flow
-      if (err?.message?.toLowerCase().includes("email") || err?.message?.toLowerCase().includes("confirm") || err?.message?.toLowerCase().includes("otp")) {
-        setOtpEmail(regEmail.trim());
-        setOtpStep("verify");
-        setOtpCountdown(60);
-        setSuccessMessage(`Verification code sent to ${regEmail.trim()}! Enter it below.`);
-      } else {
-        setErrorMessage(err?.message || "Registration failed. Please try again.");
-      }
-    } finally {
-      setIsSubmitting(false);
+    if (!regEmail || !regEmail.includes("@")) {
+      setErrorMessage("Please enter a valid email address.");
+      return;
     }
+    await handleSendOtp(regEmail);
   };
 
   const getDashboardDestinationForRole = (role: string) => {
@@ -391,10 +324,14 @@ export default function UserLogin() {
                 </div>
                 <h3 className="mt-3 text-lg font-black tracking-tight">Enter Verification Code</h3>
                 <p className="mx-auto mt-1.5 max-w-xs text-xs text-muted-foreground">
-                  We sent a 6-digit verification OTP to <span className="font-bold text-foreground">{otpEmail}</span>
+                  We sent a 6-digit verification code to <span className="font-bold text-foreground">{otpEmail}</span>
                 </p>
 
-                <form onSubmit={handleVerifyOtp} className="mt-6 space-y-5">
+                <div className="mt-3 rounded-2xl bg-amber-500/10 p-3 text-left text-[11px] font-medium text-amber-800 dark:text-amber-300">
+                  💡 <strong>Tip:</strong> You can enter the 6-digit code below <strong>or</strong> just click the login link in your email to sign in instantly!
+                </div>
+
+                <form onSubmit={handleVerifyOtp} className="mt-5 space-y-5">
                   <div className="flex justify-center">
                     <InputOTP
                       maxLength={6}
@@ -437,7 +374,7 @@ export default function UserLogin() {
                       }`}
                     >
                       <RefreshCw className={`h-3 w-3 ${otpCountdown > 0 ? "animate-spin" : ""}`} />
-                      {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Resend OTP"}
+                      {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Resend Code"}
                     </button>
                   </div>
 
@@ -452,125 +389,42 @@ export default function UserLogin() {
                 </form>
               </div>
             ) : authMode === "signin" ? (
-              /* CITIZEN SIGN IN FORM */
-              <div className="space-y-4">
-                {/* Method Toggle: Password vs OTP */}
-                <div className="flex rounded-xl bg-black/5 p-1 dark:bg-white/5">
-                  <button
-                    type="button"
-                    onClick={() => setSignInMethod("password")}
-                    className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${
-                      signInMethod === "password"
-                        ? "bg-white text-foreground shadow-xs dark:bg-[#1f2126]"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Password
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSignInMethod("otp")}
-                    className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${
-                      signInMethod === "otp"
-                        ? "bg-white text-foreground shadow-xs dark:bg-[#1f2126]"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Email OTP
-                  </button>
+              /* CITIZEN SIGN IN FORM - PURE OTP */
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendOtp(email);
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <Label htmlFor="email" className="text-xs font-bold text-foreground">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your registered email"
+                    className="mt-1.5 h-11 rounded-xl text-sm"
+                    autoComplete="email"
+                    required
+                  />
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    We will send a 6-digit login verification code directly to your email address.
+                  </p>
                 </div>
 
-                {signInMethod === "password" ? (
-                  <form onSubmit={handleSignIn} className="space-y-4">
-                    <div>
-                      <Label htmlFor="email" className="text-xs font-bold text-foreground">Email or Username</Label>
-                      <Input
-                        id="email"
-                        type="text"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Enter your email or username"
-                        className="mt-1.5 h-11 rounded-xl text-sm"
-                        autoComplete="username"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-xs font-bold text-foreground">Password</Label>
-                      </div>
-                      <div className="relative mt-1.5">
-                        <Input
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="h-11 rounded-xl pr-10 text-sm"
-                          autoComplete="current-password"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <Button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
-                      >
-                        <Lock className="mr-2 h-4 w-4" />
-                        {isSubmitting ? "Authenticating…" : "Sign In with Password"}
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleSendOtp(email);
-                    }}
-                    className="space-y-4"
+                <div className="pt-2">
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || !email.trim()}
+                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
                   >
-                    <div>
-                      <Label htmlFor="otp-email" className="text-xs font-bold text-foreground">Email Address</Label>
-                      <Input
-                        id="otp-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="name@example.com"
-                        className="mt-1.5 h-11 rounded-xl text-sm"
-                        autoComplete="email"
-                        required
-                      />
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        We will send a 6-digit temporary one-time password to your email.
-                      </p>
-                    </div>
-
-                    <div className="pt-2">
-                      <Button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
-                      >
-                        <Mail className="mr-2 h-4 w-4" />
-                        {isSubmitting ? "Sending OTP…" : "Send 6-Digit OTP"}
-                      </Button>
-                    </div>
-                  </form>
-                )}
-              </div>
+                    <Mail className="mr-2 h-4 w-4" />
+                    {isSubmitting ? "Sending Code…" : "Send Verification Code"}
+                  </Button>
+                </div>
+              </form>
             ) : registrationSubmitted ? (
               /* REGISTRATION SUCCESS NOTICE */
               <div className="py-2 text-center">
@@ -599,8 +453,18 @@ export default function UserLogin() {
                 </div>
               </div>
             ) : (
-              /* CITIZEN REGISTRATION FORM */
-              <form onSubmit={handleRegister} className="space-y-3.5">
+              /* CITIZEN REGISTRATION FORM - PURE OTP */
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!regEmail || !regEmail.includes("@")) {
+                    setErrorMessage("Please enter a valid email address.");
+                    return;
+                  }
+                  handleSendOtp(regEmail);
+                }}
+                className="space-y-3.5"
+              >
                 <div>
                   <Label htmlFor="reg-name" className="text-xs font-bold">Full Name</Label>
                   <Input
@@ -615,43 +479,18 @@ export default function UserLogin() {
                   />
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="reg-email" className="text-xs font-bold">Email Address</Label>
-                    <Input
-                      id="reg-email"
-                      type="email"
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="name@example.com"
-                      className="mt-1 h-10 rounded-xl text-sm"
-                      autoComplete="email"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="reg-password" className="text-xs font-bold">Password</Label>
-                    <div className="relative mt-1">
-                      <Input
-                        id="reg-password"
-                        type={showRegPassword ? "text" : "password"}
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="h-10 rounded-xl pr-10 text-sm"
-                        autoComplete="new-password"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowRegPassword(!showRegPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={showRegPassword ? "Hide password" : "Show password"}
-                      >
-                        {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
+                <div>
+                  <Label htmlFor="reg-email" className="text-xs font-bold">Email Address</Label>
+                  <Input
+                    id="reg-email"
+                    type="email"
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="mt-1 h-10 rounded-xl text-sm"
+                    autoComplete="email"
+                    required
+                  />
                 </div>
 
                 <div>
@@ -668,17 +507,17 @@ export default function UserLogin() {
                 </div>
 
                 <p className="rounded-xl bg-[#f0faf6] p-3 text-[11px] font-semibold leading-relaxed text-[#285f55] dark:bg-emerald-950/30 dark:text-emerald-300">
-                  🛡️ Public accounts are registered as Citizen profiles. Operational access for Rescuers & Medical facilities is assigned by State Command.
+                  🛡️ A 6-digit verification code will be sent to your email to activate your Citizen profile.
                 </p>
 
                 <div className="pt-2">
                   <Button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !regEmail.trim()}
                     className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
                   >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Creating Account…" : "Register Citizen Account"}
+                    <Mail className="mr-2 h-4 w-4" />
+                    {isSubmitting ? "Sending OTP…" : "Register with Email OTP"}
                   </Button>
                 </div>
               </form>

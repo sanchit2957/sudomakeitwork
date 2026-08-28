@@ -58,42 +58,49 @@ export async function supabaseSignUp(email: string, password: string, metadata?:
   return data;
 }
 
-export async function supabaseSendOtp(email: string, options?: { shouldCreateUser?: boolean; metadata?: Record<string, any> }) {
+export async function supabaseSendOtp(email: string, options?: { shouldCreateUser?: boolean; metadata?: Record<string, any>; emailRedirectTo?: string }) {
   if (!supabase) {
     throw new Error("Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
   }
+  const emailRedirectTo = options?.emailRedirectTo || (typeof window !== "undefined" ? `${window.location.origin}/` : undefined);
   const { data, error } = await supabase.auth.signInWithOtp({
     email: email.trim(),
     options: {
       shouldCreateUser: options?.shouldCreateUser ?? true,
       data: options?.metadata,
+      emailRedirectTo,
     },
   });
   if (error) throw error;
   return data;
 }
 
-export async function supabaseVerifyOtp(email: string, token: string, type: "email" | "signup" = "email") {
+export async function supabaseVerifyOtp(email: string, token: string, type: "email" | "magiclink" | "signup" = "email") {
   if (!supabase) {
     throw new Error("Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
   }
-  // Try with email type first, or fallback to signup
+  // Try with specified type first, with cascade fallbacks for magiclink and signup
   try {
     const { data, error } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: token.trim(),
-      type,
+      type: type as any,
     });
     if (error) {
-      if (type === "email") {
-        const retry = await supabase.auth.verifyOtp({
-          email: email.trim(),
-          token: token.trim(),
-          type: "signup",
-        });
-        if (retry.error) throw retry.error;
-        return retry.data;
-      }
+      const retry1 = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: token.trim(),
+        type: "magiclink",
+      });
+      if (!retry1.error) return retry1.data;
+
+      const retry2 = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: token.trim(),
+        type: "signup",
+      });
+      if (!retry2.error) return retry2.data;
+
       throw error;
     }
     return data;

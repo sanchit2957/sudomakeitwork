@@ -4,6 +4,7 @@ import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
 import {
   isSupabaseConfigured,
+  supabase,
   supabaseSendOtp,
   supabaseSignIn,
   supabaseSignOut,
@@ -198,6 +199,50 @@ export function useAuth(options: UseAuthOptions = {}) {
       await utils.auth.me.invalidate();
     }
   }, [logoutMutation, utils]);
+
+  // Listen for Supabase Magic Link redirect or Auth State Change
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    const handleSession = async (session: any) => {
+      if (session?.access_token && session?.user?.email && !meQuery.data) {
+        try {
+          const res = await loginMutation.mutateAsync({
+            email: session.user.email,
+            password: "supabase-magic-link",
+            supabaseToken: session.access_token,
+          });
+          if (res.sessionToken) {
+            localStorage.setItem("app-runtime-session-token", res.sessionToken);
+            localStorage.setItem("app-runtime-user-info", JSON.stringify(res.user));
+          }
+          utils.auth.me.setData(undefined, res.user as any);
+          await utils.auth.me.invalidate();
+          if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
+            window.history.replaceState(null, "", window.location.pathname);
+          }
+        } catch (e) {
+          console.warn("[Supabase Auth] Magic link session sync note:", e);
+        }
+      }
+    };
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session) {
+        handleSession(data.session);
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        handleSession(session);
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, [loginMutation, meQuery.data, utils]);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;

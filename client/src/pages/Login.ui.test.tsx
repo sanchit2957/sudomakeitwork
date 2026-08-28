@@ -9,6 +9,8 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 
 const mockLoginAsRole = vi.fn().mockResolvedValue({ success: true });
 const mockLogout = vi.fn().mockResolvedValue({ success: true });
+const mockSendEmailOtp = vi.fn().mockResolvedValue({ success: true });
+const mockVerifyEmailOtp = vi.fn().mockResolvedValue({ success: true });
 let mockUser: any = null;
 
 vi.mock("@/_core/hooks/useAuth", () => ({
@@ -18,6 +20,8 @@ vi.mock("@/_core/hooks/useAuth", () => ({
     login: mockLoginAsRole,
     loginAsRole: mockLoginAsRole,
     logout: mockLogout,
+    sendEmailOtp: mockSendEmailOtp,
+    verifyEmailOtp: mockVerifyEmailOtp,
   }),
 }));
 
@@ -41,36 +45,29 @@ describe("Login UI & Role Access Gate", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the sign in form with email and password inputs and top toggle", () => {
+  it("renders the sign in form with email OTP input and top toggle", () => {
     mockUser = null;
     renderWithProviders(<Login />);
 
     expect(screen.getAllByText("Sign In").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /^Register$/i })).toBeTruthy();
-    expect(screen.getByLabelText(/Email or Username/i)).toBeTruthy();
-    expect(screen.getByLabelText(/^Password$/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Email Address/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Send Verification Code/i })).toBeTruthy();
   });
 
-  it("handles credential submission and triggers login", async () => {
+  it("handles email OTP request and triggers sendEmailOtp", async () => {
     mockUser = null;
     const { container } = renderWithProviders(<Login />);
 
-    const emailInput = screen.getByLabelText(/Email or Username/i);
-    const passwordInput = screen.getByLabelText(/^Password$/i);
+    const emailInput = screen.getByLabelText(/Email Address/i);
     const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
 
     expect(submitBtn).toBeTruthy();
-    fireEvent.change(emailInput, { target: { value: "admin" } });
-    fireEvent.change(passwordInput, { target: { value: "admin" } });
+    fireEvent.change(emailInput, { target: { value: "citizen@example.com" } });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(mockLoginAsRole).toHaveBeenCalledWith(
-        expect.objectContaining({
-          email: "admin",
-          password: "admin",
-        })
-      );
+      expect(mockSendEmailOtp).toHaveBeenCalledWith("citizen@example.com");
     });
   });
 
@@ -84,6 +81,7 @@ describe("Login UI & Role Access Gate", () => {
     expect(screen.getByText("Create Account")).toBeTruthy();
     expect(screen.getByLabelText(/Full Name/i)).toBeTruthy();
     expect(screen.getByLabelText(/Email Address/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Register with Email OTP/i })).toBeTruthy();
   });
 
   it("renders bottom role access portals for Field Rescuers and Hospitals", () => {
