@@ -15,13 +15,31 @@ import {
   User,
   Users,
 } from "lucide-react";
-import React, { FormEvent, useState } from "react";
+import MobileCommandRestricted from "@/components/MobileCommandRestricted";
+import { isNativeApp } from "@/lib/apiConfig";
+import React, { FormEvent, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
 export default function AdminLogin() {
   const { user, login, logout } = useAuth();
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
+
+  const [isPhoneScreen, setIsPhoneScreen] = useState(() => {
+    return isNativeApp() || (typeof window !== "undefined" && window.innerWidth < 768);
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsPhoneScreen(isNativeApp() || (typeof window !== "undefined" && window.innerWidth < 768));
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  if (isPhoneScreen) {
+    return <MobileCommandRestricted />;
+  }
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

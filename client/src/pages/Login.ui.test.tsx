@@ -119,6 +119,17 @@ describe("Login UI & Role Access Gate", () => {
     expect(screen.getByText("Enter ADMIN Workspace")).toBeTruthy();
   });
 
+  it("renders Admin? Click here at the extreme bottom and triggers admin navigation", () => {
+    mockUser = null;
+    renderWithProviders(<Login />);
+
+    const adminBtn = screen.getByText(/Click here/i).closest("button")!;
+    expect(adminBtn).toBeTruthy();
+
+    fireEvent.click(adminBtn);
+    expect(mockSetLocation).toHaveBeenCalledWith("/admin/login");
+  });
+
   it("blocks unauthorized workspaces through RoleGate and redirects", () => {
     mockUser = {
       id: 2,

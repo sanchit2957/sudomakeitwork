@@ -492,18 +492,19 @@ export default function UserLogin() {
           </div>
         </div>
 
-        {/* Link to Admin Portal - Only shown on Desktop Web, hidden in Mobile App */}
-        {!isMobileApp && (
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setLocation("/admin/login")}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
-            >
-              <Shield className="h-3.5 w-3.5" />
-              State Disaster Management Administrator Portal →
-            </button>
-          </div>
-        )}
+        {/* Extreme Bottom Admin Link */}
+        <div className="mt-8 mb-6 text-center">
+          <button
+            type="button"
+            onClick={() => setLocation("/admin/login")}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition hover:text-foreground"
+          >
+            <span>Admin?</span>
+            <span className="font-bold text-[#0f766e] underline underline-offset-2 hover:text-[#0f766e]/80 dark:text-emerald-400">
+              Click here
+            </span>
+          </button>
+        </div>
       </main>
     </div>
   );
