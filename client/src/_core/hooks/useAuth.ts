@@ -119,19 +119,37 @@ export function useAuth(options?: UseAuthOptions) {
     if (meQuery.isLoading) return;
     if (meQuery.data) return;
     if (typeof window === "undefined") return;
-    if (window.location.pathname.startsWith("/login") || window.location.pathname.startsWith("/admin/login")) return;
+    const pathname = window.location.pathname;
+    if (
+      pathname.startsWith("/login") ||
+      pathname.startsWith("/admin/login") ||
+      pathname.startsWith("/user/login") ||
+      pathname.startsWith("/responder/login") ||
+      pathname.startsWith("/medical/login")
+    ) {
+      return;
+    }
     startLogin(redirectPath);
   }, [redirectOnUnauthenticated, redirectPath, meQuery.isLoading, meQuery.data]);
 
   const state = useMemo(() => {
-    const effectiveUser = meQuery.data ?? null;
+    let effectiveUser = meQuery.data ?? null;
+    if (!effectiveUser && typeof window !== "undefined") {
+      try {
+        const storedToken = localStorage.getItem("app-runtime-session-token");
+        const storedUser = localStorage.getItem("app-runtime-user-info");
+        if (storedToken && storedUser && (meQuery.isLoading || meQuery.isFetching)) {
+          effectiveUser = JSON.parse(storedUser);
+        }
+      } catch {}
+    }
     return {
       user: effectiveUser,
-      loading: meQuery.isLoading,
+      loading: meQuery.isLoading && !effectiveUser,
       error: meQuery.error ?? null,
       isAuthenticated: Boolean(effectiveUser),
     };
-  }, [meQuery.data, meQuery.isLoading, meQuery.error]);
+  }, [meQuery.data, meQuery.isLoading, meQuery.isFetching, meQuery.error]);
 
   const updateProfileMutation = trpc.auth.updateProfile.useMutation({
     onSuccess: async (data) => {
