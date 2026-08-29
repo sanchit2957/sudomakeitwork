@@ -451,9 +451,10 @@ export const rescueRouter = router({
               voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
               status: "pending",
             });
-            incidentId = Number(result[0].insertId);
-          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' });
-            console.warn("[Database] MySQL insert skipped, fallback to memory:", err);
+          } catch (err) {
+            if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' });
+            const { recordDbFailure } = await import("../db");
+            recordDbFailure(err);
           }
         }
         _memoryIncidents.set(incidentId, {

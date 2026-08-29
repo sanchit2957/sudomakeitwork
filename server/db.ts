@@ -7,6 +7,23 @@ import { hashPassword } from "./auth.password";
 
 let _pool: mysql.Pool | null = null;
 let _db: MySql2Database<any> | null = null;
+let _dbCircuitBrokenUntil = 0;
+let _lastDbWarnTime = 0;
+
+export function isDbCircuitBroken(): boolean {
+  return Date.now() < _dbCircuitBrokenUntil;
+}
+
+export function recordDbFailure(error?: any) {
+  _dbCircuitBrokenUntil = Date.now() + 30000; // Open circuit breaker for 30s
+  _db = null;
+  const now = Date.now();
+  if (now - _lastDbWarnTime > 60000) {
+    _lastDbWarnTime = now;
+    const msg = error instanceof Error ? error.message : typeof error === "string" ? error : "connection error";
+    console.warn(`[Database] MySQL unavailable (${msg}), switching to fast in-memory store for 30s.`);
+  }
+}
 
 export function planRoleSync(role: InsertUser["role"] | undefined, isProjectOwner: boolean) {
   if (role !== undefined) return { insertRole: role, updateRole: role };
@@ -18,31 +35,42 @@ export function createDatabasePool(connectionUri: string): mysql.Pool {
   const isRemoteOrTiDB = connectionUri.includes("tidbcloud.com") || connectionUri.includes("ssl=") || !connectionUri.includes("localhost");
   return mysql.createPool({
     uri: connectionUri,
-    ssl: isRemoteOrTiDB ? { minVersion: "TLSv1.2", rejectUnauthorized: true } : undefined,
     waitForConnections: true,
-    connectionLimit: 15,
-    maxIdle: 8,
-    idleTimeout: 60000,
-    connectTimeout: 2000,
+    connectionLimit: 10,
+    maxIdle: 4,
+    idleTimeout: 30000,
+    connectTimeout: 2500,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
-    queueLimit: 0,
+    queueLimit: 10,
   });
 }
 
 // Lazily create the drizzle instance so local tooling can run without a DB or with a local DB.
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (isDbCircuitBroken() && process.env.NODE_ENV !== "production") {
+    return null;
+  }
+
+  const dbUrl = process.env.DATABASE_URL?.trim();
+  if (!dbUrl || dbUrl === "" || dbUrl.includes("HOST")) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("The operational database is disconnected. Cannot safely process request.");
+    }
+    return null;
+  }
+
+  if (!_db) {
     try {
       if (!_pool) {
-        _pool = createDatabasePool(process.env.DATABASE_URL);
+        _pool = createDatabasePool(dbUrl);
       }
       _db = drizzle(_pool);
     } catch (error) {
+      recordDbFailure(error);
       if (process.env.NODE_ENV === "production") {
         throw new Error("The operational database is disconnected. Cannot safely process request.");
       }
-      console.warn("[Database] Failed to connect MySQL, falling back to local memory store:", error);
       _db = null;
     }
   }
@@ -244,10 +272,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database user update failed: ${(error as Error)?.message || "Unknown database error"}`);
       }
-      if (error?.code === "ETIMEDOUT" || error?.cause?.code === "ETIMEDOUT" || error?.code === "ECONNREFUSED" || error?.cause?.code === "ECONNREFUSED") {
-        _db = null;
-      }
-      console.warn("[Database] MySQL sync skipped, updating local development store:", error);
+      recordDbFailure(error);
     }
   }
 
@@ -290,10 +315,7 @@ export async function getUserByOpenId(openId: string) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
       }
-      if (error?.code === "ETIMEDOUT" || error?.cause?.code === "ETIMEDOUT" || error?.code === "ECONNREFUSED" || error?.cause?.code === "ECONNREFUSED") {
-        _db = null;
-      }
-      console.warn("[Database] MySQL read skipped, checking local development store:", error);
+      recordDbFailure(error);
     }
   }
   if (process.env.NODE_ENV === "production") {
@@ -332,10 +354,7 @@ export async function getUserByEmail(emailOrUsername: string) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
       }
-      if (error?.code === "ETIMEDOUT" || error?.cause?.code === "ETIMEDOUT" || error?.code === "ECONNREFUSED" || error?.cause?.code === "ECONNREFUSED") {
-        _db = null;
-      }
-      console.warn("[Database] MySQL read skipped, checking local development store:", error);
+      recordDbFailure(error);
     }
   }
   if (process.env.NODE_ENV === "production") {
@@ -376,10 +395,7 @@ export async function getUserById(id: number) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
       }
-      if (error?.code === "ETIMEDOUT" || error?.cause?.code === "ETIMEDOUT" || error?.code === "ECONNREFUSED" || error?.cause?.code === "ECONNREFUSED") {
-        _db = null;
-      }
-      console.warn("[Database] MySQL read skipped, checking local development store:", error);
+      recordDbFailure(error);
     }
   }
   if (process.env.NODE_ENV === "production") {
@@ -407,7 +423,7 @@ export async function getAllUsers() {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
       }
-      console.warn("[Database] MySQL read skipped, returning local development store:", error);
+      recordDbFailure(error);
     }
   }
   if (process.env.NODE_ENV === "production") {
@@ -452,7 +468,7 @@ export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database rescuer profile failed: ${(error as Error)?.message || "Unknown database error"}`);
       }
-      console.warn("[Database] MySQL sync skipped, updating local development store:", error);
+      recordDbFailure(error);
     }
   }
   if (process.env.NODE_ENV === "production") {
@@ -515,7 +531,7 @@ export async function ensureHospitalStaffProfile(userId: number) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database hospital staff profile failed: ${(error as Error)?.message || "Unknown database error"}`);
       }
-      console.warn("[Database] MySQL sync skipped, updating local development store:", error);
+      recordDbFailure(error);
     }
   }
   if (process.env.NODE_ENV === "production") {
@@ -563,7 +579,7 @@ export async function getEmergencyContactsByUserId(userId: number): Promise<Emer
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Failed to load emergency contacts: ${(error as Error)?.message}`);
       }
-      console.warn("[Database] MySQL read skipped, reading memory emergency contacts:", error);
+      recordDbFailure(error);
     }
   }
   return Array.from(_memoryEmergencyContacts.values()).filter(c => c.userId === userId);
@@ -624,7 +640,7 @@ export async function upsertEmergencyContact(
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Failed to save emergency contact: ${(error as Error)?.message}`);
       }
-      console.warn("[Database] MySQL write skipped, saving to memory store:", error);
+      recordDbFailure(error);
     }
   }
 
@@ -658,7 +674,7 @@ export async function deleteEmergencyContact(id: number, userId: number): Promis
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Failed to delete emergency contact: ${(error as Error)?.message}`);
       }
-      console.warn("[Database] MySQL delete skipped, deleting from memory store:", error);
+      recordDbFailure(error);
     }
   }
   const existing = _memoryEmergencyContacts.get(id);
