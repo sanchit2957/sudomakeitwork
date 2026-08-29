@@ -22,7 +22,11 @@ function formatSeconds(seconds: number): string {
   return `${m}:${s < 10 ? "0" : ""}${s}`;
 }
 
-export function VoiceNoteCard() {
+interface VoiceNoteCardProps {
+  embedded?: boolean;
+}
+
+export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
   const { t } = useLanguage();
   const [draft, setDraft] = useState<SosVoiceNoteDraft | null>(() => readSosVoiceNote());
   const [recording, setRecording] = useState(false);
@@ -270,119 +274,120 @@ export function VoiceNoteCard() {
   // 1. Idle state with permission denied banner
   if (micState === "denied" && !recording && !draft) {
     return (
-      <section className="mt-3.5 rounded-[1.55rem] bg-white p-3.5 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleManualPermissionRetry}
-            aria-label={t("Try enabling microphone")}
-            className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-amber-600 text-white transition active:scale-95 hover:bg-amber-700"
-          >
-            <RotateCcw className="h-5 w-5" />
-          </button>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-extrabold text-amber-800 dark:text-amber-300">
-              {t("Microphone access is off")}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground leading-snug">
-              {t("Enable microphone in device settings to use voice notes.")}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleManualPermissionRetry}
-            className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 transition"
-          >
-            {t("Try again")}
-          </button>
-        </div>
+      <section
+        className={`flex w-full flex-col items-center justify-center p-3.5 text-center ${
+          embedded
+            ? "rounded-r-[18px]"
+            : "rounded-[20px] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={handleManualPermissionRetry}
+          aria-label={t("Try enabling microphone")}
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-amber-600 text-white shadow-sm transition active:scale-95 hover:bg-amber-700"
+        >
+          <RotateCcw className="h-5 w-5" />
+        </button>
+        <p className="mt-2 text-sm font-extrabold text-amber-800 dark:text-amber-300">
+          {t("Microphone access is off")}
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+          {t("Enable in settings")}
+        </p>
+        <button
+          type="button"
+          onClick={handleManualPermissionRetry}
+          className="mt-1.5 rounded-xl bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 transition"
+        >
+          {t("Try again")}
+        </button>
       </section>
     );
   }
 
   // 2. Main Voice Note Card (Idle / Recording / Recorded Preview)
   return (
-    <section className="mt-3.5 rounded-[1.55rem] bg-white p-3 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10">
-      <div className="flex items-center gap-3">
-        {/* Main Action Button */}
-        {draft && !recording ? (
-          <button
-            type="button"
-            onClick={togglePlayback}
-            aria-label={isPlaying ? t("Pause voice note") : t("Play voice note")}
-            className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#174e46] text-white transition active:scale-95 hover:bg-[#1f6359]"
-          >
-            {isPlaying ? (
-              <Pause className="h-5 w-5 fill-current" />
-            ) : (
-              <Play className="h-5 w-5 fill-current ml-0.5" />
-            )}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={recording ? stopRecording : startRecording}
-            aria-label={recording ? t("Stop recording") : t("Record voice note")}
-            disabled={micState === "unsupported"}
-            className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white transition active:scale-95 disabled:opacity-50 ${
-              recording ? "bg-[#df3e43] animate-pulse" : "bg-[#174e46] hover:bg-[#1f6359]"
-            }`}
-          >
-            {recording ? (
-              <Square className="h-4 w-4 fill-current" />
-            ) : (
-              <Mic className="h-5 w-5" />
-            )}
-          </button>
-        )}
-
-        {/* Card Copy & Status */}
-        <div
-          onClick={recording ? stopRecording : !draft ? startRecording : undefined}
-          className={`min-w-0 flex-1 text-left ${!draft || recording ? "cursor-pointer" : ""}`}
+    <section
+      className={`group relative flex w-full flex-col items-center justify-center p-3.5 text-center ${
+        embedded
+          ? "rounded-r-[18px]"
+          : "rounded-[20px] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10"
+      }`}
+    >
+      {/* Delete Action when recorded draft exists */}
+      {draft && !recording && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          aria-label={t("Delete voice note")}
+          className="absolute right-2.5 top-2.5 grid h-6 w-6 place-items-center rounded-full bg-[#fff0ef] text-[#b44742] transition hover:bg-[#ffe0de] active:scale-95 dark:bg-[#2d1b1b] dark:text-[#f87171]"
         >
-          <div className="flex items-center gap-2">
-            {recording && (
-              <span className="inline-block h-2 w-2 rounded-full bg-[#df3e43] animate-ping" />
-            )}
-            <p className="text-sm font-extrabold truncate">
-              {recording
-                ? t("Stop and save voice note")
-                : draft
-                ? t("Voice note ready")
-                : t("Record voice note")}
-            </p>
-          </div>
+          <Trash2 className="h-3 w-3" />
+        </button>
+      )}
 
-          <p className="mt-0.5 text-xs text-[#708881] dark:text-[#b9b9c0] truncate">
-            {recording
-              ? `${formatSeconds(recordSeconds)} / 02:00 · ${t("Tap to stop")}`
-              : draft
-              ? isPlaying
-                ? `${formatSeconds(playProgress)} / ${formatSeconds(draft.durationSeconds)} · ${t("Playing")}`
-                : `${draft.durationSeconds}s · ${t("Attached to your next SOS")}`
-              : micState === "unsupported"
-              ? t("Voice recording is not supported in this browser.")
-              : t("Speak briefly if typing is difficult")}
-          </p>
-        </div>
+      {/* Main Action Button */}
+      {draft && !recording ? (
+        <button
+          type="button"
+          onClick={togglePlayback}
+          aria-label={isPlaying ? t("Pause voice note") : t("Play voice note")}
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#174e46] text-white shadow-sm transition active:scale-95 hover:bg-[#1f6359]"
+        >
+          {isPlaying ? (
+            <Pause className="h-5 w-5 fill-current" />
+          ) : (
+            <Play className="h-5 w-5 fill-current ml-0.5" />
+          )}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={recording ? stopRecording : startRecording}
+          aria-label={recording ? t("Stop recording") : t("Record voice note")}
+          disabled={micState === "unsupported"}
+          className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white shadow-sm transition active:scale-95 disabled:opacity-50 ${
+            recording ? "bg-[#df3e43] animate-pulse" : "bg-[#174e46] hover:bg-[#1f6359]"
+          }`}
+        >
+          {recording ? (
+            <Square className="h-4 w-4 fill-current" />
+          ) : (
+            <Mic className="h-5 w-5" />
+          )}
+        </button>
+      )}
 
-        {/* Delete Action when recorded draft exists */}
-        {draft && !recording && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            aria-label={t("Delete voice note")}
-            className="flex items-center gap-1.5 rounded-xl bg-[#fff0ef] px-3 py-2 text-[11px] font-bold text-[#b44742] transition hover:bg-[#ffe0de] active:scale-95 dark:bg-[#2d1b1b] dark:text-[#f87171]"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span>{t("Delete")}</span>
-          </button>
+      {/* Card Title */}
+      <div className="mt-2 flex items-center justify-center gap-1.5">
+        {recording && (
+          <span className="inline-block h-2 w-2 rounded-full bg-[#df3e43] animate-ping" />
         )}
+        <p className="text-sm font-extrabold text-[#142c2b] dark:text-[#f4f4f5]">
+          {recording
+            ? t("Stop and save voice note")
+            : draft
+            ? t("Voice note ready")
+            : t("Record voice note")}
+        </p>
       </div>
 
+      {/* Card Subtitle */}
+      <p className="mt-0.5 text-xs text-[#708881] dark:text-[#b9b9c0]">
+        {recording
+          ? `${formatSeconds(recordSeconds)} / 02:00 · ${t("Tap to stop")}`
+          : draft
+          ? isPlaying
+            ? `${formatSeconds(playProgress)} / ${formatSeconds(draft.durationSeconds)} · ${t("Playing")}`
+            : `${draft.durationSeconds}s · ${t("Attached to your next SOS")}`
+          : micState === "unsupported"
+          ? t("Voice recording is not supported in this browser.")
+          : t("Speak briefly if typing is difficult")}
+      </p>
+
       {message && (
-        <p role="status" className="px-2 pb-1 pt-3 text-[11px] font-semibold text-[#54746b] dark:text-[#b9b9c0]">
+        <p role="status" className="mt-1 text-[10px] font-semibold text-[#54746b] dark:text-[#b9b9c0]">
           {message}
         </p>
       )}

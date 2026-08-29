@@ -430,7 +430,7 @@ export async function generateSahayakResponse(options: GenerateChatResponseOptio
     contents.push({ role: "user", parts: [{ text: options.message }] });
 
     // Step 1: Initial call with function calling tools
-    const response = await fetchWithRetry(() => ai.models.generateContent({
+    const response: any = await fetchWithRetry(() => ai.models.generateContent({
       model: "gemini-3.6-flash",
       contents,
       config: {
@@ -441,7 +441,7 @@ export async function generateSahayakResponse(options: GenerateChatResponseOptio
 
     const candidates = response.candidates;
     const firstCandidate = candidates?.[0];
-    const functionCalls = firstCandidate?.content?.parts?.filter(p => (p as any).functionCall) as any[];
+    const functionCalls = firstCandidate?.content?.parts?.filter((p: any) => p.functionCall) as any[];
 
     // If Gemini requested tool execution, run tool and perform second turn
     if (functionCalls && functionCalls.length > 0) {
@@ -479,7 +479,7 @@ export async function generateSahayakResponse(options: GenerateChatResponseOptio
         },
       ];
 
-      const secondResponse = await fetchWithRetry(() => ai.models.generateContent({
+      const secondResponse: any = await fetchWithRetry(() => ai.models.generateContent({
         model: "gemini-3.6-flash",
         contents: toolTurnContents,
         config: {

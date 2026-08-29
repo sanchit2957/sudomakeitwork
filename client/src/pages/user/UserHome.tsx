@@ -6,6 +6,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { clearSosVoiceNote, readSosVoiceNote } from "@/lib/sosVoiceNote";
 import { VoiceNoteCard } from "@/components/VoiceNoteCard";
 import { AiBotCard } from "@/components/AiBotCard";
+import { QuickActionsPanel } from "@/components/QuickActionsPanel";
 import { SahayakAiModal } from "@/components/SahayakAiModal";
 import { flushOfflineSos, queueOfflineSos } from "@/lib/offlineSos";
 import { createAndRedirectAfterRapidSos, redirectAfterRapidSos } from "@/lib/rapidSos";
@@ -150,11 +151,7 @@ export default function UserHome() {
 
     <section className="mt-6 flex flex-col items-center"><button onClick={startRapidSos} disabled={authLoading || rapidStatus === "locating" || rapidStatus === "sending"} aria-label={t("Send SOS")} className="group isolate grid h-44 w-44 shrink-0 aspect-square place-items-center overflow-hidden rounded-[9999px] border border-white/55 bg-[linear-gradient(145deg,rgba(255,109,118,.91),rgba(209,47,55,.84)_55%,rgba(174,27,36,.9))] text-white ring-1 ring-[#ca3540]/25 backdrop-blur-md transition active:scale-[.975] disabled:cursor-wait disabled:opacity-80"><span aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-3 h-16 rounded-full bg-white/25 blur-md" /><span className="relative z-10 grid place-items-center">{rapidStatus === "locating" || rapidStatus === "sending" ? <Radio className="mb-2 h-8 w-8 animate-pulse" /> : <Siren className="mb-1 h-7 w-7" />}<span className="text-5xl font-black tracking-[-0.08em]">SOS</span><span className="mt-1 text-xs font-bold">{rapidStatus === "locating" ? t("Getting location") : rapidStatus === "sending" ? t("Sending SOS") : user ? t("Tap for immediate help") : t("Sign in to activate")}</span></span></button><p className="mt-6 flex items-center gap-2 rounded-full bg-[#fff3ef] px-3 py-1.5 text-[11px] font-bold text-[#a43d3e]"><Waves className="h-3.5 w-3.5" />{t("Use this only for an emergency")}</p>{rapidNotice && <p role="status" className={`mt-3 max-w-xs text-center text-xs font-semibold leading-5 ${rapidStatus === "error" ? "text-[#b73f43]" : "text-[#38675d]"}`}>{rapidNotice}</p>}</section>
 
-    <div className="mt-3.5">
-      <AiBotCard onOpen={() => setIsAiModalOpen(true)} />
-    </div>
-
-    <VoiceNoteCard />
+    <QuickActionsPanel onOpenAi={() => setIsAiModalOpen(true)} />
     <LocationPreview point={activePoint} state={locationStatus} />
     <FloodConditionsPanel
       conditions={conditions.data}
