@@ -30,7 +30,7 @@ export function RoleGate({
       user.role === "admin"
         ? "/command"
         : user.role === "hospital" || user.role === "medical"
-        ? "/hospital"
+        ? "/medical"
         : user.role === "rescuer"
         ? "/responder"
         : "/";

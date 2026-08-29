@@ -87,7 +87,7 @@ function LiveRescuerMap({ latitude, longitude, destination }: { latitude: number
     new maps.DirectionsService().route({ origin: rescuerPosition, destination: sosPosition, travelMode: maps.TravelMode.DRIVING }, (result: any, status: any) => {
       const leg = result?.routes?.[0]?.legs?.[0];
       const path = result?.routes?.[0]?.overview_path;
-      if (status !== "OK" || !result || !leg || !path?.length) { routePolylineRef.current?.setMap(null); routePolylineRef.current = null; setRouteSummary(t("Route estimate is temporarily unavailable.")); return; }
+      if (status !== "OK" || !result || !leg || !path?.length) { routePolylineRef.current?.setMap(null); routePolylineRef.current = null; setRouteSummary("Route estimate is temporarily unavailable."); return; }
       routePolylineRef.current?.setMap(null);
       routePolylineRef.current = new maps.Polyline({ map, path, strokeColor: "#d23f43", strokeOpacity: 1, strokeWeight: 7, geodesic: true, zIndex: 100 });
       map.fitBounds(result.routes[0].bounds);
@@ -100,8 +100,8 @@ function LiveRescuerMap({ latitude, longitude, destination }: { latitude: number
     map.setCenter(rescuerPosition);
     map.setZoom(15);
     if (window.google?.maps?.marker?.AdvancedMarkerElement) {
-      rescuerMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map, position: rescuerPosition, title: t("Assigned rescuer"), content: createEndpointPin("rescuer").element });
-      if (sosPosition) destinationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map, position: sosPosition, title: t("Your SOS location"), content: createEndpointPin("user").element });
+      rescuerMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map, position: rescuerPosition, title: "Assigned rescuer", content: createEndpointPin("rescuer").element });
+      if (sosPosition) destinationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map, position: sosPosition, title: "Your SOS location", content: createEndpointPin("user").element });
     }
     drawRoute(map);
   }, [createEndpointPin, drawRoute, rescuerPosition.lat, rescuerPosition.lng, sosPosition?.lat, sosPosition?.lng, t]);
@@ -119,7 +119,7 @@ function LiveRescuerMap({ latitude, longitude, destination }: { latitude: number
       iconAnchor: [15, 15],
     });
 
-    const rMarker = L.marker([latitude, longitude], { icon: rescuerIcon, title: t("Assigned rescuer") });
+    const rMarker = L.marker([latitude, longitude], { icon: rescuerIcon, title: "Assigned rescuer" });
     rMarker.bindPopup(`<strong style="color:#174e46;">${t("Assigned Rescuer")}</strong><br/><span>${t("En route to your location")}</span>`);
     group.addLayer(rMarker);
 
@@ -131,7 +131,7 @@ function LiveRescuerMap({ latitude, longitude, destination }: { latitude: number
         iconAnchor: [15, 15],
       });
 
-      const sMarker = L.marker([sosPosition.lat, sosPosition.lng], { icon: sosIcon, title: t("Your SOS location") });
+      const sMarker = L.marker([sosPosition.lat, sosPosition.lng], { icon: sosIcon, title: "Your SOS location" });
       sMarker.bindPopup(`<strong style="color:#c94b45;">${t("Your SOS Location")}</strong>`);
       group.addLayer(sMarker);
 
@@ -143,7 +143,7 @@ function LiveRescuerMap({ latitude, longitude, destination }: { latitude: number
       });
       group.addLayer(route);
       lMap.fitBounds(L.latLngBounds([[latitude, longitude], [sosPosition.lat, sosPosition.lng]]), { padding: [40, 40] });
-      setRouteSummary(t("Calculating live approach distance"));
+      setRouteSummary("Route estimate is temporarily unavailable.");
     }
   }, [latitude, longitude, sosPosition, t]);
 
@@ -152,11 +152,11 @@ function LiveRescuerMap({ latitude, longitude, destination }: { latitude: number
       if (rescuerMarkerRef.current) rescuerMarkerRef.current.position = rescuerPosition;
       if (sosPosition) {
         if (destinationMarkerRef.current) destinationMarkerRef.current.position = sosPosition;
-        else destinationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: mapRef.current, position: sosPosition, title: t("Your SOS location"), content: createEndpointPin("user").element });
+        else destinationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: mapRef.current, position: sosPosition, title: "Your SOS location", content: createEndpointPin("user").element });
       }
       drawRoute(mapRef.current);
     }
   }, [createEndpointPin, drawRoute, rescuerPosition.lat, rescuerPosition.lng, sosPosition?.lat, sosPosition?.lng, t]);
 
-  return <><MapView className="mt-3 h-60 overflow-hidden rounded-xl" initialCenter={rescuerPosition} initialZoom={15} onMapReady={placeMarkers} onLeafletReady={handleLeafletReady} />{routeSummary && <p className="mt-2 flex items-center gap-2 rounded-xl bg-[#fff5f3] px-3 py-2 text-xs font-bold text-[#a43f3d]"><Navigation className="h-4 w-4" />{t("Live route · ETA")} {routeSummary}</p>}</>;
+  return <><MapView className="mt-3 h-60 overflow-hidden rounded-xl" initialCenter={rescuerPosition} initialZoom={15} onMapReady={placeMarkers} onLeafletReady={handleLeafletReady} />{routeSummary && <p className="mt-2 flex items-center gap-2 rounded-xl bg-[#fff5f3] px-3 py-2 text-xs font-bold text-[#a43f3d]"><Navigation className="h-4 w-4" />Live route · ETA: {routeSummary}</p>}</>;
 }

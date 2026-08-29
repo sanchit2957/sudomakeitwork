@@ -9,8 +9,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: NODE_OPTIONS
-        value: --max-old-space-size=384
       - key: VITE_APP_TITLE
         value: sudo MakeItWork
       - key: JWT_SECRET

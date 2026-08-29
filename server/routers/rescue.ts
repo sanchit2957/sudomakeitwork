@@ -2273,6 +2273,19 @@ export const rescueRouter = router({
           } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
         }
         if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Hospital not found." });
+        if (
+          !hasValidHospitalCapacity(
+            existing.totalEmergencyBeds,
+            input.availableEmergencyBeds,
+            existing.totalIcuBeds,
+            input.availableIcuBeds
+          )
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Available beds cannot exceed the declared total capacity of the hospital.",
+          });
+        }
         if (db) {
           try {
             await db.update(hospitals).set({ ...input, updatedBy: ctx.user.id }).where(eq(hospitals.id, input.id));

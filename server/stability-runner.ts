@@ -108,7 +108,7 @@ async function runComprehensiveValidation() {
   });
 
   const rescuerProfile = await rescuerCaller.rescue.rescuer.profile();
-  console.log(`[RESCUER] Retrieved Profile: Call Sign "${rescuerProfile.callSign}"`);
+  console.log(`[RESCUER] Retrieved Profile: Call Sign "${rescuerProfile?.callSign}"`);
 
   // Admin assigns mission
   await adminCaller.rescue.operations.assignMission({

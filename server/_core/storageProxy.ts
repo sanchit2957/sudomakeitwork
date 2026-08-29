@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { ENV } from "./env";
+import { sdk } from "./sdk";
 
 export function registerStorageProxy(app: Express) {
   const handleStorageGet = async (req: any, res: any) => {
@@ -7,6 +8,26 @@ export function registerStorageProxy(app: Express) {
     if (!key) {
       res.status(400).send("Missing storage key");
       return;
+    }
+
+    // Require authentication for sensitive emergency evidence and voice notes
+    const isPrivate =
+      key.startsWith("evidence/") ||
+      key.startsWith("voicenotes/") ||
+      key.startsWith("private/") ||
+      key.includes("incident");
+
+    if (isPrivate) {
+      try {
+        const user = await sdk.authenticateRequest(req);
+        if (!user) {
+          res.status(401).send("Authentication required for private emergency records");
+          return;
+        }
+      } catch {
+        res.status(401).send("Authentication required for private emergency records");
+        return;
+      }
     }
 
     if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {

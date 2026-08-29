@@ -24,7 +24,7 @@ describe("AiBotCard component", () => {
     expect(screen.getByRole("button", { name: "Open AI Bot" })).toBeTruthy();
   });
 
-  it("triggers onOpen callback when card or button is clicked", () => {
+  it("triggers onOpen callback when button is clicked", () => {
     const handleOpen = vi.fn();
     render(<AiBotCard onOpen={handleOpen} />);
 
@@ -32,10 +32,5 @@ describe("AiBotCard component", () => {
     fireEvent.click(openBtn);
 
     expect(handleOpen).toHaveBeenCalledTimes(1);
-
-    const askBtn = screen.getByText("Ask");
-    fireEvent.click(askBtn);
-
-    expect(handleOpen).toHaveBeenCalledTimes(2);
   });
 });

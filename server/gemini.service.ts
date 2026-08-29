@@ -1,7 +1,7 @@
 import { FunctionDeclaration, GoogleGenAI, Type } from "@google/genai";
 import { ASSAM_DISTRICT_LOCATIONS, getComprehensiveWeather } from "./weather.service";
 import { getOfficialAssamRiverGauge } from "./assam-river-gauge";
-import { listHospitals, _memoryShelters, _memoryHospitals } from "./rescue.db";
+import { listHospitals, listShelters } from "./rescue.db";
 
 // Official Assam Emergency Helplines
 const ASSAM_EMERGENCY_HELPLINES = {
@@ -153,29 +153,19 @@ export const realDataTools = {
         count: results.length,
         hospitals: results,
       };
-    } catch {
-      const memory = Array.from(_memoryHospitals.values()).slice(0, 5).map(h => ({
-        name: h.name,
-        address: h.address,
-        phone: h.contactPhone,
-        availableBeds: h.availableEmergencyBeds,
-        totalBeds: h.totalEmergencyBeds,
-        icuBeds: h.availableIcuBeds,
-        totalIcuBeds: h.totalIcuBeds,
-        oxygenCylinders: h.oxygenCylinderCount,
-        status: h.status,
-      }));
+    } catch (err: any) {
       return {
-        success: true,
-        count: memory.length,
-        hospitals: memory,
+        success: false,
+        count: 0,
+        hospitals: [],
+        message: "Live hospital capacity data is temporarily unavailable. For urgent hospital dispatch or ambulance, call 108.",
       };
     }
   },
 
   getReliefShelters: async (args?: { district?: string }) => {
     try {
-      const allShelters = Array.from(_memoryShelters.values());
+      const allShelters = await listShelters();
       let filtered = allShelters;
 
       if (args?.district) {
@@ -200,7 +190,12 @@ export const realDataTools = {
         shelters: results,
       };
     } catch {
-      return { success: true, count: 0, shelters: [] };
+      return {
+        success: false,
+        count: 0,
+        shelters: [],
+        message: "Live relief shelter data is temporarily unavailable. Contact District Disaster Control Room at 1077.",
+      };
     }
   },
 
