@@ -49,6 +49,7 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   try {
     localStorage.removeItem("app-runtime-session-token");
     localStorage.removeItem("app-runtime-user-info");
+    localStorage.removeItem("app_native_bearer_token");
   } catch {}
 
   startLogin();
@@ -78,9 +79,13 @@ const trpcClient = trpc.createClient({
       headers() {
         const headers: Record<string, string> = {};
         try {
-          const token = localStorage.getItem("app-runtime-session-token");
-          if (token) {
-            headers["Authorization"] = `Bearer ${token}`;
+          // Native mobile runtime (Capacitor) uses isolated bearer token storage if running native APK
+          const isNative = typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform?.();
+          if (isNative) {
+            const nativeToken = localStorage.getItem("app_native_bearer_token");
+            if (nativeToken) {
+              headers["Authorization"] = `Bearer ${nativeToken}`;
+            }
           }
         } catch {}
         return headers;

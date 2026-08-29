@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { triggerPostAuthMicPermission } from "@/lib/micPermission";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import {
   isSupabaseConfigured,
   supabase,
@@ -18,6 +19,15 @@ type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
   redirectPath?: string;
 };
+
+// Helper for native Capacitor mobile client token isolation
+function storeNativeTokenIfPresent(sessionToken?: string) {
+  if (sessionToken && typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+    try {
+      localStorage.setItem("app_native_bearer_token", sessionToken);
+    } catch {}
+  }
+}
 
 export function useAuth(options: UseAuthOptions = {}) {
   const {
@@ -39,12 +49,7 @@ export function useAuth(options: UseAuthOptions = {}) {
 
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async (data) => {
-      if (data.sessionToken) {
-        try {
-          localStorage.setItem("app-runtime-session-token", data.sessionToken);
-          localStorage.setItem("app-runtime-user-info", JSON.stringify(data.user));
-        } catch {}
-      }
+      storeNativeTokenIfPresent((data as any).sessionToken);
       utils.auth.me.setData(undefined, data.user as any);
       await utils.auth.me.invalidate();
       void triggerPostAuthMicPermission();
@@ -75,12 +80,7 @@ export function useAuth(options: UseAuthOptions = {}) {
       }
 
       const res = await loginMutation.mutateAsync(params);
-      if (res.sessionToken) {
-        try {
-          localStorage.setItem("app-runtime-session-token", res.sessionToken);
-          localStorage.setItem("app-runtime-user-info", JSON.stringify(res.user));
-        } catch {}
-      }
+      storeNativeTokenIfPresent((res as any).sessionToken);
       utils.auth.me.setData(undefined, res.user as any);
       await utils.auth.me.invalidate();
       return res;
@@ -92,12 +92,7 @@ export function useAuth(options: UseAuthOptions = {}) {
 
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: async (data) => {
-      if (data.sessionToken) {
-        try {
-          localStorage.setItem("app-runtime-session-token", data.sessionToken);
-          localStorage.setItem("app-runtime-user-info", JSON.stringify(data.user));
-        } catch {}
-      }
+      storeNativeTokenIfPresent((data as any).sessionToken);
       utils.auth.me.setData(undefined, data.user as any);
       await utils.auth.me.invalidate();
       void triggerPostAuthMicPermission();
@@ -143,12 +138,7 @@ export function useAuth(options: UseAuthOptions = {}) {
         supabaseToken: sbToken,
       });
 
-      if (res.sessionToken) {
-        try {
-          localStorage.setItem("app-runtime-session-token", res.sessionToken);
-          localStorage.setItem("app-runtime-user-info", JSON.stringify(res.user));
-        } catch {}
-      }
+      storeNativeTokenIfPresent((res as any).sessionToken);
       utils.auth.me.setData(undefined, res.user as any);
       await utils.auth.me.invalidate();
       return res;
@@ -179,12 +169,7 @@ export function useAuth(options: UseAuthOptions = {}) {
         password: "supabase-otp-verified",
         supabaseToken: sbToken,
       });
-      if (res.sessionToken) {
-        try {
-          localStorage.setItem("app-runtime-session-token", res.sessionToken);
-          localStorage.setItem("app-runtime-user-info", JSON.stringify(res.user));
-        } catch {}
-      }
+      storeNativeTokenIfPresent((res as any).sessionToken);
       utils.auth.me.setData(undefined, res.user as any);
       await utils.auth.me.invalidate();
       return res;
@@ -208,6 +193,7 @@ export function useAuth(options: UseAuthOptions = {}) {
       try {
         localStorage.removeItem("app-runtime-session-token");
         localStorage.removeItem("app-runtime-user-info");
+        localStorage.removeItem("app_native_bearer_token");
       } catch {}
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
@@ -226,10 +212,7 @@ export function useAuth(options: UseAuthOptions = {}) {
             password: "supabase-magic-link",
             supabaseToken: session.access_token,
           });
-          if (res.sessionToken) {
-            localStorage.setItem("app-runtime-session-token", res.sessionToken);
-            localStorage.setItem("app-runtime-user-info", JSON.stringify(res.user));
-          }
+          storeNativeTokenIfPresent((res as any).sessionToken);
           utils.auth.me.setData(undefined, res.user as any);
           await utils.auth.me.invalidate();
           if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
@@ -278,30 +261,19 @@ export function useAuth(options: UseAuthOptions = {}) {
   }, [redirectOnUnauthenticated, redirectPath, meQuery.isLoading, meQuery.data]);
 
   const state = useMemo(() => {
-    let effectiveUser = meQuery.data ?? null;
-    if (!effectiveUser && typeof window !== "undefined") {
-      try {
-        const storedToken = localStorage.getItem("app-runtime-session-token");
-        const storedUser = localStorage.getItem("app-runtime-user-info");
-        if (storedToken && storedUser && (meQuery.isLoading || meQuery.isFetching)) {
-          effectiveUser = JSON.parse(storedUser);
-        }
-      } catch {}
-    }
+    // Authoritative user comes strictly from the server-side auth.me query
+    const effectiveUser = meQuery.data ?? null;
     return {
       user: effectiveUser,
       loading: !initTimeoutReached && meQuery.isLoading && !effectiveUser,
       error: meQuery.error ?? null,
       isAuthenticated: Boolean(effectiveUser),
     };
-  }, [meQuery.data, meQuery.isLoading, meQuery.isFetching, meQuery.error, initTimeoutReached]);
+  }, [meQuery.data, meQuery.isLoading, meQuery.error, initTimeoutReached]);
 
   const updateProfileMutation = trpc.auth.updateProfile.useMutation({
     onSuccess: async (data) => {
       if (data.user) {
-        try {
-          localStorage.setItem("app-runtime-user-info", JSON.stringify(data.user));
-        } catch {}
         utils.auth.me.setData(undefined, data.user as any);
       }
       await utils.auth.me.invalidate();

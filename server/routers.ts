@@ -53,6 +53,7 @@ export const appRouter = router({
           email: z.string().optional(),
           password: z.string().optional(),
           supabaseToken: z.string().optional(),
+          isNative: z.boolean().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -97,7 +98,7 @@ export const appRouter = router({
               return {
                 success: true,
                 user: sanitizeUser(dbUser),
-                sessionToken,
+                sessionToken: input.isNative ? sessionToken : undefined,
               };
             }
           }
@@ -138,7 +139,7 @@ export const appRouter = router({
         return {
           success: true,
           user: sanitizeUser(user),
-          sessionToken,
+          sessionToken: input.isNative ? sessionToken : undefined,
         };
       }),
     register: publicProcedure
@@ -152,6 +153,7 @@ export const appRouter = router({
           callSign: z.string().optional(),
           supabaseUserId: z.string().optional(),
           supabaseToken: z.string().optional(),
+          isNative: z.boolean().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -182,7 +184,7 @@ export const appRouter = router({
         return {
           success: true,
           user: sanitizeUser(dbUser),
-          sessionToken,
+          sessionToken: input.isNative ? sessionToken : undefined,
         };
       }),
     createUser: adminProcedure

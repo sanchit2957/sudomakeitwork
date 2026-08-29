@@ -20,11 +20,15 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    chunkSizeWarningLimit: 900,
+    sourcemap: false,
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes("node_modules")) {
+            if (id.includes("react") || id.includes("react-dom") || id.includes("wouter")) {
+              return "vendor-react";
+            }
             if (id.includes("recharts") || id.includes("d3-")) {
               return "vendor-charts";
             }

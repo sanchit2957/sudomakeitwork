@@ -48,11 +48,22 @@ async function startServer() {
     })
   );
 
-  // Enable CORS for native mobile apps (Capacitor) and cross-origin clients
+  // Security headers
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (process.env.NODE_ENV === "production") {
+      res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    }
+    next();
+  });
+
+  // Enable CORS with explicit production allowlist & native mobile support
   app.use(
     cors({
       origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps, curl, server-to-server)
+        // Allow requests with no origin (like native mobile apps, server-to-server)
         if (!origin) return callback(null, true);
         // Allow Capacitor local origins and localhost
         if (
@@ -66,16 +77,20 @@ async function startServer() {
           return callback(null, true);
         }
         // Check configured explicit allowed origins
-        const configuredOrigins = process.env.ALLOWED_ORIGINS
-          ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim())
-          : [];
-        if (configuredOrigins.includes(origin)) {
+        const allowedOrigins = [
+          ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim()) : []),
+          ...(process.env.APP_URL ? [process.env.APP_URL.trim()] : []),
+          ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL.trim()] : []),
+          "https://assam-rescue-platform.onrender.com",
+        ].filter(Boolean);
+
+        if (allowedOrigins.includes(origin)) {
           return callback(null, true);
         }
-        if (process.env.NODE_ENV === "production" && configuredOrigins.length > 0) {
-          return callback(new Error("CORS origin not allowed"), false);
+        if (process.env.NODE_ENV === "production") {
+          return callback(new Error("CORS origin not allowed in production"), false);
         }
-        // In local development or default web server, permit the origin
+        // In local development, permit the origin
         return callback(null, true);
       },
       credentials: true,
