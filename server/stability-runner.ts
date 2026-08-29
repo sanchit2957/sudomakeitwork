@@ -72,7 +72,6 @@ async function runComprehensiveValidation() {
 
   const testSos = await citizenCaller.rescue.emergency.create({
     contactName: "Validation Victim",
-    contactPhone: "+919876543210",
     locationLabel: "Guwahati Validation Sector 4",
     latitude: 26.1445,
     longitude: 91.7362,
@@ -80,7 +79,6 @@ async function runComprehensiveValidation() {
     severity: "critical",
     peopleAffected: 4,
     helpNeeds: "Immediate boat rescue validation",
-    offlineCreated: false,
   });
 
   console.log(`[USER] Created SOS Incident: ID ${testSos.incidentId}, Code: ${testSos.publicCode}`);
@@ -115,9 +113,9 @@ async function runComprehensiveValidation() {
   // Admin assigns mission
   await adminCaller.rescue.operations.assignMission({
     incidentId: testSos.incidentId,
-    rescuerId: rescuerLogin.user.id,
+    rescuerId: rescuerLogin.user!.id,
   });
-  console.log(`[ADMIN] Assigned Mission to Rescuer (User ID ${rescuerLogin.user.id})`);
+  console.log(`[ADMIN] Assigned Mission to Rescuer (User ID ${rescuerLogin.user!.id})`);
 
   // Rescuer sees mission
   const activeMissions = await rescuerCaller.rescue.rescuer.missions();

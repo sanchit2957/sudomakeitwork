@@ -38,7 +38,7 @@ async function startServer() {
   // Enable gzip/deflate compression for massive bandwidth & buffer reduction
   app.use(
     compression({
-      filter: (req, res) => {
+      filter: (req: express.Request, res: express.Response) => {
         if (req.headers["x-no-compression"]) {
           return false;
         }
