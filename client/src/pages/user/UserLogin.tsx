@@ -49,6 +49,7 @@ export default function UserLogin() {
 
   // Top level auth mode: "signin" or "register"
   const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
+  const [signinMethod, setSigninMethod] = useState<"otp" | "password">("otp");
   
   // OTP Verification flow state
   const [otpStep, setOtpStep] = useState<"input" | "verify">("input");
@@ -58,6 +59,8 @@ export default function UserLogin() {
 
   // Citizen Sign In & Register fields
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPhone, setRegPhone] = useState("");
@@ -82,6 +85,7 @@ export default function UserLogin() {
     try {
       await logout();
       setEmail("");
+      setPassword("");
       setRegName("");
       setRegEmail("");
       setRegPhone("");
@@ -90,6 +94,30 @@ export default function UserLogin() {
       setSuccessMessage("Signed out successfully.");
     } catch (err: any) {
       setErrorMessage(err?.message || "Failed to sign out.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePasswordLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes("@")) {
+      setErrorMessage("Please enter a valid email address.");
+      return;
+    }
+    if (!password) {
+      setErrorMessage("Please enter your account password.");
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      const res = await login({ email: email.trim(), password: password.trim() });
+      setSuccessMessage("Signed in successfully! Redirecting…");
+      const targetRole = res?.user?.role || "user";
+      setLocation(getDashboardDestinationForRole(targetRole));
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Authentication failed. Please verify your email and password.");
     } finally {
       setIsSubmitting(false);
     }
@@ -113,12 +141,17 @@ export default function UserLogin() {
       setSuccessMessage(`A 6-digit verification code was sent to ${targetEmail.trim()}. Check your inbox.`);
     } catch (err: any) {
       const msg = err?.message || "";
-      if (msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("rate_limit")) {
+      if (
+        msg.toLowerCase().includes("rate limit") ||
+        msg.toLowerCase().includes("rate_limit") ||
+        msg.toLowerCase().includes("magic link") ||
+        msg.toLowerCase().includes("error sending magic link email")
+      ) {
         setErrorMessage(
-          "Supabase default email rate limit reached (max 3-4 emails/hour on free shared pool). Please wait a few minutes, check your inbox for an earlier email link, or configure a custom SMTP (e.g. Resend/Brevo) in your Supabase dashboard."
+          "Supabase email service limit reached (default free tier allows ~3 emails/hour). If you have a password, switch to the 'Password Login' tab above, or configure custom SMTP in Supabase Settings > Auth > SMTP."
         );
       } else {
-        setErrorMessage(msg || "Failed to send verification code. Please check your Supabase settings.");
+        setErrorMessage(msg || "Failed to send verification code. Please check your network or try Password Login.");
       }
     } finally {
       setIsSubmitting(false);
@@ -407,42 +440,135 @@ export default function UserLogin() {
                 </form>
               </div>
             ) : authMode === "signin" ? (
-              /* CITIZEN SIGN IN FORM - PURE OTP */
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSendOtp(email);
-                }}
-                className="space-y-4"
-              >
-                <div>
-                  <Label htmlFor="email" className="text-xs font-bold text-foreground">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your registered email"
-                    className="mt-1.5 h-11 rounded-xl text-sm"
-                    autoComplete="email"
-                    required
-                  />
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    We will send a 6-digit login verification code directly to your email address.
-                  </p>
+              /* CITIZEN SIGN IN FORM - OTP OR PASSWORD */
+              <div className="space-y-4">
+                {/* Method Toggle */}
+                <div className="grid grid-cols-2 rounded-xl bg-black/5 p-1 dark:bg-white/5 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSigninMethod("otp");
+                      setErrorMessage("");
+                    }}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 transition-all ${
+                      signinMethod === "otp"
+                        ? "bg-white text-foreground shadow-sm dark:bg-[#1f2227]"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                    Email OTP Code
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSigninMethod("password");
+                      setErrorMessage("");
+                    }}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 transition-all ${
+                      signinMethod === "password"
+                        ? "bg-white text-foreground shadow-sm dark:bg-[#1f2227]"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                    Password Login
+                  </button>
                 </div>
 
-                <div className="pt-2">
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting || !email.trim()}
-                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                {signinMethod === "otp" ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSendOtp(email);
+                    }}
+                    className="space-y-4"
                   >
-                    <Mail className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Sending Code…" : "Send Verification Code"}
-                  </Button>
-                </div>
-              </form>
+                    <div>
+                      <Label htmlFor="email" className="text-xs font-bold text-foreground">Email Address</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Enter your registered email"
+                        className="mt-1.5 h-11 rounded-xl text-sm"
+                        autoComplete="email"
+                        required
+                      />
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">
+                        We will send a 6-digit login verification code directly to your email address.
+                      </p>
+                    </div>
+
+                    <div className="pt-2">
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting || !email.trim()}
+                        className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                      >
+                        <Mail className="mr-2 h-4 w-4" />
+                        {isSubmitting ? "Sending Code…" : "Send Verification Code"}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <form onSubmit={handlePasswordLogin} className="space-y-4">
+                    <div>
+                      <Label htmlFor="pwd-email" className="text-xs font-bold text-foreground">Email Address</Label>
+                      <Input
+                        id="pwd-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="e.g. citizen@assamrescue.gov.in"
+                        className="mt-1.5 h-11 rounded-xl text-sm"
+                        autoComplete="email"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="pwd-password" className="text-xs font-bold text-foreground">Password</Label>
+                      <div className="relative mt-1.5">
+                        <Input
+                          id="pwd-password"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Enter your account password"
+                          className="h-11 rounded-xl pr-10 text-sm"
+                          autoComplete="current-password"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          tabIndex={-1}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">
+                        Use the password created during registration or provisioned by your system administrator.
+                      </p>
+                    </div>
+
+                    <div className="pt-2">
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting || !email.trim() || !password.trim()}
+                        className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                      >
+                        <Lock className="mr-2 h-4 w-4" />
+                        {isSubmitting ? "Signing In…" : "Sign In with Password"}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </div>
             ) : registrationSubmitted ? (
               /* REGISTRATION SUCCESS NOTICE */
               <div className="py-2 text-center">

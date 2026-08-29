@@ -22,7 +22,7 @@ import {
   shelters,
   users,
 } from "../../drizzle/schema";
-import { getDb, getEmergencyContactsByUserId, upsertEmergencyContact, deleteEmergencyContact, getUserByOpenId, upsertUser, getAllUsers } from "../db";
+import { getDb, getEmergencyContactsByUserId, upsertEmergencyContact, deleteEmergencyContact, getUserByOpenId, getUserById, upsertUser, getAllUsers } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
 import { ASSAM_DISTRICT_LOCATIONS, getComprehensiveWeather, weatherProviderManager } from "../weather.service";
@@ -941,15 +941,14 @@ export const rescueRouter = router({
       const db = await database();
       if (db) {
         try {
-          return (
-            (
-              await db
-                .select()
-                .from(hospitalRegistrationRequests)
-                .where(eq(hospitalRegistrationRequests.userId, ctx.user.id))
-                .limit(1)
-            )[0] ?? null
-          );
+          const res = (
+            await db
+              .select()
+              .from(hospitalRegistrationRequests)
+              .where(eq(hospitalRegistrationRequests.userId, ctx.user.id))
+              .limit(1)
+          )[0];
+          if (res) return res;
         } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
       }
       return Array.from(_memoryHospitalRequests.values()).find(r => r.userId === ctx.user.id) ?? null;
@@ -1244,6 +1243,412 @@ export const rescueRouter = router({
       }
       return Array.from(_memoryUsers.values()).map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role }));
     }),
+    adminUsersList: adminProcedure
+      .input(
+        z.object({
+          search: z.string().optional(),
+          role: z.enum(["all", "user", "hospital", "rescuer", "admin"]).default("all"),
+          status: z.enum(["all", "active", "disabled"]).default("all"),
+          limit: z.number().int().min(1).max(200).default(100),
+          offset: z.number().int().min(0).default(0),
+        }).optional()
+      )
+      .query(async ({ input }) => {
+        const search = input?.search?.trim().toLowerCase() || "";
+        const roleFilter = input?.role || "all";
+        const statusFilter = input?.status || "all";
+        const limit = input?.limit || 100;
+        const offset = input?.offset || 0;
+
+        let allDbUsers: any[] = [];
+        let allRescuerProfiles: any[] = [];
+        let allHospitalStaffProfiles: any[] = [];
+        let allHospitals: any[] = [];
+        let allRescuerReqs: any[] = [];
+        let allHospitalReqs: any[] = [];
+
+        const db = await database();
+        if (db) {
+          try {
+            allDbUsers = await db.select().from(users).orderBy(desc(users.id));
+            allRescuerProfiles = await db.select().from(rescueProfiles);
+            allHospitalStaffProfiles = await db.select().from(hospitalStaffProfiles);
+            allHospitals = await db.select().from(hospitals);
+            allRescuerReqs = await db.select().from(rescuerRegistrationRequests);
+            allHospitalReqs = await db.select().from(hospitalRegistrationRequests);
+          } catch (err) {
+            if (process.env.NODE_ENV === "production") {
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database query failed in production" });
+            }
+          }
+        }
+
+        // Fallback / merge with memory store
+        if (!allDbUsers.length) {
+          const seen = new Set<number>();
+          for (const u of Array.from(_memoryUsers.values())) {
+            if (!seen.has(u.id)) {
+              seen.add(u.id);
+              allDbUsers.push(u);
+            }
+          }
+          allRescuerProfiles = Array.from(_memoryRescueProfiles.values());
+          allHospitalStaffProfiles = Array.from(_memoryHospitalStaffProfiles.values());
+          allHospitals = Array.from(_memoryHospitals.values());
+          allRescuerReqs = Array.from(_memoryRescuerRequests.values());
+          allHospitalReqs = Array.from(_memoryHospitalRequests.values());
+        }
+
+        const rescuerProfileMap = new Map(allRescuerProfiles.map(p => [p.userId, p]));
+        const rescuerReqMap = new Map(allRescuerReqs.map(r => [r.userId, r]));
+        const hospitalStaffMap = new Map(allHospitalStaffProfiles.map(s => [s.userId, s]));
+        const hospitalMap = new Map(allHospitals.map(h => [h.id, h]));
+        const hospitalReqMap = new Map(allHospitalReqs.map(hr => [hr.userId, hr]));
+
+        // Normalize roles & map details
+        const enriched = allDbUsers.map(u => {
+          const canonicalRole: "user" | "hospital" | "rescuer" | "admin" =
+            u.role === "medical" ? "hospital" : (u.role || "user");
+          const userStatus: "active" | "disabled" = u.status === "disabled" ? "disabled" : "active";
+
+          const rescuerProfile = rescuerProfileMap.get(u.id);
+          const rescuerReq = rescuerReqMap.get(u.id);
+          const hospitalStaff = hospitalStaffMap.get(u.id);
+          const hospitalData = hospitalStaff ? hospitalMap.get(hospitalStaff.hospitalId) : null;
+          const hospitalReq = hospitalReqMap.get(u.id);
+
+          return {
+            id: u.id,
+            openId: u.openId,
+            name: u.name,
+            email: u.email,
+            role: canonicalRole,
+            status: userStatus,
+            loginMethod: u.loginMethod || "platform-login",
+            createdAt: u.createdAt,
+            updatedAt: u.updatedAt,
+            lastSignedIn: u.lastSignedIn,
+            rescuerProfile: rescuerProfile ? {
+              callSign: rescuerProfile.callSign,
+              phone: rescuerProfile.phone,
+              availability: rescuerProfile.availability,
+              locationSharing: rescuerProfile.locationSharing,
+              locationUpdatedAt: rescuerProfile.locationUpdatedAt,
+            } : null,
+            rescuerRequest: rescuerReq ? {
+              id: rescuerReq.id,
+              status: rescuerReq.status,
+              phone: rescuerReq.phone,
+              createdAt: rescuerReq.createdAt,
+              reviewedAt: rescuerReq.reviewedAt,
+            } : null,
+            hospitalProfile: hospitalStaff ? {
+              hospitalId: hospitalStaff.hospitalId,
+              hospitalName: hospitalData?.name || `Hospital #${hospitalStaff.hospitalId}`,
+              hospitalAddress: hospitalData?.address || "",
+              designation: hospitalStaff.designation,
+              status: hospitalData?.status || "open",
+            } : null,
+            hospitalRequest: hospitalReq ? {
+              id: hospitalReq.id,
+              hospitalName: hospitalReq.hospitalName,
+              address: hospitalReq.address,
+              status: hospitalReq.status,
+              createdAt: hospitalReq.createdAt,
+              reviewedAt: hospitalReq.reviewedAt,
+            } : null,
+          };
+        });
+
+        // Compute summary counts across ALL users
+        const summary = {
+          total: enriched.length,
+          citizens: enriched.filter(u => u.role === "user").length,
+          hospitalStaff: enriched.filter(u => u.role === "hospital").length,
+          rescuers: enriched.filter(u => u.role === "rescuer").length,
+          admins: enriched.filter(u => u.role === "admin").length,
+          active: enriched.filter(u => u.status === "active").length,
+          disabled: enriched.filter(u => u.status === "disabled").length,
+        };
+
+        // Filter
+        let filtered = enriched;
+        if (roleFilter !== "all") {
+          filtered = filtered.filter(u => u.role === roleFilter);
+        }
+        if (statusFilter !== "all") {
+          filtered = filtered.filter(u => u.status === statusFilter);
+        }
+        if (search) {
+          filtered = filtered.filter(u =>
+            (u.email && u.email.toLowerCase().includes(search)) ||
+            (u.name && u.name.toLowerCase().includes(search)) ||
+            (u.openId && u.openId.toLowerCase().includes(search)) ||
+            String(u.id) === search ||
+            (u.rescuerProfile?.callSign && u.rescuerProfile.callSign.toLowerCase().includes(search)) ||
+            (u.hospitalProfile?.hospitalName && u.hospitalProfile.hospitalName.toLowerCase().includes(search))
+          );
+        }
+
+        const totalFiltered = filtered.length;
+        const paged = filtered.slice(offset, offset + limit);
+
+        return {
+          users: paged,
+          total: totalFiltered,
+          summary,
+        };
+      }),
+    adminGetUser: adminProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const user = await getUserById(input.userId);
+        if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found." });
+
+        let rescuerProfile = await getRescuerProfile(input.userId);
+        let emergencyContactsList = await getEmergencyContactsByUserId(input.userId);
+        let userHospitalStaff = null;
+        let userHospital = null;
+        let userAuditHistory: any[] = [];
+        let assignedMissionsCount = 0;
+
+        const db = await database();
+        if (db) {
+          try {
+            const hs = (await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, input.userId)).limit(1))[0];
+            if (hs) {
+              userHospitalStaff = hs;
+              userHospital = (await db.select().from(hospitals).where(eq(hospitals.id, hs.hospitalId)).limit(1))[0] || null;
+            }
+            userAuditHistory = await db.select().from(auditLogs).where(and(eq(auditLogs.resourceType, "user"), eq(auditLogs.resourceId, String(input.userId)))).orderBy(desc(auditLogs.createdAt)).limit(20);
+            const mCount = await db.select().from(missions).where(eq(missions.rescuerId, input.userId));
+            assignedMissionsCount = mCount.length;
+          } catch (err) {}
+        }
+        
+        if (!userHospitalStaff) {
+          const hs = _memoryHospitalStaffProfiles.get(input.userId);
+          if (hs) {
+            userHospitalStaff = hs;
+            userHospital = _memoryHospitals.get(hs.hospitalId) || null;
+          }
+        }
+        if (!userAuditHistory.length) {
+          userAuditHistory = _memoryAuditLogs.filter(l => l.resourceType === "user" && l.resourceId === String(input.userId));
+        }
+        if (!assignedMissionsCount) {
+          assignedMissionsCount = Array.from(_memoryMissions.values()).filter(m => m.rescuerId === input.userId).length;
+        }
+
+        return {
+          user: {
+            id: user.id,
+            openId: user.openId,
+            name: user.name,
+            email: user.email,
+            role: user.role === "medical" ? "hospital" : user.role,
+            status: user.status || "active",
+            loginMethod: user.loginMethod,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            lastSignedIn: user.lastSignedIn,
+          },
+          rescuerProfile,
+          hospitalStaffProfile: userHospitalStaff,
+          hospital: userHospital,
+          emergencyContactsCount: emergencyContactsList.length,
+          assignedMissionsCount,
+          auditHistory: userAuditHistory,
+        };
+      }),
+    adminUpdateUserRole: adminProcedure
+      .input(
+        z.object({
+          userId: z.number().int().positive(),
+          role: z.enum(["user", "hospital", "rescuer", "admin"]),
+          hospitalId: z.number().int().positive().optional(),
+          designation: z.string().trim().max(120).optional(),
+          callSign: z.string().trim().min(2).max(96).optional(),
+          phone: z.string().trim().max(32).optional(),
+          reason: z.string().trim().max(500).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserById(input.userId);
+        if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found." });
+
+        if (input.role === "hospital") {
+          if (!input.hospitalId) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "A verified hospital facility must be selected." });
+          }
+          let hospitalExists = false;
+          const db = await database();
+          if (db) {
+            try {
+              const h = (await db.select().from(hospitals).where(eq(hospitals.id, input.hospitalId)).limit(1))[0];
+              if (h) hospitalExists = true;
+            } catch (err) {}
+          } else {
+            hospitalExists = _memoryHospitals.has(input.hospitalId);
+          }
+          if (!hospitalExists) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Selected hospital facility was not found." });
+          }
+        }
+
+        if (input.role === "rescuer") {
+          if (!input.callSign || input.callSign.trim().length < 2) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "A field call sign (min 2 characters) is required for rescuer role." });
+          }
+        }
+
+        const previousRole = user.role;
+        const db = await database();
+
+        if (db) {
+          try {
+            await db.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
+
+            if (input.role === "hospital" && input.hospitalId) {
+              const existingStaff = (await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, input.userId)).limit(1))[0];
+              if (existingStaff) {
+                await db.update(hospitalStaffProfiles).set({ hospitalId: input.hospitalId, designation: input.designation || existingStaff.designation || null }).where(eq(hospitalStaffProfiles.userId, input.userId));
+              } else {
+                await db.insert(hospitalStaffProfiles).values({
+                  userId: input.userId,
+                  hospitalId: input.hospitalId,
+                  designation: input.designation || "Medical Coordinator",
+                });
+              }
+            } else if (input.role === "rescuer" && input.callSign) {
+              const existingRescue = (await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, input.userId)).limit(1))[0];
+              if (existingRescue) {
+                await db.update(rescueProfiles).set({ callSign: input.callSign.trim(), phone: input.phone || existingRescue.phone || null, availability: "available" }).where(eq(rescueProfiles.userId, input.userId));
+              } else {
+                await db.insert(rescueProfiles).values({
+                  userId: input.userId,
+                  callSign: input.callSign.trim(),
+                  phone: input.phone || null,
+                  availability: "available",
+                });
+              }
+            }
+          } catch (err) {
+            if (process.env.NODE_ENV === "production") {
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database update failed in production" });
+            }
+          }
+        }
+
+        // Memory cache sync
+        for (const [k, memU] of Array.from(_memoryUsers.entries())) {
+          if (memU && (memU.id === input.userId || memU.openId === user.openId || (user.email && memU.email?.toLowerCase() === user.email.toLowerCase()))) {
+            memU.role = input.role;
+            _memoryUsers.set(k, { ...memU, role: input.role });
+          }
+        }
+
+        if (input.role === "hospital" && input.hospitalId) {
+          _memoryHospitalStaffProfiles.set(input.userId, {
+            id: _memoryHospitalStaffProfiles.get(input.userId)?.id || _memoryHospitalStaffProfiles.size + 1,
+            userId: input.userId,
+            hospitalId: input.hospitalId,
+            designation: input.designation || "Medical Coordinator",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        } else if (input.role === "rescuer" && input.callSign) {
+          _memoryRescueProfiles.set(input.userId, {
+            id: _memoryRescueProfiles.get(input.userId)?.id || _memoryRescueProfiles.size + 1,
+            userId: input.userId,
+            callSign: input.callSign.trim(),
+            phone: input.phone || null,
+            photoKey: null,
+            photoUrl: null,
+            contactSharing: "no",
+            locationSharing: "no",
+            availability: "available",
+            lastLatitude: null,
+            lastLongitude: null,
+            locationUpdatedAt: null,
+            updatedAt: new Date(),
+          });
+        }
+
+        await writeAudit(
+          ctx.user.id,
+          "ROLE_CHANGED",
+          "user",
+          input.userId,
+          JSON.stringify({
+            previousRole,
+            newRole: input.role,
+            targetEmail: user.email,
+            targetUserId: user.id,
+            hospitalId: input.hospitalId,
+            callSign: input.callSign,
+            reason: input.reason || "Administrative role update",
+          })
+        );
+
+        return { success: true, newRole: input.role };
+      }),
+    adminSetUserStatus: adminProcedure
+      .input(
+        z.object({
+          userId: z.number().int().positive(),
+          status: z.enum(["active", "disabled"]),
+          reason: z.string().trim().max(500).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.id === input.userId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Administrators cannot disable their own account.",
+          });
+        }
+
+        const user = await getUserById(input.userId);
+        if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found." });
+
+        const previousStatus = user.status || "active";
+        const db = await database();
+
+        if (db) {
+          try {
+            await db.update(users).set({ status: input.status }).where(eq(users.id, input.userId));
+          } catch (err) {
+            if (process.env.NODE_ENV === "production") {
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database update failed in production" });
+            }
+          }
+        }
+
+        // Memory cache sync
+        for (const [k, memU] of Array.from(_memoryUsers.entries())) {
+          if (memU && (memU.id === input.userId || memU.openId === user.openId || (user.email && memU.email?.toLowerCase() === user.email.toLowerCase()))) {
+            memU.status = input.status;
+            _memoryUsers.set(k, { ...memU, status: input.status });
+          }
+        }
+
+        await writeAudit(
+          ctx.user.id,
+          input.status === "disabled" ? "ACCOUNT_DISABLED" : "ACCOUNT_ENABLED",
+          "user",
+          input.userId,
+          JSON.stringify({
+            previousStatus,
+            newStatus: input.status,
+            targetEmail: user.email,
+            targetUserId: user.id,
+            reason: input.reason || (input.status === "disabled" ? "Disabled by administrator" : "Re-activated by administrator"),
+          })
+        );
+
+        return { success: true, status: input.status };
+      }),
     promoteRescuer: adminProcedure
       .input(
         z.object({
@@ -1401,7 +1806,19 @@ export const rescueRouter = router({
         request.reviewNote = input.reviewNote ?? null;
         if (input.decision === "approved") {
           let hospitalId = _memoryHospitals.size + 1;
+          let targetOpenId: string | undefined;
+          let targetEmail: string | undefined;
           if (db) {
+            try {
+              const dbUser = (await db.select().from(users).where(eq(users.id, request.userId)).limit(1))[0];
+              if (dbUser) {
+                targetOpenId = dbUser.openId;
+                targetEmail = dbUser.email?.toLowerCase();
+              }
+            } catch (err) {}
+            try {
+              await db.update(users).set({ role: "hospital" }).where(eq(users.id, request.userId));
+            } catch (err) {}
             try {
               const created = await db.insert(hospitals).values({
                 name: request.hospitalName,
@@ -1424,7 +1841,8 @@ export const rescueRouter = router({
                 updatedBy: request.userId,
               });
               hospitalId = Number(created[0].insertId);
-              await db.update(users).set({ role: "hospital" }).where(eq(users.id, request.userId));
+            } catch (err) {}
+            try {
               await db.insert(hospitalStaffProfiles).values({
                 userId: request.userId,
                 hospitalId,
@@ -1462,8 +1880,17 @@ export const rescueRouter = router({
             createdAt: new Date(),
             updatedAt: new Date(),
           });
-          const u = Array.from(_memoryUsers.values()).find(user => user.id === request.userId);
-          if (u) u.role = "hospital";
+          for (const [k, u] of Array.from(_memoryUsers.entries())) {
+            if (
+              u &&
+              (u.id === request.userId ||
+                (targetOpenId && u.openId === targetOpenId) ||
+                (targetEmail && u.email?.toLowerCase() === targetEmail))
+            ) {
+              u.role = "hospital";
+              _memoryUsers.set(k, { ...u, role: "hospital" });
+            }
+          }
           await writeAudit(
             ctx.user.id,
             "hospitalRegistration.approved",
@@ -1495,6 +1922,8 @@ export const rescueRouter = router({
         if (!requiresCallSign(input.decision, input.callSign))
           throw new TRPCError({ code: "BAD_REQUEST", message: "A field call sign is required to approve a rescuer." });
         let request: any = _memoryRescuerRequests.get(input.requestId);
+        let targetOpenId: string | undefined;
+        let targetEmail: string | undefined;
         const db = await database();
         if (db) {
           try {
@@ -1506,6 +1935,11 @@ export const rescueRouter = router({
                 .limit(1)
             )[0];
             if (dbReq) request = dbReq;
+            const dbUser = (await db.select().from(users).where(eq(users.id, request.userId)).limit(1))[0];
+            if (dbUser) {
+              targetOpenId = dbUser.openId;
+              targetEmail = dbUser.email?.toLowerCase();
+            }
           } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
         }
         if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Registration request not found." });
@@ -1541,8 +1975,17 @@ export const rescueRouter = router({
         request.reviewedAt = reviewedAt;
         request.reviewNote = input.reviewNote ?? null;
         if (input.decision === "approved") {
-          const u = Array.from(_memoryUsers.values()).find(user => user.id === request.userId);
-          if (u) u.role = "rescuer";
+          for (const [k, u] of Array.from(_memoryUsers.entries())) {
+            if (
+              u &&
+              (u.id === request.userId ||
+                (targetOpenId && u.openId === targetOpenId) ||
+                (targetEmail && u.email?.toLowerCase() === targetEmail))
+            ) {
+              u.role = "rescuer";
+              _memoryUsers.set(k, { ...u, role: "rescuer" });
+            }
+          }
           _memoryRescueProfiles.set(request.userId, {
             id: _memoryRescueProfiles.get(request.userId)?.id || _memoryRescueProfiles.size + 1,
             userId: request.userId,
@@ -1891,15 +2334,14 @@ export const rescueRouter = router({
       const db = await database();
       if (db) {
         try {
-          return (
-            (
-              await db
-                .select()
-                .from(rescuerRegistrationRequests)
-                .where(eq(rescuerRegistrationRequests.userId, ctx.user.id))
-                .limit(1)
-            )[0] ?? null
-          );
+          const res = (
+            await db
+              .select()
+              .from(rescuerRegistrationRequests)
+              .where(eq(rescuerRegistrationRequests.userId, ctx.user.id))
+              .limit(1)
+          )[0];
+          if (res) return res;
         } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
       }
       return Array.from(_memoryRescuerRequests.values()).find(r => r.userId === ctx.user.id) ?? null;

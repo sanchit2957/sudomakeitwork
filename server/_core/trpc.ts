@@ -18,6 +18,10 @@ const requireUser = t.middleware(async opts => {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
+  if (user.status === "disabled") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Your account has been disabled. Please contact an administrator." });
+  }
+
   return next({
     ctx: {
       ...ctx,
@@ -34,6 +38,10 @@ export const adminProcedure = t.procedure.use(
 
     if (!ctx.user || ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+    }
+
+    if (ctx.user.status === 'disabled') {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Your account has been disabled. Please contact an administrator." });
     }
 
     return next({

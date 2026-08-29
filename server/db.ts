@@ -23,6 +23,7 @@ export function createDatabasePool(connectionUri: string): mysql.Pool {
     connectionLimit: 15,
     maxIdle: 8,
     idleTimeout: 60000,
+    connectTimeout: 2000,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
     queueLimit: 0,
@@ -69,6 +70,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "admin@assamrescue.gov.in",
       password: defaultAdminHash,
       role: "admin",
+      status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -84,6 +86,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "admin@assamrescue.gov.in",
       password: defaultAdminHash,
       role: "admin",
+      status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -99,6 +102,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "rescuer@assamrescue.gov.in",
       password: defaultRescuerHash,
       role: "rescuer",
+      status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -114,6 +118,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "rescuer@assamrescue.gov.in",
       password: defaultRescuerHash,
       role: "rescuer",
+      status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -129,6 +134,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "medical@assamrescue.gov.in",
       password: defaultMedicalHash,
       role: "hospital",
+      status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -144,6 +150,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "medical@assamrescue.gov.in",
       password: defaultMedicalHash,
       role: "hospital",
+      status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -159,6 +166,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "citizen@assamrescue.gov.in",
       password: defaultCitizenHash,
       role: "user",
+      status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -174,6 +182,7 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "citizen@assamrescue.gov.in",
       password: defaultCitizenHash,
       role: "user",
+      status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -211,6 +220,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.lastSignedIn = user.lastSignedIn;
       updateSet.lastSignedIn = user.lastSignedIn;
     }
+    if (user.status !== undefined) {
+      values.status = user.status;
+      updateSet.status = user.status;
+    }
     const rolePlan = planRoleSync(user.role, user.openId === ENV.ownerOpenId);
     if (rolePlan.insertRole !== undefined) values.role = rolePlan.insertRole;
     if (rolePlan.updateRole !== undefined) updateSet.role = rolePlan.updateRole;
@@ -227,17 +240,15 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       await db.insert(users).values(values).onDuplicateKeyUpdate({
         set: updateSet,
       });
-      return;
-    } catch (error) {
+    } catch (error: any) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database user update failed: ${(error as Error)?.message || "Unknown database error"}`);
       }
+      if (error?.code === "ETIMEDOUT" || error?.cause?.code === "ETIMEDOUT" || error?.code === "ECONNREFUSED" || error?.cause?.code === "ECONNREFUSED") {
+        _db = null;
+      }
       console.warn("[Database] MySQL sync skipped, updating local development store:", error);
     }
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("The authoritative database is unavailable. User operations cannot proceed in production.");
   }
 
   // Update memory cache in non-production environments
@@ -247,6 +258,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     ...existingMem,
     ...user,
     role: user.role || existingMem.role || "user",
+    status: user.status || existingMem.status || "active",
     lastSignedIn: user.lastSignedIn || new Date(),
     updatedAt: new Date(),
     createdAt: existingMem.createdAt || new Date(),
@@ -262,11 +274,24 @@ export async function getUserByOpenId(openId: string) {
   if (db) {
     try {
       const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-      if (result.length > 0) return result[0];
+      if (result.length > 0) {
+        const row = result[0];
+        const normalizedRole = row.role === "medical" ? "hospital" : row.role;
+        const mem = _memoryUsers.get(openId) || {};
+        return {
+          ...mem,
+          ...row,
+          role: (mem.role && mem.role !== "user") ? mem.role : normalizedRole,
+          status: mem.status ? mem.status : (row.status || "active"),
+        };
+      }
       return null;
-    } catch (error) {
+    } catch (error: any) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      if (error?.code === "ETIMEDOUT" || error?.cause?.code === "ETIMEDOUT" || error?.code === "ECONNREFUSED" || error?.cause?.code === "ECONNREFUSED") {
+        _db = null;
       }
       console.warn("[Database] MySQL read skipped, checking local development store:", error);
     }
@@ -274,7 +299,12 @@ export async function getUserByOpenId(openId: string) {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Authoritative database is unavailable.");
   }
-  return _memoryUsers.get(openId) || null;
+  const memUser = _memoryUsers.get(openId) || null;
+  if (memUser) {
+    if (memUser.role === "medical") memUser.role = "hospital";
+    if (!memUser.status) memUser.status = "active";
+  }
+  return memUser;
 }
 
 export async function getUserByEmail(emailOrUsername: string) {
@@ -286,11 +316,24 @@ export async function getUserByEmail(emailOrUsername: string) {
         .from(users)
         .where(or(eq(users.email, emailOrUsername), eq(users.name, emailOrUsername)))
         .limit(1);
-      if (result.length > 0) return result[0];
+      if (result.length > 0) {
+        const row = result[0];
+        const normalizedRole = row.role === "medical" ? "hospital" : row.role;
+        const mem = _memoryUsers.get(row.openId) || _memoryUsers.get(row.email?.toLowerCase() || "") || {};
+        return {
+          ...mem,
+          ...row,
+          role: (mem.role && mem.role !== "user") ? mem.role : normalizedRole,
+          status: mem.status ? mem.status : (row.status || "active"),
+        };
+      }
       return null;
-    } catch (error) {
+    } catch (error: any) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      if (error?.code === "ETIMEDOUT" || error?.cause?.code === "ETIMEDOUT" || error?.code === "ECONNREFUSED" || error?.cause?.code === "ECONNREFUSED") {
+        _db = null;
       }
       console.warn("[Database] MySQL read skipped, checking local development store:", error);
     }
@@ -299,19 +342,67 @@ export async function getUserByEmail(emailOrUsername: string) {
     throw new Error("Authoritative database is unavailable.");
   }
   const lower = emailOrUsername.toLowerCase();
-  return (
+  const memUser =
     _memoryUsers.get(lower) ||
     Array.from(_memoryUsers.values()).find(
       u => u.email?.toLowerCase() === lower || u.name?.toLowerCase() === lower || u.openId === `user-${lower}`
-    ) || null
-  );
+    ) ||
+    null;
+  if (memUser) {
+    if (memUser.role === "medical") memUser.role = "hospital";
+    if (!memUser.status) memUser.status = "active";
+  }
+  return memUser;
+}
+
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (db) {
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      if (result.length > 0) {
+        const row = result[0];
+        const normalizedRole = row.role === "medical" ? "hospital" : row.role;
+        const mem = _memoryUsers.get(row.openId) || _memoryUsers.get(row.email?.toLowerCase() || "") || {};
+        return {
+          ...mem,
+          ...row,
+          role: (mem.role && mem.role !== "user") ? mem.role : normalizedRole,
+          status: mem.status ? mem.status : (row.status || "active"),
+        };
+      }
+      return null;
+    } catch (error: any) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
+      }
+      if (error?.code === "ETIMEDOUT" || error?.cause?.code === "ETIMEDOUT" || error?.code === "ECONNREFUSED" || error?.cause?.code === "ECONNREFUSED") {
+        _db = null;
+      }
+      console.warn("[Database] MySQL read skipped, checking local development store:", error);
+    }
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authoritative database is unavailable.");
+  }
+  const memUser = Array.from(_memoryUsers.values()).find(u => u.id === id) || null;
+  if (memUser) {
+    if (memUser.role === "medical") memUser.role = "hospital";
+    if (!memUser.status) memUser.status = "active";
+  }
+  return memUser;
 }
 
 export async function getAllUsers() {
   const db = await getDb();
   if (db) {
     try {
-      return await db.select().from(users).orderBy(users.id);
+      const rows = await db.select().from(users).orderBy(users.id);
+      return rows.map(r => ({
+        ...r,
+        role: r.role === "medical" ? "hospital" : r.role,
+        status: r.status || "active",
+      }));
     } catch (error) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
@@ -322,7 +413,18 @@ export async function getAllUsers() {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Authoritative database is unavailable.");
   }
-  const uniqueUsers = Array.from(new Set(Array.from(_memoryUsers.values())));
+  const seen = new Set<number>();
+  const uniqueUsers: any[] = [];
+  for (const u of Array.from(_memoryUsers.values())) {
+    if (!seen.has(u.id)) {
+      seen.add(u.id);
+      uniqueUsers.push({
+        ...u,
+        role: u.role === "medical" ? "hospital" : (u.role || "user"),
+        status: u.status || "active",
+      });
+    }
+  }
   return uniqueUsers;
 }
 

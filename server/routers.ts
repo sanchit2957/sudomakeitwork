@@ -81,6 +81,10 @@ export const appRouter = router({
             }
 
             if (dbUser) {
+              if (dbUser.status === "disabled") {
+                throw new TRPCError({ code: "FORBIDDEN", message: "Your account has been disabled. Please contact an administrator." });
+              }
+
               if (roleVal === "rescuer") {
                 await ensureRescuerProfile(dbUser.id, sbUser.user_metadata?.callSign || "Field Unit");
               } else if (roleVal === "hospital") {
@@ -108,6 +112,10 @@ export const appRouter = router({
         const user = await getUserByEmail(emailInput);
         if (!user || !user.password) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+        }
+
+        if (user.status === "disabled") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Your account has been disabled. Please contact an administrator." });
         }
 
         const isValid = verifyPassword(input.password.trim(), user.password);
@@ -139,7 +147,7 @@ export const appRouter = router({
           name: z.string().min(1, "Name is required"),
           email: z.string().email("Invalid email address"),
           password: z.string().min(1, "Password is required"),
-          role: z.enum(["admin", "rescuer", "medical", "user"]).default("user"),
+          role: z.enum(["admin", "rescuer", "hospital", "medical", "user"]).default("user"),
           phone: z.string().optional(),
           callSign: z.string().optional(),
           supabaseUserId: z.string().optional(),
@@ -160,6 +168,7 @@ export const appRouter = router({
           email: emailVal,
           password: hashedPassword,
           role: "user", // Public registration ALWAYS assigns role: user
+          status: "active",
           loginMethod: input.supabaseUserId ? "supabase-auth" : "platform-login",
           lastSignedIn: new Date(),
         });
@@ -180,32 +189,59 @@ export const appRouter = router({
       .input(
         z.object({
           name: z.string().min(1),
-          email: z.string().min(1),
+          email: z.string().email("Invalid email address"),
           password: z.string().min(1),
-          role: z.enum(["admin", "rescuer", "medical", "user"]),
+          role: z.enum(["admin", "rescuer", "hospital", "medical", "user"]).default("user"),
           callSign: z.string().optional(),
+          hospitalId: z.number().optional(),
+          designation: z.string().optional(),
+          phone: z.string().optional(),
+          reason: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
-        const emailVal = input.email.trim();
-        const openId = `user-${emailVal.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+      .mutation(async ({ input, ctx }) => {
+        const emailVal = input.email.trim().toLowerCase();
+        const existing = await getUserByEmail(emailVal);
+        if (existing) {
+          throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
+        }
+        const assignedRole: "admin" | "rescuer" | "hospital" | "user" =
+          input.role === "medical" ? "hospital" : input.role;
+
+        const openId = `user-${emailVal.replace(/[^a-z0-9]/g, "-")}`;
         const hashedPassword = hashPassword(input.password.trim());
         await upsertUser({
           openId,
           name: input.name.trim(),
           email: emailVal,
           password: hashedPassword,
-          role: input.role,
+          role: assignedRole,
+          status: "active",
           loginMethod: "platform-login",
         });
 
         const dbUser = await getUserByEmail(emailVal);
         if (dbUser) {
-          if (input.role === "rescuer") {
-            await ensureRescuerProfile(dbUser.id, input.callSign || "New Unit");
-          } else if (input.role === "medical") {
+          if (assignedRole === "rescuer") {
+            await ensureRescuerProfile(dbUser.id, input.callSign || "New Field Unit");
+          } else if (assignedRole === "hospital") {
             await ensureHospitalStaffProfile(dbUser.id);
           }
+
+          try {
+            const { writeAudit } = await import("./rescue.db");
+            await writeAudit(
+              ctx.user.id,
+              "USER_CREATED",
+              "user",
+              dbUser.id,
+              JSON.stringify({
+                createdEmail: emailVal,
+                assignedRole,
+                reason: input.reason || "Provisioned by administrator",
+              })
+            );
+          } catch {}
         }
         return { success: true, user: sanitizeUser(dbUser) };
       }),

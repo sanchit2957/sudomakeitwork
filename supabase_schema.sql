@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(320),
   password VARCHAR(255),
   "loginMethod" VARCHAR(64) DEFAULT 'supabase-auth',
-  role VARCHAR(32) DEFAULT 'user' NOT NULL CHECK (role IN ('user', 'rescuer', 'medical', 'admin')),
+  role VARCHAR(32) DEFAULT 'user' NOT NULL CHECK (role IN ('user', 'rescuer', 'hospital', 'admin')),
+  status VARCHAR(32) DEFAULT 'active' NOT NULL CHECK (status IN ('active', 'disabled')),
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   "lastSignedIn" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL

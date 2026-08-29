@@ -81,8 +81,8 @@ export async function seedDatabase(): Promise<SeedResult> {
       openId: "user-medical",
       name: "Dr. Hazarika",
       email: "medical@assamrescue.gov.in",
-      rawPassword: getInitialSeedPassword("medical", "medical"),
-      role: "medical" as const,
+      rawPassword: getInitialSeedPassword("hospital", "medical"),
+      role: "hospital" as const,
       loginMethod: "platform-login",
     },
     {

@@ -68,9 +68,10 @@ describe("Role Hierarchy & Isolation", () => {
     expect(cookiesSet[0].name).toBe(COOKIE_NAME);
 
     // We must register the rescuer first since bypass is gone
+    const rescuerEmail = `ndrf-${Date.now()}@assamrescue.gov.in`;
     const rescuerRegistration = await caller.auth.register({
       name: "NDRF Lead",
-      email: "ndrf@assamrescue.gov.in",
+      email: rescuerEmail,
       password: "password123",
       role: "rescuer", // This actually gets downgraded to "user" by the secure register flow now
       callSign: "NDRF Boat 4",
@@ -80,7 +81,7 @@ describe("Role Hierarchy & Isolation", () => {
     // So the secure flow will make the user a "user", we can manually update them for testing purposes via db if needed,
     // but the test name says "login with session cookie creation" so let's just assert login works.
     const rescuerLogin = await caller.auth.login({
-      email: "ndrf@assamrescue.gov.in",
+      email: rescuerEmail,
       password: "password123",
     });
     expect(rescuerLogin.success).toBe(true);
