@@ -35,6 +35,30 @@ import {
 import React, { FormEvent, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
+export function formatAuthError(err: any): string {
+  if (!err) return "An unexpected error occurred. Please try again.";
+  const raw = typeof err === "string" ? err : err?.message || String(err);
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("network error") ||
+    lower.includes("networkrequestfailed") ||
+    lower.includes("load failed") ||
+    lower.includes("err_connection")
+  ) {
+    return "Unable to connect to the server. Please check your internet connection and try again.";
+  }
+  if (
+    lower.includes("rate limit") ||
+    lower.includes("rate_limit") ||
+    lower.includes("magic link") ||
+    lower.includes("error sending magic link email")
+  ) {
+    return "Supabase email service limit reached (default free tier allows ~3 emails/hour). If you have a password, switch to the 'Password Login' tab above, or configure custom SMTP in Supabase Settings > Auth > SMTP.";
+  }
+  return raw;
+}
+
 export default function UserLogin() {
   const { user, login, register, sendEmailOtp, verifyEmailOtp, logout } = useAuth();
   const { t } = useLanguage();
@@ -93,7 +117,7 @@ export default function UserLogin() {
       setOtpCode("");
       setSuccessMessage("Signed out successfully.");
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to sign out.");
+      setErrorMessage(formatAuthError(err) || "Failed to sign out.");
     } finally {
       setIsSubmitting(false);
     }
@@ -121,7 +145,7 @@ export default function UserLogin() {
       const targetRole = res?.user?.role || "user";
       setLocation(getDashboardDestinationForRole(targetRole));
     } catch (err: any) {
-      setErrorMessage(err?.message || "Authentication failed. Please verify your email and password.");
+      setErrorMessage(formatAuthError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -144,19 +168,7 @@ export default function UserLogin() {
       setOtpCountdown(60);
       setSuccessMessage(`A 6-digit verification code was sent to ${targetEmail.trim()}. Check your inbox.`);
     } catch (err: any) {
-      const msg = err?.message || "";
-      if (
-        msg.toLowerCase().includes("rate limit") ||
-        msg.toLowerCase().includes("rate_limit") ||
-        msg.toLowerCase().includes("magic link") ||
-        msg.toLowerCase().includes("error sending magic link email")
-      ) {
-        setErrorMessage(
-          "Supabase email service limit reached (default free tier allows ~3 emails/hour). If you have a password, switch to the 'Password Login' tab above, or configure custom SMTP in Supabase Settings > Auth > SMTP."
-        );
-      } else {
-        setErrorMessage(msg || "Failed to send verification code. Please check your network or try Password Login.");
-      }
+      setErrorMessage(formatAuthError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -185,7 +197,7 @@ export default function UserLogin() {
         setLocation(destination);
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || "Invalid or expired OTP. Please check your code and try again.");
+      setErrorMessage(formatAuthError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -223,7 +235,7 @@ export default function UserLogin() {
       const targetRole = res?.user?.role || "user";
       setLocation(getDashboardDestinationForRole(targetRole));
     } catch (err: any) {
-      setErrorMessage(err?.message || "Registration failed. Please try again.");
+      setErrorMessage(formatAuthError(err));
     } finally {
       setIsSubmitting(false);
     }

@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { formatAuthError } from "./user/UserLogin";
 import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,9 +110,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
       }
       setLocation(config.destination);
     } catch (error: any) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Authentication failed. Please verify your credentials and Government Code."
-      );
+      setErrorMessage(formatAuthError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -160,9 +159,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
       }
       setLocation(config.destination);
     } catch (error: any) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Registration failed. Please check your details and Government Code."
-      );
+      setErrorMessage(formatAuthError(error));
     } finally {
       setIsSubmitting(false);
     }

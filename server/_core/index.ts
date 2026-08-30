@@ -63,55 +63,61 @@ async function startServer() {
   });
 
   // Enable CORS with explicit production allowlist & native mobile support
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        // Allow requests with no origin (like native mobile apps, server-to-server)
-        if (!origin || origin === "null") return callback(null, true);
-        // Allow Capacitor local origins and localhost
-        if (
-          origin === "capacitor://localhost" ||
-          origin === "ionic://localhost" ||
-          origin === "https://localhost" ||
-          origin === "http://localhost" ||
-          origin.startsWith("http://localhost:") ||
-          origin.startsWith("https://localhost:") ||
-          origin.startsWith("http://127.0.0.1:") ||
-          origin.startsWith("https://127.0.0.1:") ||
-          origin.startsWith("http://10.0.2.2:") // Android emulator host alias
-        ) {
-          return callback(null, true);
-        }
-        // Check configured explicit allowed origins
-        const allowedOrigins = [
-          ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim()) : []),
-          ...(process.env.APP_URL ? [process.env.APP_URL.trim()] : []),
-          ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL.trim()] : []),
-          "https://assam-rescue-platform.onrender.com",
-        ].filter(Boolean);
-
-        if (allowedOrigins.includes(origin)) {
-          return callback(null, true);
-        }
-        if (process.env.NODE_ENV === "production") {
-          return callback(new Error("CORS origin not allowed in production"), false);
-        }
-        // In local development, permit the origin
+  const corsHandler = cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin or null (like native mobile apps, server-to-server)
+      if (!origin || origin === "null") return callback(null, true);
+      // Allow Capacitor local origins, android app packages, and localhost
+      if (
+        origin === "capacitor://localhost" ||
+        origin === "ionic://localhost" ||
+        origin === "https://localhost" ||
+        origin === "http://localhost" ||
+        origin.startsWith("http://localhost:") ||
+        origin.startsWith("https://localhost:") ||
+        origin.startsWith("http://127.0.0.1:") ||
+        origin.startsWith("https://127.0.0.1:") ||
+        origin.startsWith("http://10.0.2.2:") ||
+        origin.startsWith("android-app://") ||
+        origin.startsWith("capacitor://") ||
+        origin.startsWith("ionic://") ||
+        origin.includes("gov.in.assamrescue.app") ||
+        origin.includes("onrender.com")
+      ) {
         return callback(null, true);
-      },
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-        "X-Requested-With",
-        "Accept",
-        "Origin",
-        "Cache-Control",
-        "Pragma",
-      ],
-    })
-  );
+      }
+      // Check configured explicit allowed origins
+      const allowedOrigins = [
+        ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim()) : []),
+        ...(process.env.APP_URL ? [process.env.APP_URL.trim()] : []),
+        ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL.trim()] : []),
+        "https://assam-rescue-platform.onrender.com",
+      ].filter(Boolean);
+
+      if (allowedOrigins.some(allowed => origin === allowed || origin.startsWith(allowed))) {
+        return callback(null, true);
+      }
+      if (process.env.NODE_ENV === "production") {
+        return callback(null, false);
+      }
+      // In local development, permit the origin
+      return callback(null, true);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+      "Cache-Control",
+      "Pragma",
+    ],
+  });
+
+  app.use(corsHandler);
+  app.options("*", corsHandler);
 
   // Configure body parser with bounded size limit for file uploads
   app.use(express.json({ limit: "15mb" }));
