@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
@@ -25,8 +24,10 @@ function createMockContext(role?: "admin" | "rescuer" | "hospital" | "medical" |
         openId: `test-${role}-01`,
         name: `Test ${role}`,
         email: `${role}@assamrescue.gov.in`,
+        password: null,
         loginMethod: "test",
         role,
+        status: "active" as const,
         createdAt: now,
         updatedAt: now,
         lastSignedIn: now,
@@ -109,10 +110,10 @@ describe("Role Hierarchy & Isolation", () => {
     await expect(caller.rescue.rescuer.pushConfig()).resolves.toBeDefined();
 
     // Rescuer is FORBIDDEN from command centre operations
-    await expect(caller.rescue.operations.analytics()).rejects.toMatchObject<Partial<TRPCError>>({
+    await expect(caller.rescue.operations.analytics()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
-    await expect(caller.rescue.operations.rescueRoster()).rejects.toMatchObject<Partial<TRPCError>>({
+    await expect(caller.rescue.operations.rescueRoster()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
   });
@@ -122,15 +123,15 @@ describe("Role Hierarchy & Isolation", () => {
     const caller = appRouter.createCaller(ctx);
 
     // Hospital staff is FORBIDDEN from rescuer configuration
-    await expect(caller.rescue.rescuer.pushConfig()).rejects.toMatchObject<Partial<TRPCError>>({
+    await expect(caller.rescue.rescuer.pushConfig()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
 
     // Hospital staff is FORBIDDEN from command centre operations
-    await expect(caller.rescue.operations.analytics()).rejects.toMatchObject<Partial<TRPCError>>({
+    await expect(caller.rescue.operations.analytics()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
-    await expect(caller.rescue.operations.rescueRoster()).rejects.toMatchObject<Partial<TRPCError>>({
+    await expect(caller.rescue.operations.rescueRoster()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
   });
@@ -140,15 +141,15 @@ describe("Role Hierarchy & Isolation", () => {
     const caller = appRouter.createCaller(ctx);
 
     // Medical staff is FORBIDDEN from rescuer configuration
-    await expect(caller.rescue.rescuer.pushConfig()).rejects.toMatchObject<Partial<TRPCError>>({
+    await expect(caller.rescue.rescuer.pushConfig()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
 
     // Medical staff is FORBIDDEN from command centre operations
-    await expect(caller.rescue.operations.analytics()).rejects.toMatchObject<Partial<TRPCError>>({
+    await expect(caller.rescue.operations.analytics()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
-    await expect(caller.rescue.operations.rescueRoster()).rejects.toMatchObject<Partial<TRPCError>>({
+    await expect(caller.rescue.operations.rescueRoster()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
   });
@@ -157,10 +158,10 @@ describe("Role Hierarchy & Isolation", () => {
     const { ctx } = createMockContext("user");
     const caller = appRouter.createCaller(ctx);
 
-    await expect(caller.rescue.operations.analytics()).rejects.toMatchObject<Partial<TRPCError>>({
+    await expect(caller.rescue.operations.analytics()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
-    await expect(caller.rescue.rescuer.pushConfig()).rejects.toMatchObject<Partial<TRPCError>>({
+    await expect(caller.rescue.rescuer.pushConfig()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
   });
