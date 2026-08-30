@@ -22,7 +22,7 @@ import {
   shelters,
   users,
 } from "../../drizzle/schema";
-import { getDb, getEmergencyContactsByUserId, upsertEmergencyContact, deleteEmergencyContact, getUserByOpenId, getUserById, upsertUser, getAllUsers } from "../db";
+import { getDb, withDbTimeout, getEmergencyContactsByUserId, upsertEmergencyContact, deleteEmergencyContact, getUserByOpenId, getUserById, upsertUser, getAllUsers } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
 import { ASSAM_DISTRICT_LOCATIONS, getComprehensiveWeather, weatherProviderManager } from "../weather.service";
@@ -332,10 +332,14 @@ export const rescueRouter = router({
           let activeZones: Array<{ id: number; severity: string }> = [];
           if (db) {
             try {
-              activeZones = await db
-                .select({ id: floodZones.id, severity: floodZones.severity })
-                .from(floodZones)
-                .where(eq(floodZones.active, "yes"));
+              activeZones = await withDbTimeout(
+                db
+                  .select({ id: floodZones.id, severity: floodZones.severity })
+                  .from(floodZones)
+                  .where(eq(floodZones.active, "yes")),
+                3000,
+                "conditions_activeZones"
+              );
             } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
           } else {
             activeZones = Array.from(_memoryFloodZones.values())

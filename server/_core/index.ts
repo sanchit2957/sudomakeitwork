@@ -13,7 +13,7 @@ import { registerN8nRoutes } from "../n8n";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
-import { getDatabasePoolMetrics, pingDatabase } from "../db";
+import { getDatabasePoolMetrics, pingDatabase, runDatabaseForensicBenchmark } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -141,10 +141,24 @@ async function startServer() {
         status: dbPing.ok ? "connected" : "unreachable",
         pingLatencyMs: dbPing.latencyMs,
         pingError: dbPing.error,
+        code: dbPing.code,
         pool: poolMetrics,
       },
       version: "1.0.0",
     });
+  });
+
+  // Deep forensic diagnostic benchmark endpoint
+  app.get("/api/forensic-db-probe", async (_req, res) => {
+    try {
+      const benchmark = await runDatabaseForensicBenchmark();
+      res.status(200).json(benchmark);
+    } catch (err: any) {
+      res.status(500).json({
+        error: "Forensic benchmark failed",
+        message: err?.message || String(err),
+      });
+    }
   });
 
   // tRPC API

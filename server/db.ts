@@ -13,6 +13,59 @@ let _lastSuccessfulConnection: Date | null = null;
 let _lastSuccessfulQuery: Date | null = null;
 let _consecutiveFailures = 0;
 let _lastDbError: string | null = null;
+let _lastDbErrorCode: string | null = null;
+
+export interface PoolLifecycleCounters {
+  connectionsCreated: number;
+  connectionsDestroyed: number;
+  connectionErrors: number;
+  poolResets: number;
+  queriesExecuted: number;
+  queriesFailed: number;
+  staleRetries: number;
+}
+
+export const _poolCounters: PoolLifecycleCounters = {
+  connectionsCreated: 0,
+  connectionsDestroyed: 0,
+  connectionErrors: 0,
+  poolResets: 0,
+  queriesExecuted: 0,
+  queriesFailed: 0,
+  staleRetries: 0,
+};
+
+export interface SafeDbErrorInfo {
+  code: string;
+  errno?: number;
+  sqlState?: string;
+  message: string;
+}
+
+export function extractSafeDbError(error: any): SafeDbErrorInfo {
+  const target = error?.cause || error;
+  const rawMsg = target?.message || error?.message || "Unknown database error";
+  // Strict sanitization: Never expose DB credentials or connection strings
+  const sanitizedMsg = String(rawMsg)
+    .replace(/:\/\/([^:@]+):([^@]+)@/g, "://$1:***@")
+    .replace(/password=[^;&\s]+/gi, "password=***");
+
+  let code = "UNKNOWN_DB_ERROR";
+  if (target?.code) {
+    code = String(target.code);
+  } else if (error?.code) {
+    code = String(error.code);
+  } else if (rawMsg.includes("timed out") || rawMsg.includes("DATABASE_TIMEOUT")) {
+    code = "DATABASE_TIMEOUT";
+  }
+
+  return {
+    code,
+    errno: typeof target?.errno === "number" ? target.errno : (typeof error?.errno === "number" ? error.errno : undefined),
+    sqlState: target?.sqlState || error?.sqlState || undefined,
+    message: sanitizedMsg,
+  };
+}
 
 export function isDbCircuitBroken(): boolean {
   return Date.now() < _dbCircuitBrokenUntil;
@@ -24,20 +77,31 @@ export function recordDbSuccess() {
   _lastSuccessfulQuery = new Date();
   _lastSuccessfulConnection = new Date();
   _lastDbError = null;
+  _lastDbErrorCode = null;
+  _poolCounters.queriesExecuted++;
 }
 
-export function recordDbFailure(error?: any) {
+export function recordDbFailure(error?: any, operationName?: string) {
   _consecutiveFailures++;
-  _lastDbError = error instanceof Error ? error.message : typeof error === "string" ? error : "connection error";
+  _poolCounters.connectionErrors++;
+  _poolCounters.queriesFailed++;
+
+  const safe = extractSafeDbError(error);
+  _lastDbErrorCode = safe.code;
+  _lastDbError = `${safe.code}${safe.errno !== undefined ? `:${safe.errno}` : ""}: ${safe.message}`;
   _dbCircuitBrokenUntil = Date.now() + 15000; // 15s circuit breaker
+
   const now = Date.now();
-  if (now - _lastDbWarnTime > 30000) {
+  if (now - _lastDbWarnTime > 5000) {
     _lastDbWarnTime = now;
-    console.warn(`[Database] MySQL failure (${_lastDbError}), consecutive failures: ${_consecutiveFailures}`);
+    console.warn(`[Database] MySQL failure in "${operationName || 'query'}": code=${safe.code} errno=${safe.errno ?? 'N/A'} sqlState=${safe.sqlState ?? 'N/A'} message="${safe.message}" (consecutive failures: ${_consecutiveFailures})`);
   }
-  // Auto-heal: If consecutive failures >= 3, drain and reset pool so stale sockets are torn down
-  if (_consecutiveFailures >= 3 && _pool) {
-    console.warn("[Database] Auto-healing: Resetting corrupted pool instance");
+
+  // Graceful auto-healing: Do not reset pool on transient 1-2 stale socket drops.
+  // Only reset when persistent 5+ failures occur, preventing connection storm cycles.
+  if (_consecutiveFailures >= 5 && _pool) {
+    _poolCounters.poolResets++;
+    console.warn(`[Database] Auto-healing: Resetting corrupted pool after ${_consecutiveFailures} consecutive failures (last code: ${safe.code})`);
     _pool.end().catch(() => {});
     _pool = null;
     _db = null;
@@ -52,15 +116,17 @@ export async function withDbTimeout<T>(
   let timer: NodeJS.Timeout | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      reject(new Error(`[DATABASE_TIMEOUT] ${operationName} timed out after ${timeoutMs}ms`));
+      const err: any = new Error(`[DATABASE_TIMEOUT] ${operationName} timed out after ${timeoutMs}ms`);
+      err.code = "ETIMEDOUT";
+      reject(err);
     }, timeoutMs);
   });
   try {
     const result = await Promise.race([promise, timeoutPromise]);
     recordDbSuccess();
     return result;
-  } catch (err) {
-    recordDbFailure(err);
+  } catch (err: any) {
+    recordDbFailure(err, operationName);
     throw err;
   } finally {
     if (timer) clearTimeout(timer);
@@ -75,7 +141,7 @@ export function planRoleSync(role: InsertUser["role"] | undefined, isProjectOwne
 
 export function createDatabasePool(connectionUri: string): mysql.Pool {
   const isRemoteOrTiDB = connectionUri.includes("tidbcloud.com") || connectionUri.includes("ssl=") || !connectionUri.includes("localhost");
-  return mysql.createPool({
+  const pool = mysql.createPool({
     uri: connectionUri,
     waitForConnections: true,
     connectionLimit: 10,
@@ -87,12 +153,15 @@ export function createDatabasePool(connectionUri: string): mysql.Pool {
     queueLimit: 20,
     ssl: isRemoteOrTiDB ? { minVersion: "TLSv1.2", rejectUnauthorized: true } : undefined,
   });
+
+  _poolCounters.connectionsCreated++;
+  return pool;
 }
 
-export async function pingDatabase(): Promise<{ ok: boolean; latencyMs: number; error?: string }> {
+export async function pingDatabase(): Promise<{ ok: boolean; latencyMs: number; error?: string; code?: string }> {
   const db = await getDb();
   if (!db || !_pool) {
-    return { ok: false, latencyMs: 0, error: "Database pool not initialized or circuit broken" };
+    return { ok: false, latencyMs: 0, error: "Database pool not initialized or circuit broken", code: "NO_POOL" };
   }
   const start = performance.now();
   try {
@@ -106,11 +175,13 @@ export async function pingDatabase(): Promise<{ ok: boolean; latencyMs: number; 
       conn.release();
     }
   } catch (err: any) {
-    recordDbFailure(err);
+    recordDbFailure(err, "pingDatabase");
+    const safe = extractSafeDbError(err);
     return {
       ok: false,
       latencyMs: Math.round((performance.now() - start) * 10) / 10,
-      error: err?.message || "Ping failed",
+      error: safe.message,
+      code: safe.code,
     };
   }
 }
@@ -126,6 +197,8 @@ export function getDatabasePoolMetrics() {
       lastSuccessfulQuery: _lastSuccessfulQuery,
       lastSuccessfulConnection: _lastSuccessfulConnection,
       lastError: _lastDbError,
+      lastErrorCode: _lastDbErrorCode,
+      counters: { ..._poolCounters },
     };
   }
   const poolInternal = (_pool as any).pool;
@@ -138,6 +211,8 @@ export function getDatabasePoolMetrics() {
     lastSuccessfulQuery: _lastSuccessfulQuery,
     lastSuccessfulConnection: _lastSuccessfulConnection,
     lastError: _lastDbError,
+    lastErrorCode: _lastDbErrorCode,
+    counters: { ..._poolCounters },
   };
 }
 
@@ -932,5 +1007,208 @@ export async function getAllRoleAccessCodes(): Promise<Array<{ role: string; cod
     }
   }
   return results;
+}
+
+export interface QueryPhaseTiming {
+  iteration: number;
+  acquireMs: number;
+  execMs: number;
+  releaseMs: number;
+  totalMs: number;
+  success: boolean;
+  errorCode?: string;
+}
+
+export interface MetricSummary {
+  count: number;
+  failures: number;
+  minMs: number;
+  maxMs: number;
+  avgMs: number;
+  p95Ms: number;
+  errorCodes: string[];
+}
+
+function calculateSummary(timings: number[], errorCodes: string[]): MetricSummary {
+  if (timings.length === 0) {
+    return { count: 0, failures: errorCodes.length, minMs: 0, maxMs: 0, avgMs: 0, p95Ms: 0, errorCodes };
+  }
+  const sorted = [...timings].sort((a, b) => a - b);
+  const minMs = Math.round(sorted[0] * 10) / 10;
+  const maxMs = Math.round(sorted[sorted.length - 1] * 10) / 10;
+  const avgMs = Math.round((sorted.reduce((a, b) => a + b, 0) / sorted.length) * 10) / 10;
+  const p95Idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+  const p95Ms = Math.round(sorted[p95Idx] * 10) / 10;
+  return {
+    count: timings.length,
+    failures: errorCodes.length,
+    minMs,
+    maxMs,
+    avgMs,
+    p95Ms,
+    errorCodes: Array.from(new Set(errorCodes)),
+  };
+}
+
+export async function runDatabaseForensicBenchmark(): Promise<{
+  timestamp: string;
+  databaseConfigured: boolean;
+  poolMetrics: any;
+  sequentialSelect1: { summary: MetricSummary; phaseAverages: { acquireMs: number; execMs: number; releaseMs: number }; timings: QueryPhaseTiming[] };
+  concurrentSelect1: { summary: MetricSummary; timings: QueryPhaseTiming[] };
+  userLookup: { summary: MetricSummary; timings: number[] };
+  emergencyContactsLookup: { summary: MetricSummary; timings: number[] };
+}> {
+  const db = await getDb();
+  if (!db || !_pool) {
+    const emptySummary: MetricSummary = { count: 0, failures: 0, minMs: 0, maxMs: 0, avgMs: 0, p95Ms: 0, errorCodes: ["NO_DATABASE_POOL"] };
+    return {
+      timestamp: new Date().toISOString(),
+      databaseConfigured: false,
+      poolMetrics: getDatabasePoolMetrics(),
+      sequentialSelect1: { summary: emptySummary, phaseAverages: { acquireMs: 0, execMs: 0, releaseMs: 0 }, timings: [] },
+      concurrentSelect1: { summary: emptySummary, timings: [] },
+      userLookup: { summary: emptySummary, timings: [] },
+      emergencyContactsLookup: { summary: emptySummary, timings: [] },
+    };
+  }
+
+  // 1. 10 Sequential SELECT 1 queries with phased breakdown
+  const seqTimings: QueryPhaseTiming[] = [];
+  const seqTotals: number[] = [];
+  const seqErrors: string[] = [];
+
+  for (let i = 1; i <= 10; i++) {
+    const t0 = performance.now();
+    let acquireMs = 0;
+    let execMs = 0;
+    let releaseMs = 0;
+    let success = false;
+    let errorCode: string | undefined;
+
+    try {
+      const conn = await withDbTimeout(_pool.getConnection(), 3000, `bench_seq_acquire_${i}`);
+      const t1 = performance.now();
+      acquireMs = Math.round((t1 - t0) * 10) / 10;
+
+      try {
+        await withDbTimeout(conn.query("SELECT 1"), 3000, `bench_seq_query_${i}`);
+        const t2 = performance.now();
+        execMs = Math.round((t2 - t1) * 10) / 10;
+        success = true;
+      } finally {
+        const t3 = performance.now();
+        conn.release();
+        releaseMs = Math.round((performance.now() - t3) * 10) / 10;
+      }
+    } catch (err: any) {
+      const safe = extractSafeDbError(err);
+      errorCode = safe.code;
+      seqErrors.push(safe.code);
+    }
+
+    const totalMs = Math.round((performance.now() - t0) * 10) / 10;
+    if (success) seqTotals.push(totalMs);
+    seqTimings.push({ iteration: i, acquireMs, execMs, releaseMs, totalMs, success, errorCode });
+  }
+
+  const validAcquire = seqTimings.filter(t => t.success).map(t => t.acquireMs);
+  const validExec = seqTimings.filter(t => t.success).map(t => t.execMs);
+  const validRelease = seqTimings.filter(t => t.success).map(t => t.releaseMs);
+
+  const phaseAverages = {
+    acquireMs: validAcquire.length ? Math.round((validAcquire.reduce((a, b) => a + b, 0) / validAcquire.length) * 10) / 10 : 0,
+    execMs: validExec.length ? Math.round((validExec.reduce((a, b) => a + b, 0) / validExec.length) * 10) / 10 : 0,
+    releaseMs: validRelease.length ? Math.round((validRelease.reduce((a, b) => a + b, 0) / validRelease.length) * 10) / 10 : 0,
+  };
+
+  // 2. 10 Concurrent SELECT 1 queries
+  const conTotals: number[] = [];
+  const conErrors: string[] = [];
+  const conTimings = await Promise.all(
+    Array.from({ length: 10 }, async (_, idx) => {
+      const iter = idx + 1;
+      const t0 = performance.now();
+      let acquireMs = 0;
+      let execMs = 0;
+      let releaseMs = 0;
+      let success = false;
+      let errorCode: string | undefined;
+
+      try {
+        const conn = await withDbTimeout(_pool!.getConnection(), 3500, `bench_con_acquire_${iter}`);
+        const t1 = performance.now();
+        acquireMs = Math.round((t1 - t0) * 10) / 10;
+
+        try {
+          await withDbTimeout(conn.query("SELECT 1"), 3000, `bench_con_query_${iter}`);
+          const t2 = performance.now();
+          execMs = Math.round((t2 - t1) * 10) / 10;
+          success = true;
+        } finally {
+          const t3 = performance.now();
+          conn.release();
+          releaseMs = Math.round((performance.now() - t3) * 10) / 10;
+        }
+      } catch (err: any) {
+        const safe = extractSafeDbError(err);
+        errorCode = safe.code;
+        conErrors.push(safe.code);
+      }
+
+      const totalMs = Math.round((performance.now() - t0) * 10) / 10;
+      if (success) conTotals.push(totalMs);
+      return { iteration: iter, acquireMs, execMs, releaseMs, totalMs, success, errorCode };
+    })
+  );
+
+  // 3. 10 Sequential User Lookups by Email
+  const userTotals: number[] = [];
+  const userErrors: string[] = [];
+  for (let i = 1; i <= 10; i++) {
+    const t0 = performance.now();
+    try {
+      await getUserByEmail("citizen@assamrescue.gov.in");
+      userTotals.push(Math.round((performance.now() - t0) * 10) / 10);
+    } catch (err: any) {
+      userErrors.push(extractSafeDbError(err).code);
+    }
+  }
+
+  // 4. 10 Sequential Emergency Contacts Lookups
+  const ecTotals: number[] = [];
+  const ecErrors: string[] = [];
+  for (let i = 1; i <= 10; i++) {
+    const t0 = performance.now();
+    try {
+      await getEmergencyContactsByUserId(4);
+      ecTotals.push(Math.round((performance.now() - t0) * 10) / 10);
+    } catch (err: any) {
+      ecErrors.push(extractSafeDbError(err).code);
+    }
+  }
+
+  return {
+    timestamp: new Date().toISOString(),
+    databaseConfigured: true,
+    poolMetrics: getDatabasePoolMetrics(),
+    sequentialSelect1: {
+      summary: calculateSummary(seqTotals, seqErrors),
+      phaseAverages,
+      timings: seqTimings,
+    },
+    concurrentSelect1: {
+      summary: calculateSummary(conTotals, conErrors),
+      timings: conTimings,
+    },
+    userLookup: {
+      summary: calculateSummary(userTotals, userErrors),
+      timings: userTotals,
+    },
+    emergencyContactsLookup: {
+      summary: calculateSummary(ecTotals, ecErrors),
+      timings: ecTotals,
+    },
+  };
 }
 
