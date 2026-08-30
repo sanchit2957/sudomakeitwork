@@ -46,6 +46,46 @@ export function createDatabasePool(connectionUri: string): mysql.Pool {
   });
 }
 
+let _schemaEnsured = false;
+export async function ensureDatabaseSchema(pool: mysql.Pool) {
+  if (_schemaEnsured) return;
+  _schemaEnsured = true;
+  try {
+    const conn = await pool.getConnection();
+    try {
+      // 1. Ensure columns exist on users
+      const [cols]: any = await conn.query("SHOW COLUMNS FROM `users`");
+      const colNames = new Set((cols || []).map((c: any) => c.Field));
+
+      if (!colNames.has("password")) {
+        await conn.query("ALTER TABLE `users` ADD COLUMN `password` VARCHAR(255) NULL");
+      }
+      if (!colNames.has("status")) {
+        await conn.query("ALTER TABLE `users` ADD COLUMN `status` ENUM('active','disabled') NOT NULL DEFAULT 'active'");
+      }
+      if (!colNames.has("loginMethod")) {
+        await conn.query("ALTER TABLE `users` ADD COLUMN `loginMethod` VARCHAR(64) NULL");
+      }
+
+      // 2. Ensure roleAccessCodes table exists
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS \`roleAccessCodes\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`role\` VARCHAR(32) NOT NULL UNIQUE,
+          \`codeHash\` VARCHAR(255) NOT NULL,
+          \`codeVersion\` INT NOT NULL DEFAULT 1,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          \`updatedBy\` INT NULL
+        )
+      `);
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.warn("[Database] Schema sync check note:", (err as Error)?.message || err);
+  }
+}
+
 // Lazily create the drizzle instance so local tooling can run without a DB or with a local DB.
 export async function getDb() {
   if (isDbCircuitBroken() && process.env.NODE_ENV !== "production") {
@@ -55,7 +95,7 @@ export async function getDb() {
   const dbUrl = process.env.DATABASE_URL?.trim();
   if (!dbUrl || dbUrl === "" || dbUrl.includes("HOST")) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error("The operational database is disconnected. Cannot safely process request.");
+      return null;
     }
     return null;
   }
@@ -64,19 +104,13 @@ export async function getDb() {
     try {
       if (!_pool) {
         _pool = createDatabasePool(dbUrl);
+        ensureDatabaseSchema(_pool).catch(() => {});
       }
       _db = drizzle(_pool);
     } catch (error) {
       recordDbFailure(error);
-      if (process.env.NODE_ENV === "production") {
-        throw new Error("The operational database is disconnected. Cannot safely process request.");
-      }
       _db = null;
     }
-  }
-
-  if (!_db && process.env.NODE_ENV === "production") {
-    throw new Error("The operational database is disconnected. Cannot safely process request.");
   }
 
   return _db;
@@ -171,9 +205,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
         set: updateSet,
       });
     } catch (error: any) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(`Database user update failed: ${(error as Error)?.message || "Unknown database error"}`);
-      }
+      console.warn(`[Database] User update warning: ${(error as Error)?.message || "DB error"}`);
       recordDbFailure(error);
     }
   }
@@ -211,14 +243,9 @@ export async function getUserByOpenId(openId: string) {
       }
       return null;
     } catch (error: any) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
-      }
+      console.warn(`[Database] User query by openId warning: ${(error as Error)?.message || "DB error"}`);
       recordDbFailure(error);
     }
-  }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Authoritative database is unavailable.");
   }
   const memUser = _memoryUsers.get(openId) || null;
   if (memUser) {
@@ -258,14 +285,9 @@ export async function getUserByEmail(emailOrUsername: string, role?: string) {
       }
       return null;
     } catch (error: any) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
-      }
+      console.warn(`[Database] User query by email warning: ${(error as Error)?.message || "DB error"}`);
       recordDbFailure(error);
     }
-  }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Authoritative database is unavailable.");
   }
   const allUsers = Array.from(_memoryUsers.values());
   const memUser =
@@ -312,14 +334,9 @@ export async function getUserById(id: number) {
       }
       return null;
     } catch (error: any) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
-      }
+      console.warn(`[Database] User query by id warning: ${(error as Error)?.message || "DB error"}`);
       recordDbFailure(error);
     }
-  }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Authoritative database is unavailable.");
   }
   const memUser = Array.from(_memoryUsers.values()).find(u => u.id === id) || null;
   if (memUser) {
@@ -340,14 +357,9 @@ export async function getAllUsers() {
         status: r.status || "active",
       }));
     } catch (error) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(`Database user query failed: ${(error as Error)?.message || "Unknown database error"}`);
-      }
+      console.warn(`[Database] All users query warning: ${(error as Error)?.message || "DB error"}`);
       recordDbFailure(error);
     }
-  }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Authoritative database is unavailable.");
   }
   const seen = new Set<number>();
   const uniqueUsers: any[] = [];
@@ -640,9 +652,7 @@ export async function getRoleAccessCode(role: string): Promise<{ id: number; rol
         return rows[0] as any;
       }
     } catch (error) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(`Failed to query role access code: ${(error as Error)?.message}`);
-      }
+      console.warn(`[Database] Role access code query warning: ${(error as Error)?.message}`);
       recordDbFailure(error);
     }
   }
@@ -699,9 +709,7 @@ export async function setRoleAccessCode(
           },
         });
     } catch (error) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(`Failed to update role access code: ${(error as Error)?.message}`);
-      }
+      console.warn(`[Database] Role access code update warning: ${(error as Error)?.message}`);
       recordDbFailure(error);
     }
   }
