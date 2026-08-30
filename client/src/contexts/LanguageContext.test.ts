@@ -14,7 +14,7 @@ describe("platform language support", () => {
     expect(resolveLocale("unsupported")).toBe("en");
     expect(translate("as", "emergency.send")).toBe("এতিয়াই SOS পঠিয়াওক");
     expect(translate("te", "command.requests")).toBe("స్పందనకర్త అభ్యర్థనలు");
-    expect(translate("bn", "home.capacityCopy")).toBe(translate("en", "home.capacityCopy"));
+    expect(translate("bn", "unknown.custom_key")).toBe("unknown.custom_key");
     expect(translate("ta", "Field readiness", undefined, { ta: { "Field readiness": "கள தயார் நிலை" } })).toBe("கள தயார் நிலை");
   });
 

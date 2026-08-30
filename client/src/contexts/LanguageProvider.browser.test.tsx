@@ -34,4 +34,44 @@ describe("LanguageProvider browser persistence", () => {
     expect(document.documentElement.lang).toBe("hi");
     expect(window.location.search).toBe("?lang=hi");
   });
+
+  it("switches seamlessly between languages and restores English in real-time without reloading", () => {
+    function MultiLangProbe() {
+      const { setLocale } = useLanguage();
+      return (
+        <div>
+          <button onClick={() => setLocale("hi")}>Switch to Hindi</button>
+          <button onClick={() => setLocale("as")}>Switch to Assamese</button>
+          <button onClick={() => setLocale("bn")}>Switch to Bengali</button>
+          <button onClick={() => setLocale("ta")}>Switch to Tamil</button>
+          <button onClick={() => setLocale("en")}>Switch to English</button>
+          <div data-testid="target">Sign in to activate</div>
+        </div>
+      );
+    }
+
+    const view = render(<LanguageProvider><MultiLangProbe /></LanguageProvider>);
+    const target = view.getByTestId("target");
+    expect(target.textContent).toBe("Sign in to activate");
+
+    // 1. Switch to Hindi
+    fireEvent.click(view.getByText("Switch to Hindi"));
+    expect(target.textContent).toBe("सक्रिय करने के लिए साइन इन करें");
+
+    // 2. Switch to Assamese
+    fireEvent.click(view.getByText("Switch to Assamese"));
+    expect(target.textContent).toBe("সক্ৰিয় কৰিবলৈ ছাইন ইন কৰক");
+
+    // 3. Switch to Bengali
+    fireEvent.click(view.getByText("Switch to Bengali"));
+    expect(target.textContent).toBe("সক্রিয় করতে সাইন ইন করুন");
+
+    // 4. Switch to Tamil
+    fireEvent.click(view.getByText("Switch to Tamil"));
+    expect(target.textContent).toBe("செயல்படுத்த உள்நுழையவும்");
+
+    // 5. Switch back to English (without reloading!)
+    fireEvent.click(view.getByText("Switch to English"));
+    expect(target.textContent).toBe("Sign in to activate");
+  });
 });
