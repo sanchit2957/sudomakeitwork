@@ -90,8 +90,15 @@ vi.mock("@/contexts/LanguageContext", () => ({
   useLanguage: () => ({
     t: (key: string) => key,
     language: "en",
+    locale: "en",
     setLanguage: vi.fn(),
+    setLocale: vi.fn(),
   }),
+  localeOptions: [
+    { code: "en", label: "English", nativeLabel: "English" },
+    { code: "as", label: "Assamese", nativeLabel: "অসমীয়া" },
+    { code: "hi", label: "Hindi", nativeLabel: "हिन्दी" },
+  ],
 }));
 
 vi.mock("@/components/LanguageSelector", () => ({

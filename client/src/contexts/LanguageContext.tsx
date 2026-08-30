@@ -691,9 +691,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       const dict = messages[loc];
       if (dict) {
         for (const [msgKey, foreignVal] of Object.entries(dict)) {
-          const englishVal = messages.en[msgKey] || msgKey;
-          register(englishVal, foreignVal);
-          register(msgKey, foreignVal);
+          const englishVal = messages.en[msgKey];
+          // Only register actual human-readable English phrases, never internal dot-notated keys
+          if (englishVal && !englishVal.includes(".") && englishVal !== foreignVal) {
+            register(englishVal, foreignVal);
+          }
         }
       }
     }
@@ -704,7 +706,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       const dict = operationalTerms[loc];
       if (dict) {
         for (const [enKey, foreignVal] of Object.entries(dict)) {
-          register(enKey, foreignVal);
+          if (enKey && !enKey.includes(".") && enKey !== foreignVal) {
+            register(enKey, foreignVal);
+          }
         }
       }
     }
@@ -722,8 +726,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
     const isIgnoredElement = (el: Element): boolean => {
       const tag = el.tagName;
-      if (tag === "SCRIPT" || tag === "STYLE" || tag === "SVG" || tag === "CANVAS" || tag === "NOSCRIPT") return true;
+      if (tag === "SCRIPT" || tag === "STYLE" || tag === "SVG" || tag === "CANVAS" || tag === "NOSCRIPT" || tag === "OPTION") return true;
       if (el.hasAttribute("data-no-operational-translation") || el.getAttribute("contenteditable") === "true") return true;
+      if (el.closest?.("[data-no-operational-translation]")) return true;
       if (el.classList && (el.classList.contains("leaflet-container") || el.classList.contains("leaflet-pane"))) return true;
       return false;
     };

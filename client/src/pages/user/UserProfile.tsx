@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { localeOptions, useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
 import { VictimNavigation } from "@/pages/Home";
 import {
@@ -84,14 +84,6 @@ const RELATION_OPTIONS = [
   "Doctor",
   "Friend",
   "Other",
-];
-
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "as", label: "Assamese (অসমীয়া)" },
-  { code: "bn", label: "Bengali (বাংলা)" },
-  { code: "hi", label: "Hindi (हिन्दी)" },
-  { code: "brx", label: "Bodo (बर')" },
 ];
 
 export default function UserProfile() {
@@ -651,13 +643,14 @@ export default function UserProfile() {
                 </Label>
                 <select
                   id="prof-lang"
+                  data-no-operational-translation="true"
                   value={preferredLanguage}
                   onChange={(e) => setPreferredLanguage(e.target.value)}
                   className="mt-1 block w-full rounded-xl border border-black/10 bg-[#f9faf9] px-3 py-2 text-xs font-semibold text-[#122824] focus:outline-none focus:ring-2 focus:ring-[#6366f1] dark:border-white/10 dark:bg-[#1c1d22] dark:text-[#f3f4f6]"
                 >
-                  {LANGUAGES.map((l) => (
-                    <option key={l.code} value={l.code}>
-                      {l.label}
+                  {localeOptions.map((l) => (
+                    <option key={l.code} value={l.code} data-no-operational-translation="true">
+                      {l.nativeLabel} ({l.label})
                     </option>
                   ))}
                 </select>
