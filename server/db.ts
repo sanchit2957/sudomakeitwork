@@ -95,7 +95,7 @@ export async function getDb() {
   const dbUrl = process.env.DATABASE_URL?.trim();
   if (!dbUrl || dbUrl === "" || dbUrl.includes("HOST")) {
     if (process.env.NODE_ENV === "production") {
-      return null;
+      throw new Error("The operational database is disconnected. Cannot safely process request.");
     }
     return null;
   }
@@ -109,8 +109,15 @@ export async function getDb() {
       _db = drizzle(_pool);
     } catch (error) {
       recordDbFailure(error);
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("The operational database is disconnected. Cannot safely process request.");
+      }
       _db = null;
     }
+  }
+
+  if (!_db && process.env.NODE_ENV === "production") {
+    throw new Error("The operational database is disconnected. Cannot safely process request.");
   }
 
   return _db;
