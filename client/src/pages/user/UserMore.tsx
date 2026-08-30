@@ -1,20 +1,19 @@
 import React from "react";
 import LanguageSelector from "@/components/LanguageSelector";
 import { VictimNavigation } from "@/pages/Home";
+import { ProfileAvatar, UserProfileBadge, getFirstName } from "@/components/ProfileAvatar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
+  Building2,
   ChevronRight,
   ClipboardCheck,
   Edit3,
-  Hospital,
+  HeartHandshake,
+  Landmark,
   MapPin,
-  Phone,
-  Shield,
   ShieldCheck,
-  User,
-  UserRound,
-  UsersRound,
+  Sparkles,
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -28,12 +27,11 @@ export default function UserMore() {
       ? "Superadmin"
       : user?.role === "rescuer"
       ? "Rescuer"
-      : user?.role === "medical"
-      ? "Medical"
+      : user?.role === "medical" || user?.role === "hospital"
+      ? "Hospital Staff"
       : "Citizen";
 
   const userDistrict = (user as any)?.homeDistrict;
-  const userPhone = (user as any)?.phone;
   const bloodGroup = (user as any)?.bloodGroup;
 
   return (
@@ -42,7 +40,7 @@ export default function UserMore() {
         <header className="flex items-start justify-between">
           <div>
             <p className="text-2xl font-black tracking-[-.06em] text-[#122824] dark:text-white">{t("More")}</p>
-            <p className="mt-1 text-[10px] font-bold text-[#6b8780] dark:text-[#8a9f99]">{t("Profile & Operations Gateways")}</p>
+            <p className="mt-1 text-[10px] font-bold text-[#6b8780] dark:text-[#8a9f99]">{t("Profile & Community Support")}</p>
           </div>
           <LanguageSelector compact />
         </header>
@@ -50,16 +48,18 @@ export default function UserMore() {
         {/* Top Profile Card - Clickable to Open Customization Page */}
         <section
           onClick={() => setLocation("/profile")}
-          className="group mt-7 cursor-pointer rounded-[1.8rem] bg-gradient-to-br from-[#174e46] via-[#1a554c] to-[#0f3832] p-5 text-white shadow-[0_14px_30px_rgba(23,78,70,0.18)] ring-1 ring-white/10 transition hover:shadow-xl active:scale-[.99]"
+          className="group mt-6 cursor-pointer rounded-[1.8rem] bg-gradient-to-br from-[#174e46] via-[#1a554c] to-[#0f3832] p-5 text-white shadow-[0_14px_30px_rgba(23,78,70,0.18)] ring-1 ring-white/10 transition hover:shadow-xl active:scale-[.99]"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-4">
-              <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10 ring-2 ring-white/20 backdrop-blur-md transition group-hover:scale-105">
-                <UserRound className="h-7 w-7 text-[#d3eee6]" />
-              </span>
+              <ProfileAvatar
+                user={user}
+                size="xl"
+                className="ring-2 ring-white/30"
+              />
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-lg font-black leading-tight text-white">{user?.name || t("Assam Safety Network")}</p>
+                  <p className="text-lg font-black leading-tight text-white">{getFirstName(user?.name, user?.email, t("Citizen"))}</p>
                 </div>
                 <p className="mt-0.5 text-xs text-[#c2e2db]">{user?.email || t("Citizen Account")}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -96,6 +96,57 @@ export default function UserMore() {
           </div>
         </section>
 
+        {/* Disaster Relief & Donations Section */}
+        <section className="mt-5 rounded-[1.8rem] border border-[#d6ebe3] bg-gradient-to-b from-[#f4faf7] to-[#eef7f3] p-5 shadow-[0_8px_24px_rgba(23,78,70,0.06)] dark:border-white/10 dark:from-[#16181b] dark:to-[#121316]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#174e46] text-white dark:bg-emerald-500/20 dark:text-emerald-300">
+                <HeartHandshake className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#277b6b] dark:text-[#5eead4]">
+                  {t("Community Relief")}
+                </p>
+                <p className="text-base font-black tracking-tight text-[#122824] dark:text-white">
+                  {t("Disaster Donations")}
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#174e46]/10 px-2.5 py-1 text-[10px] font-extrabold text-[#174e46] dark:bg-emerald-500/10 dark:text-emerald-300">
+              <Sparkles className="h-3 w-3" />
+              {t("Direct Aid")}
+            </span>
+          </div>
+
+          <p className="mt-2 text-xs leading-5 text-[#597870] dark:text-[#8ea49d]">
+            {t("Connect with verified relief NGOs and community disaster foundations operating in Assam.")}
+          </p>
+
+          <div className="mt-4">
+            {/* Donate to NGO Card */}
+            <button
+              onClick={() => setLocation("/donations")}
+              className="group flex w-full items-center justify-between rounded-2xl border border-[#cbe4db] bg-white p-4 text-left shadow-sm transition hover:border-[#174e46]/40 hover:shadow-md active:scale-[.99] dark:border-white/10 dark:bg-[#1a1c20] dark:hover:border-emerald-500/40"
+            >
+              <div className="flex items-center gap-3.5">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e6f6f0] text-[#176a5a] transition group-hover:scale-105 dark:bg-emerald-950/50 dark:text-emerald-300">
+                  <Building2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-black text-[#13302b] dark:text-white">{t("Donate to NGO")}</span>
+                    <span className="rounded-full bg-[#e6f6f0] px-2 py-0.5 text-[9px] font-bold uppercase text-[#176a5a] dark:bg-emerald-950/60 dark:text-emerald-300">{t("Verified NGOs")}</span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-[#63817a] dark:text-[#8ea49d]">
+                    {t("Find nearby grassroots flood relief teams and contact numbers")}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-[#8da79f] transition group-hover:translate-x-1 group-hover:text-[#174e46] dark:text-neutral-500 dark:group-hover:text-emerald-300" />
+            </button>
+          </div>
+        </section>
+
         {/* Hospital Registration */}
         <button
           onClick={() => setLocation("/hospital/register")}
@@ -111,19 +162,6 @@ export default function UserMore() {
             </span>
           </span>
         </button>
-
-        {/* Protected Operations Wing */}
-        <section className="mt-5 rounded-[1.55rem] border border-[#d7e8e2] bg-[#f7fcfa] p-4 dark:border-white/10 dark:bg-[#16171a]">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#277b6b] dark:text-[#5eead4]">
-            {t("Protected Operations App")}
-          </p>
-          <p className="mt-1 text-sm font-black text-[#122824] dark:text-white">{t("For authorized response teams")}</p>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <AccessButton icon={ShieldCheck} label={t("Government")} onClick={() => setLocation("/command")} />
-            <AccessButton icon={Hospital} label={t("Medical")} onClick={() => setLocation("/medical")} />
-            <AccessButton icon={UsersRound} label={t("Rescuer")} onClick={() => setLocation("/responder")} />
-          </div>
-        </section>
       </main>
 
       <VictimNavigation current="more" />
@@ -131,22 +169,3 @@ export default function UserMore() {
   );
 }
 
-function AccessButton({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: typeof Hospital;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="grid place-items-center gap-1 rounded-2xl border border-black/5 bg-white px-2 py-3 text-[10px] font-black text-[#315e54] shadow-sm transition hover:bg-[#f3f7f5] active:scale-95 dark:border-white/10 dark:bg-[#1c1d22] dark:text-[#d3eee6] dark:hover:bg-[#25262c]"
-    >
-      <Icon className="h-4 w-4 text-[#277b6b] dark:text-[#5eead4]" />
-      {label}
-    </button>
-  );
-}

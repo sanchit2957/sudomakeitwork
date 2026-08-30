@@ -1,9 +1,9 @@
 import mysql from "mysql2/promise";
 import { and, eq, or } from "drizzle-orm";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
-import { emergencyContacts, EmergencyContact, InsertEmergencyContact, InsertUser, users } from "../drizzle/schema";
+import { emergencyContacts, EmergencyContact, InsertEmergencyContact, InsertUser, users, roleAccessCodes, RoleAccessCode } from "../drizzle/schema";
 import { ENV } from "./_core/env";
-import { hashPassword } from "./auth.password";
+import { hashPassword, verifyPassword } from "./auth.password";
 
 let _pool: mysql.Pool | null = null;
 let _db: MySql2Database<any> | null = null;
@@ -84,8 +84,6 @@ export async function getDb() {
 
 // Default development seed accounts with salted scrypt hashed passwords
 const defaultAdminHash = hashPassword("admin");
-const defaultRescuerHash = hashPassword("rescuer");
-const defaultMedicalHash = hashPassword("medical");
 const defaultCitizenHash = hashPassword("citizen");
 
 export const _memoryUsers: Map<string, any> = new Map([
@@ -106,103 +104,7 @@ export const _memoryUsers: Map<string, any> = new Map([
     },
   ],
   [
-    "admin@assamrescue.gov.in",
-    {
-      id: 1,
-      openId: "user-admin",
-      name: "Superadmin",
-      email: "admin@assamrescue.gov.in",
-      password: defaultAdminHash,
-      role: "admin",
-      status: "active",
-      loginMethod: "platform-login",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    },
-  ],
-  [
-    "user-rescuer",
-    {
-      id: 2,
-      openId: "user-rescuer",
-      name: "Inspector Barua",
-      email: "rescuer@assamrescue.gov.in",
-      password: defaultRescuerHash,
-      role: "rescuer",
-      status: "active",
-      loginMethod: "platform-login",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    },
-  ],
-  [
-    "rescuer@assamrescue.gov.in",
-    {
-      id: 2,
-      openId: "user-rescuer",
-      name: "Inspector Barua",
-      email: "rescuer@assamrescue.gov.in",
-      password: defaultRescuerHash,
-      role: "rescuer",
-      status: "active",
-      loginMethod: "platform-login",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    },
-  ],
-  [
-    "user-medical",
-    {
-      id: 3,
-      openId: "user-medical",
-      name: "Dr. Hazarika",
-      email: "medical@assamrescue.gov.in",
-      password: defaultMedicalHash,
-      role: "hospital",
-      status: "active",
-      loginMethod: "platform-login",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    },
-  ],
-  [
-    "medical@assamrescue.gov.in",
-    {
-      id: 3,
-      openId: "user-medical",
-      name: "Dr. Hazarika",
-      email: "medical@assamrescue.gov.in",
-      password: defaultMedicalHash,
-      role: "hospital",
-      status: "active",
-      loginMethod: "platform-login",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    },
-  ],
-  [
     "user-citizen",
-    {
-      id: 4,
-      openId: "user-citizen",
-      name: "Anamika Das",
-      email: "citizen@assamrescue.gov.in",
-      password: defaultCitizenHash,
-      role: "user",
-      status: "active",
-      loginMethod: "platform-login",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    },
-  ],
-  [
-    "citizen@assamrescue.gov.in",
     {
       id: 4,
       openId: "user-citizen",
@@ -289,9 +191,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     createdAt: existingMem.createdAt || new Date(),
   };
   _memoryUsers.set(user.openId, merged);
-  if (user.email) {
-    _memoryUsers.set(user.email.toLowerCase(), merged);
-  }
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -329,23 +228,31 @@ export async function getUserByOpenId(openId: string) {
   return memUser;
 }
 
-export async function getUserByEmail(emailOrUsername: string) {
+export async function getUserByEmail(emailOrUsername: string, role?: string) {
+  const clean = emailOrUsername.trim();
+  const lower = clean.toLowerCase();
+  const normalizedRole = role ? (role === "medical" ? "hospital" : role) : undefined;
   const db = await getDb();
   if (db) {
     try {
+      const emailCondition = or(eq(users.email, clean), eq(users.email, lower), eq(users.name, clean));
+      const whereClause = normalizedRole
+        ? and(emailCondition, eq(users.role, normalizedRole as any))
+        : emailCondition;
+
       const result = await db
         .select()
         .from(users)
-        .where(or(eq(users.email, emailOrUsername), eq(users.name, emailOrUsername)))
+        .where(whereClause)
         .limit(1);
       if (result.length > 0) {
         const row = result[0];
-        const normalizedRole = row.role === "medical" ? "hospital" : row.role;
-        const mem = _memoryUsers.get(row.openId) || _memoryUsers.get(row.email?.toLowerCase() || "") || {};
+        const resRole = row.role === "medical" ? "hospital" : row.role;
+        const mem = _memoryUsers.get(row.openId) || {};
         return {
           ...mem,
           ...row,
-          role: (mem.role && mem.role !== "user") ? mem.role : normalizedRole,
+          role: (mem.role && mem.role !== "user") ? mem.role : resRole,
           status: mem.status ? mem.status : (row.status || "active"),
         };
       }
@@ -360,18 +267,31 @@ export async function getUserByEmail(emailOrUsername: string) {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Authoritative database is unavailable.");
   }
-  const lower = emailOrUsername.toLowerCase();
+  const allUsers = Array.from(_memoryUsers.values());
   const memUser =
-    _memoryUsers.get(lower) ||
-    Array.from(_memoryUsers.values()).find(
-      u => u.email?.toLowerCase() === lower || u.name?.toLowerCase() === lower || u.openId === `user-${lower}`
-    ) ||
-    null;
+    allUsers.find(u => {
+      const matchesEmail =
+        u.email?.toLowerCase() === lower ||
+        u.name?.toLowerCase() === clean.toLowerCase() ||
+        u.openId === `user-${lower}` ||
+        u.openId === lower;
+      if (!matchesEmail) return false;
+      if (normalizedRole) {
+        const userRole = u.role === "medical" ? "hospital" : u.role;
+        return userRole === normalizedRole;
+      }
+      return true;
+    }) || null;
+
   if (memUser) {
     if (memUser.role === "medical") memUser.role = "hospital";
     if (!memUser.status) memUser.status = "active";
   }
   return memUser;
+}
+
+export async function getUserByEmailAndRole(emailOrUsername: string, role: string) {
+  return getUserByEmail(emailOrUsername, role);
 }
 
 export async function getUserById(id: number) {
@@ -683,5 +603,147 @@ export async function deleteEmergencyContact(id: number, userId: number): Promis
     return true;
   }
   return false;
+}
+
+export const _memoryRoleAccessCodes: Map<string, { id: number; role: string; codeHash: string; codeVersion: number; updatedAt: Date; updatedBy: number | null }> = new Map([
+  [
+    "rescuer",
+    {
+      id: 1,
+      role: "rescuer",
+      codeHash: hashPassword("RESCUER-2026"),
+      codeVersion: 1,
+      updatedAt: new Date(),
+      updatedBy: null,
+    },
+  ],
+  [
+    "hospital",
+    {
+      id: 2,
+      role: "hospital",
+      codeHash: hashPassword("HOSPITAL-2026"),
+      codeVersion: 1,
+      updatedAt: new Date(),
+      updatedBy: null,
+    },
+  ],
+]);
+
+export async function getRoleAccessCode(role: string): Promise<{ id: number; role: string; codeHash: string; codeVersion: number; updatedAt: Date; updatedBy: number | null } | null> {
+  const normalizedRole = role === "medical" ? "hospital" : role;
+  const db = await getDb();
+  if (db) {
+    try {
+      const rows = await db.select().from(roleAccessCodes).where(eq(roleAccessCodes.role, normalizedRole)).limit(1);
+      if (rows.length > 0) {
+        return rows[0] as any;
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Failed to query role access code: ${(error as Error)?.message}`);
+      }
+      recordDbFailure(error);
+    }
+  }
+  return _memoryRoleAccessCodes.get(normalizedRole) || null;
+}
+
+export async function getRoleCodeVersion(role: string): Promise<number> {
+  const rec = await getRoleAccessCode(role);
+  return rec ? rec.codeVersion : 1;
+}
+
+export async function verifyRoleAccessCode(role: string, inputCode: string): Promise<boolean> {
+  if (!inputCode || typeof inputCode !== "string") return false;
+  const cleanCode = inputCode.trim();
+  if (!cleanCode) return false;
+  const record = await getRoleAccessCode(role);
+  if (!record || !record.codeHash) return false;
+  return verifyPassword(cleanCode, record.codeHash);
+}
+
+export async function setRoleAccessCode(
+  role: "rescuer" | "hospital" | "medical",
+  rawCode: string,
+  adminUserId?: number
+): Promise<{ role: string; codeVersion: number; updatedAt: Date }> {
+  const normalizedRole = role === "medical" ? "hospital" : role;
+  const cleanCode = rawCode.trim();
+  if (!cleanCode) {
+    throw new Error("Access code cannot be empty.");
+  }
+  const codeHash = hashPassword(cleanCode);
+  const existing = await getRoleAccessCode(normalizedRole);
+  const newVersion = (existing?.codeVersion || 0) + 1;
+  const now = new Date();
+
+  const db = await getDb();
+  if (db) {
+    try {
+      await db
+        .insert(roleAccessCodes)
+        .values({
+          role: normalizedRole,
+          codeHash,
+          codeVersion: newVersion,
+          updatedAt: now,
+          updatedBy: adminUserId || null,
+        })
+        .onDuplicateKeyUpdate({
+          set: {
+            codeHash,
+            codeVersion: newVersion,
+            updatedAt: now,
+            updatedBy: adminUserId || null,
+          },
+        });
+    } catch (error) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Failed to update role access code: ${(error as Error)?.message}`);
+      }
+      recordDbFailure(error);
+    }
+  }
+
+  const memRec = {
+    id: existing?.id || (_memoryRoleAccessCodes.size + 1),
+    role: normalizedRole,
+    codeHash,
+    codeVersion: newVersion,
+    updatedAt: now,
+    updatedBy: adminUserId || null,
+  };
+  _memoryRoleAccessCodes.set(normalizedRole, memRec);
+
+  return {
+    role: normalizedRole,
+    codeVersion: newVersion,
+    updatedAt: now,
+  };
+}
+
+export async function getAllRoleAccessCodes(): Promise<Array<{ role: string; codeVersion: number; updatedAt: Date; updatedBy: number | null }>> {
+  const roles = ["rescuer", "hospital"] as const;
+  const results: Array<{ role: string; codeVersion: number; updatedAt: Date; updatedBy: number | null }> = [];
+  for (const r of roles) {
+    const rec = await getRoleAccessCode(r);
+    if (rec) {
+      results.push({
+        role: rec.role,
+        codeVersion: rec.codeVersion,
+        updatedAt: rec.updatedAt,
+        updatedBy: rec.updatedBy,
+      });
+    } else {
+      results.push({
+        role: r,
+        codeVersion: 1,
+        updatedAt: new Date(),
+        updatedBy: null,
+      });
+    }
+  }
+  return results;
 }
 

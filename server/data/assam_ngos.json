@@ -1,0 +1,100 @@
+[
+  {
+    "name": "Indian Red Cross Society (Assam State Branch)",
+    "address": "Red Cross Bhawan, Chandmari, Guwahati, Kamrup Metropolitan, Assam 781003",
+    "phone": "+91 361 266 5115",
+    "latitude": 26.1890,
+    "longitude": 91.7760
+  },
+  {
+    "name": "Goonj Assam Disaster Relief & Humanitarian Hub",
+    "address": "Opposite Administrative Staff College, Khanapara, GS Road, Guwahati, Assam 781022",
+    "phone": "+91 98640 54321",
+    "latitude": 26.1265,
+    "longitude": 91.8170
+  },
+  {
+    "name": "Brahmaputra Foundation & Flood Relief Network",
+    "address": "Tarapur Main Road, Silchar, Cachar, Assam 788003",
+    "phone": "+91 94351 98765",
+    "latitude": 24.8333,
+    "longitude": 92.7789
+  },
+  {
+    "name": "Aaranyak (Community Relief & Conservation Wing)",
+    "address": "13 Tayab Ali Byelane, Bishnu Rabha Path, Beltola, Guwahati, Assam 781028",
+    "phone": "+91 361 223 0250",
+    "latitude": 26.1368,
+    "longitude": 91.7925
+  },
+  {
+    "name": "Snehalaya Child & Community Welfare Centre",
+    "address": "Dhirenpara, Fatasil Ambari, Guwahati, Assam 781025",
+    "phone": "+91 361 247 1850",
+    "latitude": 26.1550,
+    "longitude": 91.7240
+  },
+  {
+    "name": "Assam Centre for Rural Development (ACRD)",
+    "address": "Zoo Narangi Road, Geetanagar, Guwahati, Assam 781024",
+    "phone": "+91 361 241 6290",
+    "latitude": 26.1720,
+    "longitude": 91.8010
+  },
+  {
+    "name": "North East Social Trust (NEST) Assam",
+    "address": "Maligaon Chariali, Kamrup Metropolitan, Guwahati, Assam 781011",
+    "phone": "+91 94350 45678",
+    "latitude": 26.1585,
+    "longitude": 91.6890
+  },
+  {
+    "name": "Jorhat Flood Relief Volunteers Coalition",
+    "address": "KB Road, Tarajan, Jorhat, Assam 785001",
+    "phone": "+91 376 232 0987",
+    "latitude": 26.7509,
+    "longitude": 94.2037
+  },
+  {
+    "name": "Dibrugarh Humanitarian & Disaster Welfare Trust",
+    "address": "Mancotta Road, Chowkidinghee, Dibrugarh, Assam 786001",
+    "phone": "+91 373 232 4567",
+    "latitude": 27.4728,
+    "longitude": 94.9120
+  },
+  {
+    "name": "Tezpur Social Action & Relief Society",
+    "address": "Mission Chariali, Tezpur, Sonitpur, Assam 784001",
+    "phone": "+91 3712 220 123",
+    "latitude": 26.6528,
+    "longitude": 92.7926
+  },
+  {
+    "name": "Nagaon Disaster Relief & Community Care Centre",
+    "address": "Haiborgaon Main Road, Nagaon, Assam 782002",
+    "phone": "+91 3672 233 456",
+    "latitude": 26.3465,
+    "longitude": 92.6840
+  },
+  {
+    "name": "Barpeta Rural Relief & Rehabilitation Society",
+    "address": "Bilortarihati, Near Town Hall, Barpeta, Assam 781301",
+    "phone": "Contact number not listed — reach out via address",
+    "latitude": 26.3211,
+    "longitude": 91.0042
+  },
+  {
+    "name": "Majuli River Island Flood Assistance Forum",
+    "address": "Garmur Satra Road, Majuli, Assam 785104",
+    "phone": "+91 94355 87654",
+    "latitude": 26.9638,
+    "longitude": 94.2189
+  },
+  {
+    "name": "Dhubri Border & Riverine Relief Initiative",
+    "address": "GTB Road, Dhubri Town, Dhubri, Assam 783301",
+    "phone": "Contact number not listed — reach out via address",
+    "latitude": 26.0200,
+    "longitude": 89.9800
+  }
+]

@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS users (
   status VARCHAR(32) DEFAULT 'active' NOT NULL CHECK (status IN ('active', 'disabled')),
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-  "lastSignedIn" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+  "lastSignedIn" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  CONSTRAINT "users_email_role_unique" UNIQUE (email, role)
 );
 
 -- 2. Rescuer Profiles Table
