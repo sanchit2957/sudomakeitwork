@@ -1,0 +1,189 @@
+# Project TODO
+
+- [x] Define operational roles, authorization boundaries, incident workflow states, and domain vocabulary.
+- [x] Extend the database schema for rescue profiles, SOS incidents, mission assignments, shelters, flood zones, audit records, notifications, and incident events.
+- [x] Apply the database migration and implement typed query helpers.
+- [x] Build protected role-aware backend procedures for SOS reporting, assignment, status progression, availability, shelters, map layers, analytics, and notifications.
+- [x] Enforce the mission workflow: Pending → Dispatched → Resolved, including role and transition checks.
+- [x] Implement secure victim SOS reporting with geolocation/manual location, severity, people count, and optional evidence upload support.
+- [x] Implement separate victim, rescuer, and administrator navigation and role-specific views.
+- [x] Design a mobile-first Victim Emergency App with simple SOS controls and live rescue status tracking.
+- [x] Design a Rescuer Operations Panel with availability settings, assigned missions, and mission-status actions.
+- [x] Design an Administrator Command Center with operational metrics, search/filterable incident feed, assignment actions, and map management.
+- [x] Integrate the provided map component for responsive SOS, rescuer, flood-zone, and shelter layers with click-through details and a manual-coordinate fallback.
+- [x] Add real-time-friendly refresh patterns and owner/rescuer notification delivery for assignments and high-priority SOS events.
+- [x] Create live analytics for incident totals, resolved cases, active rescuers, and average response time.
+- [x] Add meaningful Vitest coverage for authentication, rescuer authorization, Web Push configuration, and workflow/rate-limit enforcement.
+- [x] Verify desktop and mobile presentation, build health, and critical user flows.
+- [x] Save a release checkpoint and provide the completed project to the user.
+- [x] Restrict notification read actions to their authenticated recipient and record relevant access changes.
+- [x] Add durable guest-SOS rate limiting while retaining the supported guest emergency path.
+- [x] Provide a map-assisted manual-location flow that turns a selected map point into SOS coordinates.
+- [x] Allow administrators to update existing shelter details and map coordinates after creation.
+- [x] Add standards-based background web push delivery for rescuer assignment and nearby high-priority SOS alerts.
+- [x] Verify rescuer and administrator workspaces on desktop and mobile, including role gates and navigation states.
+- [x] Exercise the SOS-to-resolution workflow, shelter editing controls, live analytics refresh, and in-app browser push fallback end to end.
+- [x] Improve blocked role messaging so administrators and rescuers are directed to sign out and use the separately authorized account for the requested workspace.
+- [x] Resolve the OAuth redirect URI issue by directing external-account sign-in through the hosted HTTPS preview instead of unsupported local `127.0.0.1` previews.
+- [x] Prevent sign-in synchronization from overwriting a database-authorized rescuer role with an administrator role on refresh.
+- [x] Distinguish browser notification permission from a successfully stored Web Push subscription, and surface subscription failures clearly.
+- [x] Confirm the responder configuration responds without exposing private VAPID credentials; validate the configured P-256 VAPID pair.
+- [x] Provide an explicit responder recovery path when the browser’s own PushManager key store fails despite valid service configuration.
+- [x] Add an in-app reset that clears the site’s existing service-worker and Push subscription state before retrying registration.
+- [x] Ensure the responder alert setup control renders independent retry actions after an automatic registration reset or failed setup attempt.
+- [x] Remove stale pending-mutation dependencies from the responder alert retry control after reset completion.
+- [x] Complete one consolidated browser-push recovery pass and document the remaining device-specific PushManager limitation rather than repeating retries.
+- [x] Document the verified browser-local PushManager registration limitation and the in-app alert fallback in the release notes.
+- [x] Verify administrator and responder workspace navigation and role-gate presentation at a mobile viewport.
+- [x] Perform a consented test-only shelter creation and edit, confirm persistence, then remove the test record.
+- [x] Verify the responder in-app Alerts fallback receives and displays an operational notification while browser PushManager registration is unavailable.
+- [x] Save the release checkpoint after all outstanding verification evidence is captured.
+- [x] Make public role-entry controls stable so Command centre, Rescuer access, and SOS actions do not appear inconsistently after page load.
+- [x] Rebrand the application name, browser title, and workspace identity as sudo MakeItWork.
+- [x] Redesign the victim journey for panic conditions with image-led, minimal-decision SOS actions and clearer current-status cues.
+- [x] Add a distinct hospital and medical-resource operations panel with capacity, bed availability, key supply levels, status, and mapped location.
+- [x] Implement a client-side offline SOS outbox that queues a victim report locally and submits it automatically once the device reconnects.
+- [x] Explain the exact offline guarantee and remaining limitation: a report can be queued offline but cannot reach the control panel until a network connection returns.
+- [x] Add automated coverage and responsive verification for the new role-entry, resource, and offline-queue behaviors.
+- [x] Save a checkpoint for the sudo MakeItWork emergency-readiness update.
+- [x] Redesign the victim SOS status tracker with large visual state cues that match the panic-mode report flow.
+- [x] Add explicit regression coverage for stable role-entry controls and the offline reconnect flush behavior.
+- [x] Verify the hospital resource route at a responsive viewport and record its protected-route state.
+- [x] Save the final sudo MakeItWork checkpoint after the remaining status and verification updates.
+- [x] Diagnose and remove delayed or intermittent SOS, mission-assignment, and responder-status synchronization across operational views.
+- [x] Add immediate cache reconciliation and visible mutation feedback for SOS creation, assignment, status changes, and availability updates.
+- [x] Add a rescuer self-registration request flow with administrator review and approval in the Command Centre.
+- [x] Add a rescuer registration entry point in the field workspace and stable links to the Hospitals & critical resources panel in Command Centre.
+- [x] Add automated tests and cross-role verification for synchronization and rescuer approval workflows.
+- [x] Save a checkpoint for the synchronization and registration reliability update.
+- [x] Replace the remaining legacy Riverguard wording in responder alert messaging with sudo MakeItWork.
+- [x] Verify a consented test SOS appears in Command Centre promptly and that assignment plus responder status updates propagate across roles without waiting for stale data.
+- [x] Add automated coverage for optimistic mission and availability cache reconciliation and for administrator approval of a rescuer request.
+- [x] Verify the full rescuer-request lifecycle: submit as a standard account, approve in Command Centre, then unlock the responder workspace.
+- [x] Replace every remaining Riverguard label in responder push diagnostics with sudo MakeItWork.
+- [x] Save the final synchronization and registration reliability checkpoint after these end-to-end checks.
+- [x] Prevent intermediary and browser caching of live tRPC operational queries so newly created SOS and assignments cannot render stale responses, including the offline service worker cache.
+- [x] Create a temporary, explicitly test-only standard account and rescuer registration request for end-to-end verification.
+- [x] Approve the test-only request, verify its rescuer role transition and responder workspace access, then remove all temporary account and request records.
+- [x] Assign the test-only SOS and verify rapid mission/status reconciliation between administrator and responder views after the cache-policy fix.
+- [x] Add automated coverage for the administrator rescuer-registration approval mutation, beyond call-sign policy validation.
+- [x] Replace remaining legacy Riverguard references in release documentation with sudo MakeItWork.
+- [x] Verify and preserve an opaque DashboardLayout side panel; do not apply transparency.
+- [x] Make the mobile Rescuer workspace sidebar opaque and high-contrast so navigation tabs and controls remain clearly visible.
+- [x] Restore a visible desktop Admin Command Centre sidebar with an accessible Rescuer requests approval entry.
+- [x] Give the desktop Command Centre a permanently expanded full left sidebar with every Admin navigation item visible.
+- [x] Add a persistent selector for ten high-use Indian languages across public, rescuer, and Admin pages: English, Assamese, Hindi, Bengali, Odia, Marathi, Gujarati, Tamil, Telugu, and Kannada.
+- [x] Translate priority emergency, tracking, responder, and Command Centre interface text for the supported languages without changing operational codes or entered incident data.
+- [x] Add automated coverage for locale selection, translation fallback, and persisted language preference.
+- [x] Verify multilingual layout readability at desktop and mobile breakpoints, then save the multilingual release checkpoint.
+- [x] Translate all remaining visible Rescuer UI strings for every supported locale, including alert-state labels, setup/retry text, registration form labels/placeholders, mission status copy, and empty states.
+- [x] Translate all remaining visible Command Centre UI strings for every supported locale, including metrics, hospital/shelter/request/team forms, placeholders, approval/rejection text, assignment controls, helper copy, and empty states.
+- [x] Translate protected-access, rescuer-registration, and browser-alert setup/recovery text for all ten supported languages.
+- [x] Add direct tests for localized Rescuer mission controls and Command Centre approval/assignment labels in every supported locale.
+- [x] Add a rescuer-managed profile with an optional photo and rescuer-provided contact number for assignment-only visibility.
+- [x] Add consent-based active-mission location sharing with a visible sharing state and automatic stop outside an active assignment.
+- [x] Return an assigned rescuer's safe profile and fresh last-known location only to the matching SOS tracking code.
+- [x] Add a victim-facing assigned-rescuer card with photo, phone action, live-location status, and map display.
+- [x] Add authorization and UI regression coverage for profile exposure and active-mission location sharing.
+- [x] Add direct rescuer-role authorization regression tests for profile, contact-sharing, and live-location mutations.
+- [x] Add UI regression assertions for the Rescuer profile card and victim assigned-rescuer live-location states.
+- [x] Separate the route experience into a public Victim App and a protected Operations App for government, hospital/medical staff, and rescuers.
+- [x] Redesign the Victim App home with a brand header, language selector, giant SOS action, clear network status, voice-note capture, current-location map preview, and visual flood/weather indicators.
+- [x] Add a low-text bottom navigation for Victim Home, SOS Tracking, Safety guidance, and More/profile/support.
+- [x] Enhance victim SOS tracking with an image-led responder card, live responder location, call action, and a safe in-app contact path.
+- [x] Add visual Safety and More screens for emergency precautions, preparedness, profile, support, and app information.
+- [x] Preserve and clarify the shared sign-in restrictions across the protected Operations App, including government/admin, hospital/medical, and rescuer access.
+- [x] Add data contracts and UI states for weather/flood conditions with honest source and availability messaging.
+- [x] Add regression coverage and responsive verification for the redesigned public and protected app shells.
+- [x] Match the Victim App visual hierarchy to the supplied reference: phone-first white canvas, oversized red SOS disc, compact green connection badge, rounded white utility cards, map preview, flood card, and four-icon bottom navigation.
+- [x] Require a signed-in victim account before the public SOS action can initiate an emergency report.
+- [x] Replace the multi-step SOS entry flow with a location-first rapid SOS that creates the alert immediately and redirects to its tracking view.
+- [x] Preserve an honest failure state when GPS permission or connectivity prevents immediate SOS creation, without silently sending a location-less alert.
+- [x] Add a protected current-request editor where the reporting victim can add people count, help needs, and optional details after the alert is active.
+- [x] Review the attached interface code and apply only its relevant, safe visual or interaction patterns to the rapid SOS and tracking experience.
+- [x] Add direct authorization and UI regressions for rapid-SOS login gating, creation, redirect, and post-alert editing.
+- [x] Add a direct Home UI regression for rapid-SOS login gating and visible GPS-permission failure messaging.
+- [x] Add a direct rapid-SOS mutation regression for successful creation redirecting to the private tracking code.
+- [x] Add router-level regressions for reporter-only post-alert details on active versus resolved SOS records.
+- [x] Add a direct rapid-SOS success-path regression that mocks successful SOS creation and verifies the Home rapid-SOS flow navigates to the private tracking code after the mutation resolves.
+- [x] Add a true Home interaction regression that mocks authenticated location capture and successful SOS mutation before asserting tracking navigation.
+- [x] Review the attached Safety prototype and incorporate its relevant interaction patterns into the Victim App Safety page.
+- [x] Redesign Safety around actionable flood guidance, emergency contacts, preparedness, local alerts, and clear escalation actions.
+- [x] Connect Safety actions to authenticated rapid SOS, current conditions, and an auditable safety-assistance signal for operations.
+- [x] Add Government Command visibility and triage for safety-assistance signals without mixing them with confirmed SOS incidents.
+- [x] Add Medical and Rescuer workspace views for actionable safety guidance, emergency preparedness, and relevant assistance signals.
+- [x] Add authorization, safety-signal workflow, and responsive UI regression coverage across victim and operations roles.
+- [x] Add an honest live/local alerts and current-condition section to Safety using the existing weather and flood-condition contract.
+- [x] Add compact safety-preparedness guidance to Medical and Rescuer safety workspaces alongside their request queues.
+- [x] Add automated workflow coverage for safety-request ownership, operational status transitions, medical queue filtering, and rendered Safety UI states.
+- [x] Add a direct backend regression for medical-only safety queue filtering and broader government/field queue visibility.
+- [x] Add a direct regression for requester-owned Safety request views versus operations-only queue access.
+- [x] Add a router-level safety queue regression with mocked request rows for medical, government, and field callers.
+- [x] Add a router-level requester-view regression with mocked request rows for victim and operations callers.
+- [x] Restrict Victim, Command, Medical, and Rescuer map views to Assam geographic bounds and prevent out-of-Assam location submissions.
+- [x] Add shared Assam boundary regressions for map configuration and SOS or safety location validation.
+- [x] Add a direct map-component regression confirming Assam camera restriction settings are passed to the Google Maps constructor.
+- [x] Add a router-level regression confirming out-of-Assam Safety assistance requests are rejected before persistence.
+- [x] Verify responsive Assam-only map behavior and save a checkpoint for the boundary update.
+- [x] Verify the Assam-only map lock at mobile width in both the Victim App and a map-bearing Operations screen.
+- [x] Save the Assam-only boundary update checkpoint after the completed final validation evidence is recorded.
+- [x] Diagnose why the Victim App map preview does not refresh to the device’s current location after access.
+- [x] Restore reliable current-location acquisition and map recentering without weakening Assam-only boundaries.
+- [x] Add regression coverage, verify the corrected location preview, and save a checkpoint.
+- [x] Temporarily disable Assam-only map camera restrictions, location filters, and server-side coordinate rejections.
+- [x] Verify the map preview accepts the device’s current location again and save a checkpoint for this temporary configuration.
+- [x] Restore a consistently circular SOS control and remove the post-recording voice-note connectivity glitch.
+- [x] Extend local conditions with transparent river-status messaging, rainfall in millimetres, wind speed, a seven-day trend visual, and weather forecast.
+- [x] Replace tracking-code-led Victim tracking entry with a persistent visual rescue-flow experience and automatic assigned-rescuer details.
+- [x] Show nearby hospitals by default in Safety with current capacity, resource availability, and last-updated time sourced from Medical Operations updates.
+- [x] Assess separate Admin, Medical, and Rescuer authentication entry designs while preserving secure account authorization; adopted role-specific secure-access portals.
+- [x] Add regression coverage, responsive verification, and a checkpoint for the complete experience upgrade.
+- [x] Defer user-selectable Email OTP or Phone OTP pages because the operator has no domain available for verified production email delivery.
+- [x] Defer real Email OTP delivery and verification without retaining remote Google sign-in interfaces until a verifiable sender domain is available.
+- [x] Defer Email OTP-only implementation; Phone OTP remains out of scope by user choice.
+- [x] Assess the no-cost Email OTP tier; its required owned-and-verified sender domain is not currently available.
+- [x] Retain the current secure provider-backed sign-in behind separate Admin, Medical, and Rescuer access portals until Email OTP can be verified with an owned domain.
+- [x] Document that Email OTP remains deferred pending a verifiable sending domain and Resend credentials.
+- [x] Restyle the circular SOS control with a glass finish and remove its lower shadow while retaining emergency contrast and accessible size.
+- [x] Verify the revised SOS control at the mobile breakpoint and save a checkpoint.
+- [x] Permanently clear all SOS incidents and their dependent missions, events, messages, and notifications after user confirmation.
+- [x] Verify all SOS operational queues are empty after the confirmed data purge.
+- [x] Identify an official accessible Assam river-gauge source with clear licensing, timestamp, and station context.
+- [x] Integrate real river-gauge level and trend data with source attribution and an honest unavailable state.
+- [x] Add regression coverage and verify live river-gauge presentation before saving a checkpoint.
+- [x] Add a persistent light/dark theme control beside the language selector across Victim and Operations experiences.
+- [x] Apply accessible light and dark surfaces to all page shells and shared workspace components.
+- [x] Add theme persistence regressions, visually verify both modes, and save a checkpoint.
+- [x] Replace green-tinted dark-mode surfaces with a true black and charcoal palette across Victim and Operations experiences.
+- [x] Verify contrast and consistency of the corrected black dark theme, then save a checkpoint.
+- [x] Investigate the stale official river-gauge feed and identify a current authoritative Assam source or endpoint.
+- [x] Implement source-attributed current gauge retrieval with regression coverage while retaining truthful stale-data safeguards.
+- [x] Verify the public gauge presentation, then save a checkpoint for the repair.
+- [x] Audit all public and protected routes for incomplete dark-theme styling, unreadable text, and low-contrast interactive states.
+- [x] Replace brittle page-specific dark-mode treatment with robust neutral semantic surface, text, border, and control overrides.
+- [x] Add dark-theme regressions, complete desktop/mobile visual checks, and save a checkpoint for the contrast repair.
+- [x] Diagnose why selected languages are not applying or persisting across the Victim and Operations interfaces.
+- [x] Repair language-selector state, route persistence, and translation lookup coverage for supported Indian languages.
+- [x] Add regression coverage, verify browser language switching across routes, and save a checkpoint for the multilingual repair.
+- [x] Audit the current Safety tab and its medical, assistance-request, and Operations handoff workflows for the highest-impact next improvements.
+- [x] Develop prioritized panic-first Safety guidance, resource discovery, and assistance-request improvements without weakening existing role controls.
+- [x] Add regression coverage, validate the improved Safety experience, and save a checkpoint.
+- [x] Audit existing hospital registration approval, staff dashboard authorization, resource fields, and Safety-tab data presentation.
+- [x] Extend approved hospital staff workflows for real-time beds, ICU, food, medical supply, transport, and service-status updates.
+- [x] Replace Safety’s “What do you need?” section with senior-friendly large nearby-hospital cards and clear visual resource status.
+- [x] Add authorization and UI regressions, verify public/approved-staff flows, and save a checkpoint for the hospital-resource release.
+- [x] Move verified nearby medical care above local alerts and remove the device-only Safety Plan checklist.
+- [x] Update Safety regressions, visually verify the simplified mobile layout, and save a checkpoint.
+- [x] Add an accessible Google Maps directions action beside each verified hospital name in Safety, with regression and mobile verification.
+- [x] Add a clearly visible SOS tracking/case number to Track without changing the rest of the page.
+- [x] Add regression coverage, verify the minimal Track-page addition, and save a checkpoint.
+- [x] Audit current manual responder location-sharing controls, active-mission data flow, and disclosure safeguards.
+- [x] Automatically publish an assigned rescuer’s location every five seconds only during their active mission, ending it automatically on resolution.
+- [x] Remove the manual active-mission sharing control, add clear automatic-sharing state, regression coverage, cross-role validation, and a checkpoint.
+- [x] Audit assigned-rescuer location and SOS destination data for safe matched-case routing and ETA calculation.
+- [x] Add a live Google Maps route line and ETA from assigned rescuer to the matching SOS location, refreshing with automatic location updates.
+- [x] Add mobile routing states, privacy and rendering regressions, visual validation, and a checkpoint.
+- [x] Diagnose why the assigned-rescuer map shows ETA without drawing the rescuer-to-user route line.
+- [x] Render a robust visible route polyline and route-end markers, then add regression and mobile validation coverage.
+- [x] Differentiate active-route endpoints: show the SOS user with a familiar blue location pin and the assigned responder with a dedicated rescuer marker.
+- [x] Add marker-distinction regression coverage, validate the responsive map treatment, and save a checkpoint.

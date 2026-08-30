@@ -1,0 +1,713 @@
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { getApiUrl } from "@/lib/apiConfig";
+import { currentInterfaceTerms } from "./currentInterfaceTerms";
+
+export type Locale = "en" | "as" | "hi" | "bn" | "or" | "mr" | "gu" | "ta" | "te" | "kn";
+
+export const localeOptions: Array<{ code: Locale; label: string; nativeLabel: string }> = [
+  { code: "en", label: "English", nativeLabel: "English" },
+  { code: "as", label: "Assamese", nativeLabel: "অসমীয়া" },
+  { code: "hi", label: "Hindi", nativeLabel: "हिन्दी" },
+  { code: "bn", label: "Bengali", nativeLabel: "বাংলা" },
+  { code: "or", label: "Odia", nativeLabel: "ଓଡ଼ିଆ" },
+  { code: "mr", label: "Marathi", nativeLabel: "मराठी" },
+  { code: "gu", label: "Gujarati", nativeLabel: "ગુજરાતી" },
+  { code: "ta", label: "Tamil", nativeLabel: "தமிழ்" },
+  { code: "te", label: "Telugu", nativeLabel: "తెలుగు" },
+  { code: "kn", label: "Kannada", nativeLabel: "ಕನ್ನಡ" },
+];
+
+const storageKey = "sudo-makeitwork-language";
+const originalText = new WeakMap<Text, string>();
+const originalAttributes = new WeakMap<Element, Map<string, string>>();
+const universalTerms: Record<string, Partial<Record<Locale, string>>> = {
+  "general.new": { en: "NEW", as: "নতুন", hi: "नया", bn: "নতুন", or: "ନୂତନ", mr: "नवीन", gu: "નવું", ta: "புதியது", te: "కొత్త", kn: "ಹೊಸ" },
+};
+
+export const messages: Record<Locale, Record<string, string>> = {
+  en: {
+    "language.label": "Language",
+    "language.english": "English",
+    "language.assamese": "Assamese",
+    "language.hindi": "Hindi",
+    "brand.network": "Assam emergency network",
+    "general.sos": "SOS",
+    "general.safetyHub": "Safety hub",
+    "general.connected": "Connected",
+    "general.offline": "Offline mode",
+    "general.live": "Live",
+    "general.back": "Back",
+    "general.new": "NEW",
+    "general.optional": "optional",
+    "home.ready": "Ready when every second matters",
+    "home.heading": "One tap for help.",
+    "home.headingAccent": "One team behind you.",
+    "home.intro": "A clear rescue path for people in danger, field responders, and emergency coordinators. No searching through menus when you need help.",
+    "home.sendSos": "Send SOS now",
+    "home.offlineNote": "Your phone can save a report when offline and send it when you reconnect.",
+    "home.chooseRole": "Choose the role that fits now",
+    "home.needHelp": "I need help",
+    "home.needHelpCopy": "Report an SOS in a few visual steps.",
+    "home.responder": "I am a responder",
+    "home.responderCopy": "See assignments and set readiness.",
+    "home.coordinate": "I coordinate rescue",
+    "home.coordinateCopy": "Open the command centre.",
+    "home.track": "Track",
+    "home.trackCopy": "My request",
+    "home.rescue": "Rescue",
+    "home.rescueCopy": "Field team",
+    "home.command": "Command",
+    "home.commandCopy": "Coordinate",
+    "home.panic": "Panic-mode SOS",
+    "home.panicCopy": "Image-led choices, big controls, location first, and optional details only when you can provide them.",
+    "home.field": "Field-ready response",
+    "home.fieldCopy": "One secured workspace for missions, availability, alerts, and required status updates.",
+    "home.capacity": "Capacity in view",
+    "home.capacityCopy": "Coordinate SOS cases, relief shelters, hospitals, beds, and critical medical stock from command.",
+    "emergency.help": "Emergency help",
+    "emergency.choose": "Choose what is happening.",
+    "emergency.pictureHint": "Start with the picture that fits. Details can wait.",
+    "emergency.flood": "Flood / water",
+    "emergency.medical": "Medical help",
+    "emergency.shelter": "Need safe place",
+    "emergency.stepLocation": "Step 2",
+    "emergency.shareLocation": "Share your location",
+    "emergency.gpsHint": "Only use GPS if it is safe. You can add a landmark below.",
+    "emergency.shareMyLocation": "Share my location",
+    "emergency.locationMissing": "Location not shared yet",
+    "emergency.stepPeople": "Step 3",
+    "emergency.people": "How many people?",
+    "emergency.moreDetails": "More details (optional)",
+    "emergency.landmark": "Landmark or address",
+    "emergency.landmarkPlaceholder": "Village, road, building, or nearby landmark",
+    "emergency.contact": "Name or family identifier",
+    "emergency.importantDetail": "Important detail",
+    "emergency.detailPlaceholder": "For example: roof access, child present, injury…",
+    "emergency.photo": "Photo (optional)",
+    "emergency.addPhoto": "Add a photo",
+    "emergency.send": "Send SOS now",
+    "emergency.saveOffline": "Save SOS until signal returns",
+    "emergency.offlineWarning": "Offline SOS stays on this device until this app can reconnect. It cannot reach the control centre without any network connection.",
+    "emergency.delivered": "Saved SOS delivered. Open tracking reference",
+    "emergency.gpsUnavailable": "Location sharing is unavailable. Open More details and enter a landmark or map point.",
+    "emergency.finding": "Finding your location…",
+    "emergency.gpsShared": "GPS location shared from this phone",
+    "emergency.locationReady": "Location shared. You can send SOS now.",
+    "emergency.gpsFailure": "We could not get location. Open More details and use a map pin or landmark.",
+    "emergency.fileError": "Use a PNG, JPEG, or WebP image smaller than 1.5 MB.",
+    "emergency.locationRequired": "First, share your location so help can find you.",
+    "emergency.savedOffline": "SOS saved on this phone. We will send it as soon as this app reconnects.",
+    "emergency.signalLost": "Signal was lost. SOS saved on this phone and will send when the app reconnects.",
+    "emergency.sendFailure": "We could not send right now. Keep this page open or try again when signal returns.",
+    "emergency.mapPin": "Map pin near",
+    "emergency.outbox": "{count} SOS request(s) saved on this phone.",
+    "emergency.outboxHint": "It will send automatically when this app reconnects.",
+    "emergency.sending": "Sending SOS…",
+    "track.private": "Private SOS",
+    "track.heading": "Where is my rescue?",
+    "track.intro": "Enter the private SOS code. This page refreshes itself while a team works on your request.",
+    "track.code": "Private SOS code",
+    "track.see": "See",
+    "track.checking": "Checking the latest update…",
+    "track.yourSos": "Your SOS",
+    "track.liveCheck": "Live check",
+    "track.now": "Now",
+    "track.seen": "Seen",
+    "track.moving": "Moving",
+    "track.done": "Done",
+    "track.pending": "Your SOS is with the control team",
+    "track.dispatched": "A rescue team is being deployed",
+    "track.resolved": "The team has recorded this mission complete",
+    "track.safetyNote": "This is the last recorded control-centre status. Keep following local safety guidance while you wait.",
+    "responder.workspace": "Rescuer operations",
+    "responder.role": "Field responder",
+    "responder.missions": "My missions",
+    "responder.map": "Field map",
+    "responder.alerts": "Alerts",
+    "responder.readiness": "Field readiness",
+    "responder.available": "Available",
+    "responder.onMission": "On mission",
+    "responder.offDuty": "Off duty",
+    "responder.updating": "Updating…",
+    "responder.board": "My mission board",
+    "responder.boardTitle": "Work each mission through its required sequence.",
+    "responder.dispatched": "Mark dispatched",
+    "responder.resolved": "Mark resolved",
+    "responder.completed": "Completed",
+    "responder.assignmentAlerts": "Assignment alerts",
+    "responder.enableAlerts": "Enable browser alerts",
+    "responder.profilePending": "Rescuer profile pending",
+    "responder.readinessCopy": "Updates stay live while this workspace is open. Set availability before deploying and share GPS only when safe.",
+    "responder.mapTitle": "See active conditions in your response area.",
+    "responder.people": "people",
+    "responder.priority": "priority",
+    "responder.noMission": "No mission has been assigned to this account. Keep your availability current so dispatchers can find you.",
+    "responder.alertCopy": "Register this device to receive mission assignments and nearby priority SOS alerts even when sudo MakeItWork is not open.",
+    "responder.retryAlerts": "Retry browser alert registration",
+    "responder.missionAlerts": "Mission alerts",
+    "responder.operationalNotifications": "Operational notifications",
+    "responder.noAlerts": "No current alerts. Mission notifications will appear here.",
+    "command.workspace": "Administrator command centre",
+    "command.role": "Emergency coordination",
+    "command.operations": "Operations board",
+    "command.map": "Live map",
+    "command.shelters": "Shelters",
+    "command.hospitals": "Hospitals & resources",
+    "command.requests": "Rescuer requests",
+    "command.team": "Team roster",
+    "command.overview": "Assam · operational overview",
+    "command.heading": "Triage with confidence.",
+    "command.liveFeed": "Live operational feed",
+    "command.incidents": "Incident feed",
+    "command.openCoordination": "Open rescue coordination",
+    "command.search": "Search code or location",
+    "command.allCases": "All cases",
+    "command.pending": "Pending",
+    "command.dispatched": "Dispatched",
+    "command.resolved": "Resolved",
+    "dashboard.secureAccess": "Secure access",
+    "dashboard.signIn": "Sign in to open",
+    "dashboard.continue": "Continue securely",
+    "dashboard.signOut": "Sign out",
+    "dashboard.liveWorkspace": "Live operations workspace",
+  },
+  as: {
+    "language.label": "ভাষা",
+    "language.english": "ইংৰাজী",
+    "language.assamese": "অসমীয়া",
+    "language.hindi": "হিন্দী",
+    "brand.network": "অসম জৰুৰী নেটৱৰ্ক",
+    "general.sos": "SOS",
+    "general.safetyHub": "সুৰক্ষা কেন্দ্ৰ",
+    "general.connected": "সংযুক্ত",
+    "general.offline": "অফলাইন মোড",
+    "general.live": "লাইভ",
+    "general.back": "পিছলৈ",
+    "general.new": "নতুন",
+    "general.optional": "ঐচ্ছিক",
+    "home.ready": "প্ৰতিটো ছেকেণ্ড গুৰুত্বপূৰ্ণ হ’লে সাজু",
+    "home.heading": "সহায়ৰ বাবে এটা টেপ।",
+    "home.headingAccent": "আপোনাৰ পিছত এটা দল।",
+    "home.intro": "বিপদত থকা লোক, ক্ষেত্ৰ প্ৰতিসঁহাৰকাৰী আৰু জৰুৰী সমন্বয়কৰ বাবে স্পষ্ট উদ্ধাৰ পথ। সহায়ৰ প্ৰয়োজনত মেনু বিচাৰি সময় নষ্ট কৰিব নালাগে।",
+    "home.sendSos": "এতিয়াই SOS পঠিয়াওক",
+    "home.offlineNote": "অফলাইনত আপোনাৰ ফোনে অনুৰোধ সাঁচি ৰাখে আৰু পুনৰ সংযোগ পালে পঠিয়ায়।",
+    "home.chooseRole": "এতিয়া আপোনাৰ ভূমিকা বাছক",
+    "home.needHelp": "মোৰ সহায় লাগে",
+    "home.needHelpCopy": "কেইটামান দৃশ্যভিত্তিক ধাপত SOS পঠিয়াওক।",
+    "home.responder": "মই প্ৰতিসঁহাৰকাৰী",
+    "home.responderCopy": "দায়িত্ব চাওক আৰু সাজু অৱস্থা ঠিক কৰক।",
+    "home.coordinate": "মই উদ্ধাৰ সমন্বয় কৰোঁ",
+    "home.coordinateCopy": "কমান্ড কেন্দ্ৰ খোলক।",
+    "home.track": "খবৰ লওক",
+    "home.trackCopy": "মোৰ অনুৰোধ",
+    "home.rescue": "উদ্ধাৰ",
+    "home.rescueCopy": "ক্ষেত্ৰ দল",
+    "home.command": "কমান্ড",
+    "home.commandCopy": "সমন্বয়",
+    "home.panic": "তাৎক্ষণিক SOS",
+    "home.panicCopy": "ছবিভিত্তিক পছন্দ, ডাঙৰ নিয়ন্ত্ৰণ, প্ৰথমে অৱস্থান, আৰু পাৰিলে ঐচ্ছিক বিৱৰণ।",
+    "home.field": "ক্ষেত্ৰ-সাজু সঁহাৰি",
+    "home.fieldCopy": "অভিযান, উপলব্ধতা, সতৰ্কবাণী আৰু অৱস্থা আপডেটৰ বাবে সুৰক্ষিত স্থান।",
+    "home.capacity": "সম্পদৰ অৱস্থা",
+    "home.capacityCopy": "কমান্ডৰ পৰা SOS, আশ্ৰয়, চিকিৎসালয়, বিছনা আৰু জৰুৰী চিকিৎসা মজুত সমন্বয় কৰক।",
+    "emergency.help": "জৰুৰী সহায়",
+    "emergency.choose": "কি ঘটিছে বাছক।",
+    "emergency.pictureHint": "মিল থকা ছবিখন বাছক। বিৱৰণ পিছত দিব পাৰিব।",
+    "emergency.flood": "বান / পানী",
+    "emergency.medical": "চিকিৎসা সহায়",
+    "emergency.shelter": "নিৰাপদ ঠাই লাগে",
+    "emergency.stepLocation": "ধাপ ২",
+    "emergency.shareLocation": "আপোনাৰ অৱস্থান শ্বেয়াৰ কৰক",
+    "emergency.gpsHint": "নিৰাপদ হ’লেহে GPS ব্যৱহাৰ কৰক। তলত চিহ্নিত ঠাই যোগ কৰিব পাৰিব।",
+    "emergency.shareMyLocation": "মোৰ অৱস্থান শ্বেয়াৰ কৰক",
+    "emergency.locationMissing": "এতিয়াও অৱস্থান শ্বেয়াৰ কৰা হোৱা নাই",
+    "emergency.stepPeople": "ধাপ ৩",
+    "emergency.people": "কিমানজন লোক?",
+    "emergency.moreDetails": "অধিক বিৱৰণ (ঐচ্ছিক)",
+    "emergency.landmark": "চিনাকি ঠাই বা ঠিকনা",
+    "emergency.landmarkPlaceholder": "গাঁও, পথ, ঘৰ বা ওচৰৰ চিনাকি ঠাই",
+    "emergency.contact": "নাম বা পৰিয়ালৰ চিনাক্তকৰণ",
+    "emergency.importantDetail": "গুৰুত্বপূৰ্ণ বিৱৰণ",
+    "emergency.detailPlaceholder": "উদাহৰণ: ছাদলৈ যোৱা, শিশু আছে, আঘাত…",
+    "emergency.photo": "ফটো (ঐচ্ছিক)",
+    "emergency.addPhoto": "ফটো যোগ কৰক",
+    "emergency.send": "এতিয়াই SOS পঠিয়াওক",
+    "emergency.saveOffline": "সংযোগ ঘূৰি নাহালৈ SOS সাঁচক",
+    "emergency.offlineWarning": "অফলাইন SOS এই ডিভাইচতেই সাঁচি থাকে। নেটৱৰ্ক নাথাকিলে ই নিয়ন্ত্ৰণ কেন্দ্ৰত পঠিয়াব নোৱাৰে।",
+    "emergency.delivered": "সাঁচি ৰখা SOS পঠিওৱা হ’ল। ট্ৰেকিং নম্বৰ খোলক",
+    "emergency.gpsUnavailable": "অৱস্থান শ্বেয়াৰ সুবিধা উপলব্ধ নহয়। অধিক বিৱৰণ খুলি চিনাকি ঠাই বা মানচিত্ৰ বিন্দু দিয়ক।",
+    "emergency.finding": "আপোনাৰ অৱস্থান বিচৰা হৈছে…",
+    "emergency.gpsShared": "এই ফোনৰ পৰা GPS অৱস্থান শ্বেয়াৰ কৰা হৈছে",
+    "emergency.locationReady": "অৱস্থান শ্বেয়াৰ কৰা হ’ল। এতিয়া SOS পঠিয়াব পাৰে।",
+    "emergency.gpsFailure": "অৱস্থান পোৱা নগ’ল। অধিক বিৱৰণ খুলি মানচিত্ৰ বিন্দু বা চিনাকি ঠাই ব্যৱহাৰ কৰক।",
+    "emergency.fileError": "1.5 MB-তকৈ সৰু PNG, JPEG, বা WebP ছবি ব্যৱহাৰ কৰক।",
+    "emergency.locationRequired": "প্ৰথমে অৱস্থান শ্বেয়াৰ কৰক যাতে সহায় আপোনাক বিচাৰি পায়।",
+    "emergency.savedOffline": "SOS এই ফোনত সাঁচি ৰখা হ’ল। পুনৰ সংযোগ হ’লেই পঠিওৱা হ’ব।",
+    "emergency.signalLost": "সংকেত হেৰাইছে। SOS এই ফোনত সাঁচি ৰখা হ’ল আৰু সংযোগ ঘূৰি আহিলে পঠিওৱা হ’ব।",
+    "emergency.sendFailure": "এতিয়া পঠিয়াব নোৱাৰিলে। পৃষ্ঠা খোলা ৰাখক বা সংকেত ঘূৰি আহিলে আকৌ চেষ্টা কৰক।",
+    "emergency.mapPin": "মানচিত্ৰ বিন্দু ওচৰত",
+    "emergency.outbox": "এই ফোনত {count}টা SOS অনুৰোধ সাঁচি ৰখা আছে।",
+    "emergency.outboxHint": "এই এপ পুনৰ সংযোগ হ’লে স্বয়ংক্ৰিয়ভাৱে পঠিওৱা হ’ব।",
+    "emergency.sending": "SOS পঠোৱা হৈছে…",
+    "track.private": "ব্যক্তিগত SOS",
+    "track.heading": "মোৰ উদ্ধাৰ ক’ত?",
+    "track.intro": "ব্যক্তিগত SOS কোড দিয়ক। দলটোৱে কাম কৰাৰ সময়ত এই পৃষ্ঠাই নিজে আপডেট হয়।",
+    "track.code": "ব্যক্তিগত SOS কোড",
+    "track.see": "চাওক",
+    "track.checking": "সৰ্বশেষ আপডেট পৰীক্ষা কৰা হৈছে…",
+    "track.yourSos": "আপোনাৰ SOS",
+    "track.liveCheck": "লাইভ পৰীক্ষা",
+    "track.now": "এতিয়া",
+    "track.seen": "দেখা হৈছে",
+    "track.moving": "যাত্ৰাত",
+    "track.done": "সম্পূৰ্ণ",
+    "track.pending": "আপোনাৰ SOS নিয়ন্ত্ৰণ দলৰ ওচৰত আছে",
+    "track.dispatched": "এটা উদ্ধাৰ দল পঠোৱা হৈছে",
+    "track.resolved": "দলটোৱে এই অভিযান সম্পূৰ্ণ বুলি নথিভুক্ত কৰিছে",
+    "track.safetyNote": "এইটো নিয়ন্ত্ৰণ কেন্দ্ৰৰ সৰ্বশেষ অৱস্থা। অপেক্ষাৰ সময়ত স্থানীয় সুৰক্ষা নিৰ্দেশনা মানি চলক।",
+    "responder.workspace": "উদ্ধাৰকৰ্মী কাৰ্যকলাপ",
+    "responder.role": "ক্ষেত্ৰ প্ৰতিসঁহাৰকাৰী",
+    "responder.missions": "মোৰ অভিযানসমূহ",
+    "responder.map": "ক্ষেত্ৰ মানচিত্ৰ",
+    "responder.alerts": "সতৰ্কবাণীসমূহ",
+    "responder.readiness": "ক্ষেত্ৰৰ প্ৰস্তুতি",
+    "responder.available": "উপলব্ধ",
+    "responder.onMission": "অভিযানত",
+    "responder.offDuty": "কৰ্তব্যৰ বাহিৰত",
+    "responder.updating": "আপডেট হৈ আছে…",
+    "responder.board": "মোৰ অভিযান ফলক",
+    "responder.boardTitle": "প্ৰতিটো অভিযানৰ প্ৰয়োজনীয় ধাপ সম্পূৰ্ণ কৰক।",
+    "responder.dispatched": "পঠোৱা হৈছে বুলি চিহ্নিত কৰক",
+    "responder.resolved": "সমাধান হোৱা বুলি চিহ্নিত কৰক",
+    "responder.completed": "সম্পূৰ্ণ",
+    "responder.assignmentAlerts": "দায়িত্ব সতৰ্কবাণী",
+    "responder.enableAlerts": "ব্ৰাউজাৰ সতৰ্কবাণী সক্ৰিয় কৰক",
+    "responder.profilePending": "উদ্ধাৰকৰ্মীৰ প্ৰফাইল অপেক্ষাৰত",
+    "responder.readinessCopy": "এই কৰ্মক্ষেত্ৰ খোলা থাকিলে আপডেট লাইভ থাকে। মোতায়েনৰ আগতে উপলব্ধতা ঠিক কৰক আৰু নিৰাপদ হ’লেহে GPS শ্বেয়াৰ কৰক।",
+    "responder.mapTitle": "আপোনাৰ সঁহাৰি অঞ্চলৰ সক্ৰিয় অৱস্থা চাওক।",
+    "responder.people": "লোক",
+    "responder.priority": "অগ্ৰাধিকাৰ",
+    "responder.noMission": "এই একাউণ্টত কোনো অভিযান নিযুক্ত কৰা হোৱা নাই। ডিছপেচাৰে আপোনাক বিচাৰি পাবলৈ আপোনাৰ উপলব্ধতা সঠিক ৰাখক।",
+    "responder.alertCopy": "sudo MakeItWork খোলা নাথাকিলেও অভিযান দায়িত্ব আৰু ওচৰৰ অগ্ৰাধিকাৰ SOS সতৰ্কবাণী পাবলৈ এই ডিভাইচ পঞ্জীয়ন কৰক।",
+    "responder.retryAlerts": "ব্ৰাউজাৰ সতৰ্কবাণী পঞ্জীয়ন পুনৰ চেষ্টা কৰক",
+    "responder.missionAlerts": "অভিযান সতৰ্কবাণী",
+    "responder.operationalNotifications": "কাৰ্যকৰী অধিসূচনা",
+    "responder.noAlerts": "বৰ্তমান কোনো সতৰ্কবাণী নাই। অভিযান অধিসূচনা ইয়াত দেখা যাব।",
+    "command.workspace": "প্ৰশাসক কমাণ্ড কেন্দ্ৰ",
+    "command.role": "জৰুৰী সমন্বয়",
+    "command.operations": "কাৰ্যকলাপ ফলক",
+    "command.map": "লাইভ মানচিত্ৰ",
+    "command.shelters": "আশ্ৰয়সমূহ",
+    "command.hospitals": "চিকিৎসালয় আৰু সম্পদ",
+    "command.requests": "উদ্ধাৰকৰ্মী অনুৰোধসমূহ",
+    "command.team": "দলৰ তালিকা",
+    "command.overview": "অসম · কাৰ্যকৰী অৱলোকন",
+    "command.heading": "আত্মবিশ্বাসেৰে অগ্ৰাধিকাৰ দিয়ক।",
+    "command.liveFeed": "লাইভ কাৰ্যকৰী ফিড",
+    "command.incidents": "ঘটনা ফিড",
+    "command.openCoordination": "চলিত উদ্ধাৰ সমন্বয়",
+    "command.search": "কোড বা অৱস্থান বিচাৰক",
+    "command.allCases": "সকলো ঘটনা",
+    "command.pending": "অপেক্ষাৰত",
+    "command.dispatched": "পঠিওৱা হৈছে",
+    "command.resolved": "সমাধান",
+    "dashboard.secureAccess": "সুৰক্ষিত প্ৰৱেশ",
+    "dashboard.signIn": "খোলিবলৈ ছাইন ইন কৰক",
+    "dashboard.continue": "সুৰক্ষিতভাৱে আগবাঢ়ক",
+    "dashboard.signOut": "ছাইন আউট",
+    "dashboard.liveWorkspace": "লাইভ কাৰ্যকলাপ কৰ্মক্ষেত্ৰ",
+  },
+  hi: {
+    "language.label": "भाषा",
+    "language.english": "अंग्रेज़ी",
+    "language.assamese": "असमिया",
+    "language.hindi": "हिन्दी",
+    "brand.network": "असम आपातकालीन नेटवर्क",
+    "general.sos": "SOS",
+    "general.safetyHub": "सुरक्षा केंद्र",
+    "general.connected": "कनेक्टेड",
+    "general.offline": "ऑफ़लाइन मोड",
+    "general.live": "लाइव",
+    "general.back": "वापस",
+    "general.new": "नया",
+    "general.optional": "वैकल्पिक",
+    "home.ready": "जब हर सेकंड मायने रखता है, तब तैयार",
+    "home.heading": "मदद के लिए एक टैप।",
+    "home.headingAccent": "आपके पीछे एक टीम।",
+    "home.intro": "खतरे में लोगों, फील्ड रिस्पॉन्डर और आपात समन्वयकों के लिए स्पष्ट बचाव मार्ग। मदद चाहिए तो मेनू में खोजने की जरूरत नहीं।",
+    "home.sendSos": "अभी SOS भेजें",
+    "home.offlineNote": "ऑफ़लाइन होने पर आपका फ़ोन अनुरोध सहेज सकता है और दोबारा कनेक्ट होने पर भेज सकता है।",
+    "home.chooseRole": "अभी अपनी भूमिका चुनें",
+    "home.needHelp": "मुझे मदद चाहिए",
+    "home.needHelpCopy": "कुछ दृश्य चरणों में SOS भेजें।",
+    "home.responder": "मैं रिस्पॉन्डर हूँ",
+    "home.responderCopy": "असाइनमेंट देखें और तैयारी सेट करें।",
+    "home.coordinate": "मैं बचाव समन्वयित करता हूँ",
+    "home.coordinateCopy": "कमांड केंद्र खोलें।",
+    "home.track": "स्थिति देखें",
+    "home.trackCopy": "मेरा अनुरोध",
+    "home.rescue": "बचाव",
+    "home.rescueCopy": "फील्ड टीम",
+    "home.command": "कमांड",
+    "home.commandCopy": "समन्वय",
+    "home.panic": "पैनिक-मोड SOS",
+    "home.panicCopy": "तस्वीर आधारित विकल्प, बड़े नियंत्रण, पहले स्थान और संभव होने पर ही वैकल्पिक विवरण।",
+    "home.field": "फील्ड-रेडी प्रतिक्रिया",
+    "home.fieldCopy": "मिशन, उपलब्धता, अलर्ट और आवश्यक स्थिति अपडेट के लिए सुरक्षित कार्यक्षेत्र।",
+    "home.capacity": "क्षमता की जानकारी",
+    "home.capacityCopy": "कमांड से SOS, राहत शिविर, अस्पताल, बिस्तर और महत्वपूर्ण चिकित्सा सामग्री का समन्वय करें।",
+    "emergency.help": "आपातकालीन सहायता",
+    "emergency.choose": "क्या हो रहा है, चुनें।",
+    "emergency.pictureHint": "मिलने वाली तस्वीर चुनें। विवरण बाद में दिया जा सकता है।",
+    "emergency.flood": "बाढ़ / पानी",
+    "emergency.medical": "चिकित्सा सहायता",
+    "emergency.shelter": "सुरक्षित जगह चाहिए",
+    "emergency.stepLocation": "चरण 2",
+    "emergency.shareLocation": "अपना स्थान साझा करें",
+    "emergency.gpsHint": "GPS केवल तभी इस्तेमाल करें जब सुरक्षित हो। नीचे कोई पहचान-चिह्न जोड़ा जा सकता है।",
+    "emergency.shareMyLocation": "मेरा स्थान साझा करें",
+    "emergency.locationMissing": "स्थान अभी साझा नहीं किया गया है",
+    "emergency.stepPeople": "चरण 3",
+    "emergency.people": "कितने लोग हैं?",
+    "emergency.moreDetails": "अधिक विवरण (वैकल्पिक)",
+    "emergency.landmark": "पहचान-चिह्न या पता",
+    "emergency.landmarkPlaceholder": "गांव, सड़क, इमारत या पास का पहचान-चिह्न",
+    "emergency.contact": "नाम या परिवार की पहचान",
+    "emergency.importantDetail": "महत्वपूर्ण विवरण",
+    "emergency.detailPlaceholder": "उदाहरण: छत तक पहुंच, बच्चा मौजूद, चोट…",
+    "emergency.photo": "फ़ोटो (वैकल्पिक)",
+    "emergency.addPhoto": "फ़ोटो जोड़ें",
+    "emergency.send": "अभी SOS भेजें",
+    "emergency.saveOffline": "सिग्नल लौटने तक SOS सहेजें",
+    "emergency.offlineWarning": "ऑफ़लाइन SOS इसी डिवाइस पर सहेजा रहता है। बिना नेटवर्क के यह नियंत्रण केंद्र तक नहीं पहुंच सकता।",
+    "emergency.delivered": "सहेजा हुआ SOS पहुंच गया। ट्रैकिंग संदर्भ खोलें",
+    "emergency.gpsUnavailable": "स्थान साझा करना उपलब्ध नहीं है। अधिक विवरण खोलें और पहचान-चिह्न या मानचित्र बिंदु दर्ज करें।",
+    "emergency.finding": "आपका स्थान खोजा जा रहा है…",
+    "emergency.gpsShared": "इस फ़ोन से GPS स्थान साझा किया गया",
+    "emergency.locationReady": "स्थान साझा हो गया। अब SOS भेज सकते हैं।",
+    "emergency.gpsFailure": "स्थान नहीं मिल सका। अधिक विवरण खोलें और मानचित्र बिंदु या पहचान-चिह्न इस्तेमाल करें।",
+    "emergency.fileError": "1.5 MB से छोटी PNG, JPEG या WebP छवि इस्तेमाल करें।",
+    "emergency.locationRequired": "पहले अपना स्थान साझा करें ताकि मदद आपको ढूंढ सके।",
+    "emergency.savedOffline": "SOS इस फ़ोन पर सहेज लिया गया। ऐप दोबारा कनेक्ट होते ही भेजा जाएगा।",
+    "emergency.signalLost": "सिग्नल खो गया। SOS इस फ़ोन पर सहेज लिया गया है और ऐप कनेक्ट होते ही भेजा जाएगा।",
+    "emergency.sendFailure": "अभी भेजा नहीं जा सका। पृष्ठ खुला रखें या सिग्नल लौटने पर फिर प्रयास करें।",
+    "emergency.mapPin": "मानचित्र बिंदु के पास",
+    "emergency.outbox": "इस फ़ोन पर {count} SOS अनुरोध सहेजे गए हैं।",
+    "emergency.outboxHint": "ऐप के दोबारा कनेक्ट होते ही यह अपने आप भेजा जाएगा।",
+    "emergency.sending": "SOS भेजा जा रहा है…",
+    "track.private": "निजी SOS",
+    "track.heading": "मेरा बचाव कहाँ है?",
+    "track.intro": "निजी SOS कोड दर्ज करें। टीम के काम करते समय यह पृष्ठ खुद अपडेट होता है।",
+    "track.code": "निजी SOS कोड",
+    "track.see": "देखें",
+    "track.checking": "नवीनतम अपडेट जांचा जा रहा है…",
+    "track.yourSos": "आपका SOS",
+    "track.liveCheck": "लाइव जांच",
+    "track.now": "अभी",
+    "track.seen": "देख लिया गया",
+    "track.moving": "रवाना",
+    "track.done": "पूरा",
+    "track.pending": "आपका SOS नियंत्रण टीम के पास है",
+    "track.dispatched": "बचाव दल भेजा जा रहा है",
+    "track.resolved": "दल ने इस मिशन को पूरा दर्ज कर दिया है",
+    "track.safetyNote": "यह नियंत्रण केंद्र की अंतिम दर्ज स्थिति है। प्रतीक्षा करते समय स्थानीय सुरक्षा निर्देशों का पालन करें।",
+    "responder.workspace": "रिस्पॉन्डर कार्यक्षेत्र",
+    "responder.role": "फील्ड रिस्पॉन्डर",
+    "responder.missions": "मेरे मिशन",
+    "responder.map": "फील्ड मानचित्र",
+    "responder.alerts": "अलर्ट",
+    "responder.readiness": "फील्ड तैयारी",
+    "responder.available": "उपलब्ध",
+    "responder.onMission": "मिशन पर",
+    "responder.offDuty": "ड्यूटी से बाहर",
+    "responder.updating": "अपडेट हो रहा है…",
+    "responder.board": "मेरा मिशन बोर्ड",
+    "responder.boardTitle": "हर मिशन को उसके आवश्यक क्रम से पूरा करें।",
+    "responder.dispatched": "रवाना चिह्नित करें",
+    "responder.resolved": "समाधान चिह्नित करें",
+    "responder.completed": "पूर्ण",
+    "responder.assignmentAlerts": "असाइनमेंट अलर्ट",
+    "responder.enableAlerts": "ब्राउज़र अलर्ट सक्रिय करें",
+    "responder.profilePending": "रिस्पॉन्डर प्रोफ़ाइल लंबित",
+    "responder.readinessCopy": "यह कार्यक्षेत्र खुला रहने पर अपडेट लाइव रहते हैं। रवाना होने से पहले उपलब्धता सेट करें और सुरक्षित होने पर ही GPS साझा करें।",
+    "responder.mapTitle": "अपने प्रतिक्रिया क्षेत्र की सक्रिय स्थितियाँ देखें।",
+    "responder.people": "लोग",
+    "responder.priority": "प्राथमिकता",
+    "responder.noMission": "इस खाते को कोई मिशन नहीं दिया गया है। डिस्पैचर आपको ढूंढ सकें इसलिए उपलब्धता अद्यतन रखें।",
+    "responder.alertCopy": "sudo MakeItWork खुला न होने पर भी मिशन असाइनमेंट और निकटवर्ती प्राथमिक SOS अलर्ट पाने के लिए इस डिवाइस को पंजीकृत करें।",
+    "responder.retryAlerts": "ब्राउज़र अलर्ट पंजीकरण फिर से आज़माएँ",
+    "responder.missionAlerts": "मिशन अलर्ट",
+    "responder.operationalNotifications": "संचालन सूचनाएँ",
+    "responder.noAlerts": "कोई मौजूदा अलर्ट नहीं है। मिशन सूचनाएँ यहाँ दिखाई देंगी।",
+    "command.workspace": "प्रशासक कमांड केंद्र",
+    "command.role": "आपात समन्वय",
+    "command.operations": "ऑपरेशन बोर्ड",
+    "command.map": "लाइव मानचित्र",
+    "command.shelters": "आश्रय स्थल",
+    "command.hospitals": "अस्पताल और संसाधन",
+    "command.requests": "रिस्पॉन्डर अनुरोध",
+    "command.team": "टीम सूची",
+    "command.overview": "असम · संचालन अवलोकन",
+    "command.heading": "विश्वास के साथ प्राथमिकता दें।",
+    "command.liveFeed": "लाइव संचालन फ़ीड",
+    "command.incidents": "घटना फ़ीड",
+    "command.openCoordination": "चालू बचाव समन्वय",
+    "command.search": "कोड या स्थान खोजें",
+    "command.allCases": "सभी मामले",
+    "command.pending": "लंबित",
+    "command.dispatched": "रवाना",
+    "command.resolved": "समाधान",
+    "dashboard.secureAccess": "सुरक्षित पहुंच",
+    "dashboard.signIn": "खोलने के लिए साइन इन करें",
+    "dashboard.continue": "सुरक्षित रूप से जारी रखें",
+    "dashboard.signOut": "साइन आउट",
+    "dashboard.liveWorkspace": "लाइव संचालन कार्यक्षेत्र",
+  },
+  bn: {
+    "language.label": "ভাষা", "brand.network": "অসম জরুরি নেটওয়ার্ক", "general.safetyHub": "নিরাপত্তা কেন্দ্র", "general.connected": "সংযুক্ত", "general.offline": "অফলাইন মোড", "general.live": "লাইভ", "general.sos": "SOS",
+    "home.heading": "সাহায্যের জন্য এক ট্যাপ।", "home.headingAccent": "আপনার পাশে একটি দল।", "home.intro": "বিপদে থাকা মানুষ, ফিল্ড রেসপন্ডার এবং জরুরি সমন্বয়কদের জন্য স্পষ্ট উদ্ধার পথ। সাহায্য লাগলে মেনুতে খোঁজার দরকার নেই।", "home.offlineNote": "অফলাইনে আপনার ফোন অনুরোধ সংরক্ষণ করে পুনরায় সংযুক্ত হলে পাঠাতে পারে।", "home.track": "খোঁজ নিন", "home.trackCopy": "আমার অনুরোধ", "home.rescue": "উদ্ধার", "home.rescueCopy": "ক্ষেত্র দল", "home.command": "কমান্ড", "home.commandCopy": "সমন্বয়", "home.sendSos": "এখনই SOS পাঠান", "home.needHelp": "আমার সাহায্য চাই", "home.responder": "আমি উদ্ধারকর্মী", "home.coordinate": "আমি উদ্ধার সমন্বয় করি",
+    "emergency.help": "জরুরি সহায়তা", "emergency.choose": "কি ঘটছে, বেছে নিন।", "emergency.pictureHint": "মিলে যায় এমন ছবি বেছে নিন। বিস্তারিত পরে দিতে পারেন।", "emergency.flood": "বন্যা / জল", "emergency.medical": "চিকিৎসা সহায়তা", "emergency.shelter": "নিরাপদ স্থান চাই", "emergency.stepLocation": "ধাপ ২", "emergency.shareLocation": "আপনার অবস্থান শেয়ার করুন", "emergency.gpsHint": "নিরাপদ হলে তবেই GPS ব্যবহার করুন। নিচে একটি পরিচিত স্থান যোগ করতে পারেন।", "emergency.shareMyLocation": "আমার অবস্থান শেয়ার করুন", "emergency.locationMissing": "অবস্থান এখনও শেয়ার করা হয়নি", "emergency.stepPeople": "ধাপ ৩", "emergency.people": "কতজন মানুষ?", "emergency.moreDetails": "আরও বিস্তারিত (ঐচ্ছিক)", "emergency.send": "এখনই SOS পাঠান", "emergency.saveOffline": "সিগন্যাল ফেরার পর্যন্ত SOS সংরক্ষণ করুন",
+    "track.private": "ব্যক্তিগত SOS", "track.heading": "আমার উদ্ধার কোথায়?", "track.see": "দেখুন", "track.pending": "আপনার SOS নিয়ন্ত্রণ দলের কাছে আছে", "track.dispatched": "একটি উদ্ধার দল পাঠানো হচ্ছে", "track.resolved": "দল এই মিশন সম্পূর্ণ করেছে",
+    "responder.workspace": "উদ্ধারকর্মী কার্যক্ষেত্র", "responder.role": "ক্ষেত্র উদ্ধারকর্মী", "responder.missions": "আমার মিশন", "responder.map": "ক্ষেত্র মানচিত্র", "responder.alerts": "সতর্কতা", "responder.available": "উপলব্ধ", "responder.onMission": "মিশনে", "responder.offDuty": "দায়িত্বের বাইরে",
+    "command.workspace": "প্রশাসক কমান্ড কেন্দ্র", "command.role": "জরুরি সমন্বয়", "command.operations": "অপারেশন বোর্ড", "command.map": "লাইভ মানচিত্র", "command.shelters": "আশ্রয়", "command.hospitals": "হাসপাতাল ও সম্পদ", "command.requests": "উদ্ধারকর্মীর অনুরোধ", "command.team": "দলের তালিকা", "dashboard.signOut": "সাইন আউট",
+  },
+  or: {
+    "language.label": "ଭାଷା", "brand.network": "ଆସାମ ଜରୁରୀ ନେଟୱର୍କ", "general.safetyHub": "ସୁରକ୍ଷା କେନ୍ଦ୍ର", "general.connected": "ସଂଯୁକ୍ତ", "general.offline": "ଅଫଲାଇନ୍ ମୋଡ୍", "general.live": "ଲାଇଭ୍", "general.sos": "SOS",
+    "home.heading": "ସାହାଯ୍ୟ ପାଇଁ ଗୋଟିଏ ଟ୍ୟାପ୍।", "home.headingAccent": "ଆପଣଙ୍କ ପଛରେ ଗୋଟିଏ ଦଳ।", "home.intro": "ବିପଦରେ ଥିବା ଲୋକ, କ୍ଷେତ୍ର ଉଦ୍ଧାରକର୍ମୀ ଓ ଜରୁରୀ ସମନ୍ୱୟକଙ୍କ ପାଇଁ ସ୍ପଷ୍ଟ ଉଦ୍ଧାର ପଥ। ସାହାଯ୍ୟ ଦରକାର ହେଲେ ମେନୁରେ ଖୋଜିବାକୁ ପଡ଼ିବ ନାହିଁ।", "home.offlineNote": "ଅଫଲାଇନରେ ଆପଣଙ୍କ ଫୋନ୍ ଅନୁରୋଧ ସଞ୍ଚୟ କରି ପୁଣି ସଂଯୁକ୍ତ ହେଲେ ପଠାଇପାରେ।", "home.track": "ସ୍ଥିତି ଦେଖନ୍ତୁ", "home.trackCopy": "ମୋର ଅନୁରୋଧ", "home.rescue": "ଉଦ୍ଧାର", "home.rescueCopy": "କ୍ଷେତ୍ର ଦଳ", "home.command": "କମାଣ୍ଡ", "home.commandCopy": "ସମନ୍ୱୟ", "home.sendSos": "ଏବେ SOS ପଠାନ୍ତୁ", "home.needHelp": "ମୋତେ ସାହାଯ୍ୟ ଦରକାର", "home.responder": "ମୁଁ ଉଦ୍ଧାରକର୍ମୀ", "home.coordinate": "ମୁଁ ଉଦ୍ଧାର ସମନ୍ୱୟ କରେ",
+    "emergency.help": "ଜରୁରୀ ସହାୟତା", "emergency.choose": "କ’ଣ ଘଟୁଛି ବାଛନ୍ତୁ।", "emergency.pictureHint": "ମେଳ ଖାଉଥିବା ଛବି ବାଛନ୍ତୁ। ବିବରଣୀ ପରେ ଦେଇପାରିବେ।", "emergency.flood": "ବନ୍ୟା / ପାଣି", "emergency.medical": "ଚିକିତ୍ସା ସହାୟତା", "emergency.shelter": "ନିରାପଦ ସ୍ଥାନ ଦରକାର", "emergency.stepLocation": "ପଦକ୍ଷେପ ୨", "emergency.shareLocation": "ଆପଣଙ୍କ ଅବସ୍ଥାନ ସେୟାର କରନ୍ତୁ", "emergency.gpsHint": "ନିରାପଦ ହେଲେ ମାତ୍ର GPS ବ୍ୟବହାର କରନ୍ତୁ। ତଳେ ଏକ ଚିହ୍ନିତ ସ୍ଥାନ ଯୋଡ଼ିପାରିବେ।", "emergency.shareMyLocation": "ମୋ ଅବସ୍ଥାନ ସେୟାର କରନ୍ତୁ", "emergency.locationMissing": "ଅବସ୍ଥାନ ଏପର୍ଯ୍ୟନ୍ତ ସେୟାର ହୋଇନାହିଁ", "emergency.stepPeople": "ପଦକ୍ଷେପ ୩", "emergency.people": "କେତେ ଲୋକ?", "emergency.moreDetails": "ଅଧିକ ବିବରଣୀ (ଇଚ୍ଛାଧୀନ)", "emergency.send": "ଏବେ SOS ପଠାନ୍ତୁ", "emergency.saveOffline": "ସିଗ୍ନାଲ ଫେରିବା ପର୍ଯ୍ୟନ୍ତ SOS ସଞ୍ଚୟ କରନ୍ତୁ",
+    "track.private": "ବ୍ୟକ୍ତିଗତ SOS", "track.heading": "ମୋ ଉଦ୍ଧାର କେଉଁଠି?", "track.see": "ଦେଖନ୍ତୁ", "track.pending": "ଆପଣଙ୍କ SOS ନିୟନ୍ତ୍ରଣ ଦଳ ପାଖରେ ଅଛି", "track.dispatched": "ଏକ ଉଦ୍ଧାର ଦଳ ପଠାଯାଉଛି", "track.resolved": "ଦଳ ଏହି ମିଶନ ସମାପ୍ତ କରିଛି",
+    "responder.workspace": "ଉଦ୍ଧାରକର୍ମୀ କାର୍ଯ୍ୟକ୍ଷେତ୍ର", "responder.role": "କ୍ଷେତ୍ର ଉଦ୍ଧାରକର୍ମୀ", "responder.missions": "ମୋର ମିଶନ", "responder.map": "କ୍ଷେତ୍ର ମାନଚିତ୍ର", "responder.alerts": "ସତର୍କତା", "responder.available": "ଉପଲବ୍ଧ", "responder.onMission": "ମିଶନରେ", "responder.offDuty": "ଡ୍ୟୁଟି ବାହାରେ",
+    "command.workspace": "ପ୍ରଶାସକ କମାଣ୍ଡ କେନ୍ଦ୍ର", "command.role": "ଜରୁରୀ ସମନ୍ୱୟ", "command.operations": "ଅପରେସନ ବୋର୍ଡ", "command.map": "ଲାଇଭ୍ ମାନଚିତ୍ର", "command.shelters": "ଆଶ୍ରୟ", "command.hospitals": "ଡାକ୍ତରଖାନା ଓ ସମ୍ବଳ", "command.requests": "ଉଦ୍ଧାରକର୍ମୀ ଅନୁରୋଧ", "command.team": "ଦଳ ତାଲିକା", "dashboard.signOut": "ସାଇନ୍ ଆଉଟ୍",
+  },
+  mr: {
+    "language.label": "भाषा", "brand.network": "आसाम आपत्कालीन नेटवर्क", "general.safetyHub": "सुरक्षा केंद्र", "general.connected": "जोडलेले", "general.offline": "ऑफलाइन मोड", "general.live": "लाइव्ह", "general.sos": "SOS",
+    "home.heading": "मदतीसाठी एक टॅप.", "home.headingAccent": "तुमच्यामागे एक पथक.", "home.intro": "धोक्यातील लोक, क्षेत्रीय प्रतिसादकर्ता आणि आपत्कालीन समन्वयकांसाठी स्पष्ट बचाव मार्ग. मदत हवी असताना मेनूमध्ये शोधण्याची गरज नाही.", "home.offlineNote": "ऑफलाइन असताना तुमचा फोन विनंती जतन करून पुन्हा जोडल्यावर पाठवू शकतो.", "home.track": "स्थिती पहा", "home.trackCopy": "माझी विनंती", "home.rescue": "बचाव", "home.rescueCopy": "क्षेत्र पथक", "home.command": "कमांड", "home.commandCopy": "समन्वय", "home.sendSos": "आता SOS पाठवा", "home.needHelp": "मला मदत हवी आहे", "home.responder": "मी प्रतिसादकर्ता आहे", "home.coordinate": "मी बचाव समन्वय करतो",
+    "emergency.help": "आपत्कालीन मदत", "emergency.choose": "काय घडत आहे ते निवडा.", "emergency.pictureHint": "जुळणारे चित्र निवडा. तपशील नंतर देऊ शकता.", "emergency.flood": "पूर / पाणी", "emergency.medical": "वैद्यकीय मदत", "emergency.shelter": "सुरक्षित जागा हवी", "emergency.stepLocation": "पायरी २", "emergency.shareLocation": "तुमचे स्थान शेअर करा", "emergency.gpsHint": "सुरक्षित असल्यासच GPS वापरा. खाली ओळखण्याजोगे ठिकाण जोडू शकता.", "emergency.shareMyLocation": "माझे स्थान शेअर करा", "emergency.locationMissing": "स्थान अजून शेअर केलेले नाही", "emergency.stepPeople": "पायरी ३", "emergency.people": "किती लोक आहेत?", "emergency.moreDetails": "अधिक तपशील (ऐच्छिक)", "emergency.send": "आता SOS पाठवा", "emergency.saveOffline": "सिग्नल परत येईपर्यंत SOS जतन करा",
+    "track.private": "खाजगी SOS", "track.heading": "माझा बचाव कुठे आहे?", "track.see": "पाहा", "track.pending": "तुमचा SOS नियंत्रण पथकाकडे आहे", "track.dispatched": "बचाव पथक पाठवले जात आहे", "track.resolved": "पथकाने हे अभियान पूर्ण केले आहे",
+    "responder.workspace": "प्रतिसादकर्ता कार्यक्षेत्र", "responder.role": "क्षेत्रीय प्रतिसादकर्ता", "responder.missions": "माझी अभियान", "responder.map": "क्षेत्र नकाशा", "responder.alerts": "सूचना", "responder.available": "उपलब्ध", "responder.onMission": "अभियानावर", "responder.offDuty": "कर्तव्याबाहेर",
+    "command.workspace": "प्रशासक कमांड केंद्र", "command.role": "आपत्कालीन समन्वय", "command.operations": "ऑपरेशन बोर्ड", "command.map": "लाइव्ह नकाशा", "command.shelters": "निवारे", "command.hospitals": "रुग्णालये व संसाधने", "command.requests": "प्रतिसादकर्ता विनंत्या", "command.team": "पथक यादी", "dashboard.signOut": "साइन आउट",
+  },
+  gu: {
+    "language.label": "ભાષા", "brand.network": "આસામ કટોકટી નેટવર્ક", "general.safetyHub": "સુરક્ષા કેન્દ્ર", "general.connected": "કનેક્ટેડ", "general.offline": "ઑફલાઇન મોડ", "general.live": "લાઇવ", "general.sos": "SOS",
+    "home.heading": "મદદ માટે એક ટેપ.", "home.headingAccent": "તમારી પાછળ એક ટીમ.", "home.intro": "જોખમમાં રહેલા લોકો, ક્ષેત્ર પ્રતિસાદકો અને કટોકટી સંયોજકો માટે સ્પષ્ટ બચાવ માર્ગ. મદદ જોઈએ ત્યારે મેનૂમાં શોધવાની જરૂર નથી.", "home.offlineNote": "ઑફલાઇન હોવા પર તમારો ફોન વિનંતી સાચવીને ફરી કનેક્ટ થતાં મોકલી શકે છે.", "home.track": "સ્થિતિ જુઓ", "home.trackCopy": "મારી વિનંતી", "home.rescue": "બચાવ", "home.rescueCopy": "ક્ષેત્ર ટીમ", "home.command": "કમાન્ડ", "home.commandCopy": "સંકલન", "home.sendSos": "હમણાં SOS મોકલો", "home.needHelp": "મને મદદ જોઈએ", "home.responder": "હું પ્રતિસાદક છું", "home.coordinate": "હું બચાવનું સંકલન કરું છું",
+    "emergency.help": "કટોકટી સહાય", "emergency.choose": "શું થઈ રહ્યું છે તે પસંદ કરો.", "emergency.pictureHint": "મેળ ખાતું ચિત્ર પસંદ કરો. વિગતો પછી આપી શકો છો.", "emergency.flood": "પૂર / પાણી", "emergency.medical": "તબીબી સહાય", "emergency.shelter": "સુરક્ષિત જગ્યા જોઈએ", "emergency.stepLocation": "પગલું ૨", "emergency.shareLocation": "તમારું સ્થાન શેર કરો", "emergency.gpsHint": "સુરક્ષિત હોય તો જ GPS વાપરો. નીચે ઓળખચિહ્ન ઉમેરી શકો છો.", "emergency.shareMyLocation": "મારું સ્થાન શેર કરો", "emergency.locationMissing": "સ્થાન હજુ શેર કરાયું નથી", "emergency.stepPeople": "પગલું ૩", "emergency.people": "કેટલા લોકો?", "emergency.moreDetails": "વધુ વિગતો (વૈકલ્પિક)", "emergency.send": "હમણાં SOS મોકલો", "emergency.saveOffline": "સિગ્નલ પાછું આવે ત્યાં સુધી SOS સાચવો",
+    "track.private": "ખાનગી SOS", "track.heading": "મારું બચાવ ક્યાં છે?", "track.see": "જુઓ", "track.pending": "તમારું SOS નિયંત્રણ ટીમ પાસે છે", "track.dispatched": "બચાવ ટીમ મોકલાઈ રહી છે", "track.resolved": "ટીમે આ મિશન પૂર્ણ કર્યું છે",
+    "responder.workspace": "પ્રતિસાદક કાર્યક્ષેત્ર", "responder.role": "ક્ષેત્રીય પ્રતિસાદક", "responder.missions": "મારા મિશન", "responder.map": "ક્ષેત્ર નકશો", "responder.alerts": "ચેતવણીઓ", "responder.available": "ઉપલબ્ધ", "responder.onMission": "મિશન પર", "responder.offDuty": "ફરજ બહાર",
+    "command.workspace": "પ્રશાસક કમાન્ડ કેન્દ્ર", "command.role": "કટોકટી સંકલન", "command.operations": "ઓપરેશન બોર્ડ", "command.map": "લાઇવ નકશો", "command.shelters": "આશ્રય", "command.hospitals": "હોસ્પિટલ અને સંસાધનો", "command.requests": "પ્રતિસાદક વિનંતીઓ", "command.team": "ટીમ સૂચિ", "dashboard.signOut": "સાઇન આઉટ",
+  },
+  ta: {
+    "language.label": "மொழி", "brand.network": "அசாம் அவசர வலைப்பின்னல்", "general.safetyHub": "பாதுகாப்பு மையம்", "general.connected": "இணைக்கப்பட்டது", "general.offline": "ஆஃப்லைன் முறை", "general.live": "நேரலை", "general.sos": "SOS",
+    "home.heading": "உதவிக்கு ஒரு தொடுதல்.", "home.headingAccent": "உங்களுக்குப் பின்னால் ஒரு குழு.", "home.intro": "ஆபத்தில் உள்ளோர், கள மீட்புப் பணியாளர்கள் மற்றும் அவசர ஒருங்கிணைப்பாளர்களுக்கான தெளிவான மீட்பு வழி. உதவி தேவைப்படும் போது மெனுக்களில் தேட வேண்டியதில்லை.", "home.offlineNote": "ஆஃப்லைனில் உங்கள் தொலைபேசி கோரிக்கையைச் சேமித்து மீண்டும் இணைந்ததும் அனுப்ப முடியும்.", "home.track": "நிலை பார்க்கவும்", "home.trackCopy": "என் கோரிக்கை", "home.rescue": "மீட்பு", "home.rescueCopy": "கள குழு", "home.command": "கட்டளை", "home.commandCopy": "ஒருங்கிணைப்பு", "home.sendSos": "இப்போது SOS அனுப்பவும்", "home.needHelp": "எனக்கு உதவி வேண்டும்", "home.responder": "நான் மீட்புப் பணியாளர்", "home.coordinate": "நான் மீட்பை ஒருங்கிணைக்கிறேன்",
+    "emergency.help": "அவசர உதவி", "emergency.choose": "என்ன நடக்கிறது என்பதைத் தேர்ந்தெடுக்கவும்.", "emergency.pictureHint": "பொருந்தும் படத்தைத் தேர்ந்தெடுக்கவும். விவரங்களை பின்னர் வழங்கலாம்.", "emergency.flood": "வெள்ளம் / நீர்", "emergency.medical": "மருத்துவ உதவி", "emergency.shelter": "பாதுகாப்பான இடம் வேண்டும்", "emergency.stepLocation": "படி 2", "emergency.shareLocation": "உங்கள் இருப்பிடத்தைப் பகிரவும்", "emergency.gpsHint": "பாதுகாப்பாக இருந்தால் மட்டுமே GPS பயன்படுத்தவும். கீழே அடையாள இடம் சேர்க்கலாம்.", "emergency.shareMyLocation": "என் இருப்பிடத்தைப் பகிரவும்", "emergency.locationMissing": "இருப்பிடம் இன்னும் பகிரப்படவில்லை", "emergency.stepPeople": "படி 3", "emergency.people": "எத்தனை பேர்?", "emergency.moreDetails": "மேலும் விவரங்கள் (விருப்பமானது)", "emergency.send": "இப்போது SOS அனுப்பவும்", "emergency.saveOffline": "சிக்னல் திரும்பும் வரை SOS சேமிக்கவும்",
+    "track.private": "தனிப்பட்ட SOS", "track.heading": "என் மீட்பு எங்கே?", "track.see": "பார்க்கவும்", "track.pending": "உங்கள் SOS கட்டுப்பாட்டு குழுவிடம் உள்ளது", "track.dispatched": "மீட்புக் குழு அனுப்பப்படுகிறது", "track.resolved": "குழு இந்தப் பணியை முடித்துள்ளது",
+    "responder.workspace": "மீட்புப் பணியாளர் பணியிடம்", "responder.role": "கள மீட்புப் பணியாளர்", "responder.missions": "என் பணிகள்", "responder.map": "கள வரைபடம்", "responder.alerts": "எச்சரிக்கைகள்", "responder.available": "கிடைக்கும்", "responder.onMission": "பணியில்", "responder.offDuty": "பணிக்கு வெளியே",
+    "responder.readiness": "கள தயார் நிலை", "responder.profilePending": "மீட்பாளரின் சுயவிவரம் நிலுவையில்", "responder.readinessCopy": "இந்த பணியிடம் திறந்திருக்கும்போது புதுப்பிப்புகள் நேரலையில் இருக்கும். புறப்படுவதற்கு முன் கிடைக்கும் நிலையை அமைத்து, பாதுகாப்பாக இருந்தால் மட்டுமே GPS பகிரவும்.", "responder.mapTitle": "உங்கள் பதில் பகுதியில் செயல்பாட்டிலுள்ள நிலைமைகளைப் பார்க்கவும்.", "responder.updating": "புதுப்பிக்கப்படுகிறது…", "responder.board": "என் பணி பலகை", "responder.boardTitle": "ஒவ்வொரு பணியையும் தேவையான வரிசையில் முடிக்கவும்.", "responder.dispatched": "அனுப்பியதாக குறிக்க", "responder.resolved": "தீர்வடைந்ததாக குறிக்க", "responder.completed": "முடிந்தது", "responder.people": "பேர்", "responder.priority": "முன்னுரிமை", "responder.noMission": "இந்த கணக்கிற்கு எந்தப் பணியும் ஒதுக்கப்படவில்லை. அனுப்புநர்கள் உங்களை கண்டுபிடிக்க, கிடைக்கும் நிலையைப் புதுப்பித்து வைத்திருங்கள்.", "responder.assignmentAlerts": "ஒதுக்கீட்டு அறிவிப்புகள்", "responder.enableAlerts": "உலாவி அறிவிப்புகளை இயக்கவும்", "responder.alertCopy": "sudo MakeItWork திறக்கப்படாதபோதும் பணி ஒதுக்கீடுகள் மற்றும் அருகிலுள்ள முன்னுரிமை SOS அறிவிப்புகளைப் பெற இந்தச் சாதனத்தைப் பதிவு செய்யவும்.", "responder.retryAlerts": "உலாவி அறிவிப்பு பதிவை மீண்டும் முயற்சிக்கவும்", "responder.missionAlerts": "பணி அறிவிப்புகள்", "responder.operationalNotifications": "செயல்பாட்டு அறிவிப்புகள்", "responder.noAlerts": "தற்போது அறிவிப்புகள் இல்லை. பணி அறிவிப்புகள் இங்கே காணப்படும்.",
+    "command.workspace": "நிர்வாக கட்டளை மையம்", "command.role": "அவசர ஒருங்கிணைப்பு", "command.operations": "செயல்பாட்டு பலகை", "command.map": "நேரலை வரைபடம்", "command.shelters": "தங்குமிடங்கள்", "command.hospitals": "மருத்துவமனைகள் மற்றும் வளங்கள்", "command.requests": "மீட்புப் பணியாளர் கோரிக்கைகள்", "command.team": "குழு பட்டியல்", "dashboard.signOut": "வெளியேறு",
+    "dashboard.liveWorkspace": "நேரடி செயல்பாட்டு பணியிடம்",
+  },
+  te: {
+    "language.label": "భాష", "brand.network": "అస్సాం అత్యవసర నెట్‌వర్క్", "general.safetyHub": "భద్రతా కేంద్రం", "general.connected": "కనెక్ట్ అయింది", "general.offline": "ఆఫ్‌లైన్ మోడ్", "general.live": "లైవ్", "general.sos": "SOS",
+    "home.heading": "సహాయం కోసం ఒక ట్యాప్.", "home.headingAccent": "మీ వెనుక ఒక బృందం ఉంది.", "home.intro": "ప్రమాదంలో ఉన్నవారు, క్షేత్ర స్పందనకర్తలు మరియు అత్యవసర సమన్వయకర్తల కోసం స్పష్టమైన రక్షణ మార్గం. సహాయం అవసరమైనప్పుడు మెనూలలో వెతకాల్సిన అవసరం లేదు.", "home.offlineNote": "ఆఫ్‌లైన్‌లో మీ ఫోన్ అభ్యర్థనను భద్రపరచి మళ్లీ కనెక్ట్ అయినప్పుడు పంపగలదు.", "home.track": "స్థితి చూడండి", "home.trackCopy": "నా అభ్యర్థన", "home.rescue": "రక్షణ", "home.rescueCopy": "క్షేత్ర బృందం", "home.command": "కమాండ్", "home.commandCopy": "సమన్వయం", "home.sendSos": "ఇప్పుడే SOS పంపండి", "home.needHelp": "నాకు సహాయం కావాలి", "home.responder": "నేను స్పందనకర్తను", "home.coordinate": "నేను రక్షణను సమన్వయం చేస్తాను",
+    "emergency.help": "అత్యవసర సహాయం", "emergency.choose": "ఏమి జరుగుతుందో ఎంచుకోండి.", "emergency.pictureHint": "సరిపోయే చిత్రాన్ని ఎంచుకోండి. వివరాలను తర్వాత ఇవ్వవచ్చు.", "emergency.flood": "వరద / నీరు", "emergency.medical": "వైద్య సహాయం", "emergency.shelter": "సురక్షిత స్థలం కావాలి", "emergency.stepLocation": "దశ 2", "emergency.shareLocation": "మీ స్థానాన్ని పంచుకోండి", "emergency.gpsHint": "సురక్షితంగా ఉన్నప్పుడే GPS ఉపయోగించండి. క్రింద గుర్తింపు స్థలాన్ని జోడించవచ్చు.", "emergency.shareMyLocation": "నా స్థానాన్ని పంచుకోండి", "emergency.locationMissing": "స్థానం ఇంకా పంచుకోబడలేదు", "emergency.stepPeople": "దశ 3", "emergency.people": "ఎంతమంది వ్యక్తులు?", "emergency.moreDetails": "మరిన్ని వివరాలు (ఐచ్ఛికం)", "emergency.send": "ఇప్పుడే SOS పంపండి", "emergency.saveOffline": "సిగ్నల్ తిరిగివచ్చే వరకు SOS భద్రపరచండి",
+    "track.private": "వ్యక్తిగత SOS", "track.heading": "నా రక్షణ ఎక్కడ ఉంది?", "track.see": "చూడండి", "track.pending": "మీ SOS నియంత్రణ బృందం వద్ద ఉంది", "track.dispatched": "రక్షణ బృందం పంపబడుతోంది", "track.resolved": "బృందం ఈ మిషన్‌ను పూర్తిగా నమోదు చేసింది",
+    "responder.workspace": "స్పందనకర్త కార్యస్థలం", "responder.role": "క్షేత్ర స్పందనకర్త", "responder.missions": "నా మిషన్లు", "responder.map": "క్షేత్ర మ్యాప్", "responder.alerts": "హెచ్చరికలు", "responder.available": "అందుబాటులో", "responder.onMission": "మిషన్‌లో", "responder.offDuty": "డ్యూటీ వెలుపల",
+    "command.workspace": "నిర్వాహక కమాండ్ కేంద్రం", "command.role": "అత్యవసర సమన్వయం", "command.operations": "ఆపరేషన్స్ బోర్డు", "command.map": "లైవ్ మ్యాప్", "command.shelters": "ఆశ్రయాలు", "command.hospitals": "ఆసుపత్రులు మరియు వనరులు", "command.requests": "స్పందనకర్త అభ్యర్థనలు", "command.team": "బృంద జాబితా", "dashboard.signOut": "సైన్ అవుట్",
+  },
+  kn: {
+    "language.label": "ಭಾಷೆ", "brand.network": "ಅಸ್ಸಾಂ ತುರ್ತು ಜಾಲ", "general.safetyHub": "ಸುರಕ್ಷತಾ ಕೇಂದ್ರ", "general.connected": "ಸಂಪರ್ಕಗೊಂಡಿದೆ", "general.offline": "ಆಫ್‌ಲೈನ್ ವಿಧಾನ", "general.live": "ಲೈವ್", "general.sos": "SOS",
+    "home.heading": "ಸಹಾಯಕ್ಕಾಗಿ ಒಂದು ಟ್ಯಾಪ್.", "home.headingAccent": "ನಿಮ್ಮ ಹಿಂದೆ ಒಂದು ತಂಡ.", "home.intro": "ಅಪಾಯದಲ್ಲಿರುವ ಜನರು, ಕ್ಷೇತ್ರ ಪ್ರತಿಕ್ರಿಯಾಕಾರರು ಮತ್ತು ತುರ್ತು ಸಮನ್ವಯಕರಿಗೆ ಸ್ಪಷ್ಟ ರಕ್ಷಣಾ ದಾರಿ. ಸಹಾಯ ಬೇಕಾದಾಗ ಮೆನುಗಳಲ್ಲಿ ಹುಡುಕುವ ಅಗತ್ಯವಿಲ್ಲ.", "home.offlineNote": "ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿರುವಾಗ ನಿಮ್ಮ ಫೋನ್ ವಿನಂತಿಯನ್ನು ಉಳಿಸಿ ಮತ್ತೆ ಸಂಪರ್ಕಗೊಂಡಾಗ ಕಳುಹಿಸಬಹುದು.", "home.track": "ಸ್ಥಿತಿ ನೋಡಿ", "home.trackCopy": "ನನ್ನ ವಿನಂತಿ", "home.rescue": "ರಕ್ಷಣೆ", "home.rescueCopy": "ಕ್ಷೇತ್ರ ತಂಡ", "home.command": "ಕಮಾಂಡ್", "home.commandCopy": "ಸಮನ್ವಯ", "home.sendSos": "ಈಗ SOS ಕಳುಹಿಸಿ", "home.needHelp": "ನನಗೆ ಸಹಾಯ ಬೇಕು", "home.responder": "ನಾನು ಪ್ರತಿಕ್ರಿಯಾಕಾರ", "home.coordinate": "ನಾನು ರಕ್ಷಣೆಯನ್ನು ಸಮನ್ವಯಗೊಳಿಸುತ್ತೇನೆ",
+    "emergency.help": "ತುರ್ತು ಸಹಾಯ", "emergency.choose": "ಏನು ನಡೆಯುತ್ತಿದೆ ಆಯ್ಕೆಮಾಡಿ.", "emergency.pictureHint": "ಹೊಂದುವ ಚಿತ್ರವನ್ನು ಆಯ್ಕೆಮಾಡಿ. ವಿವರಗಳನ್ನು ನಂತರ ನೀಡಬಹುದು.", "emergency.flood": "ಪ್ರವಾಹ / ನೀರು", "emergency.medical": "ವೈದ್ಯಕೀಯ ಸಹಾಯ", "emergency.shelter": "ಸುರಕ್ಷಿತ ಸ್ಥಳ ಬೇಕು", "emergency.stepLocation": "ಹಂತ 2", "emergency.shareLocation": "ನಿಮ್ಮ ಸ್ಥಳವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ", "emergency.gpsHint": "ಸುರಕ್ಷಿತವಾಗಿದ್ದಾಗ ಮಾತ್ರ GPS ಬಳಸಿ. ಕೆಳಗೆ ಗುರುತಿನ ಸ್ಥಳವನ್ನು ಸೇರಿಸಬಹುದು.", "emergency.shareMyLocation": "ನನ್ನ ಸ್ಥಳವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ", "emergency.locationMissing": "ಸ್ಥಳ ಇನ್ನೂ ಹಂಚಿಕೊಳ್ಳಲಾಗಿಲ್ಲ", "emergency.stepPeople": "ಹಂತ 3", "emergency.people": "ಎಷ್ಟು ಜನರು?", "emergency.moreDetails": "ಹೆಚ್ಚಿನ ವಿವರಗಳು (ಐಚ್ಛಿಕ)", "emergency.send": "ಈಗ SOS ಕಳುಹಿಸಿ", "emergency.saveOffline": "ಸಿಗ್ನಲ್ ಮರಳುವವರೆಗೆ SOS ಉಳಿಸಿ",
+    "track.private": "ಖಾಸಗಿ SOS", "track.heading": "ನನ್ನ ರಕ್ಷಣೆ ಎಲ್ಲಿದೆ?", "track.see": "ನೋಡಿ", "track.pending": "ನಿಮ್ಮ SOS ನಿಯಂತ್ರಣ ತಂಡದ ಬಳಿ ಇದೆ", "track.dispatched": "ರಕ್ಷಣಾ ತಂಡ ಕಳುಹಿಸಲಾಗುತ್ತಿದೆ", "track.resolved": "ತಂಡ ಈ ಕಾರ್ಯವನ್ನು ಪೂರ್ಣಗೊಳಿಸಿದೆ",
+    "responder.workspace": "ಪ್ರತಿಕ್ರಿಯಾಕಾರ ಕಾರ್ಯಕ್ಷೇತ್ರ", "responder.role": "ಕ್ಷೇತ್ರ ಪ್ರತಿಕ್ರಿಯಾಕಾರ", "responder.missions": "ನನ್ನ ಕಾರ್ಯಗಳು", "responder.map": "ಕ್ಷೇತ್ರ ನಕ್ಷೆ", "responder.alerts": "ಎಚ್ಚರಿಕೆಗಳು", "responder.available": "ಲಭ್ಯ", "responder.onMission": "ಕಾರ್ಯದಲ್ಲಿದೆ", "responder.offDuty": "ಕರ್ತವ್ಯದಿಂದ ಹೊರಗೆ",
+    "command.workspace": "ನಿರ್ವಾಹಕ ಕಮಾಂಡ್ ಕೇಂದ್ರ", "command.role": "ತುರ್ತು ಸಮನ್ವಯ", "command.operations": "ಕಾರ್ಯಾಚರಣೆ ಫಲಕ", "command.map": "ಲೈವ್ ನಕ್ಷೆ", "command.shelters": "ಆಶ್ರಯಗಳು", "command.hospitals": "ಆಸ್ಪತ್ರೆಗಳು ಮತ್ತು ಸಂಪನ್ಮೂಲಗಳು", "command.requests": "ಪ್ರತಿಕ್ರಿಯಾಕಾರ ವಿನಂತಿಗಳು", "command.team": "ತಂಡ ಪಟ್ಟಿ", "dashboard.signOut": "ಸೈನ್ ಔಟ್",
+  },
+};
+
+export function resolveLocale(value: string | null | undefined): Locale {
+  return localeOptions.some(option => option.code === value) ? value as Locale : "en";
+}
+
+export function translate(locale: Locale, key: string, values?: Record<string, string | number>, operationalTerms?: Partial<Record<Locale, Record<string, string>>>): string {
+  const template = operationalTerms?.[locale]?.[key] || currentInterfaceTerms[locale][key] || messages[locale][key] || universalTerms[key]?.[locale] || messages.en[key] || key;
+  return values ? Object.entries(values).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), template) : template;
+}
+
+type LanguageContextValue = { locale: Locale; setLocale: (locale: Locale) => void; t: (key: string, values?: Record<string, string | number>) => string };
+const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    const requested = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("lang");
+    if (requested && localeOptions.some(option => option.code === requested)) return requested as Locale;
+    const stored = typeof window === "undefined" ? null : localStorage.getItem(storageKey);
+    if (stored) return resolveLocale(stored);
+    const browser = typeof navigator === "undefined" ? "en" : navigator.language.slice(0, 2);
+    return resolveLocale(browser);
+  });
+  const [operationalTerms, setOperationalTerms] = useState<Partial<Record<Locale, Record<string, string>>>>({});
+
+  const setLocale = useCallback((nextLocale: Locale) => {
+    const next = resolveLocale(nextLocale);
+    setLocaleState(next);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", next);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
+  useEffect(() => {
+    void fetch(getApiUrl("/storage/operational-language-pack_86163712.json"))
+      .then(response => response.ok ? response.json() : {})
+      .then((data: Partial<Record<Locale, Record<string, string>>>) => setOperationalTerms(data))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, locale);
+    document.documentElement.lang = locale;
+  }, [locale]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const terms = { ...currentInterfaceTerms[locale], ...operationalTerms[locale] };
+    const hasTerms = Boolean(terms && Object.keys(terms).length > 0);
+
+    const isIgnoredElement = (el: Element): boolean => {
+      const tag = el.tagName;
+      if (tag === "SCRIPT" || tag === "STYLE" || tag === "SVG" || tag === "CANVAS" || tag === "NOSCRIPT") return true;
+      if (el.hasAttribute("data-no-operational-translation") || el.getAttribute("contenteditable") === "true") return true;
+      if (el.classList && (el.classList.contains("leaflet-container") || el.classList.contains("leaflet-pane"))) return true;
+      return false;
+    };
+
+    const applyText = (node: Text) => {
+      const parent = node.parentElement;
+      if (!parent || isIgnoredElement(parent)) return;
+      const raw = node.nodeValue;
+      if (!raw || !raw.trim()) return;
+
+      const source = originalText.get(node) ?? raw;
+      originalText.set(node, source);
+
+      const target = hasTerms ? (terms[source] ?? (locale === "en" ? source : undefined)) : (locale === "en" ? source : undefined);
+      if (target && node.nodeValue !== target) {
+        node.nodeValue = target;
+      }
+    };
+
+    const applyElement = (element: Element) => {
+      if (isIgnoredElement(element)) return;
+      const attributes = originalAttributes.get(element) ?? new Map<string, string>();
+      for (const name of ["placeholder", "title", "aria-label"]) {
+        const currentAttr = element.getAttribute(name);
+        const source = attributes.get(name) ?? currentAttr;
+        if (!source) continue;
+        attributes.set(name, source);
+        const target = hasTerms ? (terms[source] ?? (locale === "en" ? source : undefined)) : (locale === "en" ? source : undefined);
+        if (target && currentAttr !== target) {
+          element.setAttribute(name, target);
+        }
+      }
+      originalAttributes.set(element, attributes);
+    };
+
+    const filterNode = (node: Node): number => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (isIgnoredElement(node as Element)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+      if (node.nodeType === Node.TEXT_NODE) {
+        const val = node.nodeValue;
+        if (!val || !val.trim()) return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (parent && isIgnoredElement(parent)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+      return NodeFilter.FILTER_SKIP;
+    };
+
+    const applyTree = (root: Node) => {
+      if (root.nodeType === Node.TEXT_NODE) {
+        applyText(root as Text);
+        return;
+      }
+      if (root.nodeType === Node.ELEMENT_NODE) {
+        const el = root as Element;
+        if (isIgnoredElement(el)) return;
+        applyElement(el);
+      }
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+        acceptNode: filterNode,
+      });
+      let current: Node | null;
+      while ((current = walker.nextNode())) {
+        if (current.nodeType === Node.TEXT_NODE) {
+          applyText(current as Text);
+        } else if (current.nodeType === Node.ELEMENT_NODE) {
+          applyElement(current as Element);
+        }
+      }
+    };
+
+    applyTree(document.body);
+
+    if (!hasTerms && locale === "en") return;
+
+    let pendingNodes: Node[] = [];
+    let frameId: number | null = null;
+
+    const processPending = () => {
+      frameId = null;
+      const nodes = pendingNodes;
+      pendingNodes = [];
+      for (const node of nodes) {
+        if (document.body.contains(node)) {
+          applyTree(node);
+        }
+      }
+    };
+
+    const observer = new MutationObserver(records => {
+      for (const record of records) {
+        record.addedNodes.forEach(node => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            if (isIgnoredElement(node as Element)) return;
+          }
+          pendingNodes.push(node);
+        });
+      }
+      if (pendingNodes.length > 0 && frameId === null) {
+        frameId = typeof window !== "undefined" && window.requestAnimationFrame
+          ? window.requestAnimationFrame(processPending)
+          : (setTimeout(processPending, 0) as any);
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      if (frameId !== null) {
+        if (typeof window !== "undefined" && window.cancelAnimationFrame) window.cancelAnimationFrame(frameId);
+        else clearTimeout(frameId);
+      }
+      observer.disconnect();
+    };
+  }, [locale, operationalTerms]);
+
+  const t = useCallback((key: string, values?: Record<string, string | number>) => translate(locale, key, values, operationalTerms), [locale, operationalTerms]);
+  const value = useMemo(() => ({ locale, setLocale, t }), [locale, t]);
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+}
+
+export function useLanguage() {
+  const context = useContext(LanguageContext);
+  if (!context) {
+    return {
+      locale: "en",
+      setLocale: () => {},
+      t: (key: string) => key,
+    };
+  }
+  return context;
+}
+
