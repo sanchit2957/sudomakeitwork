@@ -65,114 +65,65 @@ export function MapView({
     if (!mapContainer.current) return;
     let isMounted = true;
 
-    // Fast path: Synchronous Google Maps initialization if already present on window
-    if (typeof window !== "undefined" && (window as any).google?.maps?.Map) {
-      try {
-        const gMaps = (window as any).google.maps;
-        const map = new gMaps.Map(mapContainer.current, {
-          zoom: initialZoom,
-          center: { lat: initialCenter.lat, lng: initialCenter.lng },
-          mapTypeControl: true,
-          fullscreenControl: true,
-          zoomControl: true,
-          streetViewControl: false,
-        });
-
-        googleMapRef.current = map;
-        setMapEngine("google");
-
-        if (gMaps.Marker) {
-          const marker = new gMaps.Marker({
-            position: { lat: initialCenter.lat, lng: initialCenter.lng },
-            map,
-            title: "Selected Location",
-          });
-          googleMarkerRef.current = marker;
-        }
-
-        if (onPickLocation && map.addListener) {
-          map.addListener("click", (e: any) => {
-            if (e.latLng) {
-              const lat = e.latLng.lat();
-              const lng = e.latLng.lng();
-              if (googleMarkerRef.current?.setPosition) {
-                googleMarkerRef.current.setPosition({ lat, lng });
-              }
-              onPickLocation({ lat, lng });
-            }
-          });
-        }
-
-        onMapReady?.(map);
-
-        return () => {
-          if (googleMarkerRef.current?.setMap) {
-            googleMarkerRef.current.setMap(null);
-            googleMarkerRef.current = null;
-          }
-          googleMapRef.current = null;
-        };
-      } catch (err) {
-        console.warn("[GoogleMap] Sync init error, falling back to Leaflet:", err);
-      }
-    }
-
     async function initMap() {
-      // 1. Try loading and initializing Google Maps
-      try {
-        const gMaps = await loadGoogleMaps();
-        if (!isMounted || !mapContainer.current) return;
+      // 1. If Google Maps is already loaded or an explicit API key is configured
+      const isLoaded = isGoogleMapsLoaded();
+      const apiKey = typeof window !== "undefined" ? ((window as any).__GOOGLE_MAPS_API_KEY__ || import.meta.env.VITE_GOOGLE_MAPS_API_KEY) : "";
+      if (isLoaded || (apiKey && apiKey.trim().length > 0)) {
+        try {
+          const gMaps = isLoaded ? (window as any).google.maps : await loadGoogleMaps(apiKey);
+          if (!isMounted || !mapContainer.current) return;
 
-        if (gMaps && gMaps.Map) {
-          const map = new gMaps.Map(mapContainer.current, {
-            zoom: initialZoom,
-            center: { lat: initialCenter.lat, lng: initialCenter.lng },
-            mapTypeControl: true,
-            mapTypeControlOptions: {
-              style: (window as any).google?.maps?.MapTypeControlStyle?.HORIZONTAL_BAR,
-            },
-            fullscreenControl: true,
-            zoomControl: true,
-            streetViewControl: false,
-          });
-
-          googleMapRef.current = map;
-          setMapEngine("google");
-
-          // Add default location pin
-          if (gMaps.Marker || (window as any).google?.maps?.Marker) {
-            const MarkerClass = gMaps.Marker || (window as any).google.maps.Marker;
-            const marker = new MarkerClass({
-              position: { lat: initialCenter.lat, lng: initialCenter.lng },
-              map,
-              title: "Selected Location",
-              animation: (window as any).google?.maps?.Animation?.DROP,
+          if (gMaps && gMaps.Map) {
+            const map = new gMaps.Map(mapContainer.current, {
+              zoom: initialZoom,
+              center: { lat: initialCenter.lat, lng: initialCenter.lng },
+              mapTypeControl: true,
+              mapTypeControlOptions: {
+                style: (window as any).google?.maps?.MapTypeControlStyle?.HORIZONTAL_BAR,
+              },
+              fullscreenControl: true,
+              zoomControl: true,
+              streetViewControl: false,
             });
-            googleMarkerRef.current = marker;
-          }
 
-          // Handle click to pick location
-          if (onPickLocation && map.addListener) {
-            map.addListener("click", (e: any) => {
-              if (e.latLng) {
-                const lat = e.latLng.lat();
-                const lng = e.latLng.lng();
-                if (googleMarkerRef.current?.setPosition) {
-                  googleMarkerRef.current.setPosition({ lat, lng });
+            googleMapRef.current = map;
+            setMapEngine("google");
+
+            // Add default location pin
+            if (gMaps.Marker || (window as any).google?.maps?.Marker) {
+              const MarkerClass = gMaps.Marker || (window as any).google.maps.Marker;
+              const marker = new MarkerClass({
+                position: { lat: initialCenter.lat, lng: initialCenter.lng },
+                map,
+                title: "Selected Location",
+                animation: (window as any).google?.maps?.Animation?.DROP,
+              });
+              googleMarkerRef.current = marker;
+            }
+
+            if (onPickLocation && map.addListener) {
+              map.addListener("click", (e: any) => {
+                if (e.latLng) {
+                  const lat = e.latLng.lat();
+                  const lng = e.latLng.lng();
+                  if (googleMarkerRef.current?.setPosition) {
+                    googleMarkerRef.current.setPosition({ lat, lng });
+                  }
+                  onPickLocation({ lat, lng });
                 }
-                onPickLocation({ lat, lng });
-              }
-            });
-          }
+              });
+            }
 
-          onMapReady?.(map);
-          return;
+            onMapReady?.(map);
+            return;
+          }
+        } catch (gErr) {
+          console.warn("[GoogleMaps] Init failed, using zero-config Leaflet:", gErr);
         }
-      } catch (gErr) {
-        console.warn("[GoogleMaps] Init failed, falling back to Leaflet:", gErr);
       }
 
-      // 2. Fallback: Initialize Leaflet
+      // 2. Primary / Default Engine: Zero-config Leaflet with high-resolution OSM/CartoDB tiles (No API key required)
       try {
         const L = (await import("leaflet")).default;
         if (!isMounted || !mapContainer.current) return;
@@ -189,7 +140,7 @@ export function MapView({
           attributionControl: true,
         });
 
-        // CartoDB Voyager tiles (clean, high-res OpenStreetMap tiles)
+        // CartoDB Voyager tiles (clean, high-res OpenStreetMap tiles, 100% free & keyless)
         L.tileLayer(
           "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
           {
@@ -200,7 +151,14 @@ export function MapView({
           }
         ).addTo(lMap);
 
-        const marker = L.marker([initialCenter.lat, initialCenter.lng]).addTo(lMap);
+        const customPin = L.divIcon({
+          className: "custom-map-pin",
+          html: `<div style="background:#0f766e;color:#fff;border-radius:50%;width:30px;height:30px;display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,0.35);border:2px solid #fff;font-size:15px;">📍</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 30],
+        });
+
+        const marker = L.marker([initialCenter.lat, initialCenter.lng], { icon: customPin }).addTo(lMap);
 
         if (onPickLocation) {
           lMap.on("click", (e: any) => {

@@ -43,6 +43,14 @@ export function loadGoogleMaps(apiKey?: string): Promise<any> {
     return Promise.resolve(null);
   }
 
+  if (typeof window !== "undefined") {
+    // Intercept Google Maps auth failure to prevent browser alerts
+    (window as any).gm_authFailure = () => {
+      console.warn("[GoogleMaps] Key authentication failed. Falling back to keyless Leaflet.");
+      googleMapsPromise = Promise.resolve(null);
+    };
+  }
+
   googleMapsPromise = new Promise((resolve) => {
     const scriptId = "google-maps-script";
     const existingScript = document.getElementById(scriptId);

@@ -94,50 +94,54 @@ export default function OperationsMap({
     let isMounted = true;
 
     async function initMap() {
-      // 1. Try Google Maps first
-      try {
-        const gMaps = await loadGoogleMaps();
-        if (!isMounted || !mapContainer.current) return;
+      // 1. If Google Maps is already loaded or an explicit API key is configured
+      const isLoaded = isGoogleMapsLoaded();
+      const apiKey = typeof window !== "undefined" ? ((window as any).__GOOGLE_MAPS_API_KEY__ || import.meta.env.VITE_GOOGLE_MAPS_API_KEY) : "";
+      if (isLoaded || (apiKey && apiKey.trim().length > 0)) {
+        try {
+          const gMaps = isLoaded ? (window as any).google.maps : await loadGoogleMaps(apiKey);
+          if (!isMounted || !mapContainer.current) return;
 
-        if (gMaps && gMaps.Map) {
-          const map = new gMaps.Map(mapContainer.current, {
-            center: { lat: 26.2006, lng: 92.9376 }, // Assam Center
-            zoom: compact ? 7 : 8,
-            mapTypeControl: true,
-            fullscreenControl: true,
-            zoomControl: true,
-            streetViewControl: false,
-          });
-
-          googleMapRef.current = map;
-          setEngine("google");
-
-          if (onPickLocation) {
-            map.addListener("click", (e: any) => {
-              if (e.latLng) {
-                const point = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-                if (googlePickMarkerRef.current) {
-                  googlePickMarkerRef.current.setPosition(point);
-                } else {
-                  googlePickMarkerRef.current = new (gMaps.Marker || (window as any).google.maps.Marker)({
-                    position: point,
-                    map,
-                    title: "Selected Location",
-                    animation: (window as any).google?.maps?.Animation?.DROP,
-                  });
-                }
-                onPickLocation(point);
-              }
+          if (gMaps && gMaps.Map) {
+            const map = new gMaps.Map(mapContainer.current, {
+              center: { lat: 26.2006, lng: 92.9376 }, // Assam Center
+              zoom: compact ? 7 : 8,
+              mapTypeControl: true,
+              fullscreenControl: true,
+              zoomControl: true,
+              streetViewControl: false,
             });
-          }
 
-          return;
+            googleMapRef.current = map;
+            setEngine("google");
+
+            if (onPickLocation) {
+              map.addListener("click", (e: any) => {
+                if (e.latLng) {
+                  const point = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+                  if (googlePickMarkerRef.current) {
+                    googlePickMarkerRef.current.setPosition(point);
+                  } else {
+                    googlePickMarkerRef.current = new (gMaps.Marker || (window as any).google.maps.Marker)({
+                      position: point,
+                      map,
+                      title: "Selected Location",
+                      animation: (window as any).google?.maps?.Animation?.DROP,
+                    });
+                  }
+                  onPickLocation(point);
+                }
+              });
+            }
+
+            return;
+          }
+        } catch (err) {
+          console.warn("[OperationsMap] Google Maps init error, falling back to Leaflet:", err);
         }
-      } catch (err) {
-        console.warn("[OperationsMap] Google Maps init error, falling back to Leaflet:", err);
       }
 
-      // 2. Fallback to Leaflet
+      // 2. Primary / Default Engine: Zero-config Leaflet (100% free, no API key required)
       try {
         const L = (await import("leaflet")).default;
         if (!isMounted || !mapContainer.current) return;
