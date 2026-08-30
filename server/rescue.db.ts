@@ -422,10 +422,32 @@ export const _memoryHospitalRequests: Map<number, MemoryHospitalRequest> = new M
 export const _memoryHospitalStaffProfiles: Map<number, MemoryHospitalStaffProfile> = new Map();
 export const _memoryAuditLogs: MemoryAuditLog[] = [];
 
+let _incidentIdSeq = 100;
+let _missionIdSeq = 100;
+let _safetyRequestIdSeq = 100;
+let _shelterIdSeq = 100;
+let _hospitalIdSeq = 100;
+let _floodZoneIdSeq = 100;
+let _rescuerRequestIdSeq = 100;
+let _hospitalRequestIdSeq = 100;
+let _hospitalStaffIdSeq = 100;
+let _rescueProfileIdSeq = 100;
+
+export function nextIncidentId(): number { return ++_incidentIdSeq; }
+export function nextMissionId(): number { return ++_missionIdSeq; }
+export function nextSafetyRequestId(): number { return ++_safetyRequestIdSeq; }
+export function nextShelterId(): number { return ++_shelterIdSeq; }
+export function nextHospitalId(): number { return ++_hospitalIdSeq; }
+export function nextFloodZoneId(): number { return ++_floodZoneIdSeq; }
+export function nextRescuerRequestId(): number { return ++_rescuerRequestIdSeq; }
+export function nextHospitalRequestId(): number { return ++_hospitalRequestIdSeq; }
+export function nextHospitalStaffId(): number { return ++_hospitalStaffIdSeq; }
+export function nextRescueProfileId(): number { return ++_rescueProfileIdSeq; }
+
 export function registerMemoryRescuerProfile(profile: Partial<MemoryRescueProfile> & { userId: number; callSign: string }) {
   const existing = _memoryRescueProfiles.get(profile.userId);
   _memoryRescueProfiles.set(profile.userId, {
-    id: existing?.id || _memoryRescueProfiles.size + 1,
+    id: existing?.id || nextRescueProfileId(),
     userId: profile.userId,
     callSign: profile.callSign,
     phone: profile.phone ?? existing?.phone ?? null,
@@ -820,9 +842,9 @@ export async function getAnalytics() {
   try {
     const db = await database();
     const [incidentRows, activeRescuerRows, missionRows] = await Promise.all([
-      db.select().from(incidents),
-      db.select().from(rescueProfiles).where(inArray(rescueProfiles.availability, ["available", "on_mission"])),
-      db.select().from(missions),
+      db.select({ id: incidents.id, status: incidents.status, createdAt: incidents.createdAt }).from(incidents),
+      db.select({ id: rescueProfiles.id }).from(rescueProfiles).where(inArray(rescueProfiles.availability, ["available", "on_mission"])),
+      db.select({ incidentId: missions.incidentId, dispatchedAt: missions.dispatchedAt }).from(missions),
     ]);
     const resolvedCases = incidentRows.filter(row => row.status === "resolved").length;
     const responseMinutes = missionRows
@@ -959,7 +981,7 @@ export async function createHospitalCaseNotification(data: {
   return record;
 }
 
-export async function listHospitalCaseNotifications(hospitalId: number) {
+export async function listHospitalCaseNotifications(hospitalId?: number | null) {
   try {
     const db = await database();
     const { hospitalCaseNotifications } = await import("../drizzle/schema");
@@ -972,12 +994,12 @@ export async function listHospitalCaseNotifications(hospitalId: number) {
       .from(hospitalCaseNotifications)
       .innerJoin(incidents, eq(hospitalCaseNotifications.incidentId, incidents.id))
       .innerJoin(users, eq(hospitalCaseNotifications.rescuerId, users.id))
-      .where(eq(hospitalCaseNotifications.hospitalId, hospitalId))
+      .where(hospitalId ? eq(hospitalCaseNotifications.hospitalId, hospitalId) : undefined)
       .orderBy(desc(hospitalCaseNotifications.createdAt));
   } catch (error) {
     failClosedInProduction(error);
     const list = Array.from(_memoryHospitalCaseNotifications.values())
-      .filter(n => n.hospitalId === hospitalId)
+      .filter(n => !hospitalId || n.hospitalId === hospitalId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     return list.map(notification => {

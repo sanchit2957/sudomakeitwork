@@ -13,6 +13,7 @@ import { registerN8nRoutes } from "../n8n";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
+import { getDatabasePoolMetrics } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -120,6 +121,26 @@ async function startServer() {
 
   // n8n webhook routes + offline SOS endpoint
   registerN8nRoutes(app);
+
+  // Lightweight production diagnostic /health endpoint
+  app.get("/health", (_req, res) => {
+    const mem = process.memoryUsage();
+    res.status(200).json({
+      status: "ok",
+      uptime: Math.floor(process.uptime()),
+      memory: {
+        rss: mem.rss,
+        heapUsed: mem.heapUsed,
+        heapTotal: mem.heapTotal,
+        external: mem.external,
+        arrayBuffers: mem.arrayBuffers || 0,
+        rssMb: Math.round((mem.rss / (1024 * 1024)) * 10) / 10,
+        heapUsedMb: Math.round((mem.heapUsed / (1024 * 1024)) * 10) / 10,
+      },
+      databasePool: getDatabasePoolMetrics(),
+      version: "1.0.0",
+    });
+  });
 
   // tRPC API
   app.use("/api/trpc", (_req, res, next) => {

@@ -59,6 +59,16 @@ import {
   listHospitalCaseNotifications,
   updateHospitalCaseStatus,
   writeAudit,
+  nextIncidentId,
+  nextMissionId,
+  nextSafetyRequestId,
+  nextShelterId,
+  nextHospitalId,
+  nextFloodZoneId,
+  nextRescuerRequestId,
+  nextHospitalRequestId,
+  nextHospitalStaffId,
+  nextRescueProfileId,
   _memoryIncidents,
   _memoryMissions,
   _memoryRescueProfiles,
@@ -286,6 +296,9 @@ async function enforceGuestSosRateLimit(guestKey: string) {
   _memoryGuestRateLimits.set(keyHash, { windowStartedAt: memExisting.windowStartedAt, requestCount: decision.requestCount });
 }
 
+const _conditionsCache = new Map<string, { timestamp: number; data: any }>();
+const _conditionsInFlight = new Map<string, Promise<any>>();
+
 export const rescueRouter = router({
   emergency: router({
     conditions: publicProcedure
@@ -300,97 +313,129 @@ export const rescueRouter = router({
       .query(async ({ input }) => {
         const latitude = input?.latitude ?? 26.1445;
         const longitude = input?.longitude ?? 91.7362;
-        const db = await database();
-        let activeZones: Array<{ id: number; severity: string }> = [];
-        if (db) {
-          try {
-            activeZones = await db
-              .select({ id: floodZones.id, severity: floodZones.severity })
-              .from(floodZones)
-              .where(eq(floodZones.active, "yes"));
-          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
-        } else {
-          activeZones = Array.from(_memoryFloodZones.values())
-            .filter(z => z.active === "yes")
-            .map(z => ({ id: z.id, severity: z.severity }));
+        const cacheKey = `${latitude.toFixed(2)}_${longitude.toFixed(2)}`;
+        const now = Date.now();
+
+        // 1. Check in-memory fresh cache (3 minutes)
+        const cached = _conditionsCache.get(cacheKey);
+        if (cached && now - cached.timestamp < 3 * 60 * 1000) {
+          return cached.data;
         }
-        const river = await getOfficialAssamRiverGauge(latitude, longitude);
-        try {
-          const endpoint = new URL("https://api.open-meteo.com/v1/forecast");
-          endpoint.searchParams.set("latitude", String(latitude));
-          endpoint.searchParams.set("longitude", String(longitude));
-          endpoint.searchParams.set("current", "temperature_2m,precipitation,weather_code,wind_speed_10m");
-          endpoint.searchParams.set(
-            "daily",
-            "temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,weather_code,wind_speed_10m_max"
-          );
-          endpoint.searchParams.set("past_days", "7");
-          endpoint.searchParams.set("forecast_days", "7");
-          endpoint.searchParams.set("timezone", "auto");
-          const response = await fetch(endpoint, {
-            signal: AbortSignal.timeout(8_000),
-            headers: { accept: "application/json" },
-          });
-          if (!response.ok) throw new Error(`Weather source responded ${response.status}`);
-          const weather = (await response.json()) as {
-            current?: { temperature_2m?: number; precipitation?: number; weather_code?: number; wind_speed_10m?: number };
-            daily?: {
-              time?: string[];
-              temperature_2m_max?: number[];
-              temperature_2m_min?: number[];
-              precipitation_probability_max?: number[];
-              precipitation_sum?: number[];
-              weather_code?: number[];
-              wind_speed_10m_max?: number[];
+
+        // 2. Deduplicate concurrent in-flight requests for identical coordinates
+        if (_conditionsInFlight.has(cacheKey)) {
+          return await _conditionsInFlight.get(cacheKey)!;
+        }
+
+        const fetchPromise = (async () => {
+          const db = await database();
+          let activeZones: Array<{ id: number; severity: string }> = [];
+          if (db) {
+            try {
+              activeZones = await db
+                .select({ id: floodZones.id, severity: floodZones.severity })
+                .from(floodZones)
+                .where(eq(floodZones.active, "yes"));
+            } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+          } else {
+            activeZones = Array.from(_memoryFloodZones.values())
+              .filter(z => z.active === "yes")
+              .map(z => ({ id: z.id, severity: z.severity }));
+          }
+          const river = await getOfficialAssamRiverGauge(latitude, longitude);
+          try {
+            const endpoint = new URL("https://api.open-meteo.com/v1/forecast");
+            endpoint.searchParams.set("latitude", String(latitude));
+            endpoint.searchParams.set("longitude", String(longitude));
+            endpoint.searchParams.set("current", "temperature_2m,precipitation,weather_code,wind_speed_10m");
+            endpoint.searchParams.set(
+              "daily",
+              "temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,weather_code,wind_speed_10m_max"
+            );
+            endpoint.searchParams.set("past_days", "7");
+            endpoint.searchParams.set("forecast_days", "7");
+            endpoint.searchParams.set("timezone", "auto");
+            const response = await fetch(endpoint, {
+              signal: AbortSignal.timeout(6_000),
+              headers: { accept: "application/json" },
+            });
+            if (!response.ok) throw new Error(`Weather source responded ${response.status}`);
+            const weather = (await response.json()) as {
+              current?: { temperature_2m?: number; precipitation?: number; weather_code?: number; wind_speed_10m?: number };
+              daily?: {
+                time?: string[];
+                temperature_2m_max?: number[];
+                temperature_2m_min?: number[];
+                precipitation_probability_max?: number[];
+                precipitation_sum?: number[];
+                weather_code?: number[];
+                wind_speed_10m_max?: number[];
+              };
             };
-          };
-          const rainChance = weather.daily?.precipitation_probability_max?.[0] ?? null;
-          const rainAmount = weather.daily?.precipitation_sum?.[0] ?? null;
-          const risk =
-            rainChance !== null && (rainChance >= 80 || (rainAmount ?? 0) >= 40)
-              ? "high"
-              : rainChance !== null && (rainChance >= 50 || (rainAmount ?? 0) >= 15)
-              ? "elevated"
-              : "normal";
-          const daily = weather.daily;
-          const dailyRows = (daily?.time || []).map((date, index) => ({
-            date,
-            temperatureHighC: daily?.temperature_2m_max?.[index] ?? null,
-            temperatureLowC: daily?.temperature_2m_min?.[index] ?? null,
-            rainChance: daily?.precipitation_probability_max?.[index] ?? null,
-            rainMm: daily?.precipitation_sum?.[index] ?? null,
-            windKmh: daily?.wind_speed_10m_max?.[index] ?? null,
-            weatherCode: daily?.weather_code?.[index] ?? null,
-          }));
-          const forecastDays = dailyRows.slice(-7);
-          const trendDays = dailyRows.slice(0, Math.max(0, dailyRows.length - 7)).slice(-7);
-          return {
-            available: true,
-            source: "Open-Meteo weather model",
-            updatedAt: new Date(),
-            risk,
-            activeFloodZones: activeZones.length,
-            current: {
-              temperatureC: weather.current?.temperature_2m ?? null,
-              precipitationMm: weather.current?.precipitation ?? null,
-              windKmh: weather.current?.wind_speed_10m ?? null,
-              weatherCode: weather.current?.weather_code ?? null,
-            },
-            forecast: { rainChance, rainAmountMm: rainAmount, days: forecastDays },
-            trend: { source: "Modelled daily weather history", days: trendDays },
-            river,
-          };
-        } catch {
-          return {
-            available: false,
-            source: "Weather source unavailable",
-            updatedAt: new Date(),
-            risk: "unknown" as const,
-            activeFloodZones: activeZones.length,
-            current: { temperatureC: null, precipitationMm: null, windKmh: null, weatherCode: null },
-            forecast: { rainChance: null, rainAmountMm: null },
-            river,
-          };
+            const rainChance = weather.daily?.precipitation_probability_max?.[0] ?? null;
+            const rainAmount = weather.daily?.precipitation_sum?.[0] ?? null;
+            const risk =
+              rainChance !== null && (rainChance >= 80 || (rainAmount ?? 0) >= 40)
+                ? "high"
+                : rainChance !== null && (rainChance >= 50 || (rainAmount ?? 0) >= 15)
+                ? "elevated"
+                : "normal";
+            const daily = weather.daily;
+            const dailyRows = (daily?.time || []).map((date, index) => ({
+              date,
+              temperatureHighC: daily?.temperature_2m_max?.[index] ?? null,
+              temperatureLowC: daily?.temperature_2m_min?.[index] ?? null,
+              rainChance: daily?.precipitation_probability_max?.[index] ?? null,
+              rainMm: daily?.precipitation_sum?.[index] ?? null,
+              windKmh: daily?.wind_speed_10m_max?.[index] ?? null,
+              weatherCode: daily?.weather_code?.[index] ?? null,
+            }));
+            const forecastDays = dailyRows.slice(-7);
+            const trendDays = dailyRows.slice(0, Math.max(0, dailyRows.length - 7)).slice(-7);
+            const result = {
+              available: true,
+              source: "Open-Meteo weather model",
+              updatedAt: new Date(),
+              risk,
+              activeFloodZones: activeZones.length,
+              current: {
+                temperatureC: weather.current?.temperature_2m ?? null,
+                precipitationMm: weather.current?.precipitation ?? null,
+                windKmh: weather.current?.wind_speed_10m ?? null,
+                weatherCode: weather.current?.weather_code ?? null,
+              },
+              forecast: { rainChance, rainAmountMm: rainAmount, days: forecastDays },
+              trend: { source: "Modelled daily weather history", days: trendDays },
+              river,
+            };
+
+            // Maintain bounded cache size (<= 50 locations)
+            if (_conditionsCache.size > 50) {
+              const oldestKey = _conditionsCache.keys().next().value;
+              if (oldestKey) _conditionsCache.delete(oldestKey);
+            }
+            _conditionsCache.set(cacheKey, { timestamp: Date.now(), data: result });
+            return result;
+          } catch {
+            const fallback = {
+              available: false,
+              source: "Weather source unavailable",
+              updatedAt: new Date(),
+              risk: "unknown" as const,
+              activeFloodZones: activeZones.length,
+              current: { temperatureC: null, precipitationMm: null, windKmh: null, weatherCode: null },
+              forecast: { rainChance: null, rainAmountMm: null },
+              river,
+            };
+            return fallback;
+          }
+        })();
+
+        _conditionsInFlight.set(cacheKey, fetchPromise);
+        try {
+          return await fetchPromise;
+        } finally {
+          _conditionsInFlight.delete(cacheKey);
         }
       }),
     create: protectedProcedure
@@ -428,7 +473,7 @@ export const rescueRouter = router({
             voiceNote.bytes,
             voiceNote.contentType
           );
-        let incidentId = _memoryIncidents.size + 1;
+        let incidentId = nextIncidentId();
         const db = await database();
         if (db) {
           try {
@@ -451,6 +496,9 @@ export const rescueRouter = router({
               voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
               status: "pending",
             });
+            if (result && (result[0] as any)?.insertId) {
+              incidentId = (result[0] as any).insertId;
+            }
           } catch (err) {
             if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' });
             const { recordDbFailure } = await import("../db");
@@ -1029,14 +1077,8 @@ export const rescueRouter = router({
       }
 
       if (!hospitalId && ctx.user.role === "admin") {
-        // Admin sees all cases across all hospitals
-        const allHospitals = await listHospitals();
-        const results = [];
-        for (const h of allHospitals) {
-          const cases = await listHospitalCaseNotifications(h.id);
-          results.push(...cases);
-        }
-        return results;
+        // Admin sees all cases across all hospitals in a single indexed query
+        return await listHospitalCaseNotifications(null);
       }
 
       if (!hospitalId) return [];

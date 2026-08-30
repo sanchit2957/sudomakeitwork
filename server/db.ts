@@ -46,6 +46,19 @@ export function createDatabasePool(connectionUri: string): mysql.Pool {
   });
 }
 
+export function getDatabasePoolMetrics() {
+  if (!_pool) {
+    return { status: "disconnected", totalConnections: 0, freeConnections: 0, queuedRequests: 0 };
+  }
+  const poolInternal = (_pool as any).pool;
+  return {
+    status: isDbCircuitBroken() ? "circuit_broken" : "connected",
+    totalConnections: poolInternal?._allConnections?.length ?? 0,
+    freeConnections: poolInternal?._freeConnections?.length ?? 0,
+    queuedRequests: poolInternal?._connectionQueue?.length ?? 0,
+  };
+}
+
 let _schemaEnsured = false;
 export async function ensureDatabaseSchema(pool: mysql.Pool) {
   if (_schemaEnsured) return;
@@ -666,9 +679,19 @@ export async function getRoleAccessCode(role: string): Promise<{ id: number; rol
   return _memoryRoleAccessCodes.get(normalizedRole) || null;
 }
 
+const _roleCodeVersionCache = new Map<string, { version: number; cachedAt: number }>();
+
 export async function getRoleCodeVersion(role: string): Promise<number> {
-  const rec = await getRoleAccessCode(role);
-  return rec ? rec.codeVersion : 1;
+  const normalizedRole = role === "medical" ? "hospital" : role;
+  const now = Date.now();
+  const cached = _roleCodeVersionCache.get(normalizedRole);
+  if (cached && now - cached.cachedAt < 10000) {
+    return cached.version;
+  }
+  const rec = await getRoleAccessCode(normalizedRole);
+  const version = rec ? rec.codeVersion : 1;
+  _roleCodeVersionCache.set(normalizedRole, { version, cachedAt: now });
+  return version;
 }
 
 export async function verifyRoleAccessCode(role: string, inputCode: string): Promise<boolean> {
@@ -690,6 +713,7 @@ export async function setRoleAccessCode(
   if (!cleanCode) {
     throw new Error("Access code cannot be empty.");
   }
+  _roleCodeVersionCache.delete(normalizedRole);
   const codeHash = hashPassword(cleanCode);
   const existing = await getRoleAccessCode(normalizedRole);
   const newVersion = (existing?.codeVersion || 0) + 1;

@@ -8,8 +8,18 @@ const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
 });
 
+const timingMiddleware = t.middleware(async ({ path, type, next }) => {
+  const start = performance.now();
+  const result = await next();
+  const duration = performance.now() - start;
+  if (duration > 300) {
+    console.log(`[tRPC Performance] ${type} "${path}" completed in ${duration.toFixed(1)}ms`);
+  }
+  return result;
+});
+
 export const router = t.router;
-export const publicProcedure = t.procedure;
+export const publicProcedure = t.procedure.use(timingMiddleware);
 
 async function validateSessionCodeVersion(user: any) {
   if (!user || (user as any).loginMethod === "test" || user.role === "admin" || user.role === "user") {
@@ -46,9 +56,9 @@ const requireUser = t.middleware(async opts => {
   });
 });
 
-export const protectedProcedure = t.procedure.use(requireUser);
+export const protectedProcedure = publicProcedure.use(requireUser);
 
-export const adminProcedure = t.procedure.use(
+export const adminProcedure = publicProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
@@ -75,7 +85,6 @@ export const rescuerProcedure = protectedProcedure.use(
     if (!user || (user.role !== "rescuer" && user.role !== "admin")) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Rescuer access is required." });
     }
-    await validateSessionCodeVersion(user);
     return opts.next({ ctx: { ...opts.ctx, user } });
   }),
 );
@@ -86,7 +95,6 @@ export const hospitalProcedure = protectedProcedure.use(
     if (!user || (user.role !== "hospital" && user.role !== "medical" && user.role !== "admin")) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Authorized hospital operations access is required." });
     }
-    await validateSessionCodeVersion(user);
     return opts.next({ ctx: { ...opts.ctx, user } });
   }),
 );
@@ -100,7 +108,6 @@ export const operationalProcedure = protectedProcedure.use(
     if (!user || (user.role !== "rescuer" && user.role !== "hospital" && user.role !== "medical" && user.role !== "admin")) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Operational access is required." });
     }
-    await validateSessionCodeVersion(user);
     return opts.next({ ctx: { ...opts.ctx, user } });
   }),
 );
