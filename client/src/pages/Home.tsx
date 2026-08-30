@@ -9,13 +9,13 @@ import { AiBotCard } from "@/components/AiBotCard";
 import { UserProfileBadge } from "@/components/ProfileAvatar";
 import { QuickActionsPanel } from "@/components/QuickActionsPanel";
 import { SahayakAiModal } from "@/components/SahayakAiModal";
-import { flushOfflineSos, queueOfflineSos } from "@/lib/offlineSos";
+import { flushOfflineSos, queueOfflineSos, pendingSosCount } from "@/lib/offlineSos";
 import { getCurrentCoordinates } from "@/lib/nativeLocation";
 import { createAndRedirectAfterRapidSos, redirectAfterRapidSos } from "@/lib/rapidSos";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
-import { CloudRain, MapPin, MoreHorizontal, Navigation, PhoneCall, Radio, ShieldCheck, Siren, ThermometerSun, Waves, Wifi, WifiOff } from "lucide-react";
+import { AlertTriangle, CloudRain, Database, MapPin, MoreHorizontal, Navigation, PhoneCall, Radio, RefreshCw, ShieldCheck, Siren, ThermometerSun, Waves, Wifi, WifiOff } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -26,7 +26,7 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
-  const [online, setOnline] = useState(() => navigator.onLine);
+  const [online, setOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
   const [position, setPosition] = useState<Point | null>(null);
   const [locationStatus, setLocationStatus] = useState<"finding" | "ready" | "unavailable">("finding");
   const [rapidStatus, setRapidStatus] = useState<"idle" | "locating" | "sending" | "queued" | "error">("idle");
@@ -34,6 +34,8 @@ export default function Home() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [manualLocation, setManualLocation] = useState<{ name: string; lat: number; lng: number } | null>(null);
   const [isGpsActive, setIsGpsActive] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const activeWeatherCoords = manualLocation
     ? { latitude: manualLocation.lat, longitude: manualLocation.lng }
@@ -43,6 +45,10 @@ export default function Home() {
 
   const conditions = trpc.rescue.emergency.conditions.useQuery(activeWeatherCoords || {}, { refetchInterval: 15 * 60_000, refetchOnWindowFocus: true });
   const createSos = trpc.rescue.emergency.create.useMutation();
+
+  const refreshPending = () => {
+    void pendingSosCount().then(count => setPendingCount(count));
+  };
 
   const handleLocationChange = (lat: number, lng: number, name: string) => {
     setManualLocation({ name, lat, lng });
@@ -58,24 +64,46 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const sync = () => setOnline(navigator.onLine);
-    window.addEventListener("online", sync); window.addEventListener("offline", sync);
+    refreshPending();
+    const sync = () => {
+      setOnline(navigator.onLine);
+      refreshPending();
+    };
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    window.addEventListener("sudo-sos-outbox", refreshPending);
     void getCurrentCoordinates({ enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 })
       .then(result => { setPosition(result); setLocationStatus("ready"); })
       .catch(() => setLocationStatus("unavailable"));
-    return () => { window.removeEventListener("online", sync); window.removeEventListener("offline", sync); };
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+      window.removeEventListener("sudo-sos-outbox", refreshPending);
+    };
   }, []);
+
+  const triggerFlush = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const result = await flushOfflineSos(payload => createSos.mutateAsync(payload));
+      refreshPending();
+      if (result.delivered.length > 0) {
+        clearSosVoiceNote();
+        setRapidStatus("idle");
+        setRapidNotice(t("Offline SOS successfully dispatched to State Command Centre!"));
+        redirectAfterRapidSos(result.delivered[0], setLocation);
+      }
+    } catch {
+      // Retain in IndexedDB
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (!online || !user) return;
-    void flushOfflineSos(payload => createSos.mutateAsync(payload)).then(result => {
-      const deliveredCode = result.delivered[0];
-      if (!deliveredCode) return;
-      clearSosVoiceNote();
-      setRapidStatus("idle");
-      setRapidNotice("");
-      redirectAfterRapidSos(deliveredCode, setLocation);
-    });
+    void triggerFlush();
   }, [online, user?.id]);
 
   const startRapidSos = () => {
@@ -101,9 +129,10 @@ export default function Home() {
       if (!navigator.onLine) {
         const guestKey = localStorage.getItem("sudo-makeitwork-guest-key") || crypto.randomUUID().replaceAll("-", "");
         localStorage.setItem("sudo-makeitwork-guest-key", guestKey);
-        queueOfflineSos({ ...payload, guestKey });
+        await queueOfflineSos({ ...payload, guestKey });
+        refreshPending();
         setRapidStatus("queued");
-        setRapidNotice(t("SOS is saved on this phone and will send automatically when connection returns."));
+        setRapidNotice(t("SOS saved in device database (IndexedDB). Will automatically transmit to Command Centre when signal returns."));
         return;
       }
 
@@ -114,6 +143,16 @@ export default function Home() {
         setRapidStatus("idle");
       } catch (error) {
         const message = error instanceof Error ? error.message : "";
+        const isNetworkFail = !navigator.onLine || /fetch|network|failed to fetch|timeout|abort|econnrefused/i.test(message);
+        if (isNetworkFail) {
+          const guestKey = localStorage.getItem("sudo-makeitwork-guest-key") || crypto.randomUUID().replaceAll("-", "");
+          localStorage.setItem("sudo-makeitwork-guest-key", guestKey);
+          await queueOfflineSos({ ...payload, guestKey });
+          refreshPending();
+          setRapidStatus("queued");
+          setRapidNotice(t("Network dropped. SOS is safely preserved in device database (IndexedDB) and auto-syncing."));
+          return;
+        }
         const isSafeInputMessage = /^(Voice notes|Evidence|Locations|Available beds)/.test(message);
         setRapidStatus("error");
         setRapidNotice(isSafeInputMessage ? t(message) : t("SOS could not be sent. Check connection and try again."));
@@ -152,6 +191,30 @@ export default function Home() {
         </span>
       </div>
     </header>
+
+    {pendingCount > 0 && (
+      <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-50/90 p-3.5 text-xs text-amber-950 shadow-sm dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 font-bold">
+            <Database className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <span>{pendingCount} {pendingCount === 1 ? t("Offline SOS Saved in Phone (IndexedDB)") : t("Offline SOS Alerts Saved (IndexedDB)")}</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isSyncing || !online}
+            onClick={triggerFlush}
+            className="h-7 rounded-xl border-amber-600/40 bg-amber-600 px-2.5 text-[11px] font-bold text-white hover:bg-amber-700 active:scale-95"
+          >
+            <RefreshCw className={`mr-1 h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />
+            {isSyncing ? t("Syncing…") : t("Sync Now")}
+          </Button>
+        </div>
+        <p className="mt-1 text-[11px] opacity-90">
+          {t("Your rescue signal is securely stored on this phone and will transmit to Assam State Command automatically as soon as internet signal is detected.")}
+        </p>
+      </div>
+    )}
 
     <section className="mt-6 flex flex-col items-center"><button onClick={startRapidSos} disabled={authLoading || rapidStatus === "locating" || rapidStatus === "sending"} aria-label={t("Send SOS")} className="group isolate grid h-44 w-44 shrink-0 aspect-square place-items-center overflow-hidden rounded-[9999px] border border-white/55 bg-[linear-gradient(145deg,rgba(255,109,118,.91),rgba(209,47,55,.84)_55%,rgba(174,27,36,.9))] text-white ring-1 ring-[#ca3540]/25 backdrop-blur-md transition active:scale-[.975] disabled:cursor-wait disabled:opacity-80"><span aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-3 h-16 rounded-full bg-white/25 blur-md" /><span className="relative z-10 grid place-items-center">{rapidStatus === "locating" || rapidStatus === "sending" ? <Radio className="mb-2 h-8 w-8 animate-pulse" /> : <Siren className="mb-1 h-7 w-7" />}<span className="text-5xl font-black tracking-[-0.08em]">SOS</span><span className="mt-1 text-xs font-bold">{rapidStatus === "locating" ? t("Getting location") : rapidStatus === "sending" ? t("Sending SOS") : user ? t("Tap for immediate help") : t("Sign in to activate")}</span></span></button><p className="mt-6 flex items-center gap-2 rounded-full bg-[#fff3ef] px-3 py-1.5 text-[11px] font-bold text-[#a43d3e]"><Waves className="h-3.5 w-3.5" />{t("Use this only for an emergency")}</p>{rapidNotice && <p role="status" className={`mt-3 max-w-xs text-center text-xs font-semibold leading-5 ${rapidStatus === "error" ? "text-[#b73f43]" : "text-[#38675d]"}`}>{rapidNotice}</p>}</section>
 

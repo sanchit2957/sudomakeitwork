@@ -203,4 +203,61 @@ describe("n8n SOS Escalation & Status Monitoring Integration", () => {
     expect(updated?.automationStatus).toBe("escalated_level_2");
     expect(updated?.lastEscalatedAt).toBeDefined();
   });
+
+  it("Accepts offline SOS via POST /api/sos/offline and stores incident with valid public code", async () => {
+    const app = express();
+    app.use(express.json());
+    registerN8nRoutes(app);
+
+    const postHandler = (app as any)._router.stack.find(
+      (s: any) => s.route?.path === "/api/sos/offline" && s.route?.methods?.post
+    )?.route?.stack[0]?.handle;
+
+    expect(postHandler).toBeDefined();
+
+    const req = {
+      body: {
+        locationLabel: "Silchar Flood Evacuation Point",
+        latitude: 24.8333,
+        longitude: 92.7789,
+        emergencyType: "flood",
+        severity: "critical",
+        peopleAffected: 5,
+        notes: "Family stranded on rooftop with elderly person",
+      },
+    };
+
+    let responseData: any = null;
+    let statusCode: number = 200;
+    const res = {
+      status: (code: number) => {
+        statusCode = code;
+        return {
+          json: (data: any) => {
+            responseData = data;
+            return data;
+          },
+        };
+      },
+      json: (data: any) => {
+        responseData = data;
+        return data;
+      },
+    };
+
+    await postHandler(req, res);
+
+    expect(statusCode).toBe(201);
+    expect(responseData).not.toBeNull();
+    expect(responseData.publicCode).toMatch(/^SOS-[A-Z0-9]{8}$/);
+    expect(responseData.incidentId).toBeDefined();
+    expect(responseData.status).toBe("pending");
+
+    const saved = await getIncidentById(responseData.incidentId);
+    expect(saved).not.toBeNull();
+    expect(saved?.locationLabel).toBe("Silchar Flood Evacuation Point");
+    expect(saved?.latitude).toBe(24.8333);
+    expect(saved?.longitude).toBe(92.7789);
+    expect(saved?.peopleAffected).toBe(5);
+  });
 });

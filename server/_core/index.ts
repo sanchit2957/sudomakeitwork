@@ -9,6 +9,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { donationRouter } from "../routers/donations";
+import { registerN8nRoutes } from "../n8n";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
@@ -116,6 +117,9 @@ async function startServer() {
   registerOAuthRoutes(app);
   app.use("/api", donationRouter);
   app.use("/", donationRouter);
+
+  // n8n webhook routes + offline SOS endpoint
+  registerN8nRoutes(app);
 
   // tRPC API
   app.use("/api/trpc", (_req, res, next) => {
