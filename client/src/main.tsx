@@ -106,7 +106,15 @@ const trpcClient = trpc.createClient({
         return headers;
       },
       fetch(input, init) {
-        return globalThis.fetch(input, {
+        let target = input;
+        if (typeof target === "string" && target.startsWith("/")) {
+          target = getApiUrl(target);
+        }
+        if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform?.()) {
+          const urlStr = typeof target === "string" ? target : (target as Request).url;
+          console.log("[Mobile Request]", init?.method || "GET", urlStr);
+        }
+        return globalThis.fetch(target, {
           ...(init ?? {}),
           credentials: "include",
           cache: "no-store",

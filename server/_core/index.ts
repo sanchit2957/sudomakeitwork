@@ -67,14 +67,17 @@ async function startServer() {
     cors({
       origin: (origin, callback) => {
         // Allow requests with no origin (like native mobile apps, server-to-server)
-        if (!origin) return callback(null, true);
+        if (!origin || origin === "null") return callback(null, true);
         // Allow Capacitor local origins and localhost
         if (
           origin === "capacitor://localhost" ||
+          origin === "ionic://localhost" ||
           origin === "https://localhost" ||
           origin === "http://localhost" ||
           origin.startsWith("http://localhost:") ||
+          origin.startsWith("https://localhost:") ||
           origin.startsWith("http://127.0.0.1:") ||
+          origin.startsWith("https://127.0.0.1:") ||
           origin.startsWith("http://10.0.2.2:") // Android emulator host alias
         ) {
           return callback(null, true);

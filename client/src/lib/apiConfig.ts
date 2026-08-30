@@ -2,10 +2,24 @@ import { Capacitor } from "@capacitor/core";
 
 export const DEFAULT_PRODUCTION_API_URL = "https://assam-rescue-platform.onrender.com";
 
+export function isNativeApp(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (Capacitor.isNativePlatform()) return true;
+    const platform = Capacitor.getPlatform();
+    if (platform === "android" || platform === "ios") return true;
+    if ((window as any).Capacitor?.isNativePlatform?.()) return true;
+    if (window.location.protocol === "capacitor:" || window.location.protocol === "ionic:") return true;
+    // Android WebView User Agent check fallback
+    if (navigator.userAgent.includes("wv") || navigator.userAgent.includes("Capacitor")) return true;
+  } catch {}
+  return false;
+}
+
 /**
  * Returns the base API URL for backend communication.
- * In a native mobile APK (Capacitor), requests need to reach the hosted backend API
- * rather than https://localhost. In web browser deployments, relative URLs are used by default.
+ * In a native mobile APK (Capacitor), requests MUST reach the hosted backend API
+ * (https://assam-rescue-platform.onrender.com) rather than https://localhost.
  */
 export function getApiBaseUrl(): string {
   // 1. Check runtime window override or stored preference if configured
@@ -24,24 +38,37 @@ export function getApiBaseUrl(): string {
     }
   }
 
-  // 2. In browser development mode on localhost, always use local relative URLs
-  if (typeof window !== "undefined" && !Capacitor.isNativePlatform() && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+  // 2. If running inside native mobile app (Capacitor Android/iOS), ALWAYS use hosted production API
+  if (isNativeApp()) {
+    return DEFAULT_PRODUCTION_API_URL;
+  }
+
+  // 3. In browser development mode on localhost (vite dev server), use relative URLs for dev proxy
+  if (
+    import.meta.env.DEV &&
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  ) {
     return "";
   }
 
-  // 3. Check build-time environment variable (for remote production or native builds)
+  // 4. Check build-time environment variable
   const envUrl = import.meta.env.VITE_API_URL;
   if (typeof envUrl === "string" && envUrl.trim().length > 0) {
     return envUrl.trim().replace(/\/+$/, "");
   }
 
-  // 4. Native fallback: default production API if running in native app
-  if (Capacitor.isNativePlatform()) {
-    return DEFAULT_PRODUCTION_API_URL;
+  // 5. In production web deployment on standard hosting, relative URLs are standard
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1"
+  ) {
+    return "";
   }
 
-  // 5. Default web behavior: relative URLs
-  return "";
+  // 6. Default fallback for build-time or mobile environment
+  return DEFAULT_PRODUCTION_API_URL;
 }
 
 /**
@@ -63,12 +90,4 @@ export function getApiUrl(path: string): string {
 
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${base}${cleanPath}`;
-}
-
-export function isNativeApp(): boolean {
-  try {
-    return Capacitor.isNativePlatform();
-  } catch {
-    return false;
-  }
 }
