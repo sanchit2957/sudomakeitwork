@@ -17,8 +17,14 @@ export const startLogin = (redirectPath?: string) => {
   const appId = import.meta.env.VITE_APP_ID;
 
   if (!oauthPortalUrl) {
-    const target = redirectPath || window.location.pathname;
-    window.location.href = `/login${target && target !== "/login" ? `?redirect=${encodeURIComponent(target)}` : ""}`;
+    if (typeof window === "undefined") return;
+    const current = window.location.pathname;
+    if (current === "/login" || current.startsWith("/user/login") || current.startsWith("/responder/login")) {
+      return;
+    }
+    const target = redirectPath || (current !== "/" && !current.includes("index.html") ? current : "");
+    const dest = `/login${target && target !== "/login" ? `?redirect=${encodeURIComponent(target)}` : ""}`;
+    window.location.href = dest;
     return;
   }
 

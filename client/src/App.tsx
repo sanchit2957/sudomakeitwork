@@ -70,10 +70,8 @@ function Router() {
           <Route path={"/hospital/login"} component={HospitalLogin} />
           <Route path={"/medical/login"} component={HospitalLogin} />
 
-          {/* Main Entry: Registration & Sign In first if not logged in */}
-          <Route path={"/"}>
-            {user ? <UserHome /> : <UserLogin />}
-          </Route>
+          {/* Main Entry: User Home Emergency Hub */}
+          <Route path={"/"} component={UserHome} />
 
         {/* User Section Routes */}
         <Route path={"/emergency"}>

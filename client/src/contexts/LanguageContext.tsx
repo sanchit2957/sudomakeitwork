@@ -836,8 +836,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Run synchronous pass immediately on locale change
+    // Run pass immediately on locale change
     applyTree(document.body);
+
+    // If English, all text has been restored to default. No background DOM observer needed!
+    if (locale === "en") return;
 
     let pendingNodes: Node[] = [];
     let frameId: number | null = null;
@@ -865,7 +868,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       if (pendingNodes.length > 0 && frameId === null) {
         frameId = typeof window !== "undefined" && window.requestAnimationFrame
           ? window.requestAnimationFrame(processPending)
-          : (setTimeout(processPending, 0) as any);
+          : (setTimeout(processPending, 50) as any);
       }
     });
 

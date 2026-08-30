@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
+import { Capacitor } from "@capacitor/core";
 import App from "./App";
 import { startLogin } from "./const";
 import "leaflet/dist/leaflet.css";
@@ -14,7 +15,7 @@ const queryClient = new QueryClient();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV || Capacitor.isNativePlatform()) {
       void navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(registrations.map(registration => registration.unregister())));
       return;
     }
@@ -28,8 +29,13 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
 
+  // On Native Mobile APK (Capacitor), do NOT use window.location.href hard-redirects
+  if (Capacitor.isNativePlatform()) return;
+
   const pathname = window.location.pathname;
   if (
+    pathname === "/" ||
+    pathname.includes("index.html") ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/admin/login") ||
     pathname.startsWith("/user/login") ||
@@ -59,7 +65,6 @@ queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
-    console.error("[API Query Error]", error);
   }
 });
 
@@ -67,7 +72,6 @@ queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);
-    console.error("[API Mutation Error]", error);
   }
 });
 
@@ -79,13 +83,11 @@ const trpcClient = trpc.createClient({
       headers() {
         const headers: Record<string, string> = {};
         try {
-          // Native mobile runtime (Capacitor) uses isolated bearer token storage if running native APK
-          const isNative = typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform?.();
-          if (isNative) {
-            const nativeToken = localStorage.getItem("app_native_bearer_token");
-            if (nativeToken) {
-              headers["Authorization"] = `Bearer ${nativeToken}`;
-            }
+          const nativeToken =
+            localStorage.getItem("app_native_bearer_token") ||
+            localStorage.getItem("app-runtime-session-token");
+          if (nativeToken) {
+            headers["Authorization"] = `Bearer ${nativeToken}`;
           }
         } catch {}
         return headers;

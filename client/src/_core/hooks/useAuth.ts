@@ -20,11 +20,12 @@ type UseAuthOptions = {
   redirectPath?: string;
 };
 
-// Helper for native Capacitor mobile client token isolation
+// Helper for client session token persistence and native mobile bearer authorization
 function storeNativeTokenIfPresent(sessionToken?: string) {
-  if (sessionToken && typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+  if (sessionToken && typeof window !== "undefined") {
     try {
       localStorage.setItem("app_native_bearer_token", sessionToken);
+      localStorage.setItem("app-runtime-session-token", sessionToken);
     } catch {}
   }
 }
