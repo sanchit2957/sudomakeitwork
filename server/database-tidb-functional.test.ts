@@ -1,9 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { appRouter } from "./routers";
 import { _memoryIncidents, _memoryMissions, _memoryHospitals, _memoryRescueProfiles } from "./rescue.db";
+import { setRoleAccessCode } from "./db";
 
 describe("Real Database Functionality & Workflows", () => {
   it("authenticates Citizen, Rescuer, Medical, and Admin accounts with correct password verification", async () => {
+    await setRoleAccessCode("rescuer", "RESCUER-2026", 1);
+    await setRoleAccessCode("hospital", "HOSPITAL-2026", 1);
+
     const caller = appRouter.createCaller({
       req: { headers: {} } as any,
       res: { cookie: vi.fn(), clearCookie: vi.fn() } as any,
@@ -19,23 +23,43 @@ describe("Real Database Functionality & Workflows", () => {
     expect(citizenLogin.user?.role).toBe("user");
     expect(citizenLogin.user?.email).toBe("citizen@assamrescue.gov.in");
 
-    // 2. Rescuer login
+    // 2. Rescuer registration + login
+    const rescuerEmail = `rescuer_${Date.now()}@assamrescue.gov.in`;
+    await caller.auth.register({
+      name: "Inspector Barua",
+      email: rescuerEmail,
+      password: "rescuer-password",
+      role: "rescuer",
+      governmentCode: "RESCUER-2026",
+    });
+
     const rescuerLogin = await caller.auth.login({
-      email: "rescuer@assamrescue.gov.in",
-      password: "rescuer",
+      email: rescuerEmail,
+      password: "rescuer-password",
+      governmentCode: "RESCUER-2026",
     });
     expect(rescuerLogin.success).toBe(true);
     expect(rescuerLogin.user?.role).toBe("rescuer");
-    expect(rescuerLogin.user?.email).toBe("rescuer@assamrescue.gov.in");
+    expect(rescuerLogin.user?.email).toBe(rescuerEmail);
 
-    // 3. Hospital login
+    // 3. Hospital registration + login
+    const hospitalEmail = `hospital_${Date.now()}@assamrescue.gov.in`;
+    await caller.auth.register({
+      name: "Dr. Hazarika",
+      email: hospitalEmail,
+      password: "hospital-password",
+      role: "hospital",
+      governmentCode: "HOSPITAL-2026",
+    });
+
     const medicalLogin = await caller.auth.login({
-      email: "medical@assamrescue.gov.in",
-      password: "medical",
+      email: hospitalEmail,
+      password: "hospital-password",
+      governmentCode: "HOSPITAL-2026",
     });
     expect(medicalLogin.success).toBe(true);
     expect(medicalLogin.user?.role).toBe("hospital");
-    expect(medicalLogin.user?.email).toBe("medical@assamrescue.gov.in");
+    expect(medicalLogin.user?.email).toBe(hospitalEmail);
 
     // 4. Admin login
     const adminLogin = await caller.auth.login({
@@ -95,6 +119,8 @@ describe("Real Database Functionality & Workflows", () => {
         name: "Inspector Barua",
         email: "rescuer@assamrescue.gov.in",
         role: "rescuer",
+        loginMethod: "test",
+        codeVersion: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
         lastSignedIn: new Date(),

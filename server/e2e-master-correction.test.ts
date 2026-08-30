@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { appRouter } from "./routers";
-import { getDb } from "./db";
+import { getDb, setRoleAccessCode } from "./db";
 import { sdk } from "./_core/sdk";
 import { COOKIE_NAME } from "../shared/const";
 import { _memoryIncidents, _memoryHospitals, _memoryRescueProfiles, listShelters } from "./rescue.db";
@@ -53,10 +53,22 @@ describe("E2E Master Correction & Security Hardening Test Suite", () => {
   });
 
   it("2. Rescuer Login: authenticates rescuer with proper role", async () => {
+    await setRoleAccessCode("rescuer", "RESCUER-2026", 1);
     const { caller } = createCallerForUser(null);
+    const uniqueEmail = `rescuer_${Date.now()}@assamrescue.gov.in`;
+
+    await caller.auth.register({
+      name: "Field Officer",
+      email: uniqueEmail,
+      password: "securePassword123",
+      role: "rescuer",
+      governmentCode: "RESCUER-2026",
+    });
+
     const res = await caller.auth.login({
-      email: "rescuer@assamrescue.gov.in",
-      password: "rescuer",
+      email: uniqueEmail,
+      password: "securePassword123",
+      governmentCode: "RESCUER-2026",
     });
 
     expect(res.success).toBe(true);
@@ -65,10 +77,22 @@ describe("E2E Master Correction & Security Hardening Test Suite", () => {
   });
 
   it("3. Medical Login: authenticates medical staff with canonical hospital/medical role", async () => {
+    await setRoleAccessCode("hospital", "HOSPITAL-2026", 1);
     const { caller } = createCallerForUser(null);
+    const uniqueEmail = `hospital_${Date.now()}@assamrescue.gov.in`;
+
+    await caller.auth.register({
+      name: "Hospital Coordinator",
+      email: uniqueEmail,
+      password: "medicalPassword123",
+      role: "hospital",
+      governmentCode: "HOSPITAL-2026",
+    });
+
     const res = await caller.auth.login({
-      email: "medical@assamrescue.gov.in",
-      password: "medical",
+      email: uniqueEmail,
+      password: "medicalPassword123",
+      governmentCode: "HOSPITAL-2026",
     });
 
     expect(res.success).toBe(true);

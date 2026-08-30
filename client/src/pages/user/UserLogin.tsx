@@ -112,7 +112,11 @@ export default function UserLogin() {
     setIsSubmitting(true);
     setErrorMessage("");
     try {
-      const res = await login({ email: email.trim(), password: password.trim() });
+      const res = await login({
+        email: email.trim(),
+        password: password.trim(),
+        role: "user",
+      });
       setSuccessMessage("Signed in successfully! Redirecting…");
       const targetRole = res?.user?.role || "user";
       setLocation(getDashboardDestinationForRole(targetRole));
@@ -187,13 +191,42 @@ export default function UserLogin() {
     }
   };
 
+  const [regPassword, setRegPassword] = useState("");
+  const [showRegPassword, setShowRegPassword] = useState(false);
+
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
+    if (!regName.trim()) {
+      setErrorMessage("Please enter your full name.");
+      return;
+    }
     if (!regEmail || !regEmail.includes("@")) {
       setErrorMessage("Please enter a valid email address.");
       return;
     }
-    await handleSendOtp(regEmail);
+    if (!regPassword || regPassword.length < 4) {
+      setErrorMessage("Please enter a secure password (at least 4 characters).");
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      const res = await register({
+        name: regName.trim(),
+        email: regEmail.trim(),
+        password: regPassword.trim(),
+        phone: regPhone.trim() || undefined,
+        role: "user",
+      });
+      setSuccessMessage("Account created successfully! Redirecting…");
+      const targetRole = res?.user?.role || "user";
+      setLocation(getDashboardDestinationForRole(targetRole));
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Registration failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getDashboardDestinationForRole = (role: string) => {
@@ -225,10 +258,10 @@ export default function UserLogin() {
             </span>
             <span>
               <span className="block text-base font-black tracking-tight leading-tight">
-                sudo <span className="text-[#da3e42]">MakeItWork</span>
+                Assam Emergency Network
               </span>
               <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-[#5d7c74] dark:text-[#94a3b8]">
-                Assam Emergency Network
+                Disaster Management Authority
               </span>
             </span>
           </button>
@@ -597,18 +630,8 @@ export default function UserLogin() {
                 </div>
               </div>
             ) : (
-              /* CITIZEN REGISTRATION FORM - PURE OTP */
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!regEmail || !regEmail.includes("@")) {
-                    setErrorMessage("Please enter a valid email address.");
-                    return;
-                  }
-                  handleSendOtp(regEmail);
-                }}
-                className="space-y-3.5"
-              >
+              /* CITIZEN REGISTRATION FORM - SELF-SERVICE SIGNUP */
+              <form onSubmit={handleRegister} className="space-y-3.5">
                 <div>
                   <Label htmlFor="reg-name" className="text-xs font-bold">Full Name</Label>
                   <Input
@@ -638,6 +661,31 @@ export default function UserLogin() {
                 </div>
 
                 <div>
+                  <Label htmlFor="reg-pwd" className="text-xs font-bold">Create Password</Label>
+                  <div className="relative mt-1">
+                    <Input
+                      id="reg-pwd"
+                      type={showRegPassword ? "text" : "password"}
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="Enter a secure password (min. 4 characters)"
+                      className="h-10 rounded-xl pr-10 text-sm"
+                      autoComplete="new-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      tabIndex={-1}
+                      aria-label={showRegPassword ? "Hide password" : "Show password"}
+                    >
+                      {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
                   <Label htmlFor="reg-phone" className="text-xs font-bold">Phone Number (Optional)</Label>
                   <Input
                     id="reg-phone"
@@ -651,17 +699,17 @@ export default function UserLogin() {
                 </div>
 
                 <p className="rounded-xl bg-[#f0faf6] p-3 text-[11px] font-semibold leading-relaxed text-[#285f55] dark:bg-emerald-950/30 dark:text-emerald-300">
-                  🛡️ A 6-digit verification code will be sent to your email to activate your Citizen profile.
+                  🛡️ Instant self-service registration. Set your own password to access citizen disaster alerts and SOS features.
                 </p>
 
                 <div className="pt-2">
                   <Button
                     type="submit"
-                    disabled={isSubmitting || !regEmail.trim()}
+                    disabled={isSubmitting || !regName.trim() || !regEmail.trim() || !regPassword.trim()}
                     className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
                   >
-                    <Mail className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Sending OTP…" : "Register with Email OTP"}
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    {isSubmitting ? "Creating Account…" : "Create Citizen Account"}
                   </Button>
                 </div>
               </form>

@@ -22,6 +22,7 @@ export type SessionPayload = {
   openId: string;
   appId: string;
   name: string;
+  codeVersion?: number;
 };
 
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
@@ -162,13 +163,14 @@ class SDKServer {
    */
   async createSessionToken(
     openId: string,
-    options: { expiresInMs?: number; name?: string } = {}
+    options: { expiresInMs?: number; name?: string; codeVersion?: number } = {}
   ): Promise<string> {
     return this.signSession(
       {
         openId,
         appId: ENV.appId || "local-app",
         name: options.name || "User",
+        codeVersion: options.codeVersion,
       },
       options
     );
@@ -187,6 +189,7 @@ class SDKServer {
       openId: payload.openId,
       appId: payload.appId || "local-app",
       name: payload.name || "User",
+      ...(payload.codeVersion !== undefined ? { codeVersion: payload.codeVersion } : {}),
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setExpirationTime(expirationSeconds)
@@ -195,7 +198,7 @@ class SDKServer {
 
   async verifySession(
     cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string } | null> {
+  ): Promise<{ openId: string; appId: string; name: string; codeVersion?: number } | null> {
     if (!cookieValue) {
       return null;
     }
@@ -205,7 +208,7 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
-      const { openId, appId, name } = payload as Record<string, unknown>;
+      const { openId, appId, name, codeVersion } = payload as Record<string, unknown>;
 
       if (!isNonEmptyString(openId)) {
         console.warn("[Auth] Session payload missing openId");
@@ -216,6 +219,7 @@ class SDKServer {
         openId,
         appId: typeof appId === "string" && appId ? appId : "local-app",
         name: typeof name === "string" && name ? name : "User",
+        codeVersion: typeof codeVersion === "number" ? codeVersion : undefined,
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
@@ -292,7 +296,10 @@ class SDKServer {
       });
     } catch {}
 
-    return user;
+    return {
+      ...user,
+      codeVersion: session.codeVersion,
+    };
   }
 }
 
@@ -302,6 +309,7 @@ const CRON_OPEN_ID_PREFIX = "cron_";
 export type AuthenticatedUser = User & {
   taskUid?: string;
   isCron?: boolean;
+  codeVersion?: number;
 };
 
 function buildCronUser(

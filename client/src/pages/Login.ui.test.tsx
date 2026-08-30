@@ -81,7 +81,7 @@ describe("Login UI & Role Access Gate", () => {
     expect(screen.getByText("Create Account")).toBeTruthy();
     expect(screen.getByLabelText(/Full Name/i)).toBeTruthy();
     expect(screen.getByLabelText(/Email Address/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Register with Email OTP/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Create Citizen Account/i })).toBeTruthy();
   });
 
   it("renders bottom role access portals for Field Rescuers and Hospitals", () => {

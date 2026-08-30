@@ -22,7 +22,8 @@ describe("dedicated operational portal login", () => {
     render(<Component />);
     fireEvent.change(screen.getByLabelText("Email or Username"), { target: { value: "account" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password" } });
-    fireEvent.click(screen.getByRole("button", { name: new RegExp(`Sign In to ${_name}`, "i") }));
+    fireEvent.change(screen.getByPlaceholderText(/Government Access Code/i), { target: { value: "GOV-CODE-123" } });
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`Sign In as`, "i") }));
     await waitFor(() => expect(runtime.navigate).toHaveBeenCalledWith(destination));
   });
 
@@ -37,7 +38,8 @@ describe("dedicated operational portal login", () => {
     render(<Component />);
     fireEvent.change(screen.getByLabelText("Email or Username"), { target: { value: "account" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password" } });
-    fireEvent.click(screen.getByRole("button", { name: new RegExp(`Sign In to ${_name}`, "i") }));
+    fireEvent.change(screen.getByPlaceholderText(/Government Access Code/i), { target: { value: "GOV-CODE-123" } });
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`Sign In as`, "i") }));
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/not authorized/i));
     expect(runtime.logout).toHaveBeenCalled();
     expect(runtime.navigate).not.toHaveBeenCalledWith(_name === "rescuer" ? "/responder" : "/hospital");

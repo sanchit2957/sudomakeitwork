@@ -200,8 +200,8 @@ export function registerN8nRoutes(app: Express) {
         incidentId: incident.id,
         publicCode: incident.publicCode,
         status: refreshed?.status ?? incident.status,
-        escalationLevel: refreshed?.escalationLevel ?? 0,
-        automationStatus: refreshed?.automationStatus ?? "active",
+        escalationLevel: (refreshed as any)?.escalationLevel ?? 0,
+        automationStatus: (refreshed as any)?.automationStatus ?? "active",
       });
     } catch (err: any) {
       console.error("[REST API] Error recording automation event:", err);

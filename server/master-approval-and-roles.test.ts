@@ -4,6 +4,7 @@ import { canEditHospitalResources } from "./hospital-registration.policy";
 import { canRequestRescuerRegistration } from "./registration.policy";
 import { getInitialSeedPassword } from "./seed";
 import { _memoryRescuerRequests, _memoryHospitalRequests, _memoryUsers, _memoryRescueProfiles, _memoryHospitals, _memoryHospitalStaffProfiles } from "./rescue.db";
+import { setRoleAccessCode, getRoleCodeVersion } from "./db";
 
 describe("Master Implementation — Approval Lifecycle, Role Hierarchy & Security Matrix", () => {
   beforeEach(() => {
@@ -98,22 +99,25 @@ describe("Master Implementation — Approval Lifecycle, Role Hierarchy & Securit
       expect(approvalRes.success).toBe(true);
 
       // 4. After approval, user re-authenticates to get their updated role (ACTIVE rescuer)
+      await setRoleAccessCode("rescuer", "ASSAM-RESC-ACTIVE-2026", 1);
       const refreshedLogin = await publicCaller.auth.login({
         email: uniqueEmail,
         password: "password123",
+        governmentCode: "ASSAM-RESC-ACTIVE-2026",
       });
       expect(refreshedLogin.user?.role).toBe("rescuer");
 
+      const rescuerVersion = await getRoleCodeVersion("rescuer");
       const activeRescuerCaller = appRouter.createCaller({
         req: { headers: {} } as any,
         res: { cookie: vi.fn(), clearCookie: vi.fn() } as any,
-        user: refreshedLogin.user as any,
+        user: { ...refreshedLogin.user, codeVersion: rescuerVersion } as any,
       });
 
       const profile = await activeRescuerCaller.rescue.rescuer.profile();
       expect(profile).toBeDefined();
-      expect(profile.callSign).toBe("Guwahati Fast Boat 9");
-      expect(profile.userId).toBe(applicantUser.id);
+      expect(profile!.callSign).toBe("Guwahati Fast Boat 9");
+      expect(profile!.userId).toBe(applicantUser.id);
 
       const missions = await activeRescuerCaller.rescue.rescuer.missions();
       expect(Array.isArray(missions)).toBe(true);
@@ -240,16 +244,19 @@ describe("Master Implementation — Approval Lifecycle, Role Hierarchy & Securit
       expect(approval.hospitalId).toBeDefined();
 
       // 4. After approval, user re-authenticates to get their updated role (ACTIVE hospital)
+      await setRoleAccessCode("hospital", "ASSAM-HOSP-CODE-200", 1);
       const refreshedMedicalLogin = await publicCaller.auth.login({
         email: uniqueEmail,
         password: "password123",
+        governmentCode: "ASSAM-HOSP-CODE-200",
       });
       expect(refreshedMedicalLogin.user?.role).toBe("hospital");
 
+      const hospVersion = await getRoleCodeVersion("hospital");
       const activeMedicalCaller = appRouter.createCaller({
         req: { headers: {} } as any,
         res: { cookie: vi.fn(), clearCookie: vi.fn() } as any,
-        user: refreshedMedicalLogin.user as any,
+        user: { ...refreshedMedicalLogin.user, codeVersion: hospVersion } as any,
       });
 
       const myHospitals = await activeMedicalCaller.rescue.operations.hospitals();

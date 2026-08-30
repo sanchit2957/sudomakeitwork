@@ -54,6 +54,7 @@ export default function AdminLogin() {
       const res = await login({
         email: email.trim(),
         password: password,
+        role: "admin",
       });
 
       const role = res.user?.role;
@@ -83,7 +84,7 @@ export default function AdminLogin() {
             </span>
             <span>
               <span className="block text-base font-black tracking-tight">
-                sudo <span className="text-[#da3e42]">MakeItWork</span>
+                Assam Emergency Network
               </span>
               <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-[#5d7c74] dark:text-[#94a3b8]">
                 State Disaster Management

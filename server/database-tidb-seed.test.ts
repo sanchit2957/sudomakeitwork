@@ -5,8 +5,6 @@ describe("Database Seed & Account Integrity", () => {
   it("generates valid salted scrypt hashes for all 4 seed accounts", () => {
     const accounts = [
       { email: "citizen@assamrescue.gov.in", raw: "citizen" },
-      { email: "rescuer@assamrescue.gov.in", raw: "rescuer" },
-      { email: "medical@assamrescue.gov.in", raw: "medical" },
       { email: "admin@assamrescue.gov.in", raw: "admin" },
     ];
 
@@ -32,7 +30,7 @@ describe("Database Seed & Account Integrity", () => {
     expect(typeof seedDatabase).toBe("function");
   });
 
-  it("ensures default memory users also have valid salted scrypt hashes matching the demo credentials", async () => {
+  it("ensures default memory users have valid salted scrypt hashes matching the credentials", async () => {
     const { getUserByEmail } = await import("./db");
     
     const citizen = await getUserByEmail("citizen@assamrescue.gov.in");
@@ -40,19 +38,15 @@ describe("Database Seed & Account Integrity", () => {
     expect(verifyPassword("citizen", citizen?.password)).toBe(true);
     expect(citizen?.role).toBe("user");
 
-    const rescuer = await getUserByEmail("rescuer@assamrescue.gov.in");
-    expect(rescuer).toBeDefined();
-    expect(verifyPassword("rescuer", rescuer?.password)).toBe(true);
-    expect(rescuer?.role).toBe("rescuer");
-
-    const medical = await getUserByEmail("medical@assamrescue.gov.in");
-    expect(medical).toBeDefined();
-    expect(verifyPassword("medical", medical?.password)).toBe(true);
-    expect(medical?.role).toBe("hospital");
-
     const admin = await getUserByEmail("admin@assamrescue.gov.in");
     expect(admin).toBeDefined();
     expect(verifyPassword("admin", admin?.password)).toBe(true);
     expect(admin?.role).toBe("admin");
+
+    // Rescuer and hospital are not pre-seeded; they register self-service
+    const rescuer = await getUserByEmail("rescuer@assamrescue.gov.in");
+    expect(rescuer).toBeNull();
+    const medical = await getUserByEmail("medical@assamrescue.gov.in");
+    expect(medical).toBeNull();
   });
 });
