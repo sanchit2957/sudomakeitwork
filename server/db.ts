@@ -89,7 +89,12 @@ export function recordDbFailure(error?: any, operationName?: string) {
   const safe = extractSafeDbError(error);
   _lastDbErrorCode = safe.code;
   _lastDbError = `${safe.code}${safe.errno !== undefined ? `:${safe.errno}` : ""}: ${safe.message}`;
-  _dbCircuitBrokenUntil = Date.now() + 15000; // 15s circuit breaker
+
+  // Only trip circuit breaker for hard network connection failures, NOT SQL schema / constraint errors
+  const isNetworkFailure = ["ECONNREFUSED", "ETIMEDOUT", "PROTOCOL_CONNECTION_LOST", "DATABASE_TIMEOUT", "ER_CON_COUNT_ERROR"].includes(safe.code);
+  if (isNetworkFailure && _consecutiveFailures >= 3) {
+    _dbCircuitBrokenUntil = Date.now() + 5000; // 5s circuit breaker
+  }
 
   const now = Date.now();
   if (now - _lastDbWarnTime > 5000) {
@@ -97,11 +102,10 @@ export function recordDbFailure(error?: any, operationName?: string) {
     console.warn(`[Database] MySQL failure in "${operationName || 'query'}": code=${safe.code} errno=${safe.errno ?? 'N/A'} sqlState=${safe.sqlState ?? 'N/A'} message="${safe.message}" (consecutive failures: ${_consecutiveFailures})`);
   }
 
-  // Graceful auto-healing: Do not reset pool on transient 1-2 stale socket drops.
-  // Only reset when persistent 5+ failures occur, preventing connection storm cycles.
-  if (_consecutiveFailures >= 5 && _pool) {
+  // Graceful auto-healing: Only reset pool if 5+ persistent hard network failures occur
+  if (isNetworkFailure && _consecutiveFailures >= 5 && _pool) {
     _poolCounters.poolResets++;
-    console.warn(`[Database] Auto-healing: Resetting corrupted pool after ${_consecutiveFailures} consecutive failures (last code: ${safe.code})`);
+    console.warn(`[Database] Auto-healing: Resetting corrupted pool after ${_consecutiveFailures} consecutive network failures (last code: ${safe.code})`);
     _pool.end().catch(() => {});
     _pool = null;
     _db = null;
@@ -221,20 +225,20 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
   if (_schemaEnsured) return;
   _schemaEnsured = true;
   try {
-    const conn = await withDbTimeout(pool.getConnection(), 3000, "ensureSchema_getConnection");
+    const conn = await withDbTimeout(pool.getConnection(), 5000, "ensureSchema_getConnection");
     try {
       // 1. Ensure columns exist on users
-      const [cols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `users`"), 3000, "ensureSchema_showCols");
+      const [cols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `users`"), 4000, "ensureSchema_showCols");
       const colNames = new Set((cols || []).map((c: any) => c.Field));
 
       if (!colNames.has("password")) {
-        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `password` VARCHAR(255) NULL"), 3000, "ensureSchema_alterPassword");
+        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `password` VARCHAR(255) NULL"), 4000, "ensureSchema_alterPassword");
       }
       if (!colNames.has("status")) {
-        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `status` ENUM('active','disabled') NOT NULL DEFAULT 'active'"), 3000, "ensureSchema_alterStatus");
+        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `status` ENUM('active','disabled') NOT NULL DEFAULT 'active'"), 4000, "ensureSchema_alterStatus");
       }
       if (!colNames.has("loginMethod")) {
-        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `loginMethod` VARCHAR(64) NULL"), 3000, "ensureSchema_alterLoginMethod");
+        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `loginMethod` VARCHAR(64) NULL"), 4000, "ensureSchema_alterLoginMethod");
       }
 
       // 2. Ensure roleAccessCodes table exists
@@ -249,8 +253,100 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
             \`updatedBy\` INT NULL
           )
         `),
-        3000,
+        4000,
         "ensureSchema_createRoleAccessCodes"
+      );
+
+      // 3. Ensure emergencyContacts table exists
+      await withDbTimeout(
+        conn.query(`
+          CREATE TABLE IF NOT EXISTS \`emergencyContacts\` (
+            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+            \`userId\` INT NOT NULL,
+            \`name\` VARCHAR(160) NOT NULL,
+            \`relation\` VARCHAR(64) NOT NULL,
+            \`phone\` VARCHAR(32) NOT NULL,
+            \`alternatePhone\` VARCHAR(32) NULL,
+            \`isPrimary\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
+            \`notes\` TEXT NULL,
+            \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX \`emergencyContacts_userId_idx\` (\`userId\`)
+          )
+        `),
+        4000,
+        "ensureSchema_createEmergencyContacts"
+      );
+
+      // 4. Ensure rescueProfiles table exists
+      await withDbTimeout(
+        conn.query(`
+          CREATE TABLE IF NOT EXISTS \`rescueProfiles\` (
+            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+            \`userId\` INT NOT NULL UNIQUE,
+            \`callSign\` VARCHAR(64) NOT NULL,
+            \`phone\` VARCHAR(32) NULL,
+            \`photoKey\` VARCHAR(255) NULL,
+            \`photoUrl\` TEXT NULL,
+            \`contactSharing\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
+            \`locationSharing\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
+            \`availability\` ENUM('available', 'on_mission', 'off_duty') NOT NULL DEFAULT 'available',
+            \`lastLatitude\` DOUBLE NULL,
+            \`lastLongitude\` DOUBLE NULL,
+            \`locationUpdatedAt\` TIMESTAMP NULL,
+            \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX \`rescueProfiles_availability_idx\` (\`availability\`)
+          )
+        `),
+        4000,
+        "ensureSchema_createRescueProfiles"
+      );
+
+      // 5. Ensure hospitalStaffProfiles table exists
+      await withDbTimeout(
+        conn.query(`
+          CREATE TABLE IF NOT EXISTS \`hospitalStaffProfiles\` (
+            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+            \`userId\` INT NOT NULL UNIQUE,
+            \`hospitalId\` INT NOT NULL,
+            \`designation\` VARCHAR(120) NULL,
+            \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX \`hospitalStaffProfiles_hospitalId_idx\` (\`hospitalId\`)
+          )
+        `),
+        4000,
+        "ensureSchema_createHospitalStaffProfiles"
+      );
+
+      // 6. Ensure hospitalCaseNotifications table exists
+      await withDbTimeout(
+        conn.query(`
+          CREATE TABLE IF NOT EXISTS \`hospitalCaseNotifications\` (
+            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+            \`incidentId\` INT NOT NULL,
+            \`hospitalId\` INT NOT NULL,
+            \`rescuerId\` INT NOT NULL,
+            \`severity\` ENUM('critical', 'high', 'medium', 'low') NOT NULL DEFAULT 'high',
+            \`patientCount\` INT NOT NULL DEFAULT 1,
+            \`estimatedArrivalMinutes\` INT NOT NULL DEFAULT 15,
+            \`requiredDepartment\` VARCHAR(120) NOT NULL DEFAULT 'Emergency & Trauma',
+            \`icuRequired\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
+            \`oxygenRequired\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
+            \`notes\` TEXT NULL,
+            \`status\` ENUM('notified', 'acknowledged', 'preparing', 'ready', 'received', 'completed') NOT NULL DEFAULT 'notified',
+            \`hospitalNotes\` TEXT NULL,
+            \`acknowledgedAt\` TIMESTAMP NULL,
+            \`receivedAt\` TIMESTAMP NULL,
+            \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX \`hospitalCaseNotifications_hospitalId_status_idx\` (\`hospitalId\`, \`status\`),
+            INDEX \`hospitalCaseNotifications_incidentId_idx\` (\`incidentId\`),
+            INDEX \`hospitalCaseNotifications_rescuerId_idx\` (\`rescuerId\`)
+          )
+        `),
+        4000,
+        "ensureSchema_createHospitalCaseNotifications"
       );
     } finally {
       conn.release();
@@ -1072,6 +1168,11 @@ export async function runDatabaseForensicBenchmark(): Promise<{
       emergencyContactsLookup: { summary: emptySummary, timings: [] },
     };
   }
+
+  // Ensure all tables exist prior to benchmark
+  await ensureDatabaseSchema(_pool);
+  _dbCircuitBrokenUntil = 0;
+  _consecutiveFailures = 0;
 
   // 1. 10 Sequential SELECT 1 queries with phased breakdown
   const seqTimings: QueryPhaseTiming[] = [];
