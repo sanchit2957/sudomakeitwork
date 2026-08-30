@@ -13,7 +13,7 @@ import { registerN8nRoutes } from "../n8n";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
-import { getDatabasePoolMetrics } from "../db";
+import { getDatabasePoolMetrics, pingDatabase } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -123,21 +123,26 @@ async function startServer() {
   registerN8nRoutes(app);
 
   // Lightweight production diagnostic /health endpoint
-  app.get("/health", (_req, res) => {
+  app.get("/health", async (_req, res) => {
     const mem = process.memoryUsage();
-    res.status(200).json({
-      status: "ok",
+    const dbPing = await pingDatabase();
+    const poolMetrics = getDatabasePoolMetrics();
+    const isDegraded = !dbPing.ok || poolMetrics.status === "circuit_broken";
+
+    res.status(isDegraded && process.env.NODE_ENV === "production" ? 503 : 200).json({
+      status: isDegraded ? "degraded" : "ok",
       uptime: Math.floor(process.uptime()),
       memory: {
-        rss: mem.rss,
-        heapUsed: mem.heapUsed,
-        heapTotal: mem.heapTotal,
-        external: mem.external,
-        arrayBuffers: mem.arrayBuffers || 0,
         rssMb: Math.round((mem.rss / (1024 * 1024)) * 10) / 10,
         heapUsedMb: Math.round((mem.heapUsed / (1024 * 1024)) * 10) / 10,
+        heapTotalMb: Math.round((mem.heapTotal / (1024 * 1024)) * 10) / 10,
       },
-      databasePool: getDatabasePoolMetrics(),
+      database: {
+        status: dbPing.ok ? "connected" : "unreachable",
+        pingLatencyMs: dbPing.latencyMs,
+        pingError: dbPing.error,
+        pool: poolMetrics,
+      },
       version: "1.0.0",
     });
   });

@@ -13,7 +13,7 @@ import {
   shelters,
   users,
 } from "../drizzle/schema";
-import { getDb, _memoryUsers } from "./db";
+import { getDb, withDbTimeout, _memoryUsers } from "./db";
 export { _memoryUsers };
 
 export interface MemoryShelter {
@@ -495,13 +495,17 @@ export async function writeAudit(
 ) {
   try {
     const db = await database();
-    await db.insert(auditLogs).values({
-      actorId,
-      action,
-      resourceType,
-      resourceId: resourceId ? String(resourceId) : null,
-      detail: detail ?? null,
-    });
+    await withDbTimeout(
+      db.insert(auditLogs).values({
+        actorId,
+        action,
+        resourceType,
+        resourceId: resourceId ? String(resourceId) : null,
+        detail: detail ?? null,
+      }),
+      4000,
+      "writeAudit"
+    );
   } catch (error) {
     failClosedInProduction(error);
     _memoryAuditLogs.push({
@@ -525,7 +529,11 @@ export async function addIncidentEvent(
 ) {
   try {
     const db = await database();
-    await db.insert(incidentEvents).values({ incidentId, actorId, eventType, title, detail: detail ?? null });
+    await withDbTimeout(
+      db.insert(incidentEvents).values({ incidentId, actorId, eventType, title, detail: detail ?? null }),
+      4000,
+      "addIncidentEvent"
+    );
   } catch (error) {
     failClosedInProduction(error);
     _memoryIncidentEvents.unshift({
@@ -543,7 +551,13 @@ export async function addIncidentEvent(
 export async function getIncidentById(id: number) {
   try {
     const db = await database();
-    return (await db.select().from(incidents).where(eq(incidents.id, id)).limit(1))[0];
+    return (
+      await withDbTimeout(
+        db.select().from(incidents).where(eq(incidents.id, id)).limit(1),
+        4000,
+        "getIncidentById"
+      )
+    )[0];
   } catch (error) {
     failClosedInProduction(error);
     return _memoryIncidents.get(id) || null;
@@ -553,7 +567,13 @@ export async function getIncidentById(id: number) {
 export async function getIncidentByCode(publicCode: string) {
   try {
     const db = await database();
-    return (await db.select().from(incidents).where(eq(incidents.publicCode, publicCode)).limit(1))[0];
+    return (
+      await withDbTimeout(
+        db.select().from(incidents).where(eq(incidents.publicCode, publicCode)).limit(1),
+        4000,
+        "getIncidentByCode"
+      )
+    )[0];
   } catch (error) {
     failClosedInProduction(error);
     return Array.from(_memoryIncidents.values()).find(i => i.publicCode === publicCode) || null;
@@ -563,11 +583,15 @@ export async function getIncidentByCode(publicCode: string) {
 export async function getIncidentTimeline(incidentId: number) {
   try {
     const db = await database();
-    return await db
-      .select()
-      .from(incidentEvents)
-      .where(eq(incidentEvents.incidentId, incidentId))
-      .orderBy(desc(incidentEvents.createdAt));
+    return await withDbTimeout(
+      db
+        .select()
+        .from(incidentEvents)
+        .where(eq(incidentEvents.incidentId, incidentId))
+        .orderBy(desc(incidentEvents.createdAt)),
+      4000,
+      "getIncidentTimeline"
+    );
   } catch (error) {
     failClosedInProduction(error);
     return _memoryIncidentEvents
@@ -579,7 +603,11 @@ export async function getIncidentTimeline(incidentId: number) {
 export async function getIncidentMessages(incidentId: number) {
   try {
     const db = await database();
-    return await db.select().from(incidentMessages).where(eq(incidentMessages.incidentId, incidentId)).orderBy(incidentMessages.createdAt);
+    return await withDbTimeout(
+      db.select().from(incidentMessages).where(eq(incidentMessages.incidentId, incidentId)).orderBy(incidentMessages.createdAt),
+      4000,
+      "getIncidentMessages"
+    );
   } catch (error) {
     failClosedInProduction(error);
     return _memoryIncidentMessages
@@ -592,13 +620,17 @@ export async function getActiveAssignedRescuerForIncident(incidentId: number) {
   try {
     const db = await database();
     return (
-      await db
-        .select({ user: users, profile: rescueProfiles })
-        .from(missions)
-        .innerJoin(users, eq(missions.rescuerId, users.id))
-        .innerJoin(rescueProfiles, eq(users.id, rescueProfiles.userId))
-        .where(and(eq(missions.incidentId, incidentId), inArray(missions.status, ["pending", "dispatched"])))
-        .limit(1)
+      await withDbTimeout(
+        db
+          .select({ user: users, profile: rescueProfiles })
+          .from(missions)
+          .innerJoin(users, eq(missions.rescuerId, users.id))
+          .innerJoin(rescueProfiles, eq(users.id, rescueProfiles.userId))
+          .where(and(eq(missions.incidentId, incidentId), inArray(missions.status, ["pending", "dispatched"])))
+          .limit(1),
+        4000,
+        "getActiveAssignedRescuer"
+      )
     )[0];
   } catch (error) {
     failClosedInProduction(error);
@@ -616,18 +648,22 @@ export async function getActiveAssignedRescuerForIncident(incidentId: number) {
 export async function listIncidents(status?: "pending" | "dispatched" | "resolved") {
   try {
     const db = await database();
-    const rows = await db
-      .select({
-        incident: incidents,
-        rescuerName: users.name,
-        rescuerId: users.id,
-        rescuerCallSign: rescueProfiles.callSign,
-      })
-      .from(incidents)
-      .leftJoin(users, eq(incidents.assignedRescuerId, users.id))
-      .leftJoin(rescueProfiles, eq(users.id, rescueProfiles.userId))
-      .where(status ? eq(incidents.status, status) : undefined)
-      .orderBy(desc(incidents.createdAt));
+    const rows = await withDbTimeout(
+      db
+        .select({
+          incident: incidents,
+          rescuerName: users.name,
+          rescuerId: users.id,
+          rescuerCallSign: rescueProfiles.callSign,
+        })
+        .from(incidents)
+        .leftJoin(users, eq(incidents.assignedRescuerId, users.id))
+        .leftJoin(rescueProfiles, eq(users.id, rescueProfiles.userId))
+        .where(status ? eq(incidents.status, status) : undefined)
+        .orderBy(desc(incidents.createdAt)),
+      4000,
+      "listIncidents"
+    );
     return rows;
   } catch (error) {
     failClosedInProduction(error);
@@ -644,7 +680,11 @@ export async function listIncidents(status?: "pending" | "dispatched" | "resolve
 export async function listIncidentsForReporter(reporterId: number) {
   try {
     const db = await database();
-    return await db.select().from(incidents).where(eq(incidents.reporterId, reporterId)).orderBy(desc(incidents.createdAt));
+    return await withDbTimeout(
+      db.select().from(incidents).where(eq(incidents.reporterId, reporterId)).orderBy(desc(incidents.createdAt)),
+      4000,
+      "listIncidentsForReporter"
+    );
   } catch (error) {
     failClosedInProduction(error);
     return Array.from(_memoryIncidents.values())
@@ -656,12 +696,16 @@ export async function listIncidentsForReporter(reporterId: number) {
 export async function listMissionsForRescuer(rescuerId: number) {
   try {
     const db = await database();
-    return await db
-      .select({ mission: missions, incident: incidents })
-      .from(missions)
-      .innerJoin(incidents, eq(missions.incidentId, incidents.id))
-      .where(eq(missions.rescuerId, rescuerId))
-      .orderBy(desc(missions.assignedAt));
+    return await withDbTimeout(
+      db
+        .select({ mission: missions, incident: incidents })
+        .from(missions)
+        .innerJoin(incidents, eq(missions.incidentId, incidents.id))
+        .where(eq(missions.rescuerId, rescuerId))
+        .orderBy(desc(missions.assignedAt)),
+      4000,
+      "listMissionsForRescuer"
+    );
   } catch (error) {
     failClosedInProduction(error);
     const userMissions = Array.from(_memoryMissions.values()).filter(m => m.rescuerId === rescuerId);
@@ -679,11 +723,15 @@ export async function getMissionForRescuer(missionId: number, rescuerId: number)
   try {
     const db = await database();
     return (
-      await db
-        .select()
-        .from(missions)
-        .where(and(eq(missions.id, missionId), eq(missions.rescuerId, rescuerId)))
-        .limit(1)
+      await withDbTimeout(
+        db
+          .select()
+          .from(missions)
+          .where(and(eq(missions.id, missionId), eq(missions.rescuerId, rescuerId)))
+          .limit(1),
+        4000,
+        "getMissionForRescuer"
+      )
     )[0];
   } catch (error) {
     failClosedInProduction(error);
@@ -696,11 +744,15 @@ export async function getMissionForRescuer(missionId: number, rescuerId: number)
 export async function getRescuerRoster() {
   try {
     const db = await database();
-    return await db
-      .select({ user: users, profile: rescueProfiles })
-      .from(rescueProfiles)
-      .innerJoin(users, eq(rescueProfiles.userId, users.id))
-      .orderBy(users.name);
+    return await withDbTimeout(
+      db
+        .select({ user: users, profile: rescueProfiles })
+        .from(rescueProfiles)
+        .innerJoin(users, eq(rescueProfiles.userId, users.id))
+        .orderBy(users.name),
+      4000,
+      "getRescuerRoster"
+    );
   } catch (error) {
     failClosedInProduction(error);
     const roster: Array<{ user: any; profile: MemoryRescueProfile }> = [];
@@ -717,7 +769,13 @@ export async function getRescuerProfile(userId: number) {
   try {
     const db = await database();
     if (db) {
-      const res = (await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1))[0];
+      const res = (
+        await withDbTimeout(
+          db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1),
+          4000,
+          "getRescuerProfile"
+        )
+      )[0];
       if (res) return res;
     }
   } catch (error) {
@@ -752,11 +810,15 @@ export async function getRescuerProfile(userId: number) {
 export async function listRescuerRegistrationRequests() {
   try {
     const db = await database();
-    return await db
-      .select({ request: rescuerRegistrationRequests, user: users })
-      .from(rescuerRegistrationRequests)
-      .innerJoin(users, eq(rescuerRegistrationRequests.userId, users.id))
-      .orderBy(desc(rescuerRegistrationRequests.createdAt));
+    return await withDbTimeout(
+      db
+        .select({ request: rescuerRegistrationRequests, user: users })
+        .from(rescuerRegistrationRequests)
+        .innerJoin(users, eq(rescuerRegistrationRequests.userId, users.id))
+        .orderBy(desc(rescuerRegistrationRequests.createdAt)),
+      4000,
+      "listRescuerRegistrationRequests"
+    );
   } catch (error) {
     failClosedInProduction(error);
     const requests: Array<{ request: MemoryRescuerRequest; user: any }> = [];
@@ -772,11 +834,15 @@ export async function listRescuerRegistrationRequests() {
 export async function listNotificationFeed(recipientId: number) {
   try {
     const db = await database();
-    return await db
-      .select()
-      .from(notifications)
-      .where(eq(notifications.recipientId, recipientId))
-      .orderBy(desc(notifications.createdAt));
+    return await withDbTimeout(
+      db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.recipientId, recipientId))
+        .orderBy(desc(notifications.createdAt)),
+      4000,
+      "listNotificationFeed"
+    );
   } catch (error) {
     failClosedInProduction(error);
     return _memoryNotifications.filter(n => n.recipientId === recipientId);
@@ -786,20 +852,28 @@ export async function listNotificationFeed(recipientId: number) {
 export async function getMapLayers(includeOperational: boolean) {
   try {
     const db = await database();
-    const [shelterRows, hospitalRows, zoneRows] = await Promise.all([
-      db.select().from(shelters).orderBy(shelters.name),
-      db.select().from(hospitals).orderBy(hospitals.name),
-      db.select().from(floodZones).where(eq(floodZones.active, "yes")).orderBy(desc(floodZones.updatedAt)),
-    ]);
+    const [shelterRows, hospitalRows, zoneRows] = await withDbTimeout(
+      Promise.all([
+        db.select().from(shelters).orderBy(shelters.name),
+        db.select().from(hospitals).orderBy(hospitals.name),
+        db.select().from(floodZones).where(eq(floodZones.active, "yes")).orderBy(desc(floodZones.updatedAt)),
+      ]),
+      4000,
+      "getMapLayers_public"
+    );
     if (!includeOperational) return { shelters: shelterRows, hospitals: hospitalRows, floodZones: zoneRows, incidents: [], rescuers: [] };
-    const [incidentRows, rescuerRows] = await Promise.all([
-      db.select().from(incidents).where(inArray(incidents.status, ["pending", "dispatched"])),
-      db
-        .select({ user: users, profile: rescueProfiles })
-        .from(rescueProfiles)
-        .innerJoin(users, eq(rescueProfiles.userId, users.id))
-        .where(and(eq(users.role, "rescuer"), inArray(rescueProfiles.availability, ["available", "on_mission"]))),
-    ]);
+    const [incidentRows, rescuerRows] = await withDbTimeout(
+      Promise.all([
+        db.select().from(incidents).where(inArray(incidents.status, ["pending", "dispatched"])),
+        db
+          .select({ user: users, profile: rescueProfiles })
+          .from(rescueProfiles)
+          .innerJoin(users, eq(rescueProfiles.userId, users.id))
+          .where(and(eq(users.role, "rescuer"), inArray(rescueProfiles.availability, ["available", "on_mission"]))),
+      ]),
+      4000,
+      "getMapLayers_operational"
+    );
     return { shelters: shelterRows, hospitals: hospitalRows, floodZones: zoneRows, incidents: incidentRows, rescuers: rescuerRows };
   } catch (error) {
     failClosedInProduction(error);
@@ -821,7 +895,7 @@ export async function getMapLayers(includeOperational: boolean) {
 export async function listHospitals() {
   try {
     const db = await database();
-    return await db.select().from(hospitals).orderBy(hospitals.name);
+    return await withDbTimeout(db.select().from(hospitals).orderBy(hospitals.name), 4000, "listHospitals");
   } catch (error) {
     failClosedInProduction(error);
     return Array.from(_memoryHospitals.values());
@@ -831,7 +905,7 @@ export async function listHospitals() {
 export async function listShelters() {
   try {
     const db = await database();
-    return await db.select().from(shelters).orderBy(shelters.name);
+    return await withDbTimeout(db.select().from(shelters).orderBy(shelters.name), 4000, "listShelters");
   } catch (error) {
     failClosedInProduction(error);
     return Array.from(_memoryShelters.values());
@@ -841,11 +915,15 @@ export async function listShelters() {
 export async function getAnalytics() {
   try {
     const db = await database();
-    const [incidentRows, activeRescuerRows, missionRows] = await Promise.all([
-      db.select({ id: incidents.id, status: incidents.status, createdAt: incidents.createdAt }).from(incidents),
-      db.select({ id: rescueProfiles.id }).from(rescueProfiles).where(inArray(rescueProfiles.availability, ["available", "on_mission"])),
-      db.select({ incidentId: missions.incidentId, dispatchedAt: missions.dispatchedAt }).from(missions),
-    ]);
+    const [incidentRows, activeRescuerRows, missionRows] = await withDbTimeout(
+      Promise.all([
+        db.select({ id: incidents.id, status: incidents.status, createdAt: incidents.createdAt }).from(incidents),
+        db.select({ id: rescueProfiles.id }).from(rescueProfiles).where(inArray(rescueProfiles.availability, ["available", "on_mission"])),
+        db.select({ incidentId: missions.incidentId, dispatchedAt: missions.dispatchedAt }).from(missions),
+      ]),
+      4000,
+      "getAnalytics"
+    );
     const resolvedCases = incidentRows.filter(row => row.status === "resolved").length;
     const responseMinutes = missionRows
       .filter(row => row.dispatchedAt)
@@ -884,11 +962,15 @@ export async function getAvailableRescuersNear(latitude: number, longitude: numb
   let candidates: Array<{ user: any; profile: any }> = [];
   try {
     const db = await database();
-    candidates = await db
-      .select({ user: users, profile: rescueProfiles })
-      .from(rescueProfiles)
-      .innerJoin(users, eq(rescueProfiles.userId, users.id))
-      .where(and(eq(users.role, "rescuer"), eq(rescueProfiles.availability, "available")));
+    candidates = await withDbTimeout(
+      db
+        .select({ user: users, profile: rescueProfiles })
+        .from(rescueProfiles)
+        .innerJoin(users, eq(rescueProfiles.userId, users.id))
+        .where(and(eq(users.role, "rescuer"), eq(rescueProfiles.availability, "available"))),
+      4000,
+      "getAvailableRescuersNear"
+    );
   } catch (error) {
     failClosedInProduction(error);
     const profiles = Array.from(_memoryRescueProfiles.values());
@@ -913,7 +995,11 @@ export async function getAvailableRescuersNear(latitude: number, longitude: numb
 export async function unreadNotificationCount(recipientId: number) {
   try {
     const db = await database();
-    const result = await db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.recipientId, recipientId), isNull(notifications.readAt)));
+    const result = await withDbTimeout(
+      db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.recipientId, recipientId), isNull(notifications.readAt))),
+      4000,
+      "unreadNotificationCount"
+    );
     return result.length;
   } catch (error) {
     failClosedInProduction(error);
@@ -938,20 +1024,28 @@ export async function createHospitalCaseNotification(data: {
   try {
     const db = await database();
     const { hospitalCaseNotifications } = await import("../drizzle/schema");
-    const [inserted] = await db.insert(hospitalCaseNotifications).values({
-      incidentId: data.incidentId,
-      hospitalId: data.hospitalId,
-      rescuerId: data.rescuerId,
-      severity: data.severity,
-      patientCount: data.patientCount,
-      estimatedArrivalMinutes: data.estimatedArrivalMinutes,
-      requiredDepartment: data.requiredDepartment,
-      icuRequired: data.icuRequired,
-      oxygenRequired: data.oxygenRequired,
-      notes: data.notes || null,
-      status: "notified",
-    });
-    const created = await db.select().from(hospitalCaseNotifications).where(eq(hospitalCaseNotifications.id, inserted.insertId)).limit(1);
+    const [inserted] = await withDbTimeout(
+      db.insert(hospitalCaseNotifications).values({
+        incidentId: data.incidentId,
+        hospitalId: data.hospitalId,
+        rescuerId: data.rescuerId,
+        severity: data.severity,
+        patientCount: data.patientCount,
+        estimatedArrivalMinutes: data.estimatedArrivalMinutes,
+        requiredDepartment: data.requiredDepartment,
+        icuRequired: data.icuRequired,
+        oxygenRequired: data.oxygenRequired,
+        notes: data.notes || null,
+        status: "notified",
+      }),
+      4000,
+      "createHospitalCaseNotification_insert"
+    );
+    const created = await withDbTimeout(
+      db.select().from(hospitalCaseNotifications).where(eq(hospitalCaseNotifications.id, inserted.insertId)).limit(1),
+      4000,
+      "createHospitalCaseNotification_select"
+    );
     if (created.length > 0) return created[0];
   } catch (error) {
     failClosedInProduction(error);
@@ -985,17 +1079,21 @@ export async function listHospitalCaseNotifications(hospitalId?: number | null) 
   try {
     const db = await database();
     const { hospitalCaseNotifications } = await import("../drizzle/schema");
-    return await db
-      .select({
-        notification: hospitalCaseNotifications,
-        incident: incidents,
-        rescuer: { id: users.id, name: users.name },
-      })
-      .from(hospitalCaseNotifications)
-      .innerJoin(incidents, eq(hospitalCaseNotifications.incidentId, incidents.id))
-      .innerJoin(users, eq(hospitalCaseNotifications.rescuerId, users.id))
-      .where(hospitalId ? eq(hospitalCaseNotifications.hospitalId, hospitalId) : undefined)
-      .orderBy(desc(hospitalCaseNotifications.createdAt));
+    return await withDbTimeout(
+      db
+        .select({
+          notification: hospitalCaseNotifications,
+          incident: incidents,
+          rescuer: { id: users.id, name: users.name },
+        })
+        .from(hospitalCaseNotifications)
+        .innerJoin(incidents, eq(hospitalCaseNotifications.incidentId, incidents.id))
+        .innerJoin(users, eq(hospitalCaseNotifications.rescuerId, users.id))
+        .where(hospitalId ? eq(hospitalCaseNotifications.hospitalId, hospitalId) : undefined)
+        .orderBy(desc(hospitalCaseNotifications.createdAt)),
+      4000,
+      "listHospitalCaseNotifications"
+    );
   } catch (error) {
     failClosedInProduction(error);
     const list = Array.from(_memoryHospitalCaseNotifications.values())

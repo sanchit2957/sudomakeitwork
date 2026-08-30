@@ -11,7 +11,20 @@ import { startLogin } from "./const";
 import "leaflet/dist/leaflet.css";
 import "./index.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: any) => {
+        if (error?.data?.code === "UNAUTHORIZED" || error?.data?.code === "FORBIDDEN") return false;
+        return failureCount < 1;
+      },
+      staleTime: 2000,
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+});
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

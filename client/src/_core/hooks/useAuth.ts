@@ -38,6 +38,9 @@ let _globalRevokedDetail: { isOpen: boolean; role?: string | null; adminContactN
 };
 const _revocationListeners = new Set<(detail: typeof _globalRevokedDetail) => void>();
 
+// Module-scoped in-flight login mutation promise to prevent concurrent duplicate login requests
+let _inFlightLoginPromise: Promise<any> | null = null;
+
 function notifyRevocationListeners(detail: typeof _globalRevokedDetail) {
   _globalRevokedDetail = detail;
   _revocationListeners.forEach(listener => listener(detail));
@@ -159,11 +162,21 @@ export function useAuth(options: UseAuthOptions = {}) {
       governmentCode?: string;
       supabaseToken?: string;
     }) => {
-      const res = await loginMutation.mutateAsync(params);
-      storeNativeTokenIfPresent((res as any).sessionToken);
-      utils.auth.me.setData(undefined, res.user as any);
-      await utils.auth.me.invalidate();
-      return res;
+      if (_inFlightLoginPromise) {
+        return _inFlightLoginPromise;
+      }
+      _inFlightLoginPromise = (async () => {
+        try {
+          const res = await loginMutation.mutateAsync(params);
+          storeNativeTokenIfPresent((res as any).sessionToken);
+          utils.auth.me.setData(undefined, res.user as any);
+          await utils.auth.me.invalidate();
+          return res;
+        } finally {
+          _inFlightLoginPromise = null;
+        }
+      })();
+      return _inFlightLoginPromise;
     },
     [loginMutation, utils]
   );
@@ -218,17 +231,14 @@ export function useAuth(options: UseAuthOptions = {}) {
         const session = await getSupabaseSession();
         sbToken = session?.access_token;
       }
-      const res = await loginMutation.mutateAsync({
+      return await login({
         email: params.email,
         password: "supabase-otp-verified",
         supabaseToken: sbToken,
+        role: params.role,
       });
-      storeNativeTokenIfPresent((res as any).sessionToken);
-      utils.auth.me.setData(undefined, res.user as any);
-      await utils.auth.me.invalidate();
-      return res;
     },
-    [loginMutation, utils]
+    [login]
   );
 
   // Listen for Supabase Magic Link redirect or Auth State Change
@@ -236,16 +246,13 @@ export function useAuth(options: UseAuthOptions = {}) {
     if (!isSupabaseConfigured() || !supabase) return;
 
     const handleSession = async (session: any) => {
-      if (session?.access_token && session?.user?.email && !meQuery.data) {
+      if (session?.access_token && session?.user?.email && !meQuery.data && !_inFlightLoginPromise) {
         try {
-          const res = await loginMutation.mutateAsync({
+          await login({
             email: session.user.email,
             password: "supabase-magic-link",
             supabaseToken: session.access_token,
           });
-          storeNativeTokenIfPresent((res as any).sessionToken);
-          utils.auth.me.setData(undefined, res.user as any);
-          await utils.auth.me.invalidate();
           if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
             window.history.replaceState(null, "", window.location.pathname);
           }
@@ -270,7 +277,7 @@ export function useAuth(options: UseAuthOptions = {}) {
     return () => {
       authListener?.subscription?.unsubscribe();
     };
-  }, [loginMutation, meQuery.data, utils]);
+  }, [login, meQuery.data]);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;

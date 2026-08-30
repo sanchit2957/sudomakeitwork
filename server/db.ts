@@ -9,19 +9,61 @@ let _pool: mysql.Pool | null = null;
 let _db: MySql2Database<any> | null = null;
 let _dbCircuitBrokenUntil = 0;
 let _lastDbWarnTime = 0;
+let _lastSuccessfulConnection: Date | null = null;
+let _lastSuccessfulQuery: Date | null = null;
+let _consecutiveFailures = 0;
+let _lastDbError: string | null = null;
 
 export function isDbCircuitBroken(): boolean {
   return Date.now() < _dbCircuitBrokenUntil;
 }
 
+export function recordDbSuccess() {
+  _dbCircuitBrokenUntil = 0;
+  _consecutiveFailures = 0;
+  _lastSuccessfulQuery = new Date();
+  _lastSuccessfulConnection = new Date();
+  _lastDbError = null;
+}
+
 export function recordDbFailure(error?: any) {
-  _dbCircuitBrokenUntil = Date.now() + 30000; // Open circuit breaker for 30s
-  _db = null;
+  _consecutiveFailures++;
+  _lastDbError = error instanceof Error ? error.message : typeof error === "string" ? error : "connection error";
+  _dbCircuitBrokenUntil = Date.now() + 15000; // 15s circuit breaker
   const now = Date.now();
-  if (now - _lastDbWarnTime > 60000) {
+  if (now - _lastDbWarnTime > 30000) {
     _lastDbWarnTime = now;
-    const msg = error instanceof Error ? error.message : typeof error === "string" ? error : "connection error";
-    console.warn(`[Database] MySQL unavailable (${msg}), switching to fast in-memory store for 30s.`);
+    console.warn(`[Database] MySQL failure (${_lastDbError}), consecutive failures: ${_consecutiveFailures}`);
+  }
+  // Auto-heal: If consecutive failures >= 3, drain and reset pool so stale sockets are torn down
+  if (_consecutiveFailures >= 3 && _pool) {
+    console.warn("[Database] Auto-healing: Resetting corrupted pool instance");
+    _pool.end().catch(() => {});
+    _pool = null;
+    _db = null;
+  }
+}
+
+export async function withDbTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number = 4000,
+  operationName: string = "db_operation"
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`[DATABASE_TIMEOUT] ${operationName} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    recordDbSuccess();
+    return result;
+  } catch (err) {
+    recordDbFailure(err);
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -37,18 +79,54 @@ export function createDatabasePool(connectionUri: string): mysql.Pool {
     uri: connectionUri,
     waitForConnections: true,
     connectionLimit: 10,
-    maxIdle: 4,
-    idleTimeout: 30000,
-    connectTimeout: 2500,
+    maxIdle: 2,
+    idleTimeout: 15000,
+    connectTimeout: 5000,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 10000,
-    queueLimit: 10,
+    keepAliveInitialDelay: 5000,
+    queueLimit: 20,
+    ssl: isRemoteOrTiDB ? { minVersion: "TLSv1.2", rejectUnauthorized: true } : undefined,
   });
+}
+
+export async function pingDatabase(): Promise<{ ok: boolean; latencyMs: number; error?: string }> {
+  const db = await getDb();
+  if (!db || !_pool) {
+    return { ok: false, latencyMs: 0, error: "Database pool not initialized or circuit broken" };
+  }
+  const start = performance.now();
+  try {
+    const conn = await withDbTimeout(_pool.getConnection(), 2500, "ping_getConnection");
+    try {
+      await withDbTimeout(conn.query("SELECT 1"), 2000, "ping_query");
+      const latencyMs = Math.round((performance.now() - start) * 10) / 10;
+      recordDbSuccess();
+      return { ok: true, latencyMs };
+    } finally {
+      conn.release();
+    }
+  } catch (err: any) {
+    recordDbFailure(err);
+    return {
+      ok: false,
+      latencyMs: Math.round((performance.now() - start) * 10) / 10,
+      error: err?.message || "Ping failed",
+    };
+  }
 }
 
 export function getDatabasePoolMetrics() {
   if (!_pool) {
-    return { status: "disconnected", totalConnections: 0, freeConnections: 0, queuedRequests: 0 };
+    return {
+      status: "disconnected",
+      totalConnections: 0,
+      freeConnections: 0,
+      queuedRequests: 0,
+      consecutiveFailures: _consecutiveFailures,
+      lastSuccessfulQuery: _lastSuccessfulQuery,
+      lastSuccessfulConnection: _lastSuccessfulConnection,
+      lastError: _lastDbError,
+    };
   }
   const poolInternal = (_pool as any).pool;
   return {
@@ -56,6 +134,10 @@ export function getDatabasePoolMetrics() {
     totalConnections: poolInternal?._allConnections?.length ?? 0,
     freeConnections: poolInternal?._freeConnections?.length ?? 0,
     queuedRequests: poolInternal?._connectionQueue?.length ?? 0,
+    consecutiveFailures: _consecutiveFailures,
+    lastSuccessfulQuery: _lastSuccessfulQuery,
+    lastSuccessfulConnection: _lastSuccessfulConnection,
+    lastError: _lastDbError,
   };
 }
 
@@ -64,33 +146,37 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
   if (_schemaEnsured) return;
   _schemaEnsured = true;
   try {
-    const conn = await pool.getConnection();
+    const conn = await withDbTimeout(pool.getConnection(), 3000, "ensureSchema_getConnection");
     try {
       // 1. Ensure columns exist on users
-      const [cols]: any = await conn.query("SHOW COLUMNS FROM `users`");
+      const [cols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `users`"), 3000, "ensureSchema_showCols");
       const colNames = new Set((cols || []).map((c: any) => c.Field));
 
       if (!colNames.has("password")) {
-        await conn.query("ALTER TABLE `users` ADD COLUMN `password` VARCHAR(255) NULL");
+        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `password` VARCHAR(255) NULL"), 3000, "ensureSchema_alterPassword");
       }
       if (!colNames.has("status")) {
-        await conn.query("ALTER TABLE `users` ADD COLUMN `status` ENUM('active','disabled') NOT NULL DEFAULT 'active'");
+        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `status` ENUM('active','disabled') NOT NULL DEFAULT 'active'"), 3000, "ensureSchema_alterStatus");
       }
       if (!colNames.has("loginMethod")) {
-        await conn.query("ALTER TABLE `users` ADD COLUMN `loginMethod` VARCHAR(64) NULL");
+        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `loginMethod` VARCHAR(64) NULL"), 3000, "ensureSchema_alterLoginMethod");
       }
 
       // 2. Ensure roleAccessCodes table exists
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS \`roleAccessCodes\` (
-          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-          \`role\` VARCHAR(32) NOT NULL UNIQUE,
-          \`codeHash\` VARCHAR(255) NOT NULL,
-          \`codeVersion\` INT NOT NULL DEFAULT 1,
-          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          \`updatedBy\` INT NULL
-        )
-      `);
+      await withDbTimeout(
+        conn.query(`
+          CREATE TABLE IF NOT EXISTS \`roleAccessCodes\` (
+            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+            \`role\` VARCHAR(32) NOT NULL UNIQUE,
+            \`codeHash\` VARCHAR(255) NOT NULL,
+            \`codeVersion\` INT NOT NULL DEFAULT 1,
+            \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            \`updatedBy\` INT NULL
+          )
+        `),
+        3000,
+        "ensureSchema_createRoleAccessCodes"
+      );
     } finally {
       conn.release();
     }
@@ -221,12 +307,15 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     }
 
     try {
-      await db.insert(users).values(values).onDuplicateKeyUpdate({
-        set: updateSet,
-      });
+      await withDbTimeout(
+        db.insert(users).values(values).onDuplicateKeyUpdate({
+          set: updateSet,
+        }),
+        4000,
+        "upsertUser"
+      );
     } catch (error: any) {
       console.warn(`[Database] User update warning: ${(error as Error)?.message || "DB error"}`);
-      recordDbFailure(error);
     }
   }
 
@@ -249,7 +338,11 @@ export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (db) {
     try {
-      const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+      const result = await withDbTimeout(
+        db.select().from(users).where(eq(users.openId, openId)).limit(1),
+        4000,
+        "getUserByOpenId"
+      );
       if (result.length > 0) {
         const row = result[0];
         const normalizedRole = row.role === "medical" ? "hospital" : row.role;
@@ -264,7 +357,6 @@ export async function getUserByOpenId(openId: string) {
       return null;
     } catch (error: any) {
       console.warn(`[Database] User query by openId warning: ${(error as Error)?.message || "DB error"}`);
-      recordDbFailure(error);
     }
   }
   const memUser = _memoryUsers.get(openId) || null;
@@ -279,19 +371,21 @@ export async function getUserByEmail(emailOrUsername: string, role?: string) {
   const clean = emailOrUsername.trim();
   const lower = clean.toLowerCase();
   const normalizedRole = role ? (role === "medical" ? "hospital" : role) : undefined;
+  const isEmail = clean.includes("@");
+
   const db = await getDb();
   if (db) {
     try {
-      const emailCondition = or(eq(users.email, clean), eq(users.email, lower), eq(users.name, clean));
-      const whereClause = normalizedRole
-        ? and(emailCondition, eq(users.role, normalizedRole as any))
-        : emailCondition;
+      // Fast path: Exact indexed email lookup
+      const whereClause = isEmail
+        ? (normalizedRole ? and(eq(users.email, lower), eq(users.role, normalizedRole as any)) : eq(users.email, lower))
+        : (normalizedRole ? and(or(eq(users.email, lower), eq(users.name, clean)), eq(users.role, normalizedRole as any)) : or(eq(users.email, lower), eq(users.name, clean)));
 
-      const result = await db
-        .select()
-        .from(users)
-        .where(whereClause)
-        .limit(1);
+      const result = await withDbTimeout(
+        db.select().from(users).where(whereClause).limit(1),
+        4000,
+        "getUserByEmail"
+      );
       if (result.length > 0) {
         const row = result[0];
         const resRole = row.role === "medical" ? "hospital" : row.role;
@@ -305,8 +399,7 @@ export async function getUserByEmail(emailOrUsername: string, role?: string) {
       }
       return null;
     } catch (error: any) {
-      console.warn(`[Database] User query by email warning: ${(error as Error)?.message || "DB error"}`);
-      recordDbFailure(error);
+      console.warn(`[Database] User query by email error: ${(error as Error)?.message || "DB error"}`);
     }
   }
   const allUsers = Array.from(_memoryUsers.values());
@@ -340,7 +433,11 @@ export async function getUserById(id: number) {
   const db = await getDb();
   if (db) {
     try {
-      const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      const result = await withDbTimeout(
+        db.select().from(users).where(eq(users.id, id)).limit(1),
+        4000,
+        "getUserById"
+      );
       if (result.length > 0) {
         const row = result[0];
         const normalizedRole = row.role === "medical" ? "hospital" : row.role;
@@ -355,7 +452,6 @@ export async function getUserById(id: number) {
       return null;
     } catch (error: any) {
       console.warn(`[Database] User query by id warning: ${(error as Error)?.message || "DB error"}`);
-      recordDbFailure(error);
     }
   }
   const memUser = Array.from(_memoryUsers.values()).find(u => u.id === id) || null;
@@ -370,7 +466,11 @@ export async function getAllUsers() {
   const db = await getDb();
   if (db) {
     try {
-      const rows = await db.select().from(users).orderBy(users.id);
+      const rows = await withDbTimeout(
+        db.select().from(users).orderBy(users.id),
+        4000,
+        "getAllUsers"
+      );
       return rows.map(r => ({
         ...r,
         role: r.role === "medical" ? "hospital" : r.role,
@@ -378,7 +478,6 @@ export async function getAllUsers() {
       }));
     } catch (error) {
       console.warn(`[Database] All users query warning: ${(error as Error)?.message || "DB error"}`);
-      recordDbFailure(error);
     }
   }
   const seen = new Set<number>();
@@ -401,26 +500,33 @@ export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat
   if (db) {
     try {
       const { rescueProfiles } = await import("../drizzle/schema");
-      const existing = await db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1);
+      const existing = await withDbTimeout(
+        db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, userId)).limit(1),
+        4000,
+        "ensureRescuerProfile_check"
+      );
       if (!existing.length) {
-        await db.insert(rescueProfiles).values({
-          userId,
-          callSign,
-          phone: "+91 94350 11223",
-          contactSharing: "yes",
-          locationSharing: "yes",
-          availability: "available",
-          lastLatitude: 26.1445,
-          lastLongitude: 91.7362,
-          locationUpdatedAt: new Date(),
-        });
+        await withDbTimeout(
+          db.insert(rescueProfiles).values({
+            userId,
+            callSign,
+            phone: "+91 94350 11223",
+            contactSharing: "yes",
+            locationSharing: "yes",
+            availability: "available",
+            lastLatitude: 26.1445,
+            lastLongitude: 91.7362,
+            locationUpdatedAt: new Date(),
+          }),
+          4000,
+          "ensureRescuerProfile_insert"
+        );
       }
       return;
     } catch (error) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database rescuer profile failed: ${(error as Error)?.message || "Unknown database error"}`);
       }
-      recordDbFailure(error);
     }
   }
   if (process.env.NODE_ENV === "production") {
@@ -447,43 +553,58 @@ export async function ensureHospitalStaffProfile(userId: number) {
   if (db) {
     try {
       const { hospitalStaffProfiles, hospitals } = await import("../drizzle/schema");
-      const existing = await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, userId)).limit(1);
+      const existing = await withDbTimeout(
+        db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, userId)).limit(1),
+        4000,
+        "ensureHospitalStaffProfile_check"
+      );
       if (!existing.length) {
-        let hospitalList = await db.select().from(hospitals).limit(1);
+        let hospitalList = await withDbTimeout(
+          db.select().from(hospitals).limit(1),
+          4000,
+          "ensureHospitalStaffProfile_listHosp"
+        );
         let hospitalId: number;
         if (!hospitalList.length) {
-          const [newHospital] = await db.insert(hospitals).values({
-            name: "Gauhati Medical College & Hospital (GMCH)",
-            address: "Bhangagarh, Guwahati, Assam 781032",
-            contactPhone: "+91 361 2529457",
-            latitude: 26.1558,
-            longitude: 91.7645,
-            totalEmergencyBeds: 120,
-            availableEmergencyBeds: 34,
-            totalIcuBeds: 45,
-            availableIcuBeds: 12,
-            oxygenCylinderCount: 85,
-            bloodUnitCount: 140,
-            ambulanceCount: 14,
-            status: "open",
-          });
+          const [newHospital] = await withDbTimeout(
+            db.insert(hospitals).values({
+              name: "Gauhati Medical College & Hospital (GMCH)",
+              address: "Bhangagarh, Guwahati, Assam 781032",
+              contactPhone: "+91 361 2529457",
+              latitude: 26.1558,
+              longitude: 91.7645,
+              totalEmergencyBeds: 120,
+              availableEmergencyBeds: 34,
+              totalIcuBeds: 45,
+              availableIcuBeds: 12,
+              oxygenCylinderCount: 85,
+              bloodUnitCount: 140,
+              ambulanceCount: 14,
+              status: "open",
+            }),
+            4000,
+            "ensureHospitalStaffProfile_insertHosp"
+          );
           hospitalId = newHospital.insertId;
         } else {
           hospitalId = hospitalList[0].id;
         }
 
-        await db.insert(hospitalStaffProfiles).values({
-          userId,
-          hospitalId,
-          designation: "Emergency Medical Coordinator",
-        });
+        await withDbTimeout(
+          db.insert(hospitalStaffProfiles).values({
+            userId,
+            hospitalId,
+            designation: "Emergency Medical Coordinator",
+          }),
+          4000,
+          "ensureHospitalStaffProfile_insertStaff"
+        );
       }
       return;
     } catch (error) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Database hospital staff profile failed: ${(error as Error)?.message || "Unknown database error"}`);
       }
-      recordDbFailure(error);
     }
   }
   if (process.env.NODE_ENV === "production") {
@@ -523,15 +644,18 @@ export async function getEmergencyContactsByUserId(userId: number): Promise<Emer
   const db = await getDb();
   if (db) {
     try {
-      return await db
-        .select()
-        .from(emergencyContacts)
-        .where(eq(emergencyContacts.userId, userId));
+      return await withDbTimeout(
+        db
+          .select()
+          .from(emergencyContacts)
+          .where(eq(emergencyContacts.userId, userId)),
+        4000,
+        "getEmergencyContactsByUserId"
+      );
     } catch (error) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Failed to load emergency contacts: ${(error as Error)?.message}`);
       }
-      recordDbFailure(error);
     }
   }
   return Array.from(_memoryEmergencyContacts.values()).filter(c => c.userId === userId);
@@ -553,46 +677,61 @@ export async function upsertEmergencyContact(
   if (db) {
     try {
       if (contact.id) {
-        await db
-          .update(emergencyContacts)
-          .set({
+        await withDbTimeout(
+          db
+            .update(emergencyContacts)
+            .set({
+              name: contact.name,
+              relation: contact.relation,
+              phone: contact.phone,
+              alternatePhone: contact.alternatePhone || null,
+              isPrimary: contact.isPrimary || "no",
+              notes: contact.notes || null,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(emergencyContacts.id, contact.id), eq(emergencyContacts.userId, contact.userId))),
+          4000,
+          "updateEmergencyContact"
+        );
+        const updated = await withDbTimeout(
+          db
+            .select()
+            .from(emergencyContacts)
+            .where(eq(emergencyContacts.id, contact.id))
+            .limit(1),
+          4000,
+          "getUpdatedEmergencyContact"
+        );
+        if (updated.length > 0) return updated[0];
+      } else {
+        const [inserted] = await withDbTimeout(
+          db.insert(emergencyContacts).values({
+            userId: contact.userId,
             name: contact.name,
             relation: contact.relation,
             phone: contact.phone,
             alternatePhone: contact.alternatePhone || null,
             isPrimary: contact.isPrimary || "no",
             notes: contact.notes || null,
-            updatedAt: new Date(),
-          })
-          .where(and(eq(emergencyContacts.id, contact.id), eq(emergencyContacts.userId, contact.userId)));
-        const updated = await db
-          .select()
-          .from(emergencyContacts)
-          .where(eq(emergencyContacts.id, contact.id))
-          .limit(1);
-        if (updated.length > 0) return updated[0];
-      } else {
-        const [inserted] = await db.insert(emergencyContacts).values({
-          userId: contact.userId,
-          name: contact.name,
-          relation: contact.relation,
-          phone: contact.phone,
-          alternatePhone: contact.alternatePhone || null,
-          isPrimary: contact.isPrimary || "no",
-          notes: contact.notes || null,
-        });
-        const created = await db
-          .select()
-          .from(emergencyContacts)
-          .where(eq(emergencyContacts.id, inserted.insertId))
-          .limit(1);
+          }),
+          4000,
+          "insertEmergencyContact"
+        );
+        const created = await withDbTimeout(
+          db
+            .select()
+            .from(emergencyContacts)
+            .where(eq(emergencyContacts.id, inserted.insertId))
+            .limit(1),
+          4000,
+          "getCreatedEmergencyContact"
+        );
         if (created.length > 0) return created[0];
       }
     } catch (error) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Failed to save emergency contact: ${(error as Error)?.message}`);
       }
-      recordDbFailure(error);
     }
   }
 
@@ -618,15 +757,18 @@ export async function deleteEmergencyContact(id: number, userId: number): Promis
   const db = await getDb();
   if (db) {
     try {
-      await db
-        .delete(emergencyContacts)
-        .where(and(eq(emergencyContacts.id, id), eq(emergencyContacts.userId, userId)));
+      await withDbTimeout(
+        db
+          .delete(emergencyContacts)
+          .where(and(eq(emergencyContacts.id, id), eq(emergencyContacts.userId, userId))),
+        4000,
+        "deleteEmergencyContact"
+      );
       return true;
     } catch (error) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(`Failed to delete emergency contact: ${(error as Error)?.message}`);
       }
-      recordDbFailure(error);
     }
   }
   const existing = _memoryEmergencyContacts.get(id);
@@ -667,13 +809,16 @@ export async function getRoleAccessCode(role: string): Promise<{ id: number; rol
   const db = await getDb();
   if (db) {
     try {
-      const rows = await db.select().from(roleAccessCodes).where(eq(roleAccessCodes.role, normalizedRole)).limit(1);
+      const rows = await withDbTimeout(
+        db.select().from(roleAccessCodes).where(eq(roleAccessCodes.role, normalizedRole)).limit(1),
+        4000,
+        "getRoleAccessCode"
+      );
       if (rows.length > 0) {
         return rows[0] as any;
       }
     } catch (error) {
       console.warn(`[Database] Role access code query warning: ${(error as Error)?.message}`);
-      recordDbFailure(error);
     }
   }
   return _memoryRoleAccessCodes.get(normalizedRole) || null;
@@ -722,26 +867,29 @@ export async function setRoleAccessCode(
   const db = await getDb();
   if (db) {
     try {
-      await db
-        .insert(roleAccessCodes)
-        .values({
-          role: normalizedRole,
-          codeHash,
-          codeVersion: newVersion,
-          updatedAt: now,
-          updatedBy: adminUserId || null,
-        })
-        .onDuplicateKeyUpdate({
-          set: {
+      await withDbTimeout(
+        db
+          .insert(roleAccessCodes)
+          .values({
+            role: normalizedRole,
             codeHash,
             codeVersion: newVersion,
             updatedAt: now,
             updatedBy: adminUserId || null,
-          },
-        });
+          })
+          .onDuplicateKeyUpdate({
+            set: {
+              codeHash,
+              codeVersion: newVersion,
+              updatedAt: now,
+              updatedBy: adminUserId || null,
+            },
+          }),
+        4000,
+        "setRoleAccessCode"
+      );
     } catch (error) {
       console.warn(`[Database] Role access code update warning: ${(error as Error)?.message}`);
-      recordDbFailure(error);
     }
   }
 
