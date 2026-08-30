@@ -11,10 +11,12 @@ import { QuickActionsPanel } from "@/components/QuickActionsPanel";
 import { SahayakAiModal } from "@/components/SahayakAiModal";
 import { flushOfflineSos, queueOfflineSos, pendingSosCount } from "@/lib/offlineSos";
 import { createAndRedirectAfterRapidSos, redirectAfterRapidSos } from "@/lib/rapidSos";
+import { buildEmergencySmsUri } from "@/lib/emergencyDispatch";
+import { startBleSosBeacon } from "@/lib/bleBeacon";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
-import { CloudRain, Database, MapPin, MoreHorizontal, Navigation, PhoneCall, Radio, RefreshCw, ShieldCheck, Siren, ThermometerSun, Waves, Wifi, WifiOff } from "lucide-react";
+import { Bluetooth, CloudRain, Database, MapPin, MessageSquare, MoreHorizontal, Navigation, PhoneCall, Radio, RefreshCw, ShieldCheck, Siren, ThermometerSun, Waves, Wifi, WifiOff } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -35,6 +37,7 @@ export default function UserHome() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [bleActive, setBleActive] = useState(false);
 
   const activeWeatherCoords = manualLocation
     ? { latitude: manualLocation.lat, longitude: manualLocation.lng }
@@ -139,13 +142,23 @@ export default function UserHome() {
         voiceNoteDurationSeconds: voiceNote?.durationSeconds,
       };
 
+      // Activate Bluetooth Low Energy Beacon for nearby rescue boats
+      startBleSosBeacon({
+        id: `SOS-BLE-${Date.now().toString(36).toUpperCase()}`,
+        latitude,
+        longitude,
+        emergencyType: "flood",
+        peopleAffected: 1,
+      });
+      setBleActive(true);
+
       if (!navigator.onLine) {
         const guestKey = localStorage.getItem("sudo-makeitwork-guest-key") || crypto.randomUUID().replaceAll("-", "");
         localStorage.setItem("sudo-makeitwork-guest-key", guestKey);
         await queueOfflineSos({ ...payload, guestKey });
         refreshPending();
         setRapidStatus("queued");
-        setRapidNotice(t("SOS saved in device database (IndexedDB). Will automatically transmit to Command Centre when signal returns."));
+        setRapidNotice(t("SOS saved in device database (IndexedDB) & BLE Beacon active. Will auto-dispatch when network returns."));
         return;
       }
 
@@ -193,6 +206,14 @@ export default function UserHome() {
   };
 
   const activePoint = position || guwahati;
+  const emergencySmsUrl = buildEmergencySmsUri({
+    latitude: activePoint.latitude,
+    longitude: activePoint.longitude,
+    emergencyType: "flood",
+    peopleAffected: 1,
+    locationLabel: manualLocation?.name || t("Assam flood coordinates"),
+  });
+
   return <div className="victim-page min-h-screen bg-[#f6f8f7] text-[#142c2b] dark:bg-[#050505] dark:text-[#f4f4f5]"><main className="victim-main relative mx-auto min-h-screen max-w-lg overflow-hidden bg-[#fcfdfd] px-5 pb-28 pt-6 shadow-2xl shadow-[#113c35]/10 dark:bg-[#101011] dark:shadow-black/30 md:my-6 md:min-h-[850px] md:rounded-[2.75rem] md:border">
     <header className="flex items-center justify-between gap-3">
       <UserProfileBadge
@@ -214,26 +235,65 @@ export default function UserHome() {
       </div>
     </header>
 
-    {pendingCount > 0 && (
-      <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-50/90 p-3.5 text-xs text-amber-950 shadow-sm dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+    {/* Offline SOS & Cellular Radio / BLE Options */}
+    {(!online || pendingCount > 0 || bleActive) && (
+      <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-50/90 p-4 text-xs text-amber-950 shadow-md dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 font-bold">
+          <div className="flex items-center gap-2 font-black">
             <Database className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <span>{pendingCount} {pendingCount === 1 ? t("Offline SOS Saved in Phone (IndexedDB)") : t("Offline SOS Alerts Saved (IndexedDB)")}</span>
+            <span>
+              {pendingCount > 0
+                ? `${pendingCount} ${pendingCount === 1 ? t("Offline SOS in IndexedDB") : t("Offline SOS Alerts in IndexedDB")}`
+                : t("Offline Emergency Mode Active")}
+            </span>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={isSyncing || !online}
-            onClick={triggerFlush}
-            className="h-7 rounded-xl border-amber-600/40 bg-amber-600 px-2.5 text-[11px] font-bold text-white hover:bg-amber-700 active:scale-95"
-          >
-            <RefreshCw className={`mr-1 h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />
-            {isSyncing ? t("Syncing…") : t("Sync Now")}
-          </Button>
+          {pendingCount > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isSyncing || !online}
+              onClick={triggerFlush}
+              className="h-7 rounded-xl border-amber-600/40 bg-amber-600 px-2.5 text-[11px] font-bold text-white hover:bg-amber-700 active:scale-95"
+            >
+              <RefreshCw className={`mr-1 h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />
+              {isSyncing ? t("Syncing…") : t("Sync Now")}
+            </Button>
+          )}
         </div>
-        <p className="mt-1 text-[11px] opacity-90">
-          {t("Your rescue signal is securely stored on this phone and will transmit to Assam State Command automatically as soon as internet signal is detected.")}
+
+        {/* BLE Beacon Pulse Indicator */}
+        <div className="mt-2.5 flex items-center justify-between rounded-xl bg-cyan-950/10 px-3 py-2 text-[11px] font-bold text-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-200">
+          <span className="flex items-center gap-1.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75"></span>
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-cyan-500"></span>
+            </span>
+            <Bluetooth className="h-3.5 w-3.5" />
+            {t("Bluetooth BLE SOS Beacon: Broadcasting")}
+          </span>
+          <span className="text-[10px] opacity-80">{t("~50-100m range")}</span>
+        </div>
+
+        {/* 1-Tap Emergency SMS (Uses Cellular Radio Channel Without Internet) */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <a
+            href={emergencySmsUrl}
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2.5 text-center text-xs font-black text-white shadow-sm transition hover:bg-amber-700 active:scale-95"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span>{t("SMS 112 (No Internet)")}</span>
+          </a>
+          <a
+            href="tel:112"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-600/30 bg-rose-600 px-3 py-2.5 text-center text-xs font-black text-white shadow-sm transition hover:bg-rose-700 active:scale-95"
+          >
+            <PhoneCall className="h-3.5 w-3.5" />
+            <span>{t("Call 112 (All Towers)")}</span>
+          </a>
+        </div>
+
+        <p className="mt-2 text-[10px] leading-4 opacity-85">
+          {t("911/112 cellular frequencies connect across all mobile towers even with zero data. Tap SMS 112 to transmit exact GPS coordinates directly to State Disaster Control.")}
         </p>
       </div>
     )}

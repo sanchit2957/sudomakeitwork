@@ -3,6 +3,7 @@ import DashboardLayout, { type WorkspaceNavItem } from "@/components/DashboardLa
 import LanguageSelector from "@/components/LanguageSelector";
 import OperationsMap from "@/components/OperationsMap";
 import { SafetyAssistanceQueue } from "@/components/SafetyAssistanceQueue";
+import { BleEmergencyRadar } from "@/components/BleEmergencyRadar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -196,6 +197,7 @@ function ResponderWorkspace() {
             </div>
             <AlertSetup unread={alerts.data?.unread ?? 0} state={pushState} detail={pushDetail} disabled={subscribePush.isPending || pushState === "subscribed"} onEnable={enableAlerts} />
           </section>
+          <BleEmergencyRadar rescuerLatitude={profile.data?.lastLatitude || undefined} rescuerLongitude={profile.data?.lastLongitude || undefined} />
           <ResponderProfileCard profile={profile.data ?? null} hasActiveMission={hasActiveMission} saving={updateProfile.isPending} onSave={input => updateProfile.mutate(input)} />
           <section>
             <PageHeading eyebrow={t("responder.board")} title={t("responder.boardTitle")} />
