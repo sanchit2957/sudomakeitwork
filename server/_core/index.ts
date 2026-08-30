@@ -8,7 +8,9 @@ import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
-import { donationRouter } from "../routers/donations";
+import { registerN8nRoutes } from "../n8n";
+import { registerFloodRoutes } from "../flood";
+import { registerHospitalRoutes } from "../hospital";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
@@ -114,8 +116,9 @@ async function startServer() {
   app.use("/uploads", express.static(path.resolve(process.cwd(), "client/public/uploads")));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
-  app.use("/api", donationRouter);
-  app.use("/", donationRouter);
+  registerN8nRoutes(app);
+  registerFloodRoutes(app);
+  registerHospitalRoutes(app);
 
   // tRPC API
   app.use("/api/trpc", (_req, res, next) => {

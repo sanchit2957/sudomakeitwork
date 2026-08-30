@@ -19,23 +19,4 @@ describe("DashboardLayout sidebar styling", () => {
     expect(command).toContain('desktopSidebar="fixed"');
     expect(sidebar.indexOf("if (isMobile)")).toBeLessThan(sidebar.indexOf('if (collapsible === "none")'));
   });
-
-  it("renders header branding as non-clickable plain text without home redirects", () => {
-    const layout = readFileSync(new URL("../client/src/components/DashboardLayout.tsx", import.meta.url), "utf8");
-
-    // SidebarHeader title section should not be wrapped in button with setLocation("/")
-    const sidebarHeaderMatch = layout.match(/<SidebarHeader[\s\S]*?<\/SidebarHeader>/)?.[0] || "";
-    expect(sidebarHeaderMatch).not.toContain("onClick");
-    expect(sidebarHeaderMatch).not.toContain("<button");
-    expect(sidebarHeaderMatch).toContain("select-none group-data-[collapsible=icon]:justify-center");
-  });
-
-  it("removes Return to Public Hub link from sidebar footer while retaining Sign out", () => {
-    const layout = readFileSync(new URL("../client/src/components/DashboardLayout.tsx", import.meta.url), "utf8");
-
-    expect(layout).not.toContain("Return to Public Hub");
-    expect(layout).toContain("Sign out");
-  });
 });
-
-

@@ -29,37 +29,12 @@ function storeNativeTokenIfPresent(sessionToken?: string) {
   }
 }
 
-// Global state for access code revocation modal
-let _globalRevokedDetail: { isOpen: boolean; role?: string | null; adminContactNumber: string } = {
-  isOpen: false,
-  role: null,
-  adminContactNumber: "+91-361-2237011",
-};
-const _revocationListeners = new Set<(detail: typeof _globalRevokedDetail) => void>();
-
-function notifyRevocationListeners(detail: typeof _globalRevokedDetail) {
-  _globalRevokedDetail = detail;
-  _revocationListeners.forEach(listener => listener(detail));
-}
-
 export function useAuth(options: UseAuthOptions = {}) {
   const {
     redirectOnUnauthenticated = false,
     redirectPath = "/login",
   } = options;
   const utils = trpc.useUtils();
-
-  const [revokedModalState, setRevokedModalState] = useState(_globalRevokedDetail);
-
-  useEffect(() => {
-    const listener = (detail: typeof _globalRevokedDetail) => {
-      setRevokedModalState(detail);
-    };
-    _revocationListeners.add(listener);
-    return () => {
-      _revocationListeners.delete(listener);
-    };
-  }, []);
 
   const [initTimeoutReached, setInitTimeoutReached] = useState(false);
   useEffect(() => {
@@ -72,65 +47,6 @@ export function useAuth(options: UseAuthOptions = {}) {
     refetchOnWindowFocus: false,
   });
 
-  const currentUser = meQuery.data ?? null;
-  const isOperationalRole = Boolean(
-    currentUser &&
-      (currentUser.role === "rescuer" ||
-        currentUser.role === "hospital" ||
-        currentUser.role === "medical")
-  );
-
-  const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
-      utils.auth.me.setData(undefined, null);
-    },
-  });
-
-  const logout = useCallback(async () => {
-    try {
-      await supabaseSignOut();
-      await logoutMutation.mutateAsync();
-    } catch (error: unknown) {
-      if (
-        error instanceof TRPCClientError &&
-        error.data?.code === "UNAUTHORIZED"
-      ) {
-        return;
-      }
-      throw error;
-    } finally {
-      try {
-        localStorage.removeItem("app-runtime-session-token");
-        localStorage.removeItem("app-runtime-user-info");
-        localStorage.removeItem("app_native_bearer_token");
-      } catch {}
-      utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
-    }
-  }, [logoutMutation, utils]);
-
-  // Periodic 30s session version check for operational roles
-  const sessionVersionQuery = trpc.auth.checkSessionVersion.useQuery(undefined, {
-    refetchInterval: 30000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
-    enabled: isOperationalRole,
-    retry: false,
-  });
-
-  useEffect(() => {
-    if (sessionVersionQuery.data && sessionVersionQuery.data.valid === false && isOperationalRole) {
-      const contactNum = sessionVersionQuery.data.adminContactNumber || "+91-361-2237011";
-      const role = currentUser?.role;
-      void logout();
-      notifyRevocationListeners({
-        isOpen: true,
-        role,
-        adminContactNumber: contactNum,
-      });
-    }
-  }, [sessionVersionQuery.data, isOperationalRole, currentUser?.role, logout]);
-
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async (data) => {
       storeNativeTokenIfPresent((data as any).sessionToken);
@@ -138,26 +54,31 @@ export function useAuth(options: UseAuthOptions = {}) {
       await utils.auth.me.invalidate();
       void triggerPostAuthMicPermission();
     },
-    onError: (err) => {
-      if (err.message.includes("ACCESS_CODE_REVOKED")) {
-        void logout();
-        notifyRevocationListeners({
-          isOpen: true,
-          role: currentUser?.role,
-          adminContactNumber: "+91-361-2237011",
-        });
-      }
-    }
+  });
+
+  const logoutMutation = trpc.auth.logout.useMutation({
+    onSuccess: () => {
+      utils.auth.me.setData(undefined, null);
+    },
   });
 
   const login = useCallback(
     async (params: {
       email: string;
       password: string;
-      role?: "user" | "rescuer" | "hospital" | "medical" | "admin";
-      governmentCode?: string;
       supabaseToken?: string;
     }) => {
+      if (isSupabaseConfigured() && !params.supabaseToken) {
+        try {
+          const sbRes = await supabaseSignIn(params.email, params.password);
+          if (sbRes?.session?.access_token) {
+            params.supabaseToken = sbRes.session.access_token;
+          }
+        } catch (sbErr) {
+          console.warn("[Supabase Auth] Direct sign-in note:", sbErr);
+        }
+      }
+
       const res = await loginMutation.mutateAsync(params);
       storeNativeTokenIfPresent((res as any).sessionToken);
       utils.auth.me.setData(undefined, res.user as any);
@@ -183,14 +104,40 @@ export function useAuth(options: UseAuthOptions = {}) {
       name: string;
       email: string;
       password: string;
-      role?: "user" | "rescuer" | "hospital" | "medical" | "admin";
-      governmentCode?: string;
+      role?: "user" | "rescuer" | "medical" | "admin";
       phone?: string;
       callSign?: string;
       supabaseUserId?: string;
       supabaseToken?: string;
     }) => {
-      const res = await registerMutation.mutateAsync(params);
+      let sbUserId: string | undefined;
+      let sbToken: string | undefined;
+
+      if (isSupabaseConfigured()) {
+        try {
+          const sbRes = await supabaseSignUp(params.email, params.password, {
+            name: params.name,
+            phone: params.phone,
+            role: params.role || "user",
+          });
+          if (sbRes?.user?.id) {
+            sbUserId = sbRes.user.id;
+          }
+          if (sbRes?.session?.access_token) {
+            sbToken = sbRes.session.access_token;
+          }
+        } catch (sbErr: any) {
+          console.warn("[Supabase Auth] Direct sign-up note:", sbErr);
+          throw new Error(sbErr?.message || "Supabase registration failed.");
+        }
+      }
+
+      const res = await registerMutation.mutateAsync({
+        ...params,
+        supabaseUserId: sbUserId,
+        supabaseToken: sbToken,
+      });
+
       storeNativeTokenIfPresent((res as any).sessionToken);
       utils.auth.me.setData(undefined, res.user as any);
       await utils.auth.me.invalidate();
@@ -229,6 +176,29 @@ export function useAuth(options: UseAuthOptions = {}) {
     },
     [loginMutation, utils]
   );
+
+  const logout = useCallback(async () => {
+    try {
+      await supabaseSignOut();
+      await logoutMutation.mutateAsync();
+    } catch (error: unknown) {
+      if (
+        error instanceof TRPCClientError &&
+        error.data?.code === "UNAUTHORIZED"
+      ) {
+        return;
+      }
+      throw error;
+    } finally {
+      try {
+        localStorage.removeItem("app-runtime-session-token");
+        localStorage.removeItem("app-runtime-user-info");
+        localStorage.removeItem("app_native_bearer_token");
+      } catch {}
+      utils.auth.me.setData(undefined, null);
+      await utils.auth.me.invalidate();
+    }
+  }, [logoutMutation, utils]);
 
   // Listen for Supabase Magic Link redirect or Auth State Change
   useEffect(() => {
@@ -335,14 +305,6 @@ export function useAuth(options: UseAuthOptions = {}) {
     [updateProfileMutation, utils]
   );
 
-  const closeRevokedModal = useCallback(() => {
-    notifyRevocationListeners({
-      isOpen: false,
-      role: null,
-      adminContactNumber: _globalRevokedDetail.adminContactNumber,
-    });
-  }, []);
-
   return {
     ...state,
     refresh: () => meQuery.refetch(),
@@ -353,7 +315,5 @@ export function useAuth(options: UseAuthOptions = {}) {
     verifyEmailOtp,
     updateProfile,
     logout,
-    revokedModalState,
-    closeRevokedModal,
   };
 }

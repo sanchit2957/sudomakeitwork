@@ -4,20 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+import {
   ArrowLeft,
-  Building2,
   CheckCircle2,
   Eye,
   EyeOff,
   Hospital,
-  KeyRound,
   Lock,
+  Mail,
   Radio,
+  RefreshCw,
   ShieldAlert,
-  ShieldCheck,
-  UserPlus,
 } from "lucide-react";
-import React, { FormEvent, useState } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
 type PortalRole = "rescuer" | "hospital";
@@ -25,82 +28,57 @@ type PortalRole = "rescuer" | "hospital";
 const portalConfig = {
   rescuer: {
     title: "Rescuer Portal",
-    heading: "Rescuer Access",
+    heading: "Rescuer Login",
     description: "Restricted access for authorized field rescue personnel & SDRF teams.",
-    prompt: "Enter your rescuer credentials and the active Government Access Code.",
+    prompt: "Enter your verified rescuer credentials or Email OTP",
     destination: "/responder",
     icon: Radio,
-    callSignPlaceholder: "e.g. NDRF-Boat-01",
-    callSignLabel: "Field Call Sign",
   },
   hospital: {
     title: "Hospital Portal",
-    heading: "Hospital Access",
+    heading: "Hospital Login",
     description: "Restricted access for authorized hospital operations staff & triage centers.",
-    prompt: "Enter your hospital staff credentials and the active Government Access Code.",
+    prompt: "Enter your verified hospital credentials or Email OTP",
     destination: "/hospital",
     icon: Hospital,
-    callSignPlaceholder: "e.g. Guwahati Triage Desk",
-    callSignLabel: "Facility / Ward Label",
   },
 } as const;
 
 export function RoleLogin({ role }: { role: PortalRole }) {
   const config = portalConfig[role];
   const Icon = config.icon;
-  const { login, register, logout } = useAuth();
+  const { login, sendEmailOtp, verifyEmailOtp, logout } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Mode: "signin" vs "register"
-  const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
-
-  // Sign In fields
+  const [method, setMethod] = useState<"password" | "otp">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [governmentCode, setGovernmentCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Register fields
-  const [regName, setRegName] = useState("");
-  const [regEmail, setRegEmail] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-  const [regGovernmentCode, setRegGovernmentCode] = useState("");
-  const [regCallSign, setRegCallSign] = useState("");
-  const [showRegPassword, setShowRegPassword] = useState(false);
+  // OTP State
+  const [otpStep, setOtpStep] = useState<"input" | "verify">("input");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpCountdown, setOtpCountdown] = useState(0);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const handleSignIn = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!email.trim()) {
-      setErrorMessage("Please enter your email address.");
-      return;
+  useEffect(() => {
+    if (otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
+      return () => clearTimeout(timer);
     }
-    if (!password) {
-      setErrorMessage("Please enter your account password.");
-      return;
-    }
-    if (!governmentCode.trim()) {
-      setErrorMessage("Government Access Code is required to authenticate.");
-      return;
-    }
+  }, [otpCountdown]);
 
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
     setIsSubmitting(true);
     setErrorMessage("");
     try {
-      const result = await login({
-        email: email.trim(),
-        password,
-        role: role,
-        governmentCode: governmentCode.trim(),
-      });
+      const result = await login({ email: email.trim(), password });
       const userRole = result.user?.role;
-      const isAuthorized =
-        userRole === role ||
-        userRole === "admin" ||
-        (role === "hospital" && userRole === "medical");
+      const isAuthorized = userRole === role || userRole === "admin" || (role === "hospital" && userRole === "medical");
       if (!isAuthorized) {
         await logout();
         throw new Error(
@@ -108,387 +86,173 @@ export function RoleLogin({ role }: { role: PortalRole }) {
         );
       }
       setLocation(config.destination);
-    } catch (error: any) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Authentication failed. Please verify your credentials and Government Code."
-      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Authentication failed. Please verify your credentials.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleRegister = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!regName.trim()) {
-      setErrorMessage("Please enter your full name or unit title.");
-      return;
-    }
-    if (!regEmail || !regEmail.includes("@")) {
+  const handleSendOtp = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes("@")) {
       setErrorMessage("Please enter a valid official email address.");
       return;
     }
-    if (!regPassword || regPassword.length < 4) {
-      setErrorMessage("Please enter a secure password (at least 4 characters).");
-      return;
-    }
-    if (!regGovernmentCode.trim()) {
-      setErrorMessage("Government Access Code is required for registration.");
-      return;
-    }
-
     setIsSubmitting(true);
     setErrorMessage("");
     try {
-      const result = await register({
-        name: regName.trim(),
-        email: regEmail.trim(),
-        password: regPassword.trim(),
-        role: role,
-        governmentCode: regGovernmentCode.trim(),
-        callSign: regCallSign.trim() || undefined,
-      });
-      const userRole = result.user?.role;
-      const isAuthorized =
-        userRole === role ||
-        userRole === "admin" ||
-        (role === "hospital" && userRole === "medical");
-      if (!isAuthorized) {
-        await logout();
-        throw new Error(
-          `Registration succeeded, but account role is not authorized for the ${role === "rescuer" ? "Rescuer" : "Hospital"} Portal.`
-        );
+      if (sendEmailOtp) {
+        await sendEmailOtp(email.trim());
+      }
+      setOtpStep("verify");
+      setOtpCountdown(60);
+      setSuccessMessage(`A 6-digit verification code was sent to ${email.trim()}.`);
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Failed to dispatch verification code.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleVerifyOtp = async (codeToVerify?: string, e?: FormEvent) => {
+    if (e) e.preventDefault();
+    const code = (typeof codeToVerify === "string" ? codeToVerify : otpCode).trim();
+    if (!code || code.length < 6) {
+      setErrorMessage("Please enter the complete 6-digit code.");
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      if (verifyEmailOtp) {
+        const res = await verifyEmailOtp({
+          email: email.trim(),
+          token: code,
+        });
+        const userRole = res.user?.role;
+        const isAuthorized = userRole === role || userRole === "admin" || (role === "hospital" && userRole === "medical");
+        if (!isAuthorized) {
+          await logout();
+          throw new Error(
+            `This account is not authorized for the ${role === "rescuer" ? "Rescuer" : "Hospital"} Portal.`
+          );
+        }
       }
       setLocation(config.destination);
-    } catch (error: any) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Registration failed. Please check your details and Government Code."
-      );
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Invalid or expired OTP code.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f7f6] text-[#122824] transition-colors dark:bg-[#090a0a] dark:text-[#f3f4f6]">
+    <div className="min-h-screen bg-[#f4f7f6] text-[#122824] dark:bg-[#090a0a] dark:text-[#f3f4f6]">
       <header className="sticky top-0 z-30 border-b border-black/5 bg-white/85 px-4 py-3 backdrop-blur-md dark:border-white/10 dark:bg-[#111214]/85">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <button
-            onClick={() => setLocation("/login")}
-            className="flex items-center gap-2.5 text-left transition hover:opacity-80 focus:outline-none"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0f766e] text-white shadow-sm">
-              <ArrowLeft className="h-4 w-4" />
-            </span>
+          <button onClick={() => setLocation("/login")} className="flex items-center gap-2.5 text-left transition hover:opacity-80">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0f766e] text-white shadow-sm"><ArrowLeft className="h-4 w-4" /></span>
             <span>
-              <span className="block text-base font-black tracking-tight leading-tight">Assam Emergency Network</span>
-              <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-[#5d7c74] dark:text-[#94a3b8]">
-                Disaster Management Authority
-              </span>
+              <span className="block text-base font-black tracking-tight">sudo <span className="text-[#da3e42]">MakeItWork</span></span>
+              <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-[#5d7c74] dark:text-[#94a3b8]">Assam Emergency Network</span>
             </span>
           </button>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => setLocation("/login")} className="text-xs">
-              Citizen Portal
-            </Button>
-            <LanguageSelector compact />
-          </div>
+          <div className="flex items-center gap-3"><Button variant="outline" size="sm" onClick={() => setLocation("/login")}>Other Logins</Button><LanguageSelector compact /></div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-md px-4 py-8 md:py-12">
-        {/* Title Header */}
+      <main className="mx-auto max-w-md px-4 py-10 md:py-16">
         <div className="text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-4 py-1.5 font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0f766e] dark:text-emerald-400">
-            <Icon className="h-4 w-4" /> {config.title}
-          </div>
-          <h1 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">{config.heading}</h1>
-          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{config.description}</p>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-4 py-1.5 font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0f766e] dark:text-emerald-400"><Icon className="h-4 w-4" /> {config.title}</div>
+          <h1 className="mt-4 text-3xl font-black tracking-tight md:text-4xl">{config.heading}</h1>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{config.description}</p>
         </div>
 
-        {/* Mode Switcher */}
-        <div className="mt-6 grid grid-cols-2 rounded-2xl bg-black/5 p-1.5 dark:bg-white/5">
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode("signin");
-              setErrorMessage("");
-              setSuccessMessage("");
-            }}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
-              authMode === "signin"
-                ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Lock className="h-3.5 w-3.5" />
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode("register");
-              setErrorMessage("");
-              setSuccessMessage("");
-            }}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
-              authMode === "register"
-                ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <UserPlus className="h-3.5 w-3.5" />
-            Sign Up
-          </button>
-        </div>
-
-        {/* Form Card */}
-        <div className="mt-4 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#141517]">
+        <div className="mt-6 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#141517]">
           <div className="border-b border-black/5 bg-[#fafcfb] p-4 dark:border-white/5 dark:bg-[#18191c]">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#0f766e]/10 text-[#0f766e] dark:text-emerald-400">
-                <KeyRound className="h-4 w-4" />
-              </span>
-              <div>
-                <h2 className="text-xs font-black uppercase tracking-wide">
-                  {authMode === "signin" ? `Authorized ${config.title} Login` : `Register ${config.title} Account`}
-                </h2>
-                <p className="text-[11px] text-muted-foreground">
-                  {authMode === "signin"
-                    ? "Email/Password for identity + active Government Code."
-                    : "Create role account gated by active Government Code."}
-                </p>
-              </div>
-            </div>
+            <div className="flex items-center gap-2.5"><span className="grid h-8 w-8 place-items-center rounded-lg bg-[#0f766e]/10 text-[#0f766e] dark:text-emerald-400"><Lock className="h-4 w-4" /></span><div><h2 className="text-xs font-black uppercase tracking-wide">Official {config.title} Sign In</h2><p className="text-[11px] text-muted-foreground">{config.prompt}</p></div></div>
           </div>
+          <div className="p-6">
+            {errorMessage && <div role="alert" className="mb-5 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-semibold text-destructive"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /><div>{errorMessage}</div></div>}
+            {successMessage && <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><div>{successMessage}</div></div>}
 
-          <div className="p-5 sm:p-6">
-            {errorMessage && (
-              <div
-                role="alert"
-                className="mb-5 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-semibold text-destructive"
-              >
-                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                <div className="leading-snug">{errorMessage}</div>
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                <div className="leading-snug">{successMessage}</div>
-              </div>
-            )}
-
-            {authMode === "signin" ? (
-              /* SIGN IN FORM */
-              <form onSubmit={handleSignIn} className="space-y-4">
+            {otpStep === "verify" ? (
+              <form onSubmit={(e) => handleVerifyOtp(otpCode, e)} className="space-y-5 text-center">
+                <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-[#0f766e]/10 text-[#0f766e] dark:text-emerald-400">
+                  <Mail className="h-5 w-5" />
+                </div>
                 <div>
-                  <Label htmlFor={`${role}-email`} className="text-xs font-bold">
-                    Email or Username
-                  </Label>
-                  <Input
-                    id={`${role}-email`}
-                    type="text"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. officer@assamrescue.gov.in"
-                    className="mt-1.5 h-11 rounded-xl text-sm"
-                    autoComplete="username"
-                    required
-                  />
+                  <h3 className="text-sm font-bold">Enter Verification Code</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Sent to {email}</p>
                 </div>
 
-                <div>
-                  <Label htmlFor={`${role}-password`} className="text-xs font-bold">
-                    Password
-                  </Label>
-                  <div className="relative mt-1.5">
-                    <Input
-                      id={`${role}-password`}
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter account password"
-                      className="h-11 rounded-xl pr-11 text-sm"
-                      autoComplete="current-password"
-                      required
-                    />
-                    <button
-                      type="button"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      onClick={() => setShowPassword((v) => !v)}
-                      className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor={`${role}-gov-code`} className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                      Government Code <span className="text-destructive">*</span>
-                    </Label>
-                    <span className="font-mono text-[10px] uppercase font-bold text-amber-600 dark:text-amber-500">
-                      Required
-                    </span>
-                  </div>
-                  <div className="relative mt-1.5">
-                    <Input
-                      id={`${role}-gov-code`}
-                      type="text"
-                      value={governmentCode}
-                      onChange={(e) => setGovernmentCode(e.target.value)}
-                      placeholder="Enter active Government Access Code"
-                      className="h-11 rounded-xl border-amber-500/40 bg-amber-50/40 font-mono text-sm font-bold tracking-wider text-amber-950 focus:border-amber-600 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200"
-                      autoComplete="off"
-                      required
-                    />
-                  </div>
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    Access is gated on the active code set by the system administrator.
-                  </p>
-                </div>
-
-                <div className="pt-2">
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting || !email.trim() || !password || !governmentCode.trim()}
-                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(val) => {
+                      const clean = val.replace(/\D/g, "");
+                      setOtpCode(clean);
+                      setErrorMessage("");
+                      if (clean.length === 6 && !isSubmitting) {
+                        void handleVerifyOtp(clean);
+                      }
+                    }}
+                    autoFocus
                   >
-                    <Icon className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Authenticating…" : `Sign In as ${role === "rescuer" ? "Rescuer" : "Hospital Staff"}`}
-                  </Button>
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} className="h-11 w-9 text-sm font-bold sm:h-12 sm:w-11" />
+                      <InputOTPSlot index={1} className="h-11 w-9 text-sm font-bold sm:h-12 sm:w-11" />
+                      <InputOTPSlot index={2} className="h-11 w-9 text-sm font-bold sm:h-12 sm:w-11" />
+                      <InputOTPSlot index={3} className="h-11 w-9 text-sm font-bold sm:h-12 sm:w-11" />
+                      <InputOTPSlot index={4} className="h-11 w-9 text-sm font-bold sm:h-12 sm:w-11" />
+                      <InputOTPSlot index={5} className="h-11 w-9 text-sm font-bold sm:h-12 sm:w-11" />
+                    </InputOTPGroup>
+                  </InputOTP>
                 </div>
+
+                <div className="flex items-center justify-between text-xs px-1">
+                  <button type="button" onClick={() => setOtpStep("input")} className="text-muted-foreground hover:underline">Change Email</button>
+                  <button type="button" disabled={otpCountdown > 0 || isSubmitting} onClick={handleSendOtp} className="font-bold text-[#0f766e] hover:underline dark:text-emerald-400">
+                    <RefreshCw className={`inline mr-1 h-3 w-3 ${otpCountdown > 0 ? "animate-spin" : ""}`} />
+                    {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Resend"}
+                  </button>
+                </div>
+
+                <Button type="submit" disabled={isSubmitting || otpCode.length < 6} className="h-12 w-full rounded-xl bg-[#0f766e] font-bold text-white shadow-md hover:bg-[#0f766e]/90">
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  {isSubmitting ? "Verifying…" : "Verify & Access Portal"}
+                </Button>
               </form>
             ) : (
-              /* SIGN UP / REGISTRATION FORM */
-              <form onSubmit={handleRegister} className="space-y-3.5">
-                <div>
-                  <Label htmlFor={`${role}-reg-name`} className="text-xs font-bold">
-                    Full Name / Designation
-                  </Label>
-                  <Input
-                    id={`${role}-reg-name`}
-                    type="text"
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="e.g. Commander Barua"
-                    className="mt-1 h-10 rounded-xl text-sm"
-                    autoComplete="name"
-                    required
-                  />
+              <div>
+                <div className="mb-4 flex rounded-xl bg-black/5 p-1 dark:bg-white/5">
+                  <button type="button" onClick={() => setMethod("password")} className={`flex-1 rounded-lg py-1 text-xs font-bold transition-all ${method === "password" ? "bg-white text-foreground shadow-xs dark:bg-[#1f2126]" : "text-muted-foreground hover:text-foreground"}`}>Password</button>
+                  <button type="button" onClick={() => setMethod("otp")} className={`flex-1 rounded-lg py-1 text-xs font-bold transition-all ${method === "otp" ? "bg-white text-foreground shadow-xs dark:bg-[#1f2126]" : "text-muted-foreground hover:text-foreground"}`}>Email OTP</button>
                 </div>
 
-                <div>
-                  <Label htmlFor={`${role}-reg-email`} className="text-xs font-bold">
-                    Official Email Address
-                  </Label>
-                  <Input
-                    id={`${role}-reg-email`}
-                    type="email"
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="officer@assamrescue.gov.in"
-                    className="mt-1 h-10 rounded-xl text-sm"
-                    autoComplete="email"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor={`${role}-reg-password`} className="text-xs font-bold">
-                    Set Account Password
-                  </Label>
-                  <div className="relative mt-1">
-                    <Input
-                      id={`${role}-reg-password`}
-                      type={showRegPassword ? "text" : "password"}
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Create a secure password (min. 4 chars)"
-                      className="h-10 rounded-xl pr-10 text-sm"
-                      autoComplete="new-password"
-                      required
-                    />
-                    <button
-                      type="button"
-                      aria-label={showRegPassword ? "Hide password" : "Show password"}
-                      onClick={() => setShowRegPassword((v) => !v)}
-                      className="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground hover:text-foreground"
-                    >
-                      {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor={`${role}-reg-gov-code`} className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                      Government Code <span className="text-destructive">*</span>
-                    </Label>
-                    <span className="font-mono text-[10px] uppercase font-bold text-amber-600 dark:text-amber-500">
-                      Required
-                    </span>
-                  </div>
-                  <Input
-                    id={`${role}-reg-gov-code`}
-                    type="text"
-                    value={regGovernmentCode}
-                    onChange={(e) => setRegGovernmentCode(e.target.value)}
-                    placeholder="Enter active Government Access Code"
-                    className="mt-1 h-10 rounded-xl border-amber-500/40 bg-amber-50/40 font-mono text-sm font-bold tracking-wider text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200"
-                    autoComplete="off"
-                    required
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Required to authorize your account for operational response access.
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor={`${role}-reg-callsign`} className="text-xs font-bold">
-                    {config.callSignLabel} (Optional)
-                  </Label>
-                  <Input
-                    id={`${role}-reg-callsign`}
-                    type="text"
-                    value={regCallSign}
-                    onChange={(e) => setRegCallSign(e.target.value)}
-                    placeholder={config.callSignPlaceholder}
-                    className="mt-1 h-10 rounded-xl text-sm"
-                  />
-                </div>
-
-                <div className="pt-2">
-                  <Button
-                    type="submit"
-                    disabled={
-                      isSubmitting ||
-                      !regName.trim() ||
-                      !regEmail.trim() ||
-                      !regPassword ||
-                      !regGovernmentCode.trim()
-                    }
-                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
-                  >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Registering…" : `Sign Up as ${role === "rescuer" ? "Rescuer" : "Hospital Staff"}`}
-                  </Button>
-                </div>
-              </form>
+                {method === "password" ? (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div><Label htmlFor={`${role}-email`} className="text-xs font-bold">Email or Username</Label><Input id={`${role}-email`} type="text" value={email} onChange={event => setEmail(event.target.value)} className="mt-1.5 h-11 rounded-xl" required /></div>
+                    <div><Label htmlFor={`${role}-password`} className="text-xs font-bold">Password</Label><div className="relative mt-1.5"><Input id={`${role}-password`} type={showPassword ? "text" : "password"} value={password} onChange={event => setPassword(event.target.value)} className="h-11 rounded-xl pr-11" required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(value => !value)} className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>
+                    <Button type="submit" disabled={isSubmitting} className="h-12 w-full rounded-xl bg-[#0f766e] font-bold text-white shadow-md hover:bg-[#0f766e]/90"><Icon className="mr-2 h-4 w-4" />{isSubmitting ? "Authenticating…" : `Sign In to ${role === "rescuer" ? "Rescuer" : "Hospital"}`}</Button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleSendOtp} className="space-y-4">
+                    <div>
+                      <Label htmlFor={`${role}-otp-email`} className="text-xs font-bold">Official Email Address</Label>
+                      <Input id={`${role}-otp-email`} type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="officer@assamrescue.gov.in" className="mt-1.5 h-11 rounded-xl" required />
+                      <p className="mt-1 text-[11px] text-muted-foreground">A 6-digit emergency verification code will be dispatched to your email.</p>
+                    </div>
+                    <Button type="submit" disabled={isSubmitting} className="h-12 w-full rounded-xl bg-[#0f766e] font-bold text-white shadow-md hover:bg-[#0f766e]/90"><Mail className="mr-2 h-4 w-4" />{isSubmitting ? "Dispatching OTP…" : "Send 6-Digit OTP"}</Button>
+                  </form>
+                )}
+              </div>
             )}
           </div>
         </div>
-
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => setLocation("/login")}
-            className="text-xs font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
-          >
-            ← Back to Citizen / All Portals
-          </button>
-        </div>
+        <div className="mt-6 text-center"><button onClick={() => setLocation("/login")} className="text-xs font-bold text-[#0f766e] hover:underline dark:text-emerald-400">← Back to User / Other Logins</button></div>
       </main>
     </div>
   );

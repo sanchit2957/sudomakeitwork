@@ -28,8 +28,6 @@ interface SahayakAiModalProps {
 
 const SUGGESTED_PROMPTS = [
   { icon: "🌊", text: "Flood safety" },
-  { icon: "📏", text: "River water levels" },
-  { icon: "📱", text: "App features" },
   { icon: "🏥", text: "Find a hospital" },
   { icon: "🚑", text: "Rescue assistance" },
   { icon: "🌧️", text: "Weather information" },

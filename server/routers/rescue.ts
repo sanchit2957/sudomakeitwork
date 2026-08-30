@@ -24,6 +24,7 @@ import {
 } from "../../drizzle/schema";
 import { getDb, getEmergencyContactsByUserId, upsertEmergencyContact, deleteEmergencyContact, getUserByOpenId, getUserById, upsertUser, getAllUsers } from "../db";
 import { notifyOwner } from "../_core/notification";
+import { triggerN8nSosWebhook } from "../n8n";
 import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
 import { ASSAM_DISTRICT_LOCATIONS, getComprehensiveWeather, weatherProviderManager } from "../weather.service";
 import {
@@ -451,10 +452,9 @@ export const rescueRouter = router({
               voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
               status: "pending",
             });
-          } catch (err) {
-            if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' });
-            const { recordDbFailure } = await import("../db");
-            recordDbFailure(err);
+            incidentId = Number(result[0].insertId);
+          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' });
+            console.warn("[Database] MySQL insert skipped, fallback to memory:", err);
           }
         }
         _memoryIncidents.set(incidentId, {
@@ -498,6 +498,23 @@ export const rescueRouter = router({
           input.latitude,
           input.longitude
         );
+        try {
+          await triggerN8nSosWebhook({
+            id: incidentId,
+            publicCode,
+            severity: input.severity,
+            status: "pending",
+            emergencyType: input.emergencyType,
+            latitude: input.latitude,
+            longitude: input.longitude,
+            peopleAffected: input.peopleAffected,
+            helpNeeds: input.helpNeeds ?? null,
+            locationLabel: input.locationLabel,
+            createdAt: new Date(),
+          });
+        } catch (webhookErr) {
+          console.warn("[n8n Webhook] Async dispatch caught error:", webhookErr);
+        }
         return { incidentId, publicCode, status: "pending" as const };
       }),
     statusByCode: publicProcedure

@@ -1,7 +1,6 @@
 import React from "react";
 import LanguageSelector from "@/components/LanguageSelector";
 import { VictimNavigation } from "@/pages/Home";
-import { ProfileAvatar, UserProfileBadge, getFirstName } from "@/components/ProfileAvatar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
@@ -55,14 +54,12 @@ export default function More() {
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-4">
-              <ProfileAvatar
-                user={user}
-                size="xl"
-                className="ring-2 ring-white/30"
-              />
+              <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10 ring-2 ring-white/20 backdrop-blur-md transition group-hover:scale-105">
+                <UserRound className="h-7 w-7 text-[#d3eee6]" />
+              </span>
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-lg font-black leading-tight text-white">{getFirstName(user?.name, user?.email, t("Citizen"))}</p>
+                  <p className="text-lg font-black leading-tight text-white">{user?.name || t("Assam Safety Network")}</p>
                 </div>
                 <p className="mt-0.5 text-xs text-[#c2e2db]">{user?.email || t("Citizen Account")}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">

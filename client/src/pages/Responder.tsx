@@ -11,7 +11,6 @@ import { trpc } from "@/lib/trpc";
 import { showNotification } from "@/lib/nativeNotifications";
 import { reconcileAvailability, reconcileMissionStatus } from "@/lib/operationalSync";
 import { Bell, Camera, CheckCircle2, ClipboardList, ClipboardPenLine, Hospital, LocateFixed, MapPinned, MessageCircle, Navigation, Phone, Radio, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
-import { UserProfileBadge } from "@/components/ProfileAvatar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import React, { ChangeEvent, useEffect, useState } from "react";
@@ -26,7 +25,6 @@ export default function Responder() {
 }
 
 function ResponderWorkspace() {
-  const { user } = useAuth();
   const [location] = useLocation();
   const { t } = useLanguage();
   const nav: WorkspaceNavItem[] = [
@@ -162,24 +160,7 @@ function ResponderWorkspace() {
           <section className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
             <div className="rounded-3xl bg-[#174e46] p-6 text-white shadow-[0_20px_60px_-30px_rgb(21_78_70/0.75)]">
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b1dbd1]">{t("responder.readiness")}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <UserProfileBadge
-                  user={{
-                    name: user?.name,
-                    email: user?.email,
-                    photoUrl: profile.data?.photoUrl || (user as any)?.photoUrl,
-                    avatarUrl: (user as any)?.avatarUrl,
-                    role: user?.role,
-                  }}
-                  size="xl"
-                  textClassName="text-2xl font-extrabold tracking-tight text-white"
-                />
-                {profile.data?.callSign && (
-                  <span className="rounded-lg bg-white/15 px-2.5 py-1 font-mono text-xs font-bold text-[#b1dbd1]">
-                    {profile.data.callSign}
-                  </span>
-                )}
-              </div>
+              <h1 className="mt-2 text-2xl font-extrabold tracking-tight">{profile.data?.callSign || t("responder.profilePending")}</h1>
               <p className="mt-2 max-w-lg text-sm leading-6 text-[#c2e1d9]">{t("responder.readinessCopy")}</p>
               <div className="mt-5 flex flex-wrap gap-2">
                 {([['available', t('responder.available')], ['on_mission', t('responder.onMission')], ['off_duty', t('responder.offDuty')]] as const).map(([value, label]) => (

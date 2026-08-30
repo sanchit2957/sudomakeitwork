@@ -9,7 +9,6 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 
 import { useAuth } from "./_core/hooks/useAuth";
 import { RoleGate } from "./components/RoleGate";
-import AccessCodeRevokedModal from "./components/AccessCodeRevokedModal";
 
 // Critical synchronous core auth routes
 import { AdminLogin } from "./pages/admin";
@@ -29,7 +28,6 @@ const UserTrackFlow = lazy(() => import("./pages/user/UserTrackFlow"));
 const UserHospitalRegister = lazy(() => import("./pages/user/UserHospitalRegister"));
 const UserMore = lazy(() => import("./pages/user/UserMore"));
 const UserProfile = lazy(() => import("./pages/user/UserProfile"));
-const UserDonations = lazy(() => import("./pages/user/UserDonations"));
 
 function RouteLoadingFallback() {
   return (
@@ -44,105 +42,88 @@ function RouteLoadingFallback() {
 
 function Router() {
   useMobileLifecycle();
-  const { user, revokedModalState, closeRevokedModal } = useAuth();
+  const { user } = useAuth();
   const native = isNativeApp();
 
   return (
-    <>
-      <AccessCodeRevokedModal
-        isOpen={revokedModalState.isOpen}
-        adminContactNumber={revokedModalState.adminContactNumber}
-        role={revokedModalState.role}
-        onClose={closeRevokedModal}
-      />
-      <Suspense fallback={<RouteLoadingFallback />}>
-        <Switch>
-          {/* Auth Routes */}
-          <Route path={"/login"} component={UserLogin} />
-          <Route path={"/user/login"} component={UserLogin} />
-          <Route path={"/admin/login"}>
-            {native ? <MobileCommandRestricted /> : <AdminLogin />}
-          </Route>
-          <Route path={"/admin"}>
-            {native ? <MobileCommandRestricted /> : <AdminLogin />}
-          </Route>
-          <Route path={"/responder/login"} component={RescuerLogin} />
-          <Route path={"/hospital/login"} component={HospitalLogin} />
-          <Route path={"/medical/login"} component={HospitalLogin} />
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Switch>
+        {/* Auth Routes */}
+        <Route path={"/login"} component={UserLogin} />
+        <Route path={"/user/login"} component={UserLogin} />
+        <Route path={"/admin/login"}>
+          {native ? <MobileCommandRestricted /> : <AdminLogin />}
+        </Route>
+        <Route path={"/admin"}>
+          {native ? <MobileCommandRestricted /> : <AdminLogin />}
+        </Route>
+        <Route path={"/responder/login"} component={RescuerLogin} />
+        <Route path={"/hospital/login"} component={HospitalLogin} />
+        <Route path={"/medical/login"} component={HospitalLogin} />
 
-          {/* Main Entry: Registration & Sign In first if not logged in */}
-          <Route path={"/"}>
-            {user ? <UserHome /> : <UserLogin />}
-          </Route>
-
-        {/* User Section Routes */}
-        <Route path={"/emergency"}>
-          <RoleGate><Emergency /></RoleGate>
-        </Route>
-        <Route path={"/track"}>
-          <RoleGate><UserTrackFlow /></RoleGate>
-        </Route>
-        <Route path={"/safety"}>
-          <RoleGate><UserSafety /></RoleGate>
-        </Route>
-        <Route path={"/profile"}>
-          <RoleGate><UserProfile /></RoleGate>
-        </Route>
-        <Route path={"/user/profile"}>
-          <RoleGate><UserProfile /></RoleGate>
-        </Route>
-        <Route path={"/more"}>
-          <RoleGate><UserMore /></RoleGate>
-        </Route>
-        <Route path={"/donations"}>
-          <UserDonations />
-        </Route>
-        <Route path={"/donations/:rest*"}>
-          <UserDonations />
-        </Route>
-        <Route path={"/donate"}>
-          <UserDonations />
-        </Route>
-        <Route path={"/hospital/register"}>
-          <RoleGate><UserHospitalRegister /></RoleGate>
+        {/* Main Entry: Registration & Sign In first if not logged in */}
+        <Route path={"/"}>
+          {user ? <UserHome /> : <UserLogin />}
         </Route>
 
-        {/* Single Canonical Hospital Operations Portal */}
-        <Route path={"/hospital/:rest*"}>
-          <HospitalPortal />
-        </Route>
-        <Route path={"/hospital"}>
-          <HospitalPortal />
-        </Route>
-        <Route path={"/medical/:rest*"}>
-          <HospitalPortal />
-        </Route>
-        <Route path={"/medical"}>
-          <HospitalPortal />
-        </Route>
+      {/* User Section Routes */}
+      <Route path={"/emergency"}>
+        <RoleGate><Emergency /></RoleGate>
+      </Route>
+      <Route path={"/track"}>
+        <RoleGate><UserTrackFlow /></RoleGate>
+      </Route>
+      <Route path={"/safety"}>
+        <RoleGate><UserSafety /></RoleGate>
+      </Route>
+      <Route path={"/profile"}>
+        <RoleGate><UserProfile /></RoleGate>
+      </Route>
+      <Route path={"/user/profile"}>
+        <RoleGate><UserProfile /></RoleGate>
+      </Route>
+      <Route path={"/more"}>
+        <RoleGate><UserMore /></RoleGate>
+      </Route>
+      <Route path={"/hospital/register"}>
+        <RoleGate><UserHospitalRegister /></RoleGate>
+      </Route>
 
-        {/* Rescuer Portal */}
-        <Route path={"/responder/:rest*"}>
-          <UserResponder />
-        </Route>
-        <Route path={"/responder"}>
-          <UserResponder />
-        </Route>
+      {/* Single Canonical Hospital Operations Portal */}
+      <Route path={"/hospital/:rest*"}>
+        <HospitalPortal />
+      </Route>
+      <Route path={"/hospital"}>
+        <HospitalPortal />
+      </Route>
+      <Route path={"/medical/:rest*"}>
+        <HospitalPortal />
+      </Route>
+      <Route path={"/medical"}>
+        <HospitalPortal />
+      </Route>
 
-        {/* Admin Section Routes - Restricted in Mobile Native App */}
-        <Route path={"/command/:rest*"}>
-          {native ? <MobileCommandRestricted /> : <RoleGate roles={["admin"]}><AdminCommand /></RoleGate>}
-        </Route>
-        <Route path={"/command"}>
-          {native ? <MobileCommandRestricted /> : <RoleGate roles={["admin"]}><AdminCommand /></RoleGate>}
-        </Route>
+      {/* Rescuer Portal */}
+      <Route path={"/responder/:rest*"}>
+        <UserResponder />
+      </Route>
+      <Route path={"/responder"}>
+        <UserResponder />
+      </Route>
 
-        {/* Fallback Routes */}
-        <Route path={"/404"} component={NotFound} />
-        <Route component={NotFound} />
-      </Switch>
-      </Suspense>
-    </>
+      {/* Admin Section Routes - Restricted in Mobile Native App */}
+      <Route path={"/command/:rest*"}>
+        {native ? <MobileCommandRestricted /> : <RoleGate roles={["admin"]}><AdminCommand /></RoleGate>}
+      </Route>
+      <Route path={"/command"}>
+        {native ? <MobileCommandRestricted /> : <RoleGate roles={["admin"]}><AdminCommand /></RoleGate>}
+      </Route>
+
+      {/* Fallback Routes */}
+      <Route path={"/404"} component={NotFound} />
+      <Route component={NotFound} />
+    </Switch>
+    </Suspense>
   );
 }
 

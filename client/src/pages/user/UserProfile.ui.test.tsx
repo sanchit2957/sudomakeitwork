@@ -122,7 +122,7 @@ describe("UserProfile & UserMore UI Component", () => {
   it("renders UserMore top profile card with clickable customization link and user district/blood group pills", () => {
     const markup = renderToStaticMarkup(<UserMore />);
     expect(markup).toContain("More");
-    expect(markup).toContain("Anupam");
+    expect(markup).toContain("Anupam Deka");
     expect(markup).toContain("Tap to customize safety profile &amp; emergency contacts");
     expect(markup).toContain("Kamrup Metropolitan");
     expect(markup).toContain("O+");

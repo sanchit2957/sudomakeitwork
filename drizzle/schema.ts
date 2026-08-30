@@ -1,5 +1,4 @@
 import {
-  boolean,
   double,
   index,
   int,
@@ -11,23 +10,19 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 
-export const users = mysqlTable(
-  "users",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    openId: varchar("openId", { length: 64 }).notNull().unique(),
-    name: text("name"),
-    email: varchar("email", { length: 320 }),
-    password: varchar("password", { length: 255 }),
-    loginMethod: varchar("loginMethod", { length: 64 }),
-    role: mysqlEnum("role", ["user", "rescuer", "hospital", "admin", "medical"]).default("user").notNull(),
-    status: mysqlEnum("status", ["active", "disabled"]).default("active").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-    lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-  },
-  table => [uniqueIndex("users_email_role_unique").on(table.email, table.role)]
-);
+export const users = mysqlTable("users", {
+  id: int("id").autoincrement().primaryKey(),
+  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  name: text("name"),
+  email: varchar("email", { length: 320 }),
+  password: varchar("password", { length: 255 }),
+  loginMethod: varchar("loginMethod", { length: 64 }),
+  role: mysqlEnum("role", ["user", "rescuer", "hospital", "admin", "medical"]).default("user").notNull(),
+  status: mysqlEnum("status", ["active", "disabled"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+});
 
 export const rescueProfiles = mysqlTable(
   "rescueProfiles",
@@ -93,6 +88,9 @@ export const incidents = mysqlTable(
     assignedRescuerId: int("assignedRescuerId").references(() => users.id),
     dispatchedAt: timestamp("dispatchedAt"),
     resolvedAt: timestamp("resolvedAt"),
+    escalationLevel: int("escalationLevel").default(0).notNull(),
+    lastEscalatedAt: timestamp("lastEscalatedAt"),
+    automationStatus: varchar("automationStatus", { length: 64 }).default("active").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -367,56 +365,6 @@ export const emergencyContacts = mysqlTable(
   table => [index("emergencyContacts_userId_idx").on(table.userId)],
 );
 
-export const donationTargets = mysqlTable(
-  "donation_targets",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    type: mysqlEnum("type", ["ngo", "government"]).notNull(),
-    name: varchar("name", { length: 255 }).notNull(),
-    description: text("description"),
-    latitude: double("latitude").notNull(),
-    longitude: double("longitude").notNull(),
-    upiId: varchar("upi_id", { length: 128 }),
-    qrCodeUrl: varchar("qr_code_url", { length: 1024 }),
-    contactInfo: text("contact_info"),
-    verified: boolean("verified").default(true).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  table => [index("donation_targets_type_idx").on(table.type)],
-);
-
-export const donations = mysqlTable(
-  "donations",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    donorUserId: int("donor_user_id").references(() => users.id),
-    targetId: int("target_id").notNull().references(() => donationTargets.id),
-    donationType: mysqlEnum("donation_type", ["money", "food", "clothes"]).notNull(),
-    amount: double("amount"),
-    quantityDescription: text("quantity_description"),
-    donationDate: varchar("donation_date", { length: 64 }),
-    status: varchar("status", { length: 64 }).default("completed").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  table => [
-    index("donations_donor_idx").on(table.donorUserId),
-    index("donations_target_idx").on(table.targetId),
-  ],
-);
-
-export const roleAccessCodes = mysqlTable(
-  "roleAccessCodes",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    role: varchar("role", { length: 32 }).notNull().unique(),
-    codeHash: varchar("codeHash", { length: 255 }).notNull(),
-    codeVersion: int("codeVersion").default(1).notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-    updatedBy: int("updatedBy").references(() => users.id),
-  },
-  table => [uniqueIndex("roleAccessCodes_role_unique").on(table.role)],
-);
-
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Incident = typeof incidents.$inferSelect;
@@ -425,9 +373,3 @@ export type EmergencyContact = typeof emergencyContacts.$inferSelect;
 export type InsertEmergencyContact = typeof emergencyContacts.$inferInsert;
 export type HospitalCaseNotification = typeof hospitalCaseNotifications.$inferSelect;
 export type InsertHospitalCaseNotification = typeof hospitalCaseNotifications.$inferInsert;
-export type DonationTarget = typeof donationTargets.$inferSelect;
-export type InsertDonationTarget = typeof donationTargets.$inferInsert;
-export type Donation = typeof donations.$inferSelect;
-export type InsertDonation = typeof donations.$inferInsert;
-export type RoleAccessCode = typeof roleAccessCodes.$inferSelect;
-export type InsertRoleAccessCode = typeof roleAccessCodes.$inferInsert;

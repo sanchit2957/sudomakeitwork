@@ -1,5 +1,4 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { ProfileAvatar, UserProfileBadge, getFirstName } from "@/components/ProfileAvatar";
 import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -274,19 +273,14 @@ export default function UserProfile() {
         <section className="mt-4 rounded-[1.8rem] bg-gradient-to-br from-[#174e46] via-[#1b5850] to-[#0f3832] p-5 text-white shadow-[0_12px_28px_rgba(23,78,70,0.18)] ring-1 ring-white/10">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4">
-              <ProfileAvatar
-                user={{
-                  name: name || user?.name,
-                  email: user?.email,
-                  photoUrl: (user as any)?.photoUrl,
-                  avatarUrl: (user as any)?.avatarUrl,
-                  role: user?.role,
-                }}
-                size="xl"
-                className="ring-2 ring-white/30"
-              />
+              <span className="relative grid h-14 w-14 place-items-center rounded-2xl bg-white/10 ring-2 ring-white/20 backdrop-blur-md">
+                <User className="h-7 w-7 text-[#d3eee6]" />
+                <span className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-[#10b981] text-[10px] text-white ring-2 ring-[#174e46]">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                </span>
+              </span>
               <div>
-                <p className="text-lg font-black leading-tight text-white">{getFirstName(name || user?.name, user?.email, t("Citizen"))}</p>
+                <p className="text-lg font-black leading-tight text-white">{name || user?.name || t("Assam Citizen")}</p>
                 <p className="mt-0.5 text-xs text-[#c2e2db]">{user?.email || t("Account verified")}</p>
                 <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#e6f7f3]">
                   <ShieldCheck className="h-3 w-3 text-[#5eead4]" />

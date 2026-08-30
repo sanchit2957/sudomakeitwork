@@ -33,10 +33,10 @@ function MedicalWorkspace() {
     ...(user?.role === "admin" ? [{ label: "Hospital Approvals", path: "/medical/access", icon: UserPlus }] : []),
   ];
 
-  const live = { refetchInterval: 6_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const live = { refetchInterval: 2_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
   const hospitals = trpc.rescue.operations.hospitals.useQuery(undefined, live);
   const myHospital = trpc.rescue.operations.myHospital.useQuery(undefined, { ...live, enabled: user?.role === "medical" });
-  const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, { refetchInterval: 12_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true });
+  const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, live);
 
   return (
     <DashboardLayout
@@ -78,7 +78,7 @@ function MedicalWorkspace() {
 
 function HospitalApprovals() {
   const utils = trpc.useUtils();
-  const requests = trpc.rescue.operations.hospitalRegistrationRequests.useQuery(undefined, { refetchInterval: 8_000, refetchOnWindowFocus: true });
+  const requests = trpc.rescue.operations.hospitalRegistrationRequests.useQuery(undefined, { refetchInterval: 2_000, refetchOnWindowFocus: true });
   const review = trpc.rescue.operations.reviewHospitalRegistration.useMutation({
     onSuccess: () => {
       void utils.rescue.operations.hospitalRegistrationRequests.invalidate();

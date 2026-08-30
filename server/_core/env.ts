@@ -11,5 +11,6 @@ export const ENV = {
   supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY ?? "sb_publishable_EjeAtAGh9DXQLNvuW4axKA_fjBg5hxy",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   adminEmail: process.env.ADMIN_EMAIL ?? "",
-  adminContactNumber: process.env.ADMIN_CONTACT_NUMBER || process.env.VITE_ADMIN_CONTACT_NUMBER || "+91-361-2237011",
+  n8nSosWebhookUrl: process.env.N8N_SOS_WEBHOOK_URL ?? "",
+  n8nFloodAlertWebhookUrl: process.env.N8N_FLOOD_ALERT_WEBHOOK_URL ?? "",
 };

@@ -10,17 +10,12 @@ import {
   deleteEmergencyContact,
   ensureHospitalStaffProfile,
   ensureRescuerProfile,
-  getAllRoleAccessCodes,
   getAllUsers,
   getEmergencyContactsByUserId,
-  getRoleAccessCode,
-  getRoleCodeVersion,
   getUserByEmail,
   getUserByOpenId,
-  setRoleAccessCode,
   upsertEmergencyContact,
   upsertUser,
-  verifyRoleAccessCode,
 } from "./db";
 import { rescueRouter } from "./routers/rescue";
 import { ENV } from "./_core/env";
@@ -41,10 +36,7 @@ function resolveVerifiedRole(email: string, existingRole?: string): "user" | "re
   return "user";
 }
 
-function sanitizeUser<T extends Record<string, any>>(user: T): Omit<T, "password">;
-function sanitizeUser<T extends Record<string, any>>(user: null | undefined): null;
-function sanitizeUser<T extends Record<string, any>>(user: T | null | undefined): Omit<T, "password"> | null;
-function sanitizeUser<T extends Record<string, any>>(user: T | null | undefined): Omit<T, "password"> | null {
+function sanitizeUser<T extends Record<string, any>>(user: T | null): Omit<T, "password"> | null {
   if (!user) return null;
   const { password, ...safeUser } = user;
   return safeUser;
@@ -55,51 +47,11 @@ export const appRouter = router({
   ai: aiRouter,
   auth: router({
     me: publicProcedure.query(opts => sanitizeUser(opts.ctx.user)),
-    getPublicConfig: publicProcedure.query(() => ({
-      adminContactNumber: ENV.adminContactNumber,
-    })),
-    checkSessionVersion: publicProcedure.query(async ({ ctx }) => {
-      const user = ctx.user;
-      if (!user) {
-        return {
-          valid: true,
-          authenticated: false,
-          role: null,
-          codeVersion: null,
-          currentVersion: null,
-          adminContactNumber: ENV.adminContactNumber,
-        };
-      }
-      if (user.role === "admin" || user.role === "user") {
-        return {
-          valid: true,
-          authenticated: true,
-          role: user.role,
-          codeVersion: null,
-          currentVersion: null,
-          adminContactNumber: ENV.adminContactNumber,
-        };
-      }
-      const roleToCheck = user.role === "medical" ? "hospital" : user.role;
-      const currentVersion = await getRoleCodeVersion(roleToCheck);
-      const sessionVersion = (user as any).codeVersion;
-      const isValid = (user as any).loginMethod === "test" || (sessionVersion !== undefined && sessionVersion === currentVersion);
-      return {
-        valid: isValid,
-        authenticated: true,
-        role: user.role,
-        codeVersion: sessionVersion ?? null,
-        currentVersion,
-        adminContactNumber: ENV.adminContactNumber,
-      };
-    }),
     login: publicProcedure
       .input(
         z.object({
           email: z.string().optional(),
           password: z.string().optional(),
-          role: z.enum(["admin", "rescuer", "hospital", "medical", "user"]).optional(),
-          governmentCode: z.string().optional(),
           supabaseToken: z.string().optional(),
           isNative: z.boolean().optional(),
         })
@@ -111,34 +63,27 @@ export const appRouter = router({
           const sbUser = await verifySupabaseToken(input.supabaseToken);
           if (sbUser && sbUser.email) {
             const emailVal = sbUser.email.trim().toLowerCase();
-            const requestedRole = input.role ? (input.role === "medical" ? "hospital" : input.role) : undefined;
-            let dbUser = (await getUserByEmail(emailVal, requestedRole)) || (await getUserByOpenId(sbUser.id));
-            const roleVal = requestedRole || resolveVerifiedRole(emailVal, dbUser?.role);
-            const openId = `${roleVal}-${sbUser.id}`.slice(0, 64);
+            let dbUser = (await getUserByOpenId(sbUser.id)) || (await getUserByEmail(emailVal));
+            const roleVal = resolveVerifiedRole(emailVal, dbUser?.role);
             if (!dbUser) {
               const nameVal = sbUser.user_metadata?.name || sbUser.user_metadata?.full_name || emailVal.split("@")[0];
               await upsertUser({
-                openId,
+                openId: sbUser.id,
                 name: nameVal,
                 email: emailVal,
                 role: roleVal,
                 loginMethod: "supabase-auth",
                 lastSignedIn: new Date(),
               });
-              dbUser = await getUserByEmail(emailVal, roleVal);
+              dbUser = await getUserByEmail(emailVal);
             } else {
-              await upsertUser({ ...dbUser, openId: dbUser.openId || openId, role: roleVal, lastSignedIn: new Date() });
-              dbUser = await getUserByEmail(emailVal, roleVal);
+              await upsertUser({ ...dbUser, openId: sbUser.id, role: roleVal, lastSignedIn: new Date() });
+              dbUser = await getUserByEmail(emailVal);
             }
 
             if (dbUser) {
               if (dbUser.status === "disabled") {
                 throw new TRPCError({ code: "FORBIDDEN", message: "Your account has been disabled. Please contact an administrator." });
-              }
-
-              let codeVersion: number | undefined;
-              if (roleVal === "rescuer" || roleVal === "hospital") {
-                codeVersion = await getRoleCodeVersion(roleVal);
               }
 
               if (roleVal === "rescuer") {
@@ -147,7 +92,7 @@ export const appRouter = router({
                 await ensureHospitalStaffProfile(dbUser.id);
               }
 
-              const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User", codeVersion });
+              const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User" });
               const cookieOptions = getSessionCookieOptions(ctx.req);
               ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
               return {
@@ -165,22 +110,8 @@ export const appRouter = router({
         }
         
         const emailInput = input.email.trim().toLowerCase();
-        const targetRole = input.role
-          ? (input.role === "medical" ? "hospital" : input.role)
-          : undefined;
-
-        let user: any = null;
-        if (targetRole) {
-          user = await getUserByEmail(emailInput, targetRole);
-        } else {
-          user = await getUserByEmail(emailInput);
-        }
-
+        const user = await getUserByEmail(emailInput);
         if (!user || !user.password) {
-          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
-        }
-
-        if (targetRole && user.role !== targetRole && !(targetRole === "hospital" && user.role === "medical")) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
         }
 
@@ -199,27 +130,9 @@ export const appRouter = router({
           await upsertUser({ ...user, role: "hospital" as any });
         }
 
-        let codeVersion: number | undefined;
-        if (user.role === "rescuer" || user.role === "hospital") {
-          if (!input.governmentCode || !input.governmentCode.trim()) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: `A valid Government Access Code is required to log in to the ${user.role === "rescuer" ? "Rescuer" : "Hospital"} portal.`,
-            });
-          }
-          const isCodeValid = await verifyRoleAccessCode(user.role, input.governmentCode);
-          if (!isCodeValid) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: `Invalid Government Access Code for ${user.role === "rescuer" ? "Rescuer" : "Hospital"} portal.`,
-            });
-          }
-          codeVersion = await getRoleCodeVersion(user.role);
-        }
-
         await upsertUser({ ...user, lastSignedIn: new Date() });
 
-        const sessionToken = await sdk.createSessionToken(user.openId, { name: user.name || "User", codeVersion });
+        const sessionToken = await sdk.createSessionToken(user.openId, { name: user.name || "User" });
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
 
@@ -236,7 +149,6 @@ export const appRouter = router({
           email: z.string().email("Invalid email address"),
           password: z.string().min(1, "Password is required"),
           role: z.enum(["admin", "rescuer", "hospital", "medical", "user"]).default("user"),
-          governmentCode: z.string().optional(),
           phone: z.string().optional(),
           callSign: z.string().optional(),
           supabaseUserId: z.string().optional(),
@@ -246,61 +158,27 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const emailVal = input.email.trim().toLowerCase();
-        const requestedRole = input.role === "medical" ? "hospital" : input.role;
-        let assignedRole: "user" | "rescuer" | "hospital" = "user";
-        let codeVersion: number | undefined;
-
-        if (requestedRole === "rescuer" || requestedRole === "hospital") {
-          if (!input.governmentCode || !input.governmentCode.trim()) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: `Government Access Code is required to register as ${requestedRole === "rescuer" ? "a Rescuer" : "Hospital Staff"}.`,
-            });
-          }
-          const isCodeValid = await verifyRoleAccessCode(requestedRole, input.governmentCode);
-          if (!isCodeValid) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: `Invalid Government Access Code for ${requestedRole === "rescuer" ? "Rescuer" : "Hospital"} registration.`,
-            });
-          }
-          assignedRole = requestedRole;
-          codeVersion = await getRoleCodeVersion(requestedRole);
-        }
-
-        const existing = await getUserByEmail(emailVal, assignedRole);
+        const existing = await getUserByEmail(emailVal);
         if (existing) {
-          throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists for this role." });
+          throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
         }
-
-        const sanitizedEmail = emailVal.replace(/[^a-z0-9]/g, "-").slice(0, 36);
-        const openId = input.supabaseUserId
-          ? `${assignedRole}-${input.supabaseUserId}`.slice(0, 64)
-          : `user-${assignedRole}-${sanitizedEmail}`.slice(0, 64);
+        const openId = input.supabaseUserId || `user-${emailVal.replace(/[^a-z0-9]/g, "-")}`;
         const hashedPassword = hashPassword(input.password.trim());
         await upsertUser({
           openId,
           name: input.name.trim(),
           email: emailVal,
           password: hashedPassword,
-          role: assignedRole,
+          role: "user", // Public registration ALWAYS assigns role: user
           status: "active",
           loginMethod: input.supabaseUserId ? "supabase-auth" : "platform-login",
           lastSignedIn: new Date(),
         });
-
-        const dbUser = await getUserByEmail(emailVal, assignedRole);
+        const dbUser = await getUserByEmail(emailVal);
         if (!dbUser) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create user account." });
         }
-
-        if (assignedRole === "rescuer") {
-          await ensureRescuerProfile(dbUser.id, input.callSign || "Field Unit");
-        } else if (assignedRole === "hospital") {
-          await ensureHospitalStaffProfile(dbUser.id);
-        }
-
-        const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User", codeVersion });
+        const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User" });
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
         return {
@@ -309,39 +187,6 @@ export const appRouter = router({
           sessionToken: input.isNative ? sessionToken : undefined,
         };
       }),
-    accessCodes: router({
-      list: adminProcedure.query(async () => {
-        return await getAllRoleAccessCodes();
-      }),
-      updateCode: adminProcedure
-        .input(
-          z.object({
-            role: z.enum(["rescuer", "hospital"]),
-            code: z.string().min(4, "Access code must be at least 4 characters"),
-          })
-        )
-        .mutation(async ({ input, ctx }) => {
-          return await setRoleAccessCode(input.role, input.code, ctx.user.id);
-        }),
-      regenerateCode: adminProcedure
-        .input(
-          z.object({
-            role: z.enum(["rescuer", "hospital"]),
-          })
-        )
-        .mutation(async ({ input, ctx }) => {
-          const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-          const prefix = input.role === "rescuer" ? "RESC" : "HOSP";
-          const generatedCode = `ASSAM-${prefix}-${randomSuffix}`;
-          const res = await setRoleAccessCode(input.role, generatedCode, ctx.user.id);
-          return {
-            role: res.role,
-            code: generatedCode,
-            codeVersion: res.codeVersion,
-            updatedAt: res.updatedAt,
-          };
-        }),
-    }),
     createUser: adminProcedure
       .input(
         z.object({
@@ -358,16 +203,14 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const emailVal = input.email.trim().toLowerCase();
+        const existing = await getUserByEmail(emailVal);
+        if (existing) {
+          throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
+        }
         const assignedRole: "admin" | "rescuer" | "hospital" | "user" =
           input.role === "medical" ? "hospital" : input.role;
 
-        const existing = await getUserByEmail(emailVal, assignedRole);
-        if (existing) {
-          throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists for this role." });
-        }
-
-        const sanitizedEmail = emailVal.replace(/[^a-z0-9]/g, "-").slice(0, 36);
-        const openId = `user-${assignedRole}-${sanitizedEmail}`.slice(0, 64);
+        const openId = `user-${emailVal.replace(/[^a-z0-9]/g, "-")}`;
         const hashedPassword = hashPassword(input.password.trim());
         await upsertUser({
           openId,
@@ -379,7 +222,7 @@ export const appRouter = router({
           loginMethod: "platform-login",
         });
 
-        const dbUser = await getUserByEmail(emailVal, assignedRole);
+        const dbUser = await getUserByEmail(emailVal);
         if (dbUser) {
           if (assignedRole === "rescuer") {
             await ensureRescuerProfile(dbUser.id, input.callSign || "New Field Unit");

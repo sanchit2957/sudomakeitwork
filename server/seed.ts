@@ -2,7 +2,6 @@ import "dotenv/config";
 import crypto from "crypto";
 import { eq } from "drizzle-orm";
 import {
-  donationTargets,
   floodZones,
   hospitals,
   hospitalStaffProfiles,
@@ -71,6 +70,22 @@ export async function seedDatabase(): Promise<SeedResult> {
       loginMethod: "platform-login",
     },
     {
+      openId: "user-rescuer",
+      name: "Inspector Barua",
+      email: "rescuer@assamrescue.gov.in",
+      rawPassword: getInitialSeedPassword("rescuer", "rescuer"),
+      role: "rescuer" as const,
+      loginMethod: "platform-login",
+    },
+    {
+      openId: "user-medical",
+      name: "Dr. Hazarika",
+      email: "medical@assamrescue.gov.in",
+      rawPassword: getInitialSeedPassword("hospital", "medical"),
+      role: "hospital" as const,
+      loginMethod: "platform-login",
+    },
+    {
       openId: "user-citizen",
       name: "Anamika Das",
       email: "citizen@assamrescue.gov.in",
@@ -113,6 +128,33 @@ export async function seedDatabase(): Promise<SeedResult> {
   }
 
   const adminId = userIdMap["admin@assamrescue.gov.in"];
+  const rescuerId = userIdMap["rescuer@assamrescue.gov.in"];
+  const medicalId = userIdMap["medical@assamrescue.gov.in"];
+
+  // 2. Rescuer Profile (Idempotent)
+  if (rescuerId) {
+    const existingProfile = await db
+      .select()
+      .from(rescueProfiles)
+      .where(eq(rescueProfiles.userId, rescuerId))
+      .limit(1);
+
+    if (!existingProfile.length) {
+      await db.insert(rescueProfiles).values({
+        userId: rescuerId,
+        callSign: "NDRF Boat 4",
+        phone: "+91 94350 11223",
+        contactSharing: "yes",
+        locationSharing: "yes",
+        availability: "available",
+        lastLatitude: 26.1845,
+        lastLongitude: 91.7462,
+        locationUpdatedAt: new Date(),
+      });
+      result.rescueProfilesSeeded++;
+      console.log(`[Seed] Seeded rescuer profile for user #${rescuerId}`);
+    }
+  }
 
   // 3. Hospitals (Idempotent)
   const initialHospitals = [
@@ -177,7 +219,26 @@ export async function seedDatabase(): Promise<SeedResult> {
     }
   }
 
-  // 4. Shelters (Idempotent)
+  // 4. Medical Staff Profile Assignment (Idempotent)
+  if (medicalId && primaryHospitalId) {
+    const existingStaff = await db
+      .select()
+      .from(hospitalStaffProfiles)
+      .where(eq(hospitalStaffProfiles.userId, medicalId))
+      .limit(1);
+
+    if (!existingStaff.length) {
+      await db.insert(hospitalStaffProfiles).values({
+        userId: medicalId,
+        hospitalId: primaryHospitalId,
+        designation: "Emergency Medical Coordinator",
+      });
+      result.hospitalProfilesSeeded++;
+      console.log(`[Seed] Linked medical staff #${medicalId} to hospital #${primaryHospitalId}`);
+    }
+  }
+
+  // 5. Shelters (Idempotent)
   const initialShelters = [
     {
       name: "Guwahati Central Relief Camp",
@@ -252,89 +313,6 @@ export async function seedDatabase(): Promise<SeedResult> {
       await db.insert(floodZones).values(z);
       result.floodZonesSeeded++;
       console.log(`[Seed] Seeded flood zone: ${z.name}`);
-    }
-  }
-
-  // 7. Donation Targets (Idempotent)
-  const initialTargets = [
-    {
-      type: "government" as const,
-      name: "Assam State Disaster Management Authority (ASDMA)",
-      description: "Official Disaster Relief & Flood Mitigation Fund under the Government of Assam. Coordinates emergency distribution and post-flood rehabilitation.",
-      latitude: 26.1445,
-      longitude: 91.7362,
-      upiId: "asdmarelief@sbi",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=asdmarelief@sbi%26pn=ASDMA%20Relief%20Fund%26cu=INR",
-      contactInfo: "State Emergency Operations Centre: 1070 / 1079 | Email: asdma-relief@assam.gov.in",
-      verified: true,
-    },
-    {
-      type: "government" as const,
-      name: "Chief Minister's Relief Fund (CMRF) Assam",
-      description: "Official humanitarian and emergency relief assistance fund operated directly by the Government of Assam.",
-      latitude: 26.1433,
-      longitude: 91.7898,
-      upiId: "cmrfassam@sbi",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=cmrfassam@sbi%26pn=Assam%20CMRF%26cu=INR",
-      contactInfo: "Secretariat Dispur: 0361-2237054 | cmrf@assam.gov.in",
-      verified: true,
-    },
-    {
-      type: "government" as const,
-      name: "District Disaster Management Authority (DDMA) Kamrup Metro",
-      description: "District level emergency response unit managing relief camps, drinking water tankers, and dry ration distribution in Kamrup Metro.",
-      latitude: 26.1865,
-      longitude: 91.7488,
-      upiId: "ddmakamrup@icici",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=ddmakamrup@icici%26pn=DDMA%20Kamrup%20Metro%26cu=INR",
-      contactInfo: "DDMA Control Room: 0361-2733052 / 1077",
-      verified: true,
-    },
-    {
-      type: "ngo" as const,
-      name: "Indian Red Cross Society (Assam State Branch)",
-      description: "Providing critical medical emergency kits, water purification units, hygiene packs, and cooked meals to marooned communities.",
-      latitude: 26.1890,
-      longitude: 91.7760,
-      upiId: "assamredcross@sbi",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=assamredcross@sbi%26pn=Assam%20Red%20Cross%26cu=INR",
-      contactInfo: "Chandmari Office: +91 94350 12345 | info@assamredcross.org",
-      verified: true,
-    },
-    {
-      type: "ngo" as const,
-      name: "Goonj Assam Relief & Rehabilitation",
-      description: "Leading nationwide NGO deploying essential family survival kits, clothing packages, dignity kits, and dry rations across flood-hit districts.",
-      latitude: 26.1265,
-      longitude: 91.8170,
-      upiId: "goonjassam@hdfcbank",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=goonjassam@hdfcbank%26pn=Goonj%20Assam%26cu=INR",
-      contactInfo: "Khanapara Hub: +91 98640 54321 | assam@goonj.org",
-      verified: true,
-    },
-    {
-      type: "ngo" as const,
-      name: "Brahmaputra Flood Relief & Aid Network",
-      description: "Grassroots disaster foundation operating rescue boats, community kitchens, baby food supplies, and clothes collection centres.",
-      latitude: 24.8333,
-      longitude: 92.7789,
-      upiId: "brahmaputrarelief@axisbank",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=brahmaputrarelief@axisbank%26pn=Brahmaputra%20Relief%26cu=INR",
-      contactInfo: "Silchar / Barak Valley Desk: +91 94351 98765 | aid@brahmaputrarelief.org",
-      verified: true,
-    },
-  ];
-
-  for (const t of initialTargets) {
-    const existing = await db
-      .select()
-      .from(donationTargets)
-      .where(eq(donationTargets.name, t.name))
-      .limit(1);
-
-    if (!existing.length) {
-      await db.insert(donationTargets).values(t);
-      console.log(`[Seed] Seeded donation target: ${t.name}`);
     }
   }
 

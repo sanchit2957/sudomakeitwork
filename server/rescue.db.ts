@@ -84,6 +84,9 @@ export interface MemoryIncident {
   assignedRescuerId: number | null;
   dispatchedAt: Date | null;
   resolvedAt: Date | null;
+  escalationLevel?: number;
+  lastEscalatedAt?: Date | null;
+  automationStatus?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -354,7 +357,26 @@ export const _memoryFloodZones: Map<number, MemoryFloodZone> = new Map([
   ],
 ]);
 
-export const _memoryRescueProfiles: Map<number, MemoryRescueProfile> = new Map();
+export const _memoryRescueProfiles: Map<number, MemoryRescueProfile> = new Map([
+  [
+    2,
+    {
+      id: 1,
+      userId: 2,
+      callSign: "NDRF Boat 4",
+      phone: "+91 94350 11223",
+      photoKey: null,
+      photoUrl: null,
+      contactSharing: "yes",
+      locationSharing: "yes",
+      availability: "available",
+      lastLatitude: 26.1845,
+      lastLongitude: 91.7462,
+      locationUpdatedAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ],
+]);
 
 export const _memoryIncidents: Map<number, MemoryIncident> = new Map([
   [
@@ -377,17 +399,36 @@ export const _memoryIncidents: Map<number, MemoryIncident> = new Map([
       voiceNoteKey: null,
       voiceNoteUrl: null,
       voiceNoteDurationSeconds: null,
-      status: "pending",
-      assignedRescuerId: null,
-      dispatchedAt: null,
+      status: "dispatched",
+      assignedRescuerId: 2,
+      dispatchedAt: new Date(Date.now() - 35 * 60 * 1000),
       resolvedAt: null,
+      escalationLevel: 0,
+      lastEscalatedAt: null,
+      automationStatus: "active",
       createdAt: new Date(Date.now() - 45 * 60 * 1000),
       updatedAt: new Date(),
     },
   ],
 ]);
 
-export const _memoryMissions: Map<number, MemoryMission> = new Map();
+export const _memoryMissions: Map<number, MemoryMission> = new Map([
+  [
+    1,
+    {
+      id: 1,
+      incidentId: 1,
+      rescuerId: 2,
+      status: "dispatched",
+      assignedBy: 1,
+      assignedAt: new Date(Date.now() - 40 * 60 * 1000),
+      dispatchedAt: new Date(Date.now() - 35 * 60 * 1000),
+      resolvedAt: null,
+      notes: "Deploying motorized rescue boat from Uzan Bazar ghat.",
+      updatedAt: new Date(),
+    },
+  ],
+]);
 
 export const _memoryIncidentEvents: MemoryIncidentEvent[] = [
   {
@@ -416,7 +457,19 @@ export const _memorySafetyRequests: Map<number, MemorySafetyRequest> = new Map()
 export const _memoryNotifications: MemoryNotification[] = [];
 export const _memoryRescuerRequests: Map<number, MemoryRescuerRequest> = new Map();
 export const _memoryHospitalRequests: Map<number, MemoryHospitalRequest> = new Map();
-export const _memoryHospitalStaffProfiles: Map<number, MemoryHospitalStaffProfile> = new Map();
+export const _memoryHospitalStaffProfiles: Map<number, MemoryHospitalStaffProfile> = new Map([
+  [
+    3,
+    {
+      id: 1,
+      userId: 3,
+      hospitalId: 1,
+      designation: "Emergency Medical Coordinator",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ],
+]);
 export const _memoryAuditLogs: MemoryAuditLog[] = [];
 
 export function registerMemoryRescuerProfile(profile: Partial<MemoryRescueProfile> & { userId: number; callSign: string }) {
@@ -1049,4 +1102,38 @@ export async function updateHospitalCaseStatus(
   }
   return null;
 }
+
+export async function updateIncidentAutomationState(
+  incidentId: number,
+  updates: {
+    escalationLevel?: number;
+    lastEscalatedAt?: Date;
+    automationStatus?: string;
+  }
+) {
+  const now = new Date();
+  try {
+    const db = await database();
+    const setValues: any = { updatedAt: now };
+    if (updates.escalationLevel !== undefined) setValues.escalationLevel = updates.escalationLevel;
+    if (updates.lastEscalatedAt !== undefined) setValues.lastEscalatedAt = updates.lastEscalatedAt;
+    if (updates.automationStatus !== undefined) setValues.automationStatus = updates.automationStatus;
+
+    await db.update(incidents).set(setValues).where(eq(incidents.id, incidentId));
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  const mem = _memoryIncidents.get(incidentId);
+  if (mem) {
+    if (updates.escalationLevel !== undefined) mem.escalationLevel = updates.escalationLevel;
+    if (updates.lastEscalatedAt !== undefined) mem.lastEscalatedAt = updates.lastEscalatedAt;
+    if (updates.automationStatus !== undefined) mem.automationStatus = updates.automationStatus;
+    mem.updatedAt = now;
+    _memoryIncidents.set(incidentId, mem);
+    return mem;
+  }
+  return null;
+}
+
 
