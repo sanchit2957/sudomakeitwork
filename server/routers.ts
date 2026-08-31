@@ -172,15 +172,31 @@ export const appRouter = router({
         let user: any = null;
         if (targetRole) {
           user = await getUserByEmail(emailInput, targetRole);
+          if (!user && (targetRole === "hospital" || targetRole === "rescuer")) {
+            const adminUser = await getUserByEmail(emailInput, "admin");
+            if (adminUser) user = adminUser;
+          }
         } else {
-          user = await getUserByEmail(emailInput);
+          // If no role specified, check if there's a user role matching password, or fallback
+          const userCitizen = await getUserByEmail(emailInput, "user");
+          if (userCitizen && userCitizen.password && verifyPassword(input.password.trim(), userCitizen.password)) {
+            user = userCitizen;
+          } else {
+            user = await getUserByEmail(emailInput);
+          }
         }
 
         if (!user || !user.password) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
         }
 
-        if (targetRole && user.role !== targetRole && !(targetRole === "hospital" && user.role === "medical")) {
+        const isAuthorized =
+          !targetRole ||
+          user.role === targetRole ||
+          user.role === "admin" ||
+          (targetRole === "hospital" && user.role === "medical");
+
+        if (!isAuthorized) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
         }
 
@@ -215,6 +231,13 @@ export const appRouter = router({
             });
           }
           codeVersion = await getRoleCodeVersion(user.role);
+
+          // Ensure linked profiles exist
+          if (user.role === "hospital") {
+            await ensureHospitalStaffProfile(user.id);
+          } else if (user.role === "rescuer") {
+            await ensureRescuerProfile(user.id, "Field Unit");
+          }
         }
 
         await upsertUser({ ...user, lastSignedIn: new Date() });

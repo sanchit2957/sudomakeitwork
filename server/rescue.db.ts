@@ -551,33 +551,35 @@ export async function addIncidentEvent(
 export async function getIncidentById(id: number) {
   try {
     const db = await database();
-    return (
+    const row = (
       await withDbTimeout(
         db.select().from(incidents).where(eq(incidents.id, id)).limit(1),
         4000,
         "getIncidentById"
       )
     )[0];
+    if (row) return row;
   } catch (error) {
     failClosedInProduction(error);
-    return _memoryIncidents.get(id) || null;
   }
+  return _memoryIncidents.get(id) || null;
 }
 
 export async function getIncidentByCode(publicCode: string) {
   try {
     const db = await database();
-    return (
+    const row = (
       await withDbTimeout(
         db.select().from(incidents).where(eq(incidents.publicCode, publicCode)).limit(1),
         4000,
         "getIncidentByCode"
       )
     )[0];
+    if (row) return row;
   } catch (error) {
     failClosedInProduction(error);
-    return Array.from(_memoryIncidents.values()).find(i => i.publicCode === publicCode) || null;
   }
+  return Array.from(_memoryIncidents.values()).find(i => i.publicCode === publicCode) || null;
 }
 
 export async function getIncidentTimeline(incidentId: number) {

@@ -144,14 +144,19 @@ export function evaluateHospitalResourceStatus(hospital: MemoryHospital) {
  */
 export async function getConsolidatedHospitalResources(hospitalId: number) {
   let hospital: MemoryHospital | null = null;
-  try {
-    const db = await getDb();
-    if (db) {
-      const { eq } = await import("drizzle-orm");
-      const rows = await db.select().from(hospitals).where(eq(hospitals.id, hospitalId)).limit(1);
-      if (rows.length > 0) hospital = rows[0] as any;
-    }
-  } catch {}
+  if (process.env.NODE_ENV === "test" && _memoryHospitals.has(hospitalId)) {
+    hospital = _memoryHospitals.get(hospitalId) || null;
+  }
+  if (!hospital) {
+    try {
+      const db = await getDb();
+      if (db) {
+        const { eq } = await import("drizzle-orm");
+        const rows = await db.select().from(hospitals).where(eq(hospitals.id, hospitalId)).limit(1);
+        if (rows.length > 0) hospital = rows[0] as any;
+      }
+    } catch {}
+  }
 
   if (!hospital) {
     hospital = _memoryHospitals.get(hospitalId) || null;

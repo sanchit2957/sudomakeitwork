@@ -241,6 +241,15 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
         await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `loginMethod` VARCHAR(64) NULL"), 4000, "ensureSchema_alterLoginMethod");
       }
 
+      // Ensure role column on users supports hospital, medical, rescuer, admin, user
+      try {
+        await withDbTimeout(conn.query("ALTER TABLE `users` MODIFY COLUMN `role` VARCHAR(32) NOT NULL DEFAULT 'user'"), 4000, "ensureSchema_alterRoleVarChar");
+      } catch {
+        try {
+          await withDbTimeout(conn.query("ALTER TABLE `users` MODIFY COLUMN `role` ENUM('user','rescuer','hospital','admin','medical') NOT NULL DEFAULT 'user'"), 4000, "ensureSchema_alterRoleEnum");
+        } catch {}
+      }
+
       // 2. Ensure roleAccessCodes table exists
       await withDbTimeout(
         conn.query(`
@@ -256,6 +265,38 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
         4000,
         "ensureSchema_createRoleAccessCodes"
       );
+
+      // Seed initial roleAccessCodes if missing in table
+      try {
+        const [existingCodes]: any = await withDbTimeout(conn.query("SELECT `role` FROM `roleAccessCodes`"), 4000, "ensureSchema_checkRoleCodes");
+        const existingRoles = new Set((existingCodes || []).map((r: any) => r.role));
+        if (!existingRoles.has("rescuer")) {
+          await withDbTimeout(
+            conn.query("INSERT IGNORE INTO `roleAccessCodes` (`role`, `codeHash`, `codeVersion`, `updatedAt`) VALUES (?, ?, 1, NOW())", ["rescuer", hashPassword("RESCUER-2026")]),
+            4000,
+            "ensureSchema_seedRescuerCode"
+          );
+        }
+        if (!existingRoles.has("hospital")) {
+          await withDbTimeout(
+            conn.query("INSERT IGNORE INTO `roleAccessCodes` (`role`, `codeHash`, `codeVersion`, `updatedAt`) VALUES (?, ?, 1, NOW())", ["hospital", hashPassword("HOSPITAL-2026")]),
+            4000,
+            "ensureSchema_seedHospitalCode"
+          );
+        }
+
+        // Ensure default dev seed users maintain their canonical roles
+        await withDbTimeout(
+          conn.query("UPDATE `users` SET `role` = 'user' WHERE `openId` = 'user-citizen' AND `role` != 'user'"),
+          4000,
+          "ensureSchema_resetCitizenRole"
+        );
+        await withDbTimeout(
+          conn.query("UPDATE `users` SET `role` = 'admin' WHERE `openId` = 'user-admin' AND `role` != 'admin'"),
+          4000,
+          "ensureSchema_resetAdminRole"
+        );
+      } catch {}
 
       // 3. Ensure emergencyContacts table exists
       await withDbTimeout(
@@ -525,7 +566,6 @@ export async function getUserByOpenId(openId: string) {
           status: mem.status ? mem.status : (row.status || "active"),
         };
       }
-      return null;
     } catch (error: any) {
       console.warn(`[Database] User query by openId warning: ${(error as Error)?.message || "DB error"}`);
     }
@@ -564,11 +604,10 @@ export async function getUserByEmail(emailOrUsername: string, role?: string) {
         return {
           ...mem,
           ...row,
-          role: (mem.role && mem.role !== "user") ? mem.role : resRole,
+          role: normalizedRole || ((mem.role && mem.role !== "user") ? mem.role : resRole),
           status: mem.status ? mem.status : (row.status || "active"),
         };
       }
-      return null;
     } catch (error: any) {
       console.warn(`[Database] User query by email error: ${(error as Error)?.message || "DB error"}`);
     }
@@ -620,7 +659,6 @@ export async function getUserById(id: number) {
           status: mem.status ? mem.status : (row.status || "active"),
         };
       }
-      return null;
     } catch (error: any) {
       console.warn(`[Database] User query by id warning: ${(error as Error)?.message || "DB error"}`);
     }
