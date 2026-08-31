@@ -9,8 +9,9 @@ import { AiBotCard } from "@/components/AiBotCard";
 import { ProfileAvatar, UserProfileBadge } from "@/components/ProfileAvatar";
 import { QuickActionsPanel } from "@/components/QuickActionsPanel";
 import { SahayakAiModal } from "@/components/SahayakAiModal";
+import { SosClassificationModal } from "@/components/SosClassificationModal";
 import { flushOfflineSos, queueOfflineSos, pendingSosCount } from "@/lib/offlineSos";
-import { createAndRedirectAfterRapidSos, redirectAfterRapidSos } from "@/lib/rapidSos";
+import { createAndRedirectAfterRapidSos, redirectAfterRapidSos, rememberLatestSos } from "@/lib/rapidSos";
 import { buildEmergencySmsUri } from "@/lib/emergencyDispatch";
 import { startBleSosBeacon } from "@/lib/bleBeacon";
 import { trpc } from "@/lib/trpc";
@@ -35,9 +36,27 @@ export default function UserHome() {
   const [rapidStatus, setRapidStatus] = useState<"idle" | "locating" | "sending" | "queued" | "error">("idle");
   const [rapidNotice, setRapidNotice] = useState("");
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [triageData, setTriageData] = useState<{ publicCode: string; incidentId?: number; triageDeadlineAt?: Date | string | null } | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [bleActive, setBleActive] = useState(false);
+
+  // Secondary defense: Route operational users reaching "/" to their canonical workspace
+  useEffect(() => {
+    if (!authLoading && user && user.role && user.role !== "user") {
+      const canonicalPath =
+        user.role === "admin"
+          ? "/command"
+          : user.role === "hospital" || user.role === "medical"
+          ? "/medical"
+          : user.role === "rescuer"
+          ? "/responder"
+          : null;
+      if (canonicalPath) {
+        setLocation(canonicalPath);
+      }
+    }
+  }, [user, authLoading, setLocation]);
 
   const activeWeatherCoords = manualLocation
     ? { latitude: manualLocation.lat, longitude: manualLocation.lng }
@@ -164,9 +183,15 @@ export default function UserHome() {
 
       try {
         setRapidStatus("sending");
-        await createAndRedirectAfterRapidSos({ payload, createSos: createSos.mutateAsync, navigate: setLocation });
+        const created = await createSos.mutateAsync(payload);
+        rememberLatestSos(created.publicCode);
         clearSosVoiceNote();
         setRapidStatus("idle");
+        setTriageData({
+          publicCode: created.publicCode,
+          incidentId: (created as any).incidentId,
+          triageDeadlineAt: (created as any).triageDeadlineAt,
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : "";
         const isNetworkFail = !navigator.onLine || /fetch|network|failed to fetch|timeout|abort|econnrefused/i.test(message);
@@ -313,6 +338,19 @@ export default function UserHome() {
     />
 
     <SahayakAiModal isOpen={isAiModalOpen} onClose={() => setIsAiModalOpen(false)} />
+
+    {triageData && (
+      <SosClassificationModal
+        isOpen={Boolean(triageData)}
+        publicCode={triageData.publicCode}
+        incidentId={triageData.incidentId}
+        triageDeadlineAt={triageData.triageDeadlineAt}
+        onComplete={() => {
+          redirectAfterRapidSos(triageData.publicCode, setLocation);
+          setTriageData(null);
+        }}
+      />
+    )}
   </main><VictimNavigation current="home" /></div>;
 }
 

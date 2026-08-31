@@ -71,17 +71,19 @@ function Router() {
           <Route path={"/medical/login"} component={HospitalLogin} />
 
           {/* Main Entry: User Home Emergency Hub */}
-          <Route path={"/"} component={UserHome} />
+          <Route path={"/"}>
+            <RoleGate roles={["user"]}><UserHome /></RoleGate>
+          </Route>
 
         {/* User Section Routes */}
         <Route path={"/emergency"}>
-          <RoleGate><Emergency /></RoleGate>
+          <RoleGate roles={["user"]}><Emergency /></RoleGate>
         </Route>
         <Route path={"/track"}>
-          <RoleGate><UserTrackFlow /></RoleGate>
+          <RoleGate roles={["user"]}><UserTrackFlow /></RoleGate>
         </Route>
         <Route path={"/safety"}>
-          <RoleGate><UserSafety /></RoleGate>
+          <RoleGate roles={["user"]}><UserSafety /></RoleGate>
         </Route>
         <Route path={"/profile"}>
           <RoleGate><UserProfile /></RoleGate>
@@ -107,24 +109,24 @@ function Router() {
 
         {/* Single Canonical Hospital Operations Portal */}
         <Route path={"/hospital/:rest*"}>
-          <HospitalPortal />
+          <RoleGate roles={["hospital", "medical"]}><HospitalPortal /></RoleGate>
         </Route>
         <Route path={"/hospital"}>
-          <HospitalPortal />
+          <RoleGate roles={["hospital", "medical"]}><HospitalPortal /></RoleGate>
         </Route>
         <Route path={"/medical/:rest*"}>
-          <HospitalPortal />
+          <RoleGate roles={["hospital", "medical"]}><HospitalPortal /></RoleGate>
         </Route>
         <Route path={"/medical"}>
-          <HospitalPortal />
+          <RoleGate roles={["hospital", "medical"]}><HospitalPortal /></RoleGate>
         </Route>
 
         {/* Rescuer Portal */}
         <Route path={"/responder/:rest*"}>
-          <UserResponder />
+          <RoleGate roles={["rescuer"]}><UserResponder /></RoleGate>
         </Route>
         <Route path={"/responder"}>
-          <UserResponder />
+          <RoleGate roles={["rescuer"]}><UserResponder /></RoleGate>
         </Route>
 
         {/* Admin Section Routes - Restricted in Mobile Native App */}

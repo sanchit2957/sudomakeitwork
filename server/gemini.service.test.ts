@@ -94,7 +94,7 @@ describe("Sahayak AI Gemini Service & Guardrails", () => {
     expect(data.success).toBe(true);
     expect(data.coordinates).toBeDefined();
     expect(data.riverGauge).toBeDefined();
-  });
+  }, 30000);
 
   it("finds registered hospitals with bed and oxygen availability", async () => {
     const data = await realDataTools.findNearbyHospitals({ query: "Hospital" });

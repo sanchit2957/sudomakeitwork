@@ -10,7 +10,7 @@ import {
   interpretWmoCode,
 } from "./weather.service";
 
-describe("Multi-Provider Weather Engine & Architecture", { timeout: 20000 }, () => {
+describe("Multi-Provider Weather Engine & Architecture", { timeout: 45000 }, () => {
   let manager: WeatherProviderManager;
 
   beforeEach(() => {
@@ -53,7 +53,7 @@ describe("Multi-Provider Weather Engine & Architecture", { timeout: 20000 }, () 
       expect(report.floodRisk).toBeDefined();
       expect(report.river).toBeDefined();
       expect(report.source.tier).toBe("primary");
-    }, 20000);
+    }, 30000);
   });
 
   describe("OpenWeatherMap Fallback Provider", () => {

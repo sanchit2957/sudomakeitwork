@@ -90,6 +90,14 @@ export const incidents = mysqlTable(
     voiceNoteUrl: varchar("voiceNoteUrl", { length: 1024 }),
     voiceNoteDurationSeconds: int("voiceNoteDurationSeconds"),
     status: mysqlEnum("status", ["pending", "dispatched", "resolved"]).default("pending").notNull(),
+    requestCategory: mysqlEnum("requestCategory", ["medical", "rescue", "emergency"]).default("emergency").notNull(),
+    triageStartedAt: timestamp("triageStartedAt"),
+    triageDeadlineAt: timestamp("triageDeadlineAt"),
+    triageSelectedAt: timestamp("triageSelectedAt"),
+    dispatchStatus: mysqlEnum("dispatchStatus", ["triage_pending", "matching", "offered", "assigned", "escalated", "resolved"]).default("triage_pending").notNull(),
+    matchingStartedAt: timestamp("matchingStartedAt"),
+    matchingAttempts: int("matchingAttempts").default(0).notNull(),
+    escalatedToCommandAt: timestamp("escalatedToCommandAt"),
     assignedRescuerId: int("assignedRescuerId").references(() => users.id),
     dispatchedAt: timestamp("dispatchedAt"),
     resolvedAt: timestamp("resolvedAt"),
@@ -100,6 +108,7 @@ export const incidents = mysqlTable(
     uniqueIndex("incidents_publicCode_unique").on(table.publicCode),
     index("incidents_status_createdAt_idx").on(table.status, table.createdAt),
     index("incidents_assignedRescuerId_status_idx").on(table.assignedRescuerId, table.status),
+    index("incidents_dispatchStatus_createdAt_idx").on(table.dispatchStatus, table.createdAt),
   ],
 );
 
@@ -133,6 +142,46 @@ export const missions = mysqlTable(
   table => [
     uniqueIndex("missions_incidentId_unique").on(table.incidentId),
     index("missions_rescuerId_status_idx").on(table.rescuerId, table.status),
+  ],
+);
+
+export const rescuerCapabilities = mysqlTable(
+  "rescuerCapabilities",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    rescuerId: int("rescuerId").notNull().references(() => users.id),
+    capability: mysqlEnum("capability", ["medical", "flood_rescue", "trapped_rescue", "evacuation", "general_emergency"]).notNull(),
+    priority: int("priority").default(1).notNull(),
+    active: mysqlEnum("active", ["yes", "no"]).default("yes").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("rescuerCapabilities_rescuerId_capability_unique").on(table.rescuerId, table.capability),
+    index("rescuerCapabilities_capability_active_idx").on(table.capability, table.active),
+    index("rescuerCapabilities_rescuerId_idx").on(table.rescuerId),
+  ],
+);
+
+export const missionOffers = mysqlTable(
+  "missionOffers",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    incidentId: int("incidentId").notNull().references(() => incidents.id),
+    rescuerId: int("rescuerId").notNull().references(() => users.id),
+    distanceKm: double("distanceKm").notNull(),
+    matchScore: double("matchScore").notNull(),
+    status: mysqlEnum("status", ["offered", "accepted", "declined", "expired", "cancelled"]).default("offered").notNull(),
+    offeredAt: timestamp("offeredAt").defaultNow().notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    respondedAt: timestamp("respondedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("missionOffers_incidentId_status_idx").on(table.incidentId, table.status),
+    index("missionOffers_rescuerId_status_idx").on(table.rescuerId, table.status),
+    index("missionOffers_expiresAt_status_idx").on(table.expiresAt, table.status),
   ],
 );
 
@@ -431,3 +480,7 @@ export type Donation = typeof donations.$inferSelect;
 export type InsertDonation = typeof donations.$inferInsert;
 export type RoleAccessCode = typeof roleAccessCodes.$inferSelect;
 export type InsertRoleAccessCode = typeof roleAccessCodes.$inferInsert;
+export type RescuerCapability = typeof rescuerCapabilities.$inferSelect;
+export type InsertRescuerCapability = typeof rescuerCapabilities.$inferInsert;
+export type MissionOffer = typeof missionOffers.$inferSelect;
+export type InsertMissionOffer = typeof missionOffers.$inferInsert;

@@ -64,11 +64,15 @@ export class WeatherProviderManager {
   }
 
   /**
-   * Resets internal cache (useful in tests)
+   * Resets internal cache and circuit breaker status (useful in tests)
    */
   public clearCache(): void {
     this.cache.clear();
     this.inFlightRequests.clear();
+    this.healthStats.forEach((stats) => {
+      stats.disabledUntil = undefined;
+      stats.consecutiveFailures = 0;
+    });
   }
 
   /**

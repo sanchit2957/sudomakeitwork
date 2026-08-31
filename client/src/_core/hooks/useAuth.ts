@@ -76,7 +76,24 @@ export function useAuth(options: UseAuthOptions = {}) {
     refetchOnWindowFocus: false,
   });
 
-  const currentUser = meQuery.data ?? null;
+  const [lastKnownUser, setLastKnownUser] = useState<any>(() => {
+    return meQuery.data ?? null;
+  });
+
+  useEffect(() => {
+    if (meQuery.data !== undefined) {
+      setLastKnownUser(meQuery.data);
+    } else if (
+      meQuery.error &&
+      meQuery.error.data?.code === "UNAUTHORIZED"
+    ) {
+      setLastKnownUser(null);
+    }
+  }, [meQuery.data, meQuery.error]);
+
+  const effectiveUser = meQuery.data !== undefined ? meQuery.data : lastKnownUser;
+  const currentUser = effectiveUser;
+
   const isOperationalRole = Boolean(
     currentUser &&
       (currentUser.role === "rescuer" ||
@@ -86,6 +103,7 @@ export function useAuth(options: UseAuthOptions = {}) {
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
+      setLastKnownUser(null);
       utils.auth.me.setData(undefined, null);
     },
   });
@@ -108,6 +126,7 @@ export function useAuth(options: UseAuthOptions = {}) {
         localStorage.removeItem("app-runtime-user-info");
         localStorage.removeItem("app_native_bearer_token");
       } catch {}
+      setLastKnownUser(null);
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }
@@ -282,7 +301,10 @@ export function useAuth(options: UseAuthOptions = {}) {
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
     if (meQuery.isLoading) return;
-    if (meQuery.data) return;
+    if (effectiveUser) return;
+    if (meQuery.error && meQuery.error.data?.code !== "UNAUTHORIZED") {
+      return;
+    }
     if (typeof window === "undefined") return;
     const pathname = window.location.pathname;
     if (
@@ -296,18 +318,16 @@ export function useAuth(options: UseAuthOptions = {}) {
       return;
     }
     startLogin(redirectPath);
-  }, [redirectOnUnauthenticated, redirectPath, meQuery.isLoading, meQuery.data]);
+  }, [redirectOnUnauthenticated, redirectPath, meQuery.isLoading, effectiveUser, meQuery.error]);
 
   const state = useMemo(() => {
-    // Authoritative user comes strictly from the server-side auth.me query
-    const effectiveUser = meQuery.data ?? null;
     return {
       user: effectiveUser,
       loading: !initTimeoutReached && meQuery.isLoading && !effectiveUser,
       error: meQuery.error ?? null,
       isAuthenticated: Boolean(effectiveUser),
     };
-  }, [meQuery.data, meQuery.isLoading, meQuery.error, initTimeoutReached]);
+  }, [effectiveUser, meQuery.isLoading, meQuery.error, initTimeoutReached]);
 
   const updateProfileMutation = trpc.auth.updateProfile.useMutation({
     onSuccess: async (data) => {

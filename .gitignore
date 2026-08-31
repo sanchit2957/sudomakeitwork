@@ -115,3 +115,7 @@ temp/
 client/public/uploads/*
 !client/public/uploads/.gitkeep
 
+# Scratch files
+scratch/
+
+

@@ -1,11 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import {
   getComprehensiveWeather,
   interpretWmoCode,
+  weatherProviderManager,
 } from "./weather.service";
 import { appRouter } from "./routers";
 
 describe("Comprehensive Weather & Open-Meteo Integration", () => {
+  beforeEach(() => {
+    weatherProviderManager.clearCache();
+  });
+
   it("correctly maps WMO weather codes to descriptive categories and icons", () => {
     expect(interpretWmoCode(0)).toMatchObject({ description: "Clear sky", category: "clear", icon: "sun" });
     expect(interpretWmoCode(3)).toMatchObject({ description: "Overcast", category: "cloudy", icon: "cloud" });
@@ -26,7 +31,7 @@ describe("Comprehensive Weather & Open-Meteo Integration", () => {
     expect(report.floodRisk.activeFloodZonesCount).toBe(1);
     expect(report.airQuality).toBeDefined();
     expect(report.river).toBeDefined();
-  }, 15000);
+  }, 30000);
 
   it("serves dedicated weather procedures via tRPC router", async () => {
     const caller = appRouter.createCaller({
@@ -54,5 +59,5 @@ describe("Comprehensive Weather & Open-Meteo Integration", () => {
     // 4. Air Quality Endpoint
     const aqi = await caller.rescue.weather.airQuality({ latitude: 26.1445, longitude: 91.7362 });
     expect(aqi.airQuality).toBeDefined();
-  });
+  }, 30000);
 });

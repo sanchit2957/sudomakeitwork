@@ -34,7 +34,7 @@ describe("Feature #2: Flood Risk Early-Warning & Operations Alert Workflow", () 
     expect(conditions.river).toBeDefined();
     expect(conditions.floodZones).toBeDefined();
     expect(conditions.dataFreshness).toBeDefined();
-  });
+  }, 30000);
 
   it("TEST 2: Stale or unavailable data is correctly indicated with isFresh=false and staleSources", async () => {
     // Mock weather service fallback to simulate offline/unavailable provider

@@ -397,8 +397,9 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
   }
 }
 
-// Lazily create the drizzle instance so local tooling can run without a DB or with a local DB.
 export async function getDb() {
+  if (_db) return _db;
+
   if (isDbCircuitBroken() && process.env.NODE_ENV !== "production") {
     return null;
   }
@@ -432,6 +433,10 @@ export async function getDb() {
   }
 
   return _db;
+}
+
+export function setDbInstanceForTesting(dbInstance: any) {
+  _db = dbInstance;
 }
 
 // Default development seed accounts with salted scrypt hashed passwords
@@ -532,16 +537,18 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   // Update memory cache in non-production environments
-  const existingMem = _memoryUsers.get(user.openId) || {};
+  const existingMem = _memoryUsers.get(user.openId);
+  const resolvedRole = user.role !== undefined ? user.role : (existingMem?.role !== undefined ? existingMem.role : undefined);
+  const resolvedStatus = user.status !== undefined ? user.status : (existingMem?.status !== undefined ? existingMem.status : undefined);
   const merged = {
-    id: existingMem.id || (_memoryUsers.size + 1),
+    id: existingMem?.id || (_memoryUsers.size + 1),
     ...existingMem,
     ...user,
-    role: user.role || existingMem.role || "user",
-    status: user.status || existingMem.status || "active",
-    lastSignedIn: user.lastSignedIn || new Date(),
+    ...(resolvedRole !== undefined ? { role: resolvedRole } : (existingMem ? {} : { role: "user" })),
+    ...(resolvedStatus !== undefined ? { status: resolvedStatus } : (existingMem ? {} : { status: "active" })),
+    lastSignedIn: user.lastSignedIn || existingMem?.lastSignedIn || new Date(),
     updatedAt: new Date(),
-    createdAt: existingMem.createdAt || new Date(),
+    createdAt: existingMem?.createdAt || new Date(),
   };
   _memoryUsers.set(user.openId, merged);
 }
@@ -558,16 +565,15 @@ export async function getUserByOpenId(openId: string) {
       if (result.length > 0) {
         const row = result[0];
         const normalizedRole = row.role === "medical" ? "hospital" : row.role;
-        const mem = _memoryUsers.get(openId) || {};
         return {
-          ...mem,
           ...row,
-          role: (mem.role && mem.role !== "user") ? mem.role : normalizedRole,
-          status: mem.status ? mem.status : (row.status || "active"),
+          role: normalizedRole,
+          status: row.status || "active",
         };
       }
     } catch (error: any) {
-      console.warn(`[Database] User query by openId warning: ${(error as Error)?.message || "DB error"}`);
+      console.error(`[Database] User query by openId error: ${(error as Error)?.message || "DB error"}`);
+      throw error;
     }
   }
   const memUser = _memoryUsers.get(openId) || null;
@@ -600,7 +606,7 @@ export async function getUserByEmail(emailOrUsername: string, role?: string) {
       if (result.length > 0) {
         const row = result[0];
         const resRole = row.role === "medical" ? "hospital" : row.role;
-        const mem = _memoryUsers.get(row.openId) || {};
+        const mem = _memoryUsers.get(row.openId) || _memoryUsers.get(row.email?.toLowerCase() || "") || {};
         return {
           ...mem,
           ...row,
@@ -609,7 +615,8 @@ export async function getUserByEmail(emailOrUsername: string, role?: string) {
         };
       }
     } catch (error: any) {
-      console.warn(`[Database] User query by email error: ${(error as Error)?.message || "DB error"}`);
+      console.error(`[Database] User query by email error: ${(error as Error)?.message || "DB error"}`);
+      throw error;
     }
   }
   const allUsers = Array.from(_memoryUsers.values());
@@ -1026,8 +1033,10 @@ export async function getRoleAccessCode(role: string): Promise<{ id: number; rol
       if (rows.length > 0) {
         return rows[0] as any;
       }
+      return null;
     } catch (error) {
-      console.warn(`[Database] Role access code query warning: ${(error as Error)?.message}`);
+      console.error(`[Database] Role access code query error: ${(error as Error)?.message}`);
+      throw error;
     }
   }
   return _memoryRoleAccessCodes.get(normalizedRole) || null;

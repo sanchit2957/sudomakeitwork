@@ -202,6 +202,8 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/ (NODE_ENV=${process.env.NODE_ENV || "production"})`);
+    // Start automated emergency dispatch background orchestrator
+    import("../dispatch/dispatch").then(d => d.startDispatchWorker()).catch(console.warn);
   });
 }
 

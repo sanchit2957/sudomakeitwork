@@ -4,6 +4,7 @@ import LanguageSelector from "@/components/LanguageSelector";
 import OperationsMap from "@/components/OperationsMap";
 import { SafetyAssistanceQueue } from "@/components/SafetyAssistanceQueue";
 import { BleEmergencyRadar } from "@/components/BleEmergencyRadar";
+import { EmergencyOfferCard } from "@/components/EmergencyOfferCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,15 +41,17 @@ function ResponderWorkspace() {
   const [pushState, setPushState] = useState<PushState>("not_requested");
   const [pushDetail, setPushDetail] = useState("");
   const liveMissionQuery = { refetchInterval: 4_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
+  const liveOfferQuery = { refetchInterval: 3_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
   const liveLayersQuery = { refetchInterval: 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const liveProfileQuery = { refetchInterval: 15_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const profile = trpc.rescue.rescuer.profile.useQuery(undefined, liveProfileQuery);
+  const activeOffer = trpc.rescue.rescuer.activeOffer.useQuery(undefined, liveOfferQuery);
   const missions = trpc.rescue.rescuer.missions.useQuery(undefined, liveMissionQuery);
   const alerts = trpc.rescue.rescuer.notifications.useQuery(undefined, liveMissionQuery);
   const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, liveLayersQuery);
   const pushConfig = trpc.rescue.rescuer.pushConfig.useQuery();
   const subscribePush = trpc.rescue.rescuer.subscribePush.useMutation();
-  const refreshOperationalState = () => { void utils.rescue.rescuer.profile.invalidate(); void utils.rescue.rescuer.missions.invalidate(); void utils.rescue.rescuer.notifications.invalidate(); void utils.rescue.operations.mapLayers.invalidate(); };
+  const refreshOperationalState = () => { void utils.rescue.rescuer.profile.invalidate(); void utils.rescue.rescuer.activeOffer.invalidate(); void utils.rescue.rescuer.missions.invalidate(); void utils.rescue.rescuer.notifications.invalidate(); void utils.rescue.operations.mapLayers.invalidate(); };
   const setAvailability = trpc.rescue.rescuer.setAvailability.useMutation({ onMutate: async ({ availability }) => { await utils.rescue.rescuer.profile.cancel(); const previous = utils.rescue.rescuer.profile.getData(); utils.rescue.rescuer.profile.setData(undefined, profile => reconcileAvailability(profile, availability)); return { previous }; }, onError: (_error, _input, context) => { if (context?.previous) utils.rescue.rescuer.profile.setData(undefined, context.previous); }, onSettled: refreshOperationalState });
   const updateMission = trpc.rescue.rescuer.updateMission.useMutation({ onMutate: async ({ missionId, status }) => { await utils.rescue.rescuer.missions.cancel(); const previous = utils.rescue.rescuer.missions.getData(); utils.rescue.rescuer.missions.setData(undefined, rows => reconcileMissionStatus(rows, missionId, status)); return { previous }; }, onError: (_error, _input, context) => { if (context?.previous) utils.rescue.rescuer.missions.setData(undefined, context.previous); }, onSettled: refreshOperationalState });
   const updateProfile = trpc.rescue.rescuer.updateProfile.useMutation({ onSettled: refreshOperationalState });
@@ -198,6 +201,19 @@ function ResponderWorkspace() {
             <AlertSetup unread={alerts.data?.unread ?? 0} state={pushState} detail={pushDetail} disabled={subscribePush.isPending || pushState === "subscribed"} onEnable={enableAlerts} />
           </section>
           <BleEmergencyRadar rescuerLatitude={profile.data?.lastLatitude || undefined} rescuerLongitude={profile.data?.lastLongitude || undefined} />
+          {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && (
+            <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+              <EmergencyOfferCard
+                data={activeOffer.data as any}
+                onAccepted={() => {
+                  void refreshOperationalState();
+                }}
+                onDeclined={() => {
+                  void refreshOperationalState();
+                }}
+              />
+            </div>
+          )}
           <ResponderProfileCard profile={profile.data ?? null} hasActiveMission={hasActiveMission} saving={updateProfile.isPending} onSave={input => updateProfile.mutate(input)} />
           <section>
             <PageHeading eyebrow={t("responder.board")} title={t("responder.boardTitle")} />

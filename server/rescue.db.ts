@@ -6,8 +6,10 @@ import {
   incidentMessages,
   incidentEvents,
   incidents,
+  missionOffers,
   missions,
   notifications,
+  rescuerCapabilities,
   rescueProfiles,
   rescuerRegistrationRequests,
   shelters,
@@ -15,6 +17,30 @@ import {
 } from "../drizzle/schema";
 import { getDb, withDbTimeout, _memoryUsers } from "./db";
 export { _memoryUsers };
+
+export interface MemoryRescuerCapability {
+  id: number;
+  rescuerId: number;
+  capability: "medical" | "flood_rescue" | "trapped_rescue" | "evacuation" | "general_emergency";
+  priority: number;
+  active: "yes" | "no";
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MemoryMissionOffer {
+  id: number;
+  incidentId: number;
+  rescuerId: number;
+  distanceKm: number;
+  matchScore: number;
+  status: "offered" | "accepted" | "declined" | "expired" | "cancelled";
+  offeredAt: Date;
+  expiresAt: Date;
+  respondedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface MemoryShelter {
   id: number;
@@ -71,6 +97,7 @@ export interface MemoryIncident {
   latitude: number;
   longitude: number;
   emergencyType: "flood" | "medical" | "trapped" | "evacuation" | "other";
+  requestCategory: "medical" | "rescue" | "emergency";
   helpNeeds: string | null;
   severity: "critical" | "high" | "medium" | "low";
   peopleAffected: number;
@@ -81,6 +108,13 @@ export interface MemoryIncident {
   voiceNoteUrl: string | null;
   voiceNoteDurationSeconds: number | null;
   status: "pending" | "dispatched" | "resolved";
+  dispatchStatus: "triage_pending" | "matching" | "offered" | "assigned" | "escalated" | "resolved";
+  triageStartedAt: Date | null;
+  triageDeadlineAt: Date | null;
+  triageSelectedAt: Date | null;
+  matchingStartedAt: Date | null;
+  matchingAttempts: number;
+  escalatedToCommandAt: Date | null;
   assignedRescuerId: number | null;
   dispatchedAt: Date | null;
   resolvedAt: Date | null;
@@ -371,6 +405,7 @@ export const _memoryIncidents: Map<number, MemoryIncident> = new Map([
       latitude: 26.1921,
       longitude: 91.7543,
       emergencyType: "flood",
+      requestCategory: "emergency",
       helpNeeds: "Boat rescue required, rising water level reaching roof",
       severity: "critical",
       peopleAffected: 4,
@@ -381,6 +416,13 @@ export const _memoryIncidents: Map<number, MemoryIncident> = new Map([
       voiceNoteUrl: null,
       voiceNoteDurationSeconds: null,
       status: "pending",
+      dispatchStatus: "triage_pending",
+      triageStartedAt: new Date(Date.now() - 45 * 60 * 1000),
+      triageDeadlineAt: new Date(Date.now() - 45 * 60 * 1000 + 10_000),
+      triageSelectedAt: null,
+      matchingStartedAt: null,
+      matchingAttempts: 0,
+      escalatedToCommandAt: null,
       assignedRescuerId: null,
       dispatchedAt: null,
       resolvedAt: null,
@@ -391,6 +433,8 @@ export const _memoryIncidents: Map<number, MemoryIncident> = new Map([
 ]);
 
 export const _memoryMissions: Map<number, MemoryMission> = new Map();
+export const _memoryRescuerCapabilities: Map<number, MemoryRescuerCapability[]> = new Map();
+export const _memoryMissionOffers: Map<number, MemoryMissionOffer> = new Map();
 
 export const _memoryIncidentEvents: MemoryIncidentEvent[] = [
   {
@@ -424,6 +468,7 @@ export const _memoryAuditLogs: MemoryAuditLog[] = [];
 
 let _incidentIdSeq = 100;
 let _missionIdSeq = 100;
+let _offerIdSeq = 100;
 let _safetyRequestIdSeq = 100;
 let _shelterIdSeq = 100;
 let _hospitalIdSeq = 100;
@@ -435,6 +480,7 @@ let _rescueProfileIdSeq = 100;
 
 export function nextIncidentId(): number { return ++_incidentIdSeq; }
 export function nextMissionId(): number { return ++_missionIdSeq; }
+export function nextOfferId(): number { return ++_offerIdSeq; }
 export function nextSafetyRequestId(): number { return ++_safetyRequestIdSeq; }
 export function nextShelterId(): number { return ++_shelterIdSeq; }
 export function nextHospitalId(): number { return ++_hospitalIdSeq; }
@@ -449,7 +495,7 @@ export function registerMemoryRescuerProfile(profile: Partial<MemoryRescueProfil
   _memoryRescueProfiles.set(profile.userId, {
     id: existing?.id || nextRescueProfileId(),
     userId: profile.userId,
-    callSign: profile.callSign,
+    callSign: existing?.callSign || profile.callSign,
     phone: profile.phone ?? existing?.phone ?? null,
     photoKey: profile.photoKey ?? existing?.photoKey ?? null,
     photoUrl: profile.photoUrl ?? existing?.photoUrl ?? null,
@@ -464,12 +510,13 @@ export function registerMemoryRescuerProfile(profile: Partial<MemoryRescueProfil
 }
 
 export function registerMemoryHospitalStaffProfile(profile: { userId: number; hospitalId: number; designation?: string | null }) {
+  const existing = _memoryHospitalStaffProfiles.get(profile.userId);
   _memoryHospitalStaffProfiles.set(profile.userId, {
-    id: _memoryHospitalStaffProfiles.size + 1,
+    id: existing?.id || (_memoryHospitalStaffProfiles.size + 1),
     userId: profile.userId,
-    hospitalId: profile.hospitalId,
-    designation: profile.designation ?? null,
-    createdAt: new Date(),
+    hospitalId: existing?.hospitalId || profile.hospitalId,
+    designation: profile.designation ?? existing?.designation ?? null,
+    createdAt: existing?.createdAt || new Date(),
     updatedAt: new Date(),
   });
 }
@@ -666,16 +713,68 @@ export async function listIncidents(status?: "pending" | "dispatched" | "resolve
       4000,
       "listIncidents"
     );
-    return rows;
+
+    // Fetch active offers for offered incidents
+    const activeOfferRows = await withDbTimeout(
+      db
+        .select({
+          offer: missionOffers,
+          rescuerName: users.name,
+          rescuerCallSign: rescueProfiles.callSign,
+        })
+        .from(missionOffers)
+        .innerJoin(users, eq(missionOffers.rescuerId, users.id))
+        .leftJoin(rescueProfiles, eq(users.id, rescueProfiles.userId))
+        .where(eq(missionOffers.status, "offered")),
+      4000,
+      "listIncidents_activeOffers"
+    );
+
+    const activeOfferByIncident = new Map<number, any>();
+    for (const r of activeOfferRows) {
+      activeOfferByIncident.set(r.offer.incidentId, {
+        id: r.offer.id,
+        rescuerId: r.offer.rescuerId,
+        rescuerName: r.rescuerName,
+        rescuerCallSign: r.rescuerCallSign || `Rescuer #${r.offer.rescuerId}`,
+        distanceKm: r.offer.distanceKm,
+        matchScore: r.offer.matchScore,
+        expiresAt: r.offer.expiresAt,
+      });
+    }
+
+    return rows.map(r => ({
+      ...r,
+      activeOffer: activeOfferByIncident.get(r.incident.id) || null,
+    }));
   } catch (error) {
     failClosedInProduction(error);
     const list = Array.from(_memoryIncidents.values()).filter(i => !status || i.status === status);
-    return list.map(incident => ({
-      incident,
-      rescuerName: incident.assignedRescuerId ? _memoryUsers.get(String(incident.assignedRescuerId))?.name || null : null,
-      rescuerId: incident.assignedRescuerId,
-      rescuerCallSign: incident.assignedRescuerId ? _memoryRescueProfiles.get(incident.assignedRescuerId)?.callSign || null : null,
-    }));
+    return list.map(incident => {
+      const activeOffer = Array.from(_memoryMissionOffers.values()).find(
+        o => o.incidentId === incident.id && o.status === "offered" && o.expiresAt.getTime() > Date.now()
+      );
+      const offeredUser = activeOffer ? Array.from(_memoryUsers.values()).find(u => u.id === activeOffer.rescuerId) : null;
+      const offeredProfile = activeOffer ? _memoryRescueProfiles.get(activeOffer.rescuerId) : null;
+
+      return {
+        incident,
+        rescuerName: incident.assignedRescuerId ? _memoryUsers.get(String(incident.assignedRescuerId))?.name || null : null,
+        rescuerId: incident.assignedRescuerId,
+        rescuerCallSign: incident.assignedRescuerId ? _memoryRescueProfiles.get(incident.assignedRescuerId)?.callSign || null : null,
+        activeOffer: activeOffer
+          ? {
+              id: activeOffer.id,
+              rescuerId: activeOffer.rescuerId,
+              rescuerName: offeredUser?.name || null,
+              rescuerCallSign: offeredProfile?.callSign || `Rescuer #${activeOffer.rescuerId}`,
+              distanceKm: activeOffer.distanceKm,
+              matchScore: activeOffer.matchScore,
+              expiresAt: activeOffer.expiresAt,
+            }
+          : null,
+      };
+    });
   }
 }
 
@@ -1207,4 +1306,438 @@ export async function updateIncidentAutomationState(
   }
   return null;
 }
+
+export async function getRescuerCapabilities(rescuerId: number): Promise<Array<{ capability: string; priority: number; active: string }>> {
+  try {
+    const db = await database();
+    const rows = await withDbTimeout(
+      db
+        .select()
+        .from(rescuerCapabilities)
+        .where(and(eq(rescuerCapabilities.rescuerId, rescuerId), eq(rescuerCapabilities.active, "yes")))
+        .orderBy(rescuerCapabilities.priority),
+      4000,
+      "getRescuerCapabilities"
+    );
+    if (rows.length > 0) {
+      return rows.map(r => ({ capability: r.capability, priority: r.priority, active: r.active }));
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  const mem = _memoryRescuerCapabilities.get(rescuerId);
+  if (mem && mem.length > 0) {
+    return mem.filter(c => c.active === "yes").map(c => ({ capability: c.capability, priority: c.priority, active: c.active }));
+  }
+
+  // Default capabilities for memory rescuers
+  return [
+    { capability: "general_emergency", priority: 1, active: "yes" },
+    { capability: "flood_rescue", priority: 1, active: "yes" },
+    { capability: "evacuation", priority: 1, active: "yes" },
+  ];
+}
+
+export async function setRescuerCapabilities(
+  rescuerId: number,
+  capabilities: Array<{ capability: "medical" | "flood_rescue" | "trapped_rescue" | "evacuation" | "general_emergency"; priority?: number; active?: "yes" | "no" }>
+) {
+  try {
+    const db = await database();
+    await withDbTimeout(
+      db.delete(rescuerCapabilities).where(eq(rescuerCapabilities.rescuerId, rescuerId)),
+      4000,
+      "deleteRescuerCapabilities"
+    );
+    if (capabilities.length > 0) {
+      await withDbTimeout(
+        db.insert(rescuerCapabilities).values(
+          capabilities.map(c => ({
+            rescuerId,
+            capability: c.capability,
+            priority: c.priority ?? 1,
+            active: c.active ?? "yes",
+          }))
+        ),
+        4000,
+        "insertRescuerCapabilities"
+      );
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  const memCaps: MemoryRescuerCapability[] = capabilities.map((c, i) => ({
+    id: i + 1,
+    rescuerId,
+    capability: c.capability,
+    priority: c.priority ?? 1,
+    active: c.active ?? "yes",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
+  _memoryRescuerCapabilities.set(rescuerId, memCaps);
+}
+
+export async function createMissionOffer(data: {
+  incidentId: number;
+  rescuerId: number;
+  distanceKm: number;
+  matchScore: number;
+  expiresAt: Date;
+}) {
+  let offerId = nextOfferId();
+  try {
+    const db = await database();
+    const result = await withDbTimeout(
+      db.insert(missionOffers).values({
+        incidentId: data.incidentId,
+        rescuerId: data.rescuerId,
+        distanceKm: data.distanceKm,
+        matchScore: data.matchScore,
+        status: "offered",
+        expiresAt: data.expiresAt,
+      }),
+      4000,
+      "createMissionOffer"
+    );
+    if (result && (result[0] as any)?.insertId) {
+      offerId = Number((result[0] as any).insertId);
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  const record: MemoryMissionOffer = {
+    id: offerId,
+    incidentId: data.incidentId,
+    rescuerId: data.rescuerId,
+    distanceKm: data.distanceKm,
+    matchScore: data.matchScore,
+    status: "offered",
+    offeredAt: new Date(),
+    expiresAt: data.expiresAt,
+    respondedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  _memoryMissionOffers.set(offerId, record);
+  return record;
+}
+
+export async function getMissionOfferById(id: number) {
+  try {
+    const db = await database();
+    const rows = await withDbTimeout(
+      db.select().from(missionOffers).where(eq(missionOffers.id, id)).limit(1),
+      4000,
+      "getMissionOfferById"
+    );
+    if (rows.length > 0) return rows[0];
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+  return _memoryMissionOffers.get(id) || null;
+}
+
+export async function getActiveOfferForRescuer(rescuerId: number) {
+  const now = new Date();
+  try {
+    const db = await database();
+    const rows = await withDbTimeout(
+      db
+        .select({
+          offer: missionOffers,
+          incident: incidents,
+        })
+        .from(missionOffers)
+        .innerJoin(incidents, eq(missionOffers.incidentId, incidents.id))
+        .where(
+          and(
+            eq(missionOffers.rescuerId, rescuerId),
+            eq(missionOffers.status, "offered")
+          )
+        )
+        .orderBy(desc(missionOffers.offeredAt))
+        .limit(1),
+      4000,
+      "getActiveOfferForRescuer"
+    );
+    if (rows.length > 0 && rows[0].offer.expiresAt.getTime() > now.getTime()) {
+      return rows[0];
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  const activeOffer = Array.from(_memoryMissionOffers.values()).find(
+    o => o.rescuerId === rescuerId && o.status === "offered" && o.expiresAt.getTime() > now.getTime()
+  );
+  if (!activeOffer) return null;
+  const incident = _memoryIncidents.get(activeOffer.incidentId);
+  if (!incident) return null;
+  return { offer: activeOffer, incident };
+}
+
+export async function listOffersForIncident(incidentId: number) {
+  try {
+    const db = await database();
+    return await withDbTimeout(
+      db.select().from(missionOffers).where(eq(missionOffers.incidentId, incidentId)).orderBy(desc(missionOffers.offeredAt)),
+      4000,
+      "listOffersForIncident"
+    );
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+  return Array.from(_memoryMissionOffers.values()).filter(o => o.incidentId === incidentId);
+}
+
+export async function updateMissionOfferStatus(
+  id: number,
+  status: "offered" | "accepted" | "declined" | "expired" | "cancelled",
+  respondedAt: Date = new Date()
+) {
+  try {
+    const db = await database();
+    await withDbTimeout(
+      db.update(missionOffers).set({ status, respondedAt, updatedAt: new Date() }).where(eq(missionOffers.id, id)),
+      4000,
+      "updateMissionOfferStatus"
+    );
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  const mem = _memoryMissionOffers.get(id);
+  if (mem) {
+    mem.status = status;
+    mem.respondedAt = respondedAt;
+    mem.updatedAt = new Date();
+    _memoryMissionOffers.set(id, mem);
+    return mem;
+  }
+  return null;
+}
+
+/**
+ * Concurrency-safe atomic mission assignment.
+ * Ensures an incident cannot be claimed by multiple rescuers concurrently.
+ */
+export async function assignMissionAtomically(data: {
+  incidentId: number;
+  rescuerId: number;
+  assignedBy: number;
+  offerId?: number;
+  notes?: string | null;
+}) {
+  const now = new Date();
+  let missionId = nextMissionId();
+
+  try {
+    const db = await database();
+    if (db) {
+      // 1. Atomic verification & incident lock
+      const targetIncident = (
+        await withDbTimeout(
+          db.select().from(incidents).where(eq(incidents.id, data.incidentId)).limit(1),
+          4000,
+          "assignMissionAtomically_checkIncident"
+        )
+      )[0];
+
+      if (!targetIncident) {
+        throw new Error("SOS request not found.");
+      }
+      if (targetIncident.status !== "pending" || targetIncident.assignedRescuerId !== null) {
+        throw new Error("This SOS request has already been assigned to another response unit.");
+      }
+
+      const profile = (
+        await withDbTimeout(
+          db.select().from(rescueProfiles).where(eq(rescueProfiles.userId, data.rescuerId)).limit(1),
+          4000,
+          "assignMissionAtomically_checkProfile"
+        )
+      )[0];
+
+      if (!profile) {
+        throw new Error("Responder profile not found.");
+      }
+      if (profile.availability !== "available") {
+        throw new Error("Selected responder is no longer available.");
+      }
+
+      // 2. Insert mission
+      const missionResult = await withDbTimeout(
+        db.insert(missions).values({
+          incidentId: data.incidentId,
+          rescuerId: data.rescuerId,
+          assignedBy: data.assignedBy,
+          status: "pending",
+          notes: data.notes ?? null,
+        }),
+        4000,
+        "assignMissionAtomically_insertMission"
+      );
+      if (missionResult && (missionResult[0] as any)?.insertId) {
+        missionId = Number((missionResult[0] as any).insertId);
+      }
+
+      // 3. Update incident status
+      await withDbTimeout(
+        db
+          .update(incidents)
+          .set({
+            assignedRescuerId: data.rescuerId,
+            status: "dispatched",
+            dispatchStatus: "assigned",
+            dispatchedAt: now,
+            updatedAt: now,
+          })
+          .where(and(eq(incidents.id, data.incidentId), eq(incidents.status, "pending"), isNull(incidents.assignedRescuerId))),
+        4000,
+        "assignMissionAtomically_updateIncident"
+      );
+
+      // 4. Update rescuer availability
+      await withDbTimeout(
+        db
+          .update(rescueProfiles)
+          .set({
+            availability: "on_mission",
+            locationSharing: "yes",
+            updatedAt: now,
+          })
+          .where(eq(rescueProfiles.userId, data.rescuerId)),
+        4000,
+        "assignMissionAtomically_updateRescuer"
+      );
+
+      // 5. Update accepted offer & cancel any other pending offers
+      if (data.offerId) {
+        await withDbTimeout(
+          db
+            .update(missionOffers)
+            .set({ status: "accepted", respondedAt: now, updatedAt: now })
+            .where(eq(missionOffers.id, data.offerId)),
+          4000,
+          "assignMissionAtomically_acceptOffer"
+        );
+      }
+      await withDbTimeout(
+        db
+          .update(missionOffers)
+          .set({ status: "cancelled", respondedAt: now, updatedAt: now })
+          .where(and(eq(missionOffers.incidentId, data.incidentId), eq(missionOffers.status, "offered"))),
+        4000,
+        "assignMissionAtomically_cancelOtherOffers"
+      );
+
+      // 6. Insert notification
+      await withDbTimeout(
+        db.insert(notifications).values({
+          recipientId: data.rescuerId,
+          incidentId: data.incidentId,
+          type: "mission_assigned",
+          title: `Mission assigned: ${targetIncident.publicCode}`,
+          body: `Proceed to ${targetIncident.locationLabel} and update status when dispatched.`,
+        }),
+        4000,
+        "assignMissionAtomically_notification"
+      );
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  // Memory state synchronization (Dev/Test fallback)
+  const memInc = _memoryIncidents.get(data.incidentId);
+  if (!memInc) throw new Error("SOS request not found.");
+  if (memInc.status !== "pending" || memInc.assignedRescuerId !== null) {
+    throw new Error("This SOS request has already been assigned to another response unit.");
+  }
+  const memProf = _memoryRescueProfiles.get(data.rescuerId);
+  if (memProf && memProf.availability !== "available") {
+    throw new Error("Selected responder is no longer available.");
+  }
+
+  memInc.assignedRescuerId = data.rescuerId;
+  memInc.status = "dispatched";
+  memInc.dispatchStatus = "assigned";
+  memInc.dispatchedAt = now;
+  memInc.updatedAt = now;
+  _memoryIncidents.set(data.incidentId, memInc);
+
+  if (memProf) {
+    memProf.availability = "on_mission";
+    memProf.locationSharing = "yes";
+    memProf.updatedAt = now;
+    _memoryRescueProfiles.set(data.rescuerId, memProf);
+  }
+
+  _memoryMissions.set(missionId, {
+    id: missionId,
+    incidentId: data.incidentId,
+    rescuerId: data.rescuerId,
+    status: "pending",
+    assignedBy: data.assignedBy,
+    assignedAt: now,
+    dispatchedAt: null,
+    resolvedAt: null,
+    notes: data.notes ?? null,
+    updatedAt: now,
+  });
+
+  if (data.offerId) {
+    const memOffer = _memoryMissionOffers.get(data.offerId);
+    if (memOffer) {
+      memOffer.status = "accepted";
+      memOffer.respondedAt = now;
+      memOffer.updatedAt = now;
+      _memoryMissionOffers.set(data.offerId, memOffer);
+    }
+  }
+
+  // Cancel any other offered records for this incident in memory
+  for (const offer of Array.from(_memoryMissionOffers.values())) {
+    if (offer.incidentId === data.incidentId && offer.status === "offered") {
+      offer.status = "cancelled";
+      offer.respondedAt = now;
+      offer.updatedAt = now;
+      _memoryMissionOffers.set(offer.id, offer);
+    }
+  }
+
+  _memoryNotifications.push({
+    id: _memoryNotifications.length + 1,
+    recipientId: data.rescuerId,
+    incidentId: data.incidentId,
+    type: "mission_assigned",
+    title: `Mission assigned: ${memInc.publicCode}`,
+    body: `Proceed to ${memInc.locationLabel} and update status when dispatched.`,
+    readAt: null,
+    createdAt: now,
+  });
+
+  await addIncidentEvent(
+    data.incidentId,
+    data.assignedBy,
+    "mission_assigned",
+    "Rescue mission assigned",
+    "A responder has accepted the mission offer and is deploying."
+  );
+
+  await writeAudit(
+    data.assignedBy,
+    "mission.assign",
+    "incident",
+    data.incidentId,
+    `Assigned to responder user ${data.rescuerId} (Mission ${missionId})`
+  );
+
+  return { missionId, incident: memInc };
+}
+
 

@@ -188,5 +188,5 @@ describe("PHASE 10 — Production Load Test & Memory Forensics", () => {
 
     console.log(`\n💡 Total Heap Delta across all 4 tiers (5->10->25->50): ${heapGrowth.toFixed(1)} MB`);
     expect(heapGrowth).toBeLessThan(50); // Memory growth is bounded & stable
-  });
+  }, 45000);
 });

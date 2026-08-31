@@ -478,6 +478,10 @@ export const rescueRouter = router({
             voiceNote.contentType
           );
         let incidentId = nextIncidentId();
+        const now = new Date();
+        const triageDeadlineAt = new Date(now.getTime() + 10_000);
+        const defaultCategory: "medical" | "rescue" | "emergency" = input.emergencyType === "medical" ? "medical" : input.emergencyType === "trapped" ? "rescue" : "emergency";
+
         const db = await database();
         if (db) {
           try {
@@ -489,6 +493,7 @@ export const rescueRouter = router({
               latitude: input.latitude,
               longitude: input.longitude,
               emergencyType: input.emergencyType,
+              requestCategory: defaultCategory,
               helpNeeds: input.helpNeeds ?? null,
               severity: input.severity,
               peopleAffected: input.peopleAffected,
@@ -499,6 +504,10 @@ export const rescueRouter = router({
               voiceNoteUrl: uploadedVoiceNote?.url ?? null,
               voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
               status: "pending",
+              dispatchStatus: "triage_pending",
+              triageStartedAt: now,
+              triageDeadlineAt,
+              matchingAttempts: 0,
             });
             if (result && (result[0] as any)?.insertId) {
               incidentId = (result[0] as any).insertId;
@@ -518,6 +527,7 @@ export const rescueRouter = router({
           latitude: input.latitude,
           longitude: input.longitude,
           emergencyType: input.emergencyType,
+          requestCategory: defaultCategory,
           helpNeeds: input.helpNeeds ?? null,
           severity: input.severity,
           peopleAffected: input.peopleAffected,
@@ -528,20 +538,27 @@ export const rescueRouter = router({
           voiceNoteUrl: uploadedVoiceNote?.url ?? null,
           voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
           status: "pending",
+          dispatchStatus: "triage_pending",
+          triageStartedAt: now,
+          triageDeadlineAt,
+          triageSelectedAt: null,
+          matchingStartedAt: null,
+          matchingAttempts: 0,
+          escalatedToCommandAt: null,
           assignedRescuerId: null,
           dispatchedAt: null,
           resolvedAt: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: now,
+          updatedAt: now,
         });
         await addIncidentEvent(
           incidentId,
           ctx.user.id,
           "sos_created",
           "SOS received",
-          "Awaiting dispatch from the emergency operations team."
+          "Awaiting rapid classification and automated responder dispatch."
         );
-        await writeAudit(ctx.user.id, "incident.create", "incident", incidentId, `Created ${publicCode}`);
+        await writeAudit(ctx.user.id, "incident.create", "incident", incidentId, `Created ${publicCode} with 10s rapid triage`);
         await emitIncidentAlerts(
           incidentId,
           publicCode,
@@ -550,7 +567,26 @@ export const rescueRouter = router({
           input.latitude,
           input.longitude
         );
-        return { incidentId, publicCode, status: "pending" as const };
+        return { incidentId, publicCode, status: "pending" as const, triageDeadlineAt, requestCategory: defaultCategory };
+      }),
+    selectCategory: publicProcedure
+      .input(
+        z.object({
+          publicCode: z.string().optional(),
+          incidentId: z.number().optional(),
+          category: z.enum(["medical", "rescue", "emergency"]),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        let incidentId = input.incidentId;
+        if (!incidentId && input.publicCode) {
+          const found = await getIncidentByCode(input.publicCode);
+          if (found) incidentId = found.id;
+        }
+        if (!incidentId) throw new TRPCError({ code: "NOT_FOUND", message: "SOS incident not found." });
+        const { selectIncidentCategory } = await import("../dispatch/dispatch");
+        const result = await selectIncidentCategory(incidentId, input.category, ctx.user?.id ?? null);
+        return { success: true, result };
       }),
     statusByCode: publicProcedure
       .input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) }))
@@ -565,6 +601,11 @@ export const rescueRouter = router({
         return {
           publicCode: incident.publicCode,
           status: incident.status,
+          requestCategory: (incident as any).requestCategory || "emergency",
+          dispatchStatus: (incident as any).dispatchStatus || "triage_pending",
+          triageDeadlineAt: (incident as any).triageDeadlineAt || null,
+          escalatedToCommandAt: (incident as any).escalatedToCommandAt || null,
+          matchingAttempts: (incident as any).matchingAttempts || 0,
           locationLabel: incident.locationLabel,
           latitude: incident.latitude,
           longitude: incident.longitude,
@@ -2061,81 +2102,19 @@ export const rescueRouter = router({
     assignMission: adminProcedure
       .input(z.object({ incidentId: z.number().int().positive(), rescuerId: z.number().int().positive() }))
       .mutation(async ({ input, ctx }) => {
-        const incident = await getIncidentById(input.incidentId);
-        if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "SOS request not found." });
-        if (incident.status !== "pending")
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Only pending SOS requests can be assigned." });
-        const profile = await getRescuerProfile(input.rescuerId);
-        if (!profile)
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Select an authorized rescuer." });
-        if (profile.availability !== "available")
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Selected rescuer is not available." });
-        let missionId = _memoryMissions.size + 1;
-        const db = await database();
-        if (db) {
-          try {
-            const mission = await db
-              .insert(missions)
-              .values({ incidentId: incident.id, rescuerId: input.rescuerId, assignedBy: ctx.user.id, status: "pending" });
-            missionId = Number(mission[0].insertId);
-            await db.update(incidents).set({ assignedRescuerId: input.rescuerId }).where(eq(incidents.id, incident.id));
-            await db.update(rescueProfiles).set({ availability: "on_mission", locationSharing: "yes", lastLatitude: null, lastLongitude: null, locationUpdatedAt: null }).where(eq(rescueProfiles.userId, input.rescuerId));
-            await db.insert(notifications).values({
-              recipientId: input.rescuerId,
-              incidentId: incident.id,
-              type: "mission_assigned",
-              title: `Mission assigned: ${incident.publicCode}`,
-              body: `Proceed to ${incident.locationLabel} and update the mission status when dispatched.`,
-            });
-          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+        // Enforces availability: "on_mission", locationSharing: "yes", lastLatitude: null, lastLongitude: null, locationUpdatedAt: null
+        const { assignMissionAtomically } = await import("../rescue.db");
+        try {
+          const result = await assignMissionAtomically({
+            incidentId: input.incidentId,
+            rescuerId: input.rescuerId,
+            assignedBy: ctx.user.id,
+            notes: "Manually assigned via Command Centre override.",
+          });
+          return { missionId: result.missionId };
+        } catch (err: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Failed to assign mission." });
         }
-        _memoryMissions.set(missionId, {
-          id: missionId,
-          incidentId: incident.id,
-          rescuerId: input.rescuerId,
-          status: "pending",
-          assignedBy: ctx.user.id,
-          assignedAt: new Date(),
-          dispatchedAt: null,
-          resolvedAt: null,
-          notes: null,
-          updatedAt: new Date(),
-        });
-        const memInc = _memoryIncidents.get(incident.id);
-        if (memInc) memInc.assignedRescuerId = input.rescuerId;
-        const memProf = _memoryRescueProfiles.get(input.rescuerId);
-        if (memProf) {
-          memProf.availability = "on_mission";
-          memProf.locationSharing = "yes";
-          memProf.lastLatitude = null;
-          memProf.lastLongitude = null;
-          memProf.locationUpdatedAt = null;
-        }
-        _memoryNotifications.push({
-          id: _memoryNotifications.length + 1,
-          recipientId: input.rescuerId,
-          incidentId: incident.id,
-          type: "mission_assigned",
-          title: `Mission assigned: ${incident.publicCode}`,
-          body: `Proceed to ${incident.locationLabel} and update the mission status when dispatched.`,
-          readAt: null,
-          createdAt: new Date(),
-        });
-        await sendRescuerPush([input.rescuerId], {
-          title: `Mission assigned: ${incident.publicCode}`,
-          body: `Proceed to ${incident.locationLabel} and update the mission status when dispatched.`,
-          incidentId: incident.id,
-          url: "/responder/alerts",
-        });
-        await addIncidentEvent(
-          incident.id,
-          ctx.user.id,
-          "mission_assigned",
-          "Rescue mission assigned",
-          "A rescuer has been assigned and is preparing to deploy."
-        );
-        await writeAudit(ctx.user.id, "mission.assign", "incident", incident.id, `Assigned to user ${input.rescuerId}`);
-        return { missionId };
       }),
     addShelter: adminProcedure
       .input(
@@ -2478,6 +2457,77 @@ export const rescueRouter = router({
         return { success: true };
       }),
     profile: rescuerProcedure.query(({ ctx }) => getRescuerProfile(ctx.user.id)),
+    activeOffer: rescuerProcedure.query(async ({ ctx }) => {
+      const { getActiveOfferForRescuer } = await import("../rescue.db");
+      const offerData = await getActiveOfferForRescuer(ctx.user.id);
+      if (!offerData) return { hasOffer: false, offer: null, incident: null };
+      return {
+        hasOffer: true,
+        offer: {
+          id: offerData.offer.id,
+          distanceKm: offerData.offer.distanceKm,
+          matchScore: offerData.offer.matchScore,
+          status: offerData.offer.status,
+          offeredAt: offerData.offer.offeredAt,
+          expiresAt: offerData.offer.expiresAt,
+        },
+        incident: {
+          id: offerData.incident.id,
+          publicCode: offerData.incident.publicCode,
+          locationLabel: offerData.incident.locationLabel,
+          latitude: offerData.incident.latitude,
+          longitude: offerData.incident.longitude,
+          requestCategory: (offerData.incident as any).requestCategory || "emergency",
+          emergencyType: offerData.incident.emergencyType,
+          severity: offerData.incident.severity,
+          peopleAffected: offerData.incident.peopleAffected,
+          notes: offerData.incident.notes,
+        },
+      };
+    }),
+    acceptMissionOffer: rescuerProcedure
+      .input(z.object({ offerId: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const { acceptMissionOffer } = await import("../dispatch/dispatch");
+        try {
+          const result = await acceptMissionOffer(input.offerId, ctx.user.id);
+          return { success: true, missionId: result.missionId };
+        } catch (err: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Failed to accept offer." });
+        }
+      }),
+    declineMissionOffer: rescuerProcedure
+      .input(z.object({ offerId: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const { declineMissionOffer } = await import("../dispatch/dispatch");
+        try {
+          await declineMissionOffer(input.offerId, ctx.user.id);
+          return { success: true };
+        } catch (err: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Failed to decline offer." });
+        }
+      }),
+    capabilities: rescuerProcedure.query(async ({ ctx }) => {
+      const { getRescuerCapabilities } = await import("../rescue.db");
+      return await getRescuerCapabilities(ctx.user.id);
+    }),
+    updateCapabilities: rescuerProcedure
+      .input(
+        z.object({
+          capabilities: z.array(
+            z.object({
+              capability: z.enum(["medical", "flood_rescue", "trapped_rescue", "evacuation", "general_emergency"]),
+              priority: z.number().int().min(1).max(10).optional(),
+              active: z.enum(["yes", "no"]).optional(),
+            })
+          ),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { setRescuerCapabilities } = await import("../rescue.db");
+        await setRescuerCapabilities(ctx.user.id, input.capabilities);
+        return { success: true };
+      }),
     missionMessages: rescuerProcedure
       .input(z.object({ missionId: z.number().int().positive() }))
       .query(async ({ input, ctx }) => {

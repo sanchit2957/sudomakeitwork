@@ -216,7 +216,7 @@ export class OpenMeteoProvider implements IWeatherProvider {
     endpoint.searchParams.set("timezone", "auto");
 
     const response = await fetch(endpoint.toString(), {
-      signal: AbortSignal.timeout(7_000),
+      signal: AbortSignal.timeout(12_000),
       headers: { accept: "application/json" },
     });
 

@@ -94,6 +94,20 @@ export default function UserLogin() {
   const [successMessage, setSuccessMessage] = useState("");
   const [registrationSubmitted, setRegistrationSubmitted] = useState(false);
 
+  // Handle ?panel= query parameter for panel-specific login entry
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const panel = params.get("panel");
+    if (panel === "admin") {
+      setLocation("/admin/login");
+    } else if (panel === "rescuer" || panel === "responder") {
+      setLocation("/responder/login");
+    } else if (panel === "medical" || panel === "hospital") {
+      setLocation("/hospital/login");
+    }
+  }, [setLocation]);
+
   // Countdown timer effect
   useEffect(() => {
     if (otpCountdown > 0) {
