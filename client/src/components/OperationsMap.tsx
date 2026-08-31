@@ -28,6 +28,8 @@ export type OperationalLayers = {
     id: number;
     name: string;
     address: string;
+    contactPhone?: string | null;
+    specialty?: string;
     latitude: number;
     longitude: number;
     status: string;
@@ -295,18 +297,37 @@ export default function OperationsMap({
           title: hospital.name,
         });
 
+        const totalBeds = hospital.totalEmergencyBeds + hospital.totalIcuBeds;
+        const availableBeds = hospital.availableEmergencyBeds + hospital.availableIcuBeds;
+        const occupiedBeds = totalBeds - availableBeds;
+        const specialty = hospital.specialty || "Trauma & Emergency Care";
+        const contact = hospital.contactPhone || "+91 361 2529457";
+
         marker.addListener("click", () => {
           infoWindow.setContent(`
-            <div style="font-family:Inter,system-ui,sans-serif;padding:4px;min-width:190px;">
-              <strong style="color:#1d5148;font-size:13px;">🏥 ${hospital.name}</strong><br/>
-              <span style="font-size:11px;color:#666;">${hospital.address}</span>
-              <div style="margin-top:6px;display:flex;gap:6px;font-size:11px;">
-                <span style="background:#e8f4f1;color:#19755f;padding:2px 6px;border-radius:4px;font-weight:bold;">
-                  ER ${hospital.availableEmergencyBeds}/${hospital.totalEmergencyBeds}
-                </span>
-                <span style="background:#eaf2fb;color:#255c7d;padding:2px 6px;border-radius:4px;font-weight:bold;">
-                  ICU ${hospital.availableIcuBeds}/${hospital.totalIcuBeds}
-                </span>
+            <div style="font-family:Inter,system-ui,sans-serif;padding:6px;min-width:240px;max-width:280px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:16px;">🏥</span>
+                <strong style="color:#1d5148;font-size:13px;font-weight:800;">${hospital.name}</strong>
+              </div>
+              <div style="margin-top:4px;font-size:11px;color:#555;line-height:1.4;">📍 ${hospital.address}</div>
+              <div style="margin-top:6px;padding:4px 6px;border-radius:6px;background:#f0f7f5;font-size:11px;color:#174e46;font-weight:600;">
+                🩺 <strong>Specialty:</strong> ${specialty}
+              </div>
+              <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px;">
+                <div style="background:#e8f4f1;color:#19755f;padding:4px 6px;border-radius:4px;">
+                  <div style="font-weight:bold;text-transform:uppercase;">Bed Capacity</div>
+                  <div style="font-size:12px;font-weight:800;">${totalBeds} beds</div>
+                  <div>ER: ${hospital.totalEmergencyBeds} · ICU: ${hospital.totalIcuBeds}</div>
+                </div>
+                <div style="background:#eaf2fb;color:#255c7d;padding:4px 6px;border-radius:4px;">
+                  <div style="font-weight:bold;text-transform:uppercase;">Occupancy</div>
+                  <div style="font-size:12px;font-weight:800;">${occupiedBeds} occupied</div>
+                  <div>${availableBeds} available</div>
+                </div>
+              </div>
+              <div style="margin-top:6px;font-size:11px;font-weight:bold;color:#1d5148;">
+                📞 Contact: <a href="tel:${contact}" style="color:#0f766e;text-decoration:underline;">${contact}</a>
               </div>
             </div>
           `);
@@ -467,17 +488,36 @@ export default function OperationsMap({
             title: hospital.name,
           });
 
+          const totalBeds = hospital.totalEmergencyBeds + hospital.totalIcuBeds;
+          const availableBeds = hospital.availableEmergencyBeds + hospital.availableIcuBeds;
+          const occupiedBeds = totalBeds - availableBeds;
+          const specialty = hospital.specialty || "Trauma & Emergency Care";
+          const contact = hospital.contactPhone || "+91 361 2529457";
+
           marker.bindPopup(`
-            <div style="font-family:Inter,system-ui,sans-serif;padding:4px;min-width:190px;">
-              <strong style="color:#1d5148;font-size:13px;">${hospital.name}</strong><br/>
-              <span style="font-size:11px;color:#666;">${hospital.address}</span>
-              <div style="margin-top:6px;display:flex;gap:6px;font-size:11px;">
-                <span style="background:#e8f4f1;color:#19755f;padding:2px 6px;border-radius:4px;font-weight:bold;">
-                  ER ${hospital.availableEmergencyBeds}/${hospital.totalEmergencyBeds}
-                </span>
-                <span style="background:#eaf2fb;color:#255c7d;padding:2px 6px;border-radius:4px;font-weight:bold;">
-                  ICU ${hospital.availableIcuBeds}/${hospital.totalIcuBeds}
-                </span>
+            <div style="font-family:Inter,system-ui,sans-serif;padding:6px;min-width:240px;max-width:280px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:16px;">🏥</span>
+                <strong style="color:#1d5148;font-size:13px;font-weight:800;">${hospital.name}</strong>
+              </div>
+              <div style="margin-top:4px;font-size:11px;color:#555;line-height:1.4;">📍 ${hospital.address}</div>
+              <div style="margin-top:6px;padding:4px 6px;border-radius:6px;background:#f0f7f5;font-size:11px;color:#174e46;font-weight:600;">
+                🩺 <strong>Specialty:</strong> ${specialty}
+              </div>
+              <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px;">
+                <div style="background:#e8f4f1;color:#19755f;padding:4px 6px;border-radius:4px;">
+                  <div style="font-weight:bold;text-transform:uppercase;">Bed Capacity</div>
+                  <div style="font-size:12px;font-weight:800;">${totalBeds} beds</div>
+                  <div>ER: ${hospital.totalEmergencyBeds} · ICU: ${hospital.totalIcuBeds}</div>
+                </div>
+                <div style="background:#eaf2fb;color:#255c7d;padding:4px 6px;border-radius:4px;">
+                  <div style="font-weight:bold;text-transform:uppercase;">Occupancy</div>
+                  <div style="font-size:12px;font-weight:800;">${occupiedBeds} occupied</div>
+                  <div>${availableBeds} available</div>
+                </div>
+              </div>
+              <div style="margin-top:6px;font-size:11px;font-weight:bold;color:#1d5148;">
+                📞 Contact: <a href="tel:${contact}" style="color:#0f766e;text-decoration:underline;">${contact}</a>
               </div>
             </div>
           `);

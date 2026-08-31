@@ -19,6 +19,7 @@ export interface RescuerCandidate {
   };
   profile: {
     callSign: string;
+    category?: "medical" | "boat" | "ground-team" | "other";
     availability: "available" | "on_mission" | "off_duty";
     lastLatitude: number | null;
     lastLongitude: number | null;
@@ -84,13 +85,32 @@ export function calculateHaversineDistanceKm(
  */
 export function evaluateCapabilityScore(
   category: SOSCategory,
-  capabilities: Array<{ capability: string; active: string; priority?: number }>
+  capabilities: Array<{ capability: string; active: string; priority?: number }>,
+  profile?: { category?: string; callSign?: string }
 ): { compatible: boolean; capabilityScore: number; matchedCapability: string | null } {
   const activeCaps = new Set(
     capabilities
       .filter(c => c.active === "yes" || (c as any).active === true)
       .map(c => c.capability.toLowerCase().trim())
   );
+
+  // Infer capabilities from rescuer category or call sign asset tags
+  const rescuerCategory = profile?.category?.toLowerCase();
+  const callSign = (profile?.callSign || "").toLowerCase();
+
+  if (rescuerCategory === "medical" || callSign.includes("med") || callSign.includes("doctor")) {
+    activeCaps.add("medical");
+  }
+  if (rescuerCategory === "boat" || callSign.includes("boat") || callSign.includes("ndrf") || callSign.includes("sdrf")) {
+    activeCaps.add("flood_rescue");
+    activeCaps.add("trapped_rescue");
+    activeCaps.add("evacuation");
+  }
+  if (rescuerCategory === "ground-team") {
+    activeCaps.add("general_emergency");
+    activeCaps.add("trapped_rescue");
+    activeCaps.add("evacuation");
+  }
 
   switch (category) {
     case "medical": {
@@ -194,7 +214,7 @@ export function scoreCandidate(
   }
 
   // 4. Capability Compatibility
-  const { compatible, capabilityScore, matchedCapability } = evaluateCapabilityScore(target.requestCategory, candidate.capabilities);
+  const { compatible, capabilityScore, matchedCapability } = evaluateCapabilityScore(target.requestCategory, candidate.capabilities, candidate.profile);
   if (!compatible) {
     return {
       score: 0,

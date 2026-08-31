@@ -9,6 +9,7 @@ import {
   missionOffers,
   missions,
   notifications,
+  postRescueCheckIns,
   rescuerCapabilities,
   rescueProfiles,
   rescuerRegistrationRequests,
@@ -60,6 +61,7 @@ export interface MemoryHospital {
   name: string;
   address: string;
   contactPhone: string | null;
+  specialty?: string;
   latitude: number;
   longitude: number;
   totalEmergencyBeds: number;
@@ -76,6 +78,17 @@ export interface MemoryHospital {
   status: "open" | "limited" | "critical" | "closed";
   updatedBy: number | null;
   updatedAt: Date;
+}
+
+export interface MemoryPostRescueCheckIn {
+  id: number;
+  incidentId: number;
+  publicCode: string;
+  reporterId: number | null;
+  reliefCentreAllotted: "yes" | "no";
+  helpCategory: "medical" | "trapped" | "evacuation" | "other";
+  notes: string | null;
+  submittedAt: Date;
 }
 
 export interface MemoryFloodZone {
@@ -116,6 +129,8 @@ export interface MemoryIncident {
   matchingAttempts: number;
   escalatedToCommandAt: Date | null;
   assignedRescuerId: number | null;
+  destinationHospitalId?: number | null;
+  destinationHospitalName?: string | null;
   dispatchedAt: Date | null;
   resolvedAt: Date | null;
   escalationLevel?: number;
@@ -161,6 +176,7 @@ export interface MemoryRescueProfile {
   id: number;
   userId: number;
   callSign: string;
+  category?: "medical" | "boat" | "ground-team" | "other";
   phone: string | null;
   photoKey: string | null;
   photoUrl: string | null;
@@ -326,6 +342,7 @@ export const _memoryHospitals: Map<number, MemoryHospital> = new Map([
       name: "Gauhati Medical College & Hospital (GMCH)",
       address: "Bhangagarh, Guwahati, Assam 781032",
       contactPhone: "+91 361 2529457",
+      specialty: "Trauma, Emergency & Critical Care",
       latitude: 26.1558,
       longitude: 91.7645,
       totalEmergencyBeds: 120,
@@ -351,6 +368,7 @@ export const _memoryHospitals: Map<number, MemoryHospital> = new Map([
       name: "Assam Medical College & Hospital (AMCH)",
       address: "Barbari, Dibrugarh, Assam 786002",
       contactPhone: "+91 373 2300080",
+      specialty: "Pediatric, General & Emergency Surgery",
       latitude: 27.4612,
       longitude: 94.9215,
       totalEmergencyBeds: 90,
@@ -435,6 +453,7 @@ export const _memoryIncidents: Map<number, MemoryIncident> = new Map([
 export const _memoryMissions: Map<number, MemoryMission> = new Map();
 export const _memoryRescuerCapabilities: Map<number, MemoryRescuerCapability[]> = new Map();
 export const _memoryMissionOffers: Map<number, MemoryMissionOffer> = new Map();
+export const _memoryPostRescueCheckIns: Map<number, MemoryPostRescueCheckIn> = new Map();
 
 export const _memoryIncidentEvents: MemoryIncidentEvent[] = [
   {
@@ -1738,6 +1757,141 @@ export async function assignMissionAtomically(data: {
   );
 
   return { missionId, incident: memInc };
+}
+
+/**
+ * Saves a victim's post-rescue check-in response.
+ */
+export async function submitPostRescueCheckIn(data: {
+  incidentId: number;
+  publicCode: string;
+  reporterId?: number | null;
+  reliefCentreAllotted: "yes" | "no";
+  helpCategory: "medical" | "trapped" | "evacuation" | "other";
+  notes?: string | null;
+}) {
+  const now = new Date();
+  try {
+    const db = await database();
+    if (db) {
+      const inserted = await withDbTimeout(
+        db.insert(postRescueCheckIns).values({
+          incidentId: data.incidentId,
+          publicCode: data.publicCode,
+          reporterId: data.reporterId || null,
+          reliefCentreAllotted: data.reliefCentreAllotted,
+          helpCategory: data.helpCategory,
+          notes: data.notes || null,
+          submittedAt: now,
+        }),
+        4000,
+        "submitPostRescueCheckIn"
+      );
+      if (inserted && (inserted[0] as any)?.insertId) {
+        return { id: Number((inserted[0] as any).insertId), ...data, submittedAt: now };
+      }
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  const id = _memoryPostRescueCheckIns.size + 1;
+  const item: MemoryPostRescueCheckIn = {
+    id,
+    incidentId: data.incidentId,
+    publicCode: data.publicCode,
+    reporterId: data.reporterId || null,
+    reliefCentreAllotted: data.reliefCentreAllotted,
+    helpCategory: data.helpCategory,
+    notes: data.notes || null,
+    submittedAt: now,
+  };
+  _memoryPostRescueCheckIns.set(id, item);
+
+  await addIncidentEvent(
+    data.incidentId,
+    data.reporterId || null,
+    "post_rescue_checkin",
+    "Post-rescue check-in submitted",
+    `Relief centre allotted: ${data.reliefCentreAllotted.toUpperCase()} · Needs: ${data.helpCategory.toUpperCase()}`
+  );
+
+  return item;
+}
+
+/**
+ * Gets post-rescue check-in for a given tracking public code.
+ */
+export async function getPostRescueCheckInByPublicCode(publicCode: string) {
+  try {
+    const db = await database();
+    if (db) {
+      const rows = await withDbTimeout(
+        db.select().from(postRescueCheckIns).where(eq(postRescueCheckIns.publicCode, publicCode)).limit(1),
+        4000,
+        "getPostRescueCheckInByPublicCode"
+      );
+      if (rows.length > 0) return rows[0];
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+  return Array.from(_memoryPostRescueCheckIns.values()).find(c => c.publicCode === publicCode) || null;
+}
+
+/**
+ * Updates destination hospital on an active incident.
+ */
+export async function setIncidentDestinationHospital(incidentId: number, hospitalId: number, rescuerId: number) {
+  const hospital = (await listHospitals()).find(h => h.id === hospitalId);
+  if (!hospital) throw new Error("Selected hospital not found.");
+
+  const now = new Date();
+  try {
+    const db = await database();
+    if (db) {
+      await withDbTimeout(
+        db
+          .update(incidents)
+          .set({
+            destinationHospitalId: hospital.id,
+            destinationHospitalName: hospital.name,
+            updatedAt: now,
+          })
+          .where(eq(incidents.id, incidentId)),
+        4000,
+        "setIncidentDestinationHospital"
+      );
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  const mem = _memoryIncidents.get(incidentId);
+  if (mem) {
+    mem.destinationHospitalId = hospital.id;
+    mem.destinationHospitalName = hospital.name;
+    mem.updatedAt = now;
+    _memoryIncidents.set(incidentId, mem);
+  }
+
+  await addIncidentEvent(
+    incidentId,
+    rescuerId,
+    "hospital_selected",
+    `Routing to ${hospital.name}`,
+    `Rescuer designated ${hospital.name} (${hospital.address}) as patient handoff facility.`
+  );
+
+  await writeAudit(
+    rescuerId,
+    "hospital.route",
+    "incident",
+    incidentId,
+    `Rescuer routed to hospital ${hospital.id} (${hospital.name})`
+  );
+
+  return { success: true, hospital };
 }
 
 

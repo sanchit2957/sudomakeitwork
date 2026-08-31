@@ -4,6 +4,7 @@ import LanguageSelector from "@/components/LanguageSelector";
 import OperationsMap from "@/components/OperationsMap";
 import { SafetyAssistanceQueue } from "@/components/SafetyAssistanceQueue";
 import { BleEmergencyRadar } from "@/components/BleEmergencyRadar";
+import { EmergencyOfferCard } from "@/components/EmergencyOfferCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { showNotification } from "@/lib/nativeNotifications";
 import { reconcileAvailability, reconcileMissionStatus } from "@/lib/operationalSync";
-import { Bell, Camera, CheckCircle2, ClipboardList, ClipboardPenLine, LocateFixed, MapPinned, MessageCircle, Navigation, Phone, Radio, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { Bell, Camera, CheckCircle2, ClipboardList, ClipboardPenLine, Hospital, LocateFixed, MapPinned, MessageCircle, Navigation, Phone, Radio, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { UserProfileBadge } from "@/components/ProfileAvatar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -39,16 +40,23 @@ function ResponderWorkspace() {
   const utils = trpc.useUtils();
   const [pushState, setPushState] = useState<PushState>("not_requested");
   const [pushDetail, setPushDetail] = useState("");
-  const liveMissionQuery = { refetchInterval: 4_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
+  const liveMissionQuery = { refetchInterval: 3_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
   const liveLayersQuery = { refetchInterval: 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const liveProfileQuery = { refetchInterval: 15_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const profile = trpc.rescue.rescuer.profile.useQuery(undefined, liveProfileQuery);
   const missions = trpc.rescue.rescuer.missions.useQuery(undefined, liveMissionQuery);
+  const activeOffer = trpc.rescue.rescuer.activeOffer.useQuery(undefined, liveMissionQuery);
   const alerts = trpc.rescue.rescuer.notifications.useQuery(undefined, liveMissionQuery);
   const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, liveLayersQuery);
   const pushConfig = trpc.rescue.rescuer.pushConfig.useQuery();
   const subscribePush = trpc.rescue.rescuer.subscribePush.useMutation();
-  const refreshOperationalState = () => { void utils.rescue.rescuer.profile.invalidate(); void utils.rescue.rescuer.missions.invalidate(); void utils.rescue.rescuer.notifications.invalidate(); void utils.rescue.operations.mapLayers.invalidate(); };
+  const refreshOperationalState = () => {
+    void utils.rescue.rescuer.profile.invalidate();
+    void utils.rescue.rescuer.missions.invalidate();
+    void utils.rescue.rescuer.activeOffer.invalidate();
+    void utils.rescue.rescuer.notifications.invalidate();
+    void utils.rescue.operations.mapLayers.invalidate();
+  };
   const setAvailability = trpc.rescue.rescuer.setAvailability.useMutation({ onMutate: async ({ availability }) => { await utils.rescue.rescuer.profile.cancel(); const previous = utils.rescue.rescuer.profile.getData(); utils.rescue.rescuer.profile.setData(undefined, profile => reconcileAvailability(profile, availability)); return { previous }; }, onError: (_error, _input, context) => { if (context?.previous) utils.rescue.rescuer.profile.setData(undefined, context.previous); }, onSettled: refreshOperationalState });
   const updateMission = trpc.rescue.rescuer.updateMission.useMutation({ onMutate: async ({ missionId, status }) => { await utils.rescue.rescuer.missions.cancel(); const previous = utils.rescue.rescuer.missions.getData(); utils.rescue.rescuer.missions.setData(undefined, rows => reconcileMissionStatus(rows, missionId, status)); return { previous }; }, onError: (_error, _input, context) => { if (context?.previous) utils.rescue.rescuer.missions.setData(undefined, context.previous); }, onSettled: refreshOperationalState });
   const updateProfile = trpc.rescue.rescuer.updateProfile.useMutation({ onSettled: refreshOperationalState });
@@ -156,7 +164,22 @@ function ResponderWorkspace() {
     {location === "/responder/map" ? <section><PageHeading eyebrow={t("responder.map")} title={t("responder.mapTitle")} /><OperationsMap layers={layers.data} /></section>
       : location === "/responder/safety" ? <SafetyAssistanceQueue title="Safety assistance requests" description="Review shelter, food, medical, and protection needs shared by people who are not reporting immediate SOS danger. Acknowledge only when you or the command team can begin a response." guidance={["Check current weather, flood-zone, and route conditions on the Operations Map before travelling.", "Use the SOS mission board for immediate danger; do not replace an active SOS assignment with a safety request.", "Acknowledge only after confirming a safe response route, team capacity, or command handoff."]} />
       : location === "/responder/alerts" ? <AlertsView items={alerts.data?.items ?? []} onRead={id => markRead.mutate({ notificationId: id })} />
-          : <><section className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]"><div className="rounded-3xl bg-[#174e46] p-6 text-white shadow-[0_20px_60px_-30px_rgb(21_78_70/0.75)]"><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b1dbd1]">{t("responder.readiness")}</p><div className="mt-3 flex flex-wrap items-center gap-3"><UserProfileBadge user={{ name: user?.name, email: user?.email, photoUrl: profile.data?.photoUrl || (user as any)?.photoUrl, avatarUrl: (user as any)?.avatarUrl, role: user?.role }} size="xl" textClassName="text-2xl font-extrabold tracking-tight text-white" />{profile.data?.callSign && <span className="rounded-lg bg-white/15 px-2.5 py-1 font-mono text-xs font-bold text-[#b1dbd1]">{profile.data.callSign}</span>}</div><p className="mt-2 max-w-lg text-sm leading-6 text-[#c2e1d9]">{t("responder.readinessCopy")}</p><div className="mt-5 flex flex-wrap gap-2">{([['available',t('responder.available')],['on_mission',t('responder.onMission')],['off_duty',t('responder.offDuty')]] as const).map(([value, label]) => <button key={value} onClick={() => withCurrentLocation(value)} disabled={setAvailability.isPending || !profile.data} className={`rounded-xl px-4 py-2.5 text-sm font-extrabold transition ${profile.data?.availability === value ? 'bg-white text-[#174e46]' : 'bg-white/10 text-[#d8eee8] hover:bg-white/20'}`}>{setAvailability.isPending ? t("responder.updating") : label}</button>)}</div></div><AlertSetup unread={alerts.data?.unread ?? 0} state={pushState} detail={pushDetail} disabled={subscribePush.isPending || pushState === "subscribed"} onEnable={enableAlerts} /></section><BleEmergencyRadar rescuerLatitude={profile.data?.lastLatitude || undefined} rescuerLongitude={profile.data?.lastLongitude || undefined} /><ResponderProfileCard profile={profile.data ?? null} hasActiveMission={hasActiveMission} saving={updateProfile.isPending} onSave={input => updateProfile.mutate(input)} /><section><PageHeading eyebrow={t("responder.board")} title={t("responder.boardTitle")} /><div className="grid gap-3">{missions.data?.length ? missions.data.map(({ mission, incident }) => <article key={mission.id} className="grid gap-4 rounded-2xl border bg-white p-5 shadow-sm md:grid-cols-[1fr_auto]"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs font-medium text-primary">{incident.publicCode}</span><StatusBadge status={mission.status} /></div><h2 className="mt-2 text-lg font-extrabold">{incident.locationLabel}</h2><p className="mt-1 text-sm text-muted-foreground">{incident.peopleAffected} {t("responder.people")} · {incident.emergencyType} · <strong className={incident.severity === "critical" ? "text-destructive" : ""}>{incident.severity}</strong> {t("responder.priority")}</p>{mission.notes && <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">{mission.notes}</p>}</div><div className="flex items-center md:justify-end">{mission.status === "resolved" ? <span className="flex items-center gap-2 text-sm font-bold text-[#19755f]"><CheckCircle2 className="h-5 w-5" /> {t("responder.completed")}</span> : <Button disabled={updateMission.isPending} onClick={() => updateMission.mutate({ missionId: mission.id, status: mission.status === "pending" ? "dispatched" : "resolved" })} className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">{updateMission.isPending ? t("responder.updating") : mission.status === "pending" ? <><Navigation className="mr-2 h-4 w-4" /> {t("responder.dispatched")}</> : <><CheckCircle2 className="mr-2 h-4 w-4" /> {t("responder.resolved")}</>}</Button>}</div></article>) : <Empty text={t("responder.noMission")} />}</div></section></>}
+          : <>
+              {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && (
+                <EmergencyOfferCard
+                  data={{
+                    offer: activeOffer.data.offer,
+                    incident: activeOffer.data.incident,
+                  }}
+                  onAccepted={() => {
+                    refreshOperationalState();
+                  }}
+                  onDeclined={() => {
+                    refreshOperationalState();
+                  }}
+                />
+              )}
+              <section className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]"><div className="rounded-3xl bg-[#174e46] p-6 text-white shadow-[0_20px_60px_-30px_rgb(21_78_70/0.75)]"><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b1dbd1]">{t("responder.readiness")}</p><div className="mt-3 flex flex-wrap items-center gap-3"><UserProfileBadge user={{ name: user?.name, email: user?.email, photoUrl: profile.data?.photoUrl || (user as any)?.photoUrl, avatarUrl: (user as any)?.avatarUrl, role: user?.role }} size="xl" textClassName="text-2xl font-extrabold tracking-tight text-white" />{profile.data?.callSign && <span className="rounded-lg bg-white/15 px-2.5 py-1 font-mono text-xs font-bold text-[#b1dbd1]">{profile.data.callSign}</span>}</div><p className="mt-2 max-w-lg text-sm leading-6 text-[#c2e1d9]">{t("responder.readinessCopy")}</p><div className="mt-5 flex flex-wrap gap-2">{([['available',t('responder.available')],['on_mission',t('responder.onMission')],['off_duty',t('responder.offDuty')]] as const).map(([value, label]) => <button key={value} onClick={() => withCurrentLocation(value)} disabled={setAvailability.isPending || !profile.data} className={`rounded-xl px-4 py-2.5 text-sm font-extrabold transition ${profile.data?.availability === value ? 'bg-white text-[#174e46]' : 'bg-white/10 text-[#d8eee8] hover:bg-white/20'}`}>{setAvailability.isPending ? t("responder.updating") : label}</button>)}</div></div><AlertSetup unread={alerts.data?.unread ?? 0} state={pushState} detail={pushDetail} disabled={subscribePush.isPending || pushState === "subscribed"} onEnable={enableAlerts} /></section><BleEmergencyRadar rescuerLatitude={profile.data?.lastLatitude || undefined} rescuerLongitude={profile.data?.lastLongitude || undefined} /><ResponderProfileCard profile={profile.data ?? null} hasActiveMission={hasActiveMission} saving={updateProfile.isPending} onSave={input => updateProfile.mutate(input)} /><section><PageHeading eyebrow={t("responder.board")} title={t("responder.boardTitle")} /><div className="grid gap-3">{missions.data?.length ? missions.data.map(({ mission, incident }) => <UserRescuerMissionCard key={mission.id} mission={mission} incident={incident} hospitals={layers.data?.hospitals ?? []} onUpdateStatus={(status) => updateMission.mutate({ missionId: mission.id, status })} isUpdating={updateMission.isPending} onHandoffSelected={refreshOperationalState} />) : <Empty text={t("responder.noMission")} />}</div></section></>}
   <ResponderMissionChat missions={missions.data ?? []} /></div></DashboardLayout>;
 }
 
@@ -393,3 +416,218 @@ function PageHeading({ eyebrow, title }: { eyebrow: string; title: string }) { r
 function ResponderMissionChat({ missions }: { missions: Array<{ mission: { id: number; status: string }; incident: { publicCode: string } }> }) { const active = missions.find(({ mission }) => mission.status !== "resolved") || missions[0]; const [message, setMessage] = useState(""); const utils = trpc.useUtils(); const thread = trpc.rescue.rescuer.missionMessages.useQuery({ missionId: active?.mission.id || 0 }, { enabled: Boolean(active), refetchInterval: 5_000, retry: false }); const send = trpc.rescue.rescuer.sendMissionMessage.useMutation({ onSuccess: () => { setMessage(""); if (active) void utils.rescue.rescuer.missionMessages.invalidate({ missionId: active.mission.id }); } }); if (!active) return null; return <section className="mt-6 rounded-3xl border bg-white p-5 shadow-sm"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-primary"><MessageCircle className="h-5 w-5" /></span><div><p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-primary">SOS conversation</p><h2 className="mt-1 text-lg font-extrabold">{active.incident.publicCode}</h2></div></div><div className="mt-4 max-h-44 space-y-2 overflow-y-auto rounded-2xl bg-[#f7faf9] p-3">{thread.data?.length ? thread.data.map(item => <div key={item.id} className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-5 ${item.authorType === "rescuer" ? "ml-auto bg-[#174e46] text-white" : "bg-white text-[#315e54]"}`}><span className="block text-[9px] font-black uppercase tracking-wide opacity-70">{item.authorType === "victim" ? "Victim" : item.authorType === "operations" ? "Operations" : "You"}</span>{item.message}</div>) : <p className="text-xs text-muted-foreground">No messages yet. Send a concise update if contact is needed.</p>}</div>{active.mission.status !== "resolved" && <div className="mt-3 flex gap-2"><Input value={message} onChange={event => setMessage(event.target.value)} maxLength={500} placeholder="Send a short update" className="h-10 text-xs" /><Button disabled={!message.trim() || send.isPending} onClick={() => send.mutate({ missionId: active.mission.id, message: message.trim() })} className="h-10 w-10 shrink-0 rounded-xl p-0"><Send className="h-4 w-4" /></Button></div>}{send.error && <p className="mt-2 text-xs font-semibold text-destructive">{send.error.message}</p>}</section>; }
 function StatusBadge({ status }: { status: string }) { return <span className={`rounded-full px-2.5 py-1 font-mono text-[10px] font-bold uppercase ${status === "resolved" ? "bg-[#d9f3e8] text-[#19755f]" : status === "dispatched" ? "bg-[#dfeeff] text-[#255c7d]" : "bg-[#fff2d9] text-[#9b6615]"}`}>{status}</span>; }
 function Empty({ text }: { text: string }) { return <div className="rounded-2xl border border-dashed bg-white/70 p-8 text-center text-sm leading-6 text-muted-foreground"><UserRoundCheck className="mx-auto mb-3 h-7 w-7 text-primary/60" />{text}</div>; }
+
+function UserRescuerMissionCard({
+  mission,
+  incident,
+  hospitals,
+  onUpdateStatus,
+  isUpdating,
+  onHandoffSelected,
+}: {
+  mission: any;
+  incident: any;
+  hospitals: Array<any>;
+  onUpdateStatus: (status: "dispatched" | "resolved") => void;
+  isUpdating: boolean;
+  onHandoffSelected?: () => void;
+}) {
+  const { t } = useLanguage();
+  const [showHospitalDialog, setShowHospitalDialog] = useState(false);
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string>(hospitals[0]?.id ? String(hospitals[0].id) : "");
+  const [successNotice, setSuccessNotice] = useState(false);
+
+  const selectHospital = trpc.rescue.rescuer.selectHospitalDestination.useMutation({
+    onSuccess: () => {
+      setSuccessNotice(true);
+      setTimeout(() => {
+        setSuccessNotice(false);
+        setShowHospitalDialog(false);
+        onHandoffSelected?.();
+      }, 1500);
+    },
+  });
+
+  const handleSelectHospital = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedHospitalId) return;
+    selectHospital.mutate({
+      incidentId: incident.id,
+      hospitalId: Number(selectedHospitalId),
+    });
+  };
+
+  const currentHospital = hospitals.find(h => h.id === Number(selectedHospitalId)) || hospitals[0];
+
+  return (
+    <article className="grid gap-4 rounded-2xl border bg-white p-5 shadow-sm md:grid-cols-[1fr_auto]">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-xs font-medium text-primary">{incident.publicCode}</span>
+          <StatusBadge status={mission.status} />
+          {incident.destinationHospitalName && (
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 ring-1 ring-emerald-300">
+              🏥 En route: {incident.destinationHospitalName}
+            </span>
+          )}
+        </div>
+        <h2 className="mt-2 text-lg font-extrabold">{incident.locationLabel}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {incident.peopleAffected} {t("responder.people")} · {incident.emergencyType} ·{" "}
+          <strong className={incident.severity === "critical" ? "text-destructive" : ""}>
+            {incident.severity}
+          </strong>{" "}
+          {t("responder.priority")}
+        </p>
+        {mission.notes && (
+          <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+            {mission.notes}
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col items-start gap-2 md:items-end md:justify-center">
+        <div className="flex flex-wrap items-center gap-2">
+          {mission.status !== "resolved" && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowHospitalDialog(true)}
+              className="rounded-xl border-[#0f766e]/40 bg-[#0f766e]/10 text-xs font-bold text-[#0f766e] hover:bg-[#0f766e]/20"
+            >
+              <Hospital className="mr-1.5 h-3.5 w-3.5" />
+              {incident.destinationHospitalName ? "Change Hospital" : "Route to Hospital"}
+            </Button>
+          )}
+
+          {mission.status === "resolved" ? (
+            <span className="flex items-center gap-2 text-sm font-bold text-[#19755f]">
+              <CheckCircle2 className="h-5 w-5" /> {t("responder.completed")}
+            </span>
+          ) : (
+            <Button
+              disabled={isUpdating}
+              onClick={() => onUpdateStatus(mission.status === "pending" ? "dispatched" : "resolved")}
+              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {isUpdating ? (
+                t("responder.updating")
+              ) : mission.status === "pending" ? (
+                <>
+                  <Navigation className="mr-2 h-4 w-4" /> {t("responder.dispatched")}
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> {t("responder.resolved")}
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* HOSPITAL SELECTION MODAL */}
+      {showHospitalDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <Hospital className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold">Select Destination Hospital Handoff</h3>
+                  <p className="text-xs text-muted-foreground">SOS #{incident.publicCode} · Live Availability</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHospitalDialog(false)}
+                className="rounded-lg p-1 text-muted-foreground hover:bg-muted"
+              >
+                ✕
+              </button>
+            </div>
+
+            {successNotice && (
+              <div className="rounded-xl bg-emerald-500/10 p-3 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                ✓ Hospital destination assigned! Patient and map routing updated.
+              </div>
+            )}
+
+            <form onSubmit={handleSelectHospital} className="space-y-4">
+              <div>
+                <Label className="text-xs font-bold">Choose Hospital Facility</Label>
+                <select
+                  value={selectedHospitalId}
+                  onChange={e => setSelectedHospitalId(e.target.value)}
+                  className="mt-1.5 h-10 w-full rounded-xl border border-input bg-background px-3 text-xs font-bold"
+                  required
+                >
+                  {hospitals.map(h => (
+                    <option key={h.id} value={h.id}>
+                      {h.name} — {h.address}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 6 Hospital Fields Display */}
+              {currentHospital && (
+                <div className="rounded-2xl border border-emerald-800/20 bg-emerald-500/5 p-4 space-y-2.5 text-xs">
+                  <div className="font-extrabold text-sm text-primary flex items-center gap-1.5">
+                    <span>🏥</span> {currentHospital.name}
+                  </div>
+                  <div className="text-muted-foreground flex items-center gap-1">
+                    <span>📍</span> {currentHospital.address}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="rounded-xl bg-white p-2.5 border">
+                      <div className="text-[10px] uppercase font-bold text-muted-foreground">Bed Capacity</div>
+                      <div className="font-black text-sm text-emerald-700">
+                        {currentHospital.totalEmergencyBeds + currentHospital.totalIcuBeds} total beds
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        ER: {currentHospital.totalEmergencyBeds} · ICU: {currentHospital.totalIcuBeds}
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-white p-2.5 border">
+                      <div className="text-[10px] uppercase font-bold text-muted-foreground">Occupancy</div>
+                      <div className="font-black text-sm text-sky-700">
+                        {(currentHospital.totalEmergencyBeds + currentHospital.totalIcuBeds) - (currentHospital.availableEmergencyBeds + currentHospital.availableIcuBeds)} occupied
+                      </div>
+                      <div className="text-[10px] text-emerald-600 font-bold">
+                        {currentHospital.availableEmergencyBeds + currentHospital.availableIcuBeds} beds available
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 pt-1">
+                    <div>
+                      <strong>Specialty:</strong> {currentHospital.specialty || "Trauma, Critical Care & Emergency"}
+                    </div>
+                    <div>
+                      <strong>Contact:</strong>{" "}
+                      <a href={`tel:${currentHospital.contactPhone || "+913612529457"}`} className="text-primary font-bold underline">
+                        {currentHospital.contactPhone || "+91 361 2529457"}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowHospitalDialog(false)} className="rounded-xl">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={selectHospital.isPending} className="rounded-xl bg-primary text-white">
+                  {selectHospital.isPending ? "Assigning…" : "Confirm Hospital Route"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}

@@ -24,8 +24,9 @@ import { findRankedMatchesForIncident } from "./matching";
 import type { IncidentDispatchTarget, SOSCategory } from "./scoring";
 import { sendRescuerPush } from "../push";
 
-export const CITIZEN_TRIAGE_WINDOW_MS = 10_000; // 10 seconds
-export const RESPONDER_OFFER_WINDOW_MS = 10_000; // 10 seconds
+export const CITIZEN_TRIAGE_WINDOW_MS = 15_000; // 15 seconds
+export const RESPONDER_OFFER_WINDOW_MS = 15_000; // 15 seconds
+export const DISPATCH_RADIUS_TIERS_KM = [15, 35, 75, 150, Infinity];
 
 /**
  * Initializes rapid triage and deadline for a newly created SOS incident.
@@ -199,34 +200,41 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
 
   // 2. Check Active Offers for Expiry
   const offers = await listOffersForIncident(incidentId);
-  const activeOffer = offers.find(o => o.status === "offered");
+  const activeOffers = offers.filter(o => o.status === "offered");
 
-  if (activeOffer) {
-    const expiresAtTime = new Date(activeOffer.expiresAt).getTime();
-    if (currentTime.getTime() >= expiresAtTime) {
-      // Expired!
-      await updateMissionOfferStatus(activeOffer.id, "expired", currentTime);
-      await writeAudit(
-        activeOffer.rescuerId,
-        "responder_offer_expired",
-        "missionOffer",
-        activeOffer.id,
-        `Offer for rescuer ${activeOffer.rescuerId} expired after ${RESPONDER_OFFER_WINDOW_MS / 1000}s`
-      );
-      await addIncidentEvent(
-        incidentId,
-        activeOffer.rescuerId,
-        "responder_offer_expired",
-        "Offer expired",
-        "Responder did not accept within the 10-second response window. Finding next available unit."
-      );
-    } else {
-      // Offer is still actively counting down
-      return { status: "offered", activeOffer };
+  if (activeOffers.length > 0) {
+    let anyStillActive = false;
+    for (const activeOffer of activeOffers) {
+      const expiresAtTime = new Date(activeOffer.expiresAt).getTime();
+      if (currentTime.getTime() >= expiresAtTime) {
+        // Expired!
+        await updateMissionOfferStatus(activeOffer.id, "expired", currentTime);
+        await writeAudit(
+          activeOffer.rescuerId,
+          "responder_offer_expired",
+          "missionOffer",
+          activeOffer.id,
+          `Offer for rescuer ${activeOffer.rescuerId} expired after ${RESPONDER_OFFER_WINDOW_MS / 1000}s`
+        );
+        await addIncidentEvent(
+          incidentId,
+          activeOffer.rescuerId,
+          "responder_offer_expired",
+          "Offer expired",
+          `Responder did not accept within the ${RESPONDER_OFFER_WINDOW_MS / 1000}-second response window.`
+        );
+      } else {
+        anyStillActive = true;
+      }
+    }
+
+    if (anyStillActive) {
+      const remainingActive = (await listOffersForIncident(incidentId)).filter(o => o.status === "offered");
+      return { status: "offered", offers: remainingActive };
     }
   }
 
-  // 3. Find Next Best Candidate
+  // 3. Find Candidates (Broaden search radius tier on zero accepts)
   const target: IncidentDispatchTarget = {
     id: incident.id,
     latitude: incident.latitude,
@@ -237,22 +245,35 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
     peopleAffected: incident.peopleAffected,
   };
 
-  const rankedMatches = await findRankedMatchesForIncident(target, currentTime);
+  let tierIndex = Math.min(incident.matchingAttempts || 0, DISPATCH_RADIUS_TIERS_KM.length - 1);
+  let rankedMatches: Awaited<ReturnType<typeof findRankedMatchesForIncident>> = [];
+
+  while (tierIndex < DISPATCH_RADIUS_TIERS_KM.length) {
+    const maxRadiusKm = DISPATCH_RADIUS_TIERS_KM[tierIndex];
+    rankedMatches = await findRankedMatchesForIncident(target, currentTime, maxRadiusKm);
+    if (rankedMatches.length > 0) {
+      break;
+    }
+    // Silently broaden to next tier
+    tierIndex++;
+  }
 
   if (rankedMatches.length > 0) {
-    // Offer to Top Candidate
-    const top = rankedMatches[0];
+    // Broadcast SIMULTANEOUSLY to all eligible candidates in this tier
     const offerExpiresAt = new Date(currentTime.getTime() + RESPONDER_OFFER_WINDOW_MS);
+    const createdOffers = await Promise.all(
+      rankedMatches.map(top =>
+        createMissionOffer({
+          incidentId: incident.id,
+          rescuerId: top.candidate.user.id,
+          distanceKm: top.match.distanceKm,
+          matchScore: top.match.score,
+          expiresAt: offerExpiresAt,
+        })
+      )
+    );
 
-    const createdOffer = await createMissionOffer({
-      incidentId: incident.id,
-      rescuerId: top.candidate.user.id,
-      distanceKm: top.match.distanceKm,
-      matchScore: top.match.score,
-      expiresAt: offerExpiresAt,
-    });
-
-    const matchingAttempts = (incident.matchingAttempts || 0) + 1;
+    const matchingAttempts = tierIndex + 1;
 
     const db = await getDb();
     if (db) {
@@ -282,37 +303,45 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
       _memoryIncidents.set(incidentId, mem);
     }
 
-    await writeAudit(
-      top.candidate.user.id,
-      "responder_offer_created",
-      "missionOffer",
-      createdOffer.id,
-      `Offer created for responder ${top.candidate.user.id} (${top.candidate.profile.callSign}). Score: ${top.match.score}, Dist: ${top.match.distanceKm}km. ${top.match.reason}`
-    );
+    for (let i = 0; i < rankedMatches.length; i++) {
+      const top = rankedMatches[i];
+      const offer = createdOffers[i];
+      await writeAudit(
+        top.candidate.user.id,
+        "responder_offer_created",
+        "missionOffer",
+        offer.id,
+        `Simultaneous offer created for responder ${top.candidate.user.id} (${top.candidate.profile.callSign}). Score: ${top.match.score}, Dist: ${top.match.distanceKm}km. ${top.match.reason}`
+      );
+    }
 
     await addIncidentEvent(
       incidentId,
-      top.candidate.user.id,
+      null,
       "responder_offer_created",
-      "Mission offer dispatched",
-      `Offer dispatched to ${top.candidate.profile.callSign} (${top.match.distanceKm} km away). 10-second response window active.`
+      "Mission broadcast dispatched",
+      `Offers dispatched simultaneously to ${rankedMatches.length} nearby response unit(s). 15-second response window active.`
     );
 
-    // Send push / notification to rescuer
+    // Send push / notifications to all rescuer candidates simultaneously
     try {
-      await sendRescuerPush([top.candidate.user.id], {
-        title: `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
-        body: `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel} (${top.match.distanceKm} km). 10s to accept.`,
-        incidentId: incident.id,
-        url: "/responder",
-      });
+      await sendRescuerPush(
+        rankedMatches.map(r => r.candidate.user.id),
+        {
+          title: `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
+          body: `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 15s to accept.`,
+          incidentId: incident.id,
+          url: "/responder",
+        }
+      );
     } catch (pushErr) {
       console.warn("[Dispatch] Push notification skipped:", pushErr);
     }
 
-    return { status: "offered", offer: createdOffer, candidate: top.candidate };
+    return { status: "offered", offers: createdOffers, candidates: rankedMatches.map(r => r.candidate) };
   } else {
-    // 4. No Eligible Responders Remaining -> Escalate to Command Centre
+    // Zero available responders right now in any tier -> maintain "matching" search status
+    // (Silently broaden / poll; do not auto-escalate to Command)
     const db = await getDb();
     if (db) {
       try {
@@ -320,13 +349,13 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
           db
             .update(incidents)
             .set({
-              dispatchStatus: "escalated",
-              escalatedToCommandAt: currentTime,
+              dispatchStatus: "matching",
+              matchingAttempts: DISPATCH_RADIUS_TIERS_KM.length,
               updatedAt: currentTime,
             })
             .where(eq(incidents.id, incidentId)),
           4000,
-          "advance_escalate"
+          "advance_matchingSearch"
         );
       } catch (err) {
         if (process.env.NODE_ENV === "production") throw err;
@@ -335,35 +364,20 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
 
     const mem = _memoryIncidents.get(incidentId);
     if (mem) {
-      mem.dispatchStatus = "escalated";
-      mem.escalatedToCommandAt = currentTime;
+      mem.dispatchStatus = "matching";
+      mem.matchingAttempts = DISPATCH_RADIUS_TIERS_KM.length;
       mem.updatedAt = currentTime;
       _memoryIncidents.set(incidentId, mem);
     }
 
-    await writeAudit(
-      null,
-      "dispatch_escalated",
-      "incident",
-      incidentId,
-      `No available responders accepted. Escalated to State Command Centre for manual override.`
-    );
-
-    await addIncidentEvent(
-      incidentId,
-      null,
-      "dispatch_escalated",
-      "Escalated to Command Centre",
-      "All nearby response units are currently engaged. State Command Centre alerted for emergency manual assignment."
-    );
-
-    return { status: "escalated" };
+    return { status: "matching" };
   }
 }
 
 /**
  * Rescuer accepts a mission offer.
  * Concurrency-safe and strictly validates expiration and ownership.
+ * First-to-respond wins. Losing rescuers get a clear "mission already assigned" notice.
  */
 export async function acceptMissionOffer(
   offerId: number,
@@ -378,6 +392,9 @@ export async function acceptMissionOffer(
   }
 
   if (offer.status !== "offered") {
+    if (offer.status === "cancelled" || offer.status === "expired") {
+      throw new Error("This mission was already assigned to another responder. You may be matched to a nearby victim shortly.");
+    }
     throw new Error(`This offer is no longer valid (status: ${offer.status}).`);
   }
 
@@ -388,24 +405,31 @@ export async function acceptMissionOffer(
     throw new Error("Offer has expired.");
   }
 
-  // Atomically assign mission
-  const result = await assignMissionAtomically({
-    incidentId: offer.incidentId,
-    rescuerId,
-    assignedBy: rescuerId,
-    offerId,
-    notes: `Accepted automatically via responder matching engine at ${currentTime.toISOString()}`,
-  });
+  // Atomically assign mission (first-to-respond wins)
+  try {
+    const result = await assignMissionAtomically({
+      incidentId: offer.incidentId,
+      rescuerId,
+      assignedBy: rescuerId,
+      offerId,
+      notes: `Accepted automatically via responder matching engine at ${currentTime.toISOString()}`,
+    });
 
-  await writeAudit(
-    rescuerId,
-    "responder_offer_accepted",
-    "missionOffer",
-    offerId,
-    `Rescuer ${rescuerId} accepted offer within response window. Mission ${result.missionId} active.`
-  );
+    await writeAudit(
+      rescuerId,
+      "responder_offer_accepted",
+      "missionOffer",
+      offerId,
+      `Rescuer ${rescuerId} accepted offer within response window. Mission ${result.missionId} active.`
+    );
 
-  return result;
+    return result;
+  } catch (err: any) {
+    if (err.message && err.message.includes("already been assigned")) {
+      throw new Error("This mission was already assigned to another responder. You may be matched to a nearby victim shortly.");
+    }
+    throw err;
+  }
 }
 
 /**

@@ -100,6 +100,7 @@ export async function getRescuerCandidates(): Promise<RescuerCandidate[]> {
             },
             profile: {
               callSign: profile.callSign,
+              category: (profile as any).category || (profile.callSign.toLowerCase().includes("boat") ? "boat" : profile.callSign.toLowerCase().includes("med") ? "medical" : "ground-team"),
               availability: profile.availability as "available" | "on_mission" | "off_duty",
               lastLatitude: profile.lastLatitude,
               lastLongitude: profile.lastLongitude,
@@ -141,6 +142,7 @@ export async function getRescuerCandidates(): Promise<RescuerCandidate[]> {
         },
         profile: {
           callSign: profile.callSign,
+          category: (profile as any).category || (profile.callSign.toLowerCase().includes("boat") ? "boat" : profile.callSign.toLowerCase().includes("med") ? "medical" : "ground-team"),
           availability: profile.availability,
           lastLatitude: profile.lastLatitude,
           lastLongitude: profile.lastLongitude,
@@ -163,10 +165,12 @@ export async function getRescuerCandidates(): Promise<RescuerCandidate[]> {
 /**
  * Finds and ranks all eligible rescuer candidates for an incident.
  * Excludes candidates who have already declined or had expired offers for this incident.
+ * Optionally filters by radius tier (maxRadiusKm).
  */
 export async function findRankedMatchesForIncident(
   target: IncidentDispatchTarget,
-  currentTime: Date = new Date()
+  currentTime: Date = new Date(),
+  maxRadiusKm?: number
 ): Promise<RankedMatch[]> {
   const allCandidates = await getRescuerCandidates();
   const pastOffers = await listOffersForIncident(target.id);
@@ -187,6 +191,9 @@ export async function findRankedMatchesForIncident(
 
     const match = scoreCandidate(candidate, target, currentTime);
     if (match.isEligible) {
+      if (maxRadiusKm !== undefined && match.distanceKm > maxRadiusKm) {
+        continue;
+      }
       ranked.push({ candidate, match });
     }
   }

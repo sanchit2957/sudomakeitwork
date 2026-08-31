@@ -56,7 +56,13 @@ export function SosClassificationModal({
 
   const [currentStep, setCurrentStep] = useState<"categories" | "details">("categories");
   const [selectedCategory, setSelectedCategory] = useState<SOSCategoryOption | null>(null);
-  const [timeLeft, setTimeLeft] = useState(10);
+  const [timeLeft, setTimeLeft] = useState(() => {
+    if (triageDeadlineAt) {
+      const remainingMs = Math.max(0, new Date(triageDeadlineAt).getTime() - Date.now());
+      return Math.ceil(remainingMs / 1000);
+    }
+    return 15;
+  });
   const [isExpired, setIsExpired] = useState(false);
   const [isDispatchedOnServer, setIsDispatchedOnServer] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -81,12 +87,12 @@ export function SosClassificationModal({
     selectedCategoryRef.current = selectedCategory;
   }, [selectedCategory]);
 
-  // Fixed authoritative server deadline for the initial cancellation / triage window
+  // Fixed authoritative server deadline for the initial cancellation / triage window (15s)
   const deadlineMs = useMemo(() => {
-    return triageDeadlineAt ? new Date(triageDeadlineAt).getTime() : Date.now() + 10_000;
+    return triageDeadlineAt ? new Date(triageDeadlineAt).getTime() : Date.now() + 15_000;
   }, [triageDeadlineAt]);
 
-  // Master 10-second timer for initial triage/cancellation window
+  // Master 15-second timer for initial triage/cancellation window
   useEffect(() => {
     if (!isOpen) return;
 
@@ -292,7 +298,7 @@ export function SosClassificationModal({
               <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e3efe9] dark:bg-zinc-800">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-[#d23f43] via-amber-500 to-[#174e46] transition-all duration-200 ease-linear dark:from-rose-500 dark:via-amber-500 dark:to-emerald-500"
-                  style={{ width: `${Math.min(100, Math.max(0, (timeLeft / 10) * 100))}%` }}
+                  style={{ width: `${Math.min(100, Math.max(0, (timeLeft / 15) * 100))}%` }}
                 />
               </div>
             </div>

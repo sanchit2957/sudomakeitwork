@@ -265,6 +265,7 @@ function RescuerMissionCard({
   const [notes, setNotes] = useState("");
   const [notifiedNotice, setNotifiedNotice] = useState(false);
 
+  const selectHospitalDest = trpc.rescue.rescuer.selectHospitalDestination.useMutation();
   const notifyHospital = trpc.rescue.rescuer.notifyHospital.useMutation({
     onSuccess: () => {
       setNotifiedNotice(true);
@@ -278,9 +279,11 @@ function RescuerMissionCard({
   const handleSendHospitalAlert = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedHospitalId) return;
+    const hospId = Number(selectedHospitalId);
+    selectHospitalDest.mutate({ incidentId: incident.id, hospitalId: hospId });
     notifyHospital.mutate({
       incidentId: incident.id,
-      hospitalId: Number(selectedHospitalId),
+      hospitalId: hospId,
       severity: incident.severity || "high",
       patientCount: Number(patientCount) || 1,
       estimatedArrivalMinutes: Number(etaMinutes) || 15,
@@ -291,12 +294,19 @@ function RescuerMissionCard({
     });
   };
 
+  const currentHospital: any = hospitals.find(h => h.id === Number(selectedHospitalId)) || hospitals[0];
+
   return (
     <article className="grid gap-4 rounded-2xl border bg-white p-5 shadow-sm md:grid-cols-[1fr_auto]">
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-xs font-medium text-primary">{incident.publicCode}</span>
           <StatusBadge status={mission.status} />
+          {incident.destinationHospitalName && (
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 ring-1 ring-emerald-300">
+              🏥 En route: {incident.destinationHospitalName}
+            </span>
+          )}
         </div>
         <h2 className="mt-2 text-lg font-extrabold">{incident.locationLabel}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -395,7 +405,7 @@ function RescuerMissionCard({
                   {hospitals.length ? (
                     hospitals.map(h => (
                       <option key={h.id} value={h.id}>
-                        {h.name} ({h.address})
+                        {h.name} — {h.address}
                       </option>
                     ))
                   ) : (
@@ -403,6 +413,49 @@ function RescuerMissionCard({
                   )}
                 </select>
               </div>
+
+              {/* 6 Hospital Fields Display */}
+              {currentHospital && (
+                <div className="rounded-2xl border border-emerald-800/20 bg-emerald-500/5 p-3.5 space-y-2 text-xs">
+                  <div className="font-extrabold text-sm text-primary flex items-center gap-1.5">
+                    <span>🏥</span> {currentHospital.name}
+                  </div>
+                  <div className="text-muted-foreground">
+                    📍 {currentHospital.address}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-1.5">
+                    <div className="rounded-xl bg-white p-2 border">
+                      <div className="text-[10px] uppercase font-bold text-muted-foreground">Bed Capacity</div>
+                      <div className="font-black text-xs text-emerald-700">
+                        {(currentHospital.totalEmergencyBeds || 0) + (currentHospital.totalIcuBeds || 0)} total beds
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        ER: {currentHospital.totalEmergencyBeds || 0} · ICU: {currentHospital.totalIcuBeds || 0}
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-white p-2 border">
+                      <div className="text-[10px] uppercase font-bold text-muted-foreground">Occupancy</div>
+                      <div className="font-black text-xs text-sky-700">
+                        {((currentHospital.totalEmergencyBeds || 0) + (currentHospital.totalIcuBeds || 0)) - ((currentHospital.availableEmergencyBeds || 0) + (currentHospital.availableIcuBeds || 0))} occupied
+                      </div>
+                      <div className="text-[10px] text-emerald-600 font-bold">
+                        {(currentHospital.availableEmergencyBeds || 0) + (currentHospital.availableIcuBeds || 0)} available
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-0.5 pt-1">
+                    <div>
+                      <strong>Specialty:</strong> {currentHospital.specialty || "Trauma, Critical Care & Emergency"}
+                    </div>
+                    <div>
+                      <strong>Contact:</strong>{" "}
+                      <a href={`tel:${currentHospital.contactPhone || "+913612529457"}`} className="text-primary font-bold underline">
+                        {currentHospital.contactPhone || "+91 361 2529457"}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

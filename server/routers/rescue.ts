@@ -715,8 +715,61 @@ export const rescueRouter = router({
           resolvedAt: incident.resolvedAt,
           events,
           assignedRescuer: !assigned || !profile ? null : { ...presentAssignedRescuerToVictim({ ...profile, name: assigned.user.name }), destination: { latitude: incident.latitude, longitude: incident.longitude } },
+          destinationHospitalId: (incident as any).destinationHospitalId || null,
+          destinationHospitalName: (incident as any).destinationHospitalName || null,
+          destinationHospital: (incident as any).destinationHospitalId
+            ? await (async () => {
+                const { listHospitals } = await import("../rescue.db");
+                const allHosps = await listHospitals();
+                const foundHosp = allHosps.find(h => h.id === (incident as any).destinationHospitalId);
+                if (!foundHosp) return null;
+                return {
+                  id: foundHosp.id,
+                  name: foundHosp.name,
+                  address: foundHosp.address,
+                  contactPhone: foundHosp.contactPhone || null,
+                  specialty: (foundHosp as any).specialty || "Trauma & Emergency Care",
+                  latitude: foundHosp.latitude,
+                  longitude: foundHosp.longitude,
+                  availableEmergencyBeds: foundHosp.availableEmergencyBeds,
+                  totalEmergencyBeds: foundHosp.totalEmergencyBeds,
+                  availableIcuBeds: foundHosp.availableIcuBeds,
+                  totalIcuBeds: foundHosp.totalIcuBeds,
+                };
+              })()
+            : null,
         };
       }),
+    submitPostRescueCheckIn: publicProcedure
+      .input(
+        z.object({
+          publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/),
+          reliefCentreAllotted: z.enum(["yes", "no"]),
+          helpCategory: z.enum(["medical", "trapped", "evacuation", "other"]).default("other"),
+          notes: z.string().trim().max(2000).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const incident = await getIncidentByCode(input.publicCode);
+        if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
+        const { submitPostRescueCheckIn } = await import("../rescue.db");
+        const result = await submitPostRescueCheckIn({
+          incidentId: incident.id,
+          publicCode: incident.publicCode,
+          reporterId: ctx.user?.id ?? null,
+          reliefCentreAllotted: input.reliefCentreAllotted,
+          helpCategory: input.helpCategory,
+          notes: input.notes ?? null,
+        });
+        return { success: true, checkIn: result };
+      }),
+    myCheckInByCode: publicProcedure
+      .input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) }))
+      .query(async ({ input }) => {
+        const { getPostRescueCheckInByPublicCode } = await import("../rescue.db");
+        return await getPostRescueCheckInByPublicCode(input.publicCode);
+      }),
+
     myDetailsByCode: protectedProcedure
       .input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) }))
       .query(async ({ input, ctx }) => {
@@ -2605,6 +2658,21 @@ export const rescueRouter = router({
           return { success: true };
         } catch (err: any) {
           throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Failed to decline offer." });
+        }
+      }),
+    selectHospitalDestination: rescuerProcedure
+      .input(
+        z.object({
+          incidentId: z.number().int().positive(),
+          hospitalId: z.number().int().positive(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { setIncidentDestinationHospital } = await import("../rescue.db");
+        try {
+          return await setIncidentDestinationHospital(input.incidentId, input.hospitalId, ctx.user.id);
+        } catch (err: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Failed to select hospital." });
         }
       }),
     capabilities: rescuerProcedure.query(async ({ ctx }) => {

@@ -43,6 +43,7 @@ export const rescueProfiles = mysqlTable(
     availability: mysqlEnum("availability", ["available", "on_mission", "off_duty"])
       .default("available")
       .notNull(),
+    category: mysqlEnum("category", ["medical", "boat", "ground-team", "other"]).default("ground-team").notNull(),
     lastLatitude: double("lastLatitude"),
     lastLongitude: double("lastLongitude"),
     locationUpdatedAt: timestamp("locationUpdatedAt"),
@@ -99,6 +100,8 @@ export const incidents = mysqlTable(
     matchingAttempts: int("matchingAttempts").default(0).notNull(),
     escalatedToCommandAt: timestamp("escalatedToCommandAt"),
     assignedRescuerId: int("assignedRescuerId").references(() => users.id),
+    destinationHospitalId: int("destinationHospitalId"),
+    destinationHospitalName: varchar("destinationHospitalName", { length: 180 }),
     dispatchedAt: timestamp("dispatchedAt"),
     resolvedAt: timestamp("resolvedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -242,6 +245,7 @@ export const hospitals = mysqlTable(
     name: varchar("name", { length: 180 }).notNull(),
     address: varchar("address", { length: 360 }).notNull(),
     contactPhone: varchar("contactPhone", { length: 32 }),
+    specialty: varchar("specialty", { length: 180 }).default("Trauma & Emergency Care").notNull(),
     latitude: double("latitude").notNull(),
     longitude: double("longitude").notNull(),
     totalEmergencyBeds: int("totalEmergencyBeds").default(0).notNull(),
@@ -466,6 +470,24 @@ export const roleAccessCodes = mysqlTable(
   table => [uniqueIndex("roleAccessCodes_role_unique").on(table.role)],
 );
 
+export const postRescueCheckIns = mysqlTable(
+  "postRescueCheckIns",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    incidentId: int("incidentId").notNull().references(() => incidents.id),
+    publicCode: varchar("publicCode", { length: 24 }).notNull(),
+    reporterId: int("reporterId").references(() => users.id),
+    reliefCentreAllotted: mysqlEnum("reliefCentreAllotted", ["yes", "no"]).notNull(),
+    helpCategory: mysqlEnum("helpCategory", ["medical", "trapped", "evacuation", "other"]).default("other").notNull(),
+    notes: text("notes"),
+    submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+  },
+  table => [
+    index("postRescueCheckIns_incidentId_idx").on(table.incidentId),
+    index("postRescueCheckIns_publicCode_idx").on(table.publicCode),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Incident = typeof incidents.$inferSelect;
@@ -484,3 +506,5 @@ export type RescuerCapability = typeof rescuerCapabilities.$inferSelect;
 export type InsertRescuerCapability = typeof rescuerCapabilities.$inferInsert;
 export type MissionOffer = typeof missionOffers.$inferSelect;
 export type InsertMissionOffer = typeof missionOffers.$inferInsert;
+export type PostRescueCheckIn = typeof postRescueCheckIns.$inferSelect;
+export type InsertPostRescueCheckIn = typeof postRescueCheckIns.$inferInsert;

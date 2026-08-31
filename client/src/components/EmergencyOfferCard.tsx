@@ -39,7 +39,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
   const acceptOffer = trpc.rescue.rescuer.acceptMissionOffer.useMutation();
   const declineOffer = trpc.rescue.rescuer.declineMissionOffer.useMutation();
 
-  const [secondsRemaining, setSecondsRemaining] = useState(10);
+  const [secondsRemaining, setSecondsRemaining] = useState(15);
   const [isExpired, setIsExpired] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
