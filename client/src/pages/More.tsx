@@ -6,7 +6,6 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   ChevronRight,
-  ClipboardCheck,
   Edit3,
   Hospital,
   MapPin,
@@ -98,22 +97,6 @@ export default function More() {
             <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </div>
         </section>
-
-        {/* Hospital Registration */}
-        <button
-          onClick={() => setLocation("/hospital/register")}
-          className="mt-5 flex w-full items-center gap-4 rounded-[1.55rem] border border-[#c8ddef] bg-[#f5f9ff] p-4 text-left transition hover:bg-[#eef5fc] active:scale-[.99] dark:border-blue-950 dark:bg-blue-950/20 dark:hover:bg-blue-950/40"
-        >
-          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eaf2fb] text-[#255c7d] dark:bg-blue-900/40 dark:text-blue-300">
-            <ClipboardCheck className="h-5 w-5" />
-          </span>
-          <span>
-            <span className="block text-sm font-black text-[#234b77] dark:text-blue-300">{t("Hospital registration")}</span>
-            <span className="mt-1 block text-xs leading-5 text-[#58738f] dark:text-blue-200/70">
-              {t("Hospitals can request verified staff access and publish live resource information.")}
-            </span>
-          </span>
-        </button>
 
         {/* Protected Operations Wing */}
         <section className="mt-5 rounded-[1.55rem] border border-[#d7e8e2] bg-[#f7fcfa] p-4 dark:border-white/10 dark:bg-[#16171a]">

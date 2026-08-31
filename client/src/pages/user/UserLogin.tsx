@@ -263,7 +263,7 @@ export default function UserLogin() {
         return "/responder";
       case "hospital":
       case "medical":
-        return "/hospital";
+        return "/medical";
       default:
         return "/";
     }

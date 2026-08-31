@@ -349,6 +349,11 @@ export default function UserHome() {
           redirectAfterRapidSos(triageData.publicCode, setLocation);
           setTriageData(null);
         }}
+        onCancel={() => {
+          setTriageData(null);
+          setRapidStatus("idle");
+          setRapidNotice(t("SOS cancelled. Emergency dispatch aborted."));
+        }}
       />
     )}
   </main><VictimNavigation current="home" /></div>;

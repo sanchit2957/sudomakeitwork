@@ -89,7 +89,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
     }
   };
 
-  const formattedCountdown = `00:0${Math.min(9, secondsRemaining)}`;
+  const formattedCountdown = `00:${String(Math.max(0, secondsRemaining)).padStart(2, "0")}`;
 
   const CategoryIcon =
     incident.requestCategory === "medical"

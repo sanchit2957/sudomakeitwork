@@ -13,6 +13,7 @@ import {
   hospitals,
   incidentMessages,
   incidents,
+  missionOffers,
   missions,
   notifications,
   pushSubscriptions,
@@ -83,6 +84,7 @@ import {
   _memoryHospitalStaffProfiles,
   _memoryIncidentMessages,
   _memoryIncidentEvents,
+  _memoryMissionOffers,
   _memoryUsers,
 } from "../rescue.db";
 import { storagePut } from "../storage";
@@ -587,6 +589,104 @@ export const rescueRouter = router({
         const { selectIncidentCategory } = await import("../dispatch/dispatch");
         const result = await selectIncidentCategory(incidentId, input.category, ctx.user?.id ?? null);
         return { success: true, result };
+      }),
+    cancel: protectedProcedure
+      .input(
+        z.object({
+          publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/).optional(),
+          incidentId: z.number().int().positive().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        let incident = null;
+        if (input.incidentId) {
+          incident = await getIncidentById(input.incidentId);
+        } else if (input.publicCode) {
+          incident = await getIncidentByCode(input.publicCode);
+        }
+        if (!incident) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "SOS incident not found." });
+        }
+
+        // Ownership validation: Only the incident reporter or admin can cancel
+        if (incident.reporterId !== ctx.user.id && ctx.user.role !== "admin") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only the SOS reporter can cancel this emergency request.",
+          });
+        }
+
+        // Must still be in cancellable state (pending, not assigned to a rescuer)
+        if (incident.status !== "pending" || incident.assignedRescuerId !== null) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "SOS has already been assigned to a responder or resolved, and cannot be cancelled automatically.",
+          });
+        }
+
+        const now = new Date();
+        const db = await database();
+        if (db) {
+          try {
+            await withDbTimeout(
+              db
+                .update(incidents)
+                .set({
+                  status: "resolved",
+                  dispatchStatus: "resolved",
+                  resolvedAt: now,
+                  updatedAt: now,
+                })
+                .where(eq(incidents.id, incident.id)),
+              4000,
+              "cancel_incident"
+            );
+
+            // Cancel any active mission offers for this incident
+            await withDbTimeout(
+              db
+                .update(missionOffers)
+                .set({ status: "cancelled", respondedAt: now, updatedAt: now })
+                .where(and(eq(missionOffers.incidentId, incident.id), eq(missionOffers.status, "offered"))),
+              4000,
+              "cancel_incident_offers"
+            );
+          } catch (err) {
+            if (process.env.NODE_ENV === "production") {
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database operation failed in production" });
+            }
+          }
+        }
+
+        // Memory sync for testing / dev
+        const mem = _memoryIncidents.get(incident.id);
+        if (mem) {
+          mem.status = "resolved";
+          mem.dispatchStatus = "resolved";
+          mem.resolvedAt = now;
+          mem.updatedAt = now;
+          _memoryIncidents.set(incident.id, mem);
+        }
+
+        for (const [offerId, offer] of Array.from(_memoryMissionOffers.entries())) {
+          if (offer.incidentId === incident.id && offer.status === "offered") {
+            offer.status = "cancelled";
+            offer.respondedAt = now;
+            offer.updatedAt = now;
+            _memoryMissionOffers.set(offerId, offer);
+          }
+        }
+
+        await addIncidentEvent(
+          incident.id,
+          ctx.user.id,
+          "sos_cancelled",
+          "SOS Cancelled",
+          "Reporter cancelled the emergency request during the cancellation window."
+        );
+        await writeAudit(ctx.user.id, "incident.cancel", "incident", incident.id, `Cancelled SOS ${incident.publicCode}`);
+
+        return { success: true, publicCode: incident.publicCode, status: "resolved" as const };
       }),
     statusByCode: publicProcedure
       .input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) }))

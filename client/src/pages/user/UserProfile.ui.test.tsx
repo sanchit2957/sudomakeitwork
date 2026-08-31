@@ -133,6 +133,7 @@ describe("UserProfile & UserMore UI Component", () => {
     expect(markup).toContain("Tap to customize safety profile &amp; emergency contacts");
     expect(markup).toContain("Kamrup Metropolitan");
     expect(markup).toContain("O+");
-    expect(markup).toContain("Hospital registration");
+    expect(markup).toContain("Disaster Donations");
+    expect(markup).not.toContain("Hospital registration");
   });
 });
