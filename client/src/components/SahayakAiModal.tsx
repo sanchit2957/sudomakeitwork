@@ -1,4 +1,5 @@
 import { useLanguage } from "@/contexts/LanguageContext";
+import { getCurrentCoordinates } from "@/lib/nativeLocation";
 import { trpc } from "@/lib/trpc";
 import {
   Bot,
@@ -42,6 +43,7 @@ export function SahayakAiModal({ isOpen, onClose }: SahayakAiModalProps) {
   const [input, setInput] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [lastFailedMessage, setLastFailedMessage] = useState("");
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isListening, setIsListening] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -124,6 +126,17 @@ export function SahayakAiModal({ isOpen, onClose }: SahayakAiModalProps) {
       setTimeout(() => {
         inputRef.current?.focus();
       }, 200);
+
+      // Acquire user coordinates non-blockingly when modal is opened
+      if (!userLocation) {
+        getCurrentCoordinates({ enableHighAccuracy: false, timeout: 5000 })
+          .then(coords => {
+            setUserLocation({ lat: coords.latitude, lng: coords.longitude });
+          })
+          .catch(() => {
+            // Geolocation unavailable or denied; proceed gracefully without location
+          });
+      }
     }
   }, [isOpen]);
 
@@ -159,6 +172,7 @@ export function SahayakAiModal({ isOpen, onClose }: SahayakAiModalProps) {
           role: m.role,
           content: m.content,
         })),
+        userLocation: userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : null,
       });
 
       const assistantMessage: Message = {

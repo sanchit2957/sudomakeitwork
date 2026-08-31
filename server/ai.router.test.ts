@@ -54,4 +54,25 @@ describe("AI tRPC Router (ai.chat)", () => {
     expect(result).toBeDefined();
     expect(typeof result.reply).toBe("string");
   }, 60000);
+
+  it("accepts optional userLocation coordinates and forwards them", async () => {
+    const caller = createCaller({
+      user: null,
+      req: { cookies: {}, headers: {} } as any,
+      res: { cookie: vi.fn(), clearCookie: vi.fn() } as any,
+    });
+
+    const result = await caller.ai.chat({
+      message: "Where is the nearest hospital with an ICU bed?",
+      userLocation: { lat: 26.1445, lng: 91.7362 },
+    });
+
+    expect(result).toBeDefined();
+    expect(geminiService.generateSahayakResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Where is the nearest hospital with an ICU bed?",
+        userLocation: { lat: 26.1445, lng: 91.7362 },
+      })
+    );
+  });
 });

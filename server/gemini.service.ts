@@ -60,7 +60,7 @@ export function getSahayakRedirectMessage(language?: string): string {
   return SAHAYAK_REDIRECT_MESSAGES[langKey] || SAHAYAK_REDIRECT_MESSAGES.en;
 }
 
-export const SAHAYAK_SYSTEM_INSTRUCTIONS = `You are Sahayak AI, the official Assam Emergency & Disaster Response Assistant for the Assam Rescue Platform. You ONLY answer questions about flood safety, emergency preparedness, disaster response, weather/rain forecasts, river levels & gauge monitoring, hospitals/medical beds/ICU/oxygen, relief shelters, first aid, emergency helplines, and how to use this app's features (Rapid SOS, Voice Notes, Case Tracking, Live Flood & River Gauges, Safety Checklists, Hospital Portal, and Responder Dashboard). If a user asks anything unrelated (physics, math, coding, trivia, homework, entertainment, general knowledge, recipes, sports, politics, etc.), respond ONLY with: '${SAHAYAK_REDIRECT_MESSAGE}' Do not explain or entertain the off-topic subject even briefly. This applies even if the user insists or rephrases.`;
+export const SAHAYAK_SYSTEM_INSTRUCTIONS = `You are Sahayak AI, the official Assam Emergency & Disaster Response Assistant for the Assam Rescue Platform. You ONLY answer questions about flood safety, emergency preparedness, disaster response, weather/rain forecasts, river levels & gauge monitoring, hospitals/medical beds/ICU/oxygen, relief shelters, first aid, emergency helplines, and how to use this app's features (Rapid SOS, Voice Notes, Case Tracking, Live Flood & River Gauges, Safety Checklists, Hospital Portal, and Responder Dashboard). When finding hospitals or medical assistance and user location/coordinates are available, call the findNearbyHospitals tool with lat and lng coordinates, and present the nearest hospitals first including their distance in kilometres (e.g., "X.X km away"), address, phone, emergency beds, ICU beds, and oxygen capacity. Do NOT give a generic 108 helpline fallback message when real hospital data is available for their location. If a user asks anything unrelated (physics, math, coding, trivia, homework, entertainment, general knowledge, recipes, sports, politics, etc.), respond ONLY with: '${SAHAYAK_REDIRECT_MESSAGE}' Do not explain or entertain the off-topic subject even briefly. This applies even if the user insists or rephrases.`;
 
 export const DISASTER_KEYWORDS = [
   // River Levels & Gauges
@@ -318,6 +318,20 @@ export function isDisasterRelatedMessage(message: string): boolean {
   return DISASTER_KEYWORDS.some((kw) => normalized.includes(kw.toLowerCase()));
 }
 
+function calculateHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
+
 // Tool implementations using real application data
 export const realDataTools = {
   getCurrentWeatherAndFloodRisk: async (args?: { district?: string; latitude?: number; longitude?: number }) => {
@@ -376,7 +390,7 @@ export const realDataTools = {
     }
   },
 
-  findNearbyHospitals: async (args?: { district?: string; query?: string }) => {
+  findNearbyHospitals: async (args?: { district?: string; query?: string; lat?: number; lng?: number }) => {
     try {
       const allHospitals = await listHospitals();
       let filtered = allHospitals;
@@ -397,17 +411,36 @@ export const realDataTools = {
         );
       }
 
-      const results = filtered.slice(0, 5).map(h => ({
-        name: h.name,
-        address: h.address,
-        phone: h.contactPhone,
-        availableBeds: h.availableEmergencyBeds,
-        totalBeds: h.totalEmergencyBeds,
-        icuBeds: h.availableIcuBeds,
-        totalIcuBeds: h.totalIcuBeds,
-        oxygenCylinders: h.oxygenCylinderCount,
-        status: h.status,
-      }));
+      let mapped = filtered.map(h => {
+        let distanceKm: number | undefined = undefined;
+        if (
+          typeof args?.lat === "number" &&
+          typeof args?.lng === "number" &&
+          typeof h.latitude === "number" &&
+          typeof h.longitude === "number"
+        ) {
+          distanceKm = calculateHaversineDistanceKm(args.lat, args.lng, h.latitude, h.longitude);
+        }
+
+        return {
+          name: h.name,
+          address: h.address,
+          phone: h.contactPhone,
+          availableBeds: h.availableEmergencyBeds,
+          totalBeds: h.totalEmergencyBeds,
+          icuBeds: h.availableIcuBeds,
+          totalIcuBeds: h.totalIcuBeds,
+          oxygenCylinders: h.oxygenCylinderCount,
+          status: h.status,
+          distanceKm,
+        };
+      });
+
+      if (typeof args?.lat === "number" && typeof args?.lng === "number") {
+        mapped.sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+      }
+
+      const results = mapped.slice(0, 5);
 
       return {
         success: true,
@@ -525,12 +558,14 @@ const geminiFunctionDeclarations: FunctionDeclaration[] = [
   },
   {
     name: "findNearbyHospitals",
-    description: "Find real registered hospitals and medical centers in Assam with live bed availability, ICU capacity, oxygen cylinders, and contact numbers.",
+    description: "Find real registered hospitals and medical centers in Assam with live bed availability, ICU capacity, oxygen cylinders, contact numbers, and distance when coordinates are provided.",
     parameters: {
       type: Type.OBJECT,
       properties: {
         district: { type: Type.STRING, description: "District to filter by (e.g. Kamrup Metro, Cachar, Dibrugarh, etc.)" },
         query: { type: Type.STRING, description: "Search term for hospital name or department" },
+        lat: { type: Type.NUMBER, description: "Optional user latitude coordinate for proximity sorting" },
+        lng: { type: Type.NUMBER, description: "Optional user longitude coordinate for proximity sorting" },
       },
     },
   },
@@ -625,6 +660,7 @@ export interface ChatMessage {
 export interface GenerateChatResponseOptions {
   message: string;
   language?: string;
+  userLocation?: { lat: number; lng: number } | null;
   history?: ChatMessage[];
   conversationId?: string;
 }
@@ -824,15 +860,19 @@ Stay alert and move to higher ground if heavy rain continues. Dial 112 / 1070 fo
     normalized.includes("अस्पताल")
   ) {
     try {
-      const hospData = await realDataTools.findNearbyHospitals({ district: matchedDistrict });
+      const hospData = await realDataTools.findNearbyHospitals({
+        district: matchedDistrict,
+        lat: options.userLocation?.lat,
+        lng: options.userLocation?.lng,
+      });
       if (hospData.hospitals && hospData.hospitals.length > 0) {
         const listStr = hospData.hospitals
           .map(
             (h, i) =>
-              `${i + 1}. **${h.name}**\n   📍 ${h.address}\n   📞 ${h.phone || "108 (Ambulance)"}\n   🛏️ Emergency Beds: ${h.availableBeds}/${h.totalBeds} | ICU: ${h.icuBeds}/${h.totalIcuBeds} | 💨 Oxygen: ${h.oxygenCylinders}`
+              `${i + 1}. **${h.name}**${h.distanceKm !== undefined ? ` (${h.distanceKm} km away)` : ""}\n   📍 ${h.address}\n   📞 ${h.phone || "108 (Ambulance)"}\n   🛏️ Emergency Beds: ${h.availableBeds}/${h.totalBeds} | ICU: ${h.icuBeds}/${h.totalIcuBeds} | 💨 Oxygen: ${h.oxygenCylinders}`
           )
           .join("\n\n");
-        return `🏥 **Assam Hospital Bed & Medical Availability (${matchedDistrict})**:\n\n${listStr}\n\n🚑 **For immediate medical emergencies or ambulance dispatch, call 108.**`;
+        return `🏥 **Assam Hospital Bed & Medical Availability (${matchedDistrict || "Nearest"})**:\n\n${listStr}\n\n🚑 **For immediate medical emergencies or ambulance dispatch, call 108.**`;
       }
     } catch {
       // ignore
@@ -974,7 +1014,13 @@ export async function generateSahayakResponse(options: GenerateChatResponseOptio
       if (functionName === "getCurrentWeatherAndFloodRisk") {
         toolResult = await realDataTools.getCurrentWeatherAndFloodRisk(functionArgs);
       } else if (functionName === "findNearbyHospitals") {
-        toolResult = await realDataTools.findNearbyHospitals(functionArgs);
+        const toolLat = typeof functionArgs.lat === "number" ? functionArgs.lat : options.userLocation?.lat;
+        const toolLng = typeof functionArgs.lng === "number" ? functionArgs.lng : options.userLocation?.lng;
+        toolResult = await realDataTools.findNearbyHospitals({
+          ...functionArgs,
+          lat: toolLat,
+          lng: toolLng,
+        });
       } else if (functionName === "getReliefShelters") {
         toolResult = await realDataTools.getReliefShelters(functionArgs);
       } else if (functionName === "getEmergencyHelplines") {

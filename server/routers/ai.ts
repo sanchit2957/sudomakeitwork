@@ -31,6 +31,13 @@ export const aiRouter = router({
           .max(2000, "Message is too long. Please keep it under 2000 characters."),
         language: z.string().optional(),
         conversationId: z.string().optional(),
+        userLocation: z
+          .object({
+            lat: z.number(),
+            lng: z.number(),
+          })
+          .nullable()
+          .optional(),
         history: z
           .array(
             z.object({
@@ -51,6 +58,7 @@ export const aiRouter = router({
         message: input.message.trim(),
         language: input.language,
         conversationId: input.conversationId,
+        userLocation: input.userLocation,
         history: input.history,
       });
 

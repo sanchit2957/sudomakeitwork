@@ -12,6 +12,10 @@ vi.mock("@/contexts/LanguageContext", () => ({
   useLanguage: () => ({ locale: "as", t: (key: string) => key }),
 }));
 
+vi.mock("@/lib/nativeLocation", () => ({
+  getCurrentCoordinates: vi.fn().mockResolvedValue({ latitude: 26.1445, longitude: 91.7362 }),
+}));
+
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     ai: {
@@ -61,11 +65,13 @@ describe("SahayakAiModal component", () => {
     const promptChip = screen.getByText("Flood safety");
     fireEvent.click(promptChip);
 
-    expect(mockMutateAsync).toHaveBeenCalledWith({
-      message: "Flood safety",
-      language: "as",
-      history: [{ role: "user", content: "Flood safety" }],
-    });
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Flood safety",
+        language: "as",
+        history: [{ role: "user", content: "Flood safety" }],
+      })
+    );
 
     await waitFor(() => {
       expect(screen.getByText("For flood safety, move to high ground immediately and avoid floodwater.")).toBeTruthy();
@@ -81,11 +87,13 @@ describe("SahayakAiModal component", () => {
     const sendBtn = screen.getByRole("button", { name: "Send message" });
     fireEvent.click(sendBtn);
 
-    expect(mockMutateAsync).toHaveBeenCalledWith({
-      message: "Where is the nearest shelter?",
-      language: "as",
-      history: [{ role: "user", content: "Where is the nearest shelter?" }],
-    });
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Where is the nearest shelter?",
+        language: "as",
+        history: [{ role: "user", content: "Where is the nearest shelter?" }],
+      })
+    );
   });
 
   it("calls onClose when close button is clicked", () => {

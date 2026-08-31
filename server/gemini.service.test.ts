@@ -102,6 +102,19 @@ describe("Sahayak AI Gemini Service & Guardrails", () => {
     expect(Array.isArray(data.hospitals)).toBe(true);
   });
 
+  it("calculates distance and sorts hospitals nearest-first when user coordinates are supplied", async () => {
+    const data = await realDataTools.findNearbyHospitals({ lat: 26.1445, lng: 91.7362 });
+    expect(data.success).toBe(true);
+    expect(data.hospitals.length).toBeGreaterThan(0);
+    expect(data.hospitals[0].distanceKm).toBeDefined();
+    expect(typeof data.hospitals[0].distanceKm).toBe("number");
+    
+    // Ensure sorted nearest first
+    if (data.hospitals.length > 1) {
+      expect(data.hospitals[0].distanceKm!).toBeLessThanOrEqual(data.hospitals[1].distanceKm!);
+    }
+  });
+
   it("retrieves official Assam disaster helplines including 112 and 1070", async () => {
     const data = await realDataTools.getEmergencyHelplines();
     expect(data.success).toBe(true);
