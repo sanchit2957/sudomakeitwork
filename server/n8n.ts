@@ -168,6 +168,8 @@ export function registerN8nRoutes(app: Express) {
         matchingAttempts: 0,
         escalatedToCommandAt: null,
         assignedRescuerId: null,
+        destinationHospitalId: null,
+        destinationHospitalName: null,
         dispatchedAt: null,
         resolvedAt: null,
         createdAt: now,

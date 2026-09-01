@@ -123,6 +123,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "responder.role": "Field responder",
     "responder.missions": "My missions",
     "responder.map": "Field map",
+    "responder.hospitals": "Nearby hospitals",
     "responder.alerts": "Alerts",
     "responder.readiness": "Field readiness",
     "responder.available": "Available",

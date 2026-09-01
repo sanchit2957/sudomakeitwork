@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
 import {
   auditLogs,
   floodZones,
@@ -129,8 +129,8 @@ export interface MemoryIncident {
   matchingAttempts: number;
   escalatedToCommandAt: Date | null;
   assignedRescuerId: number | null;
-  destinationHospitalId?: number | null;
-  destinationHospitalName?: string | null;
+  destinationHospitalId: number | null;
+  destinationHospitalName: string | null;
   dispatchedAt: Date | null;
   resolvedAt: Date | null;
   escalationLevel?: number;
@@ -442,6 +442,8 @@ export const _memoryIncidents: Map<number, MemoryIncident> = new Map([
       matchingAttempts: 0,
       escalatedToCommandAt: null,
       assignedRescuerId: null,
+      destinationHospitalId: null,
+      destinationHospitalName: null,
       dispatchedAt: null,
       resolvedAt: null,
       createdAt: new Date(Date.now() - 45 * 60 * 1000),
@@ -952,20 +954,23 @@ export async function listRescuerRegistrationRequests() {
 }
 
 export async function listNotificationFeed(recipientId: number) {
+  const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
   try {
     const db = await database();
     return await withDbTimeout(
       db
         .select()
         .from(notifications)
-        .where(eq(notifications.recipientId, recipientId))
+        .where(and(eq(notifications.recipientId, recipientId), gte(notifications.createdAt, cutoff24h)))
         .orderBy(desc(notifications.createdAt)),
       4000,
       "listNotificationFeed"
     );
   } catch (error) {
     failClosedInProduction(error);
-    return _memoryNotifications.filter(n => n.recipientId === recipientId);
+    return _memoryNotifications.filter(
+      n => n.recipientId === recipientId && new Date(n.createdAt).getTime() >= cutoff24h.getTime()
+    );
   }
 }
 
@@ -1113,17 +1118,29 @@ export async function getAvailableRescuersNear(latitude: number, longitude: numb
 }
 
 export async function unreadNotificationCount(recipientId: number) {
+  const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
   try {
     const db = await database();
     const result = await withDbTimeout(
-      db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.recipientId, recipientId), isNull(notifications.readAt))),
+      db
+        .select({ id: notifications.id })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.recipientId, recipientId),
+            isNull(notifications.readAt),
+            gte(notifications.createdAt, cutoff24h)
+          )
+        ),
       4000,
       "unreadNotificationCount"
     );
     return result.length;
   } catch (error) {
     failClosedInProduction(error);
-    return _memoryNotifications.filter(n => n.recipientId === recipientId && !n.readAt).length;
+    return _memoryNotifications.filter(
+      n => n.recipientId === recipientId && !n.readAt && new Date(n.createdAt).getTime() >= cutoff24h.getTime()
+    ).length;
   }
 }
 
