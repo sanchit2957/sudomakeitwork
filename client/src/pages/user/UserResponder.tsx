@@ -145,6 +145,12 @@ function ResponderWorkspace() {
 
   const lastNotifiedOfferIdRef = useRef<number | null>(null);
   const lastNotifiedAlertIdRef = useRef<number | null>(null);
+  const sessionMaxIncidentIdRef = useRef<number | null>(null);
+  const resolvedOfferIdsRef = useRef<Set<number>>(new Set());
+
+  if (sessionMaxIncidentIdRef.current === null && profile.data?.sessionMaxIncidentId !== undefined) {
+    sessionMaxIncidentIdRef.current = profile.data.sessionMaxIncidentId;
+  }
 
   useEffect(() => {
     const refresh = () => refreshOperationalState();
@@ -169,6 +175,14 @@ function ResponderWorkspace() {
       setPushDetail(t("Browser permission is granted. Finish setup to securely register this device for delivery."));
     }
   }, []);
+
+  useEffect(() => {
+    if (pushConfig.isSuccess && !Capacitor.isNativePlatform()) {
+      if (Notification.permission === "default" || (Notification.permission === "granted" && pushState !== "subscribed")) {
+        void enableAlerts();
+      }
+    }
+  }, [pushConfig.isSuccess]);
 
   // Generic alerts feed effect: fires once per unique unread alert ID, not on every polling cycle.
   // The emergency mission offer takes priority over this generic feed — it is handled separately.
@@ -365,7 +379,12 @@ function ResponderWorkspace() {
   return (
     <DashboardLayout navItems={nav} workspace={t("responder.workspace")} roleLabel={t("responder.role")}>
       <div className="space-y-6">
-        {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && (
+        {activeOffer.data?.hasOffer && 
+         activeOffer.data.offer && 
+         activeOffer.data.incident && 
+         sessionMaxIncidentIdRef.current !== null &&
+         activeOffer.data.incident.id > sessionMaxIncidentIdRef.current &&
+         !resolvedOfferIdsRef.current.has(activeOffer.data.offer.id) && (
           <div
             role="dialog"
             aria-modal="true"
@@ -379,9 +398,11 @@ function ResponderWorkspace() {
                   incident: activeOffer.data.incident,
                 }}
                 onAccepted={() => {
+                  resolvedOfferIdsRef.current.add(activeOffer.data.offer!.id);
                   refreshOperationalState();
                 }}
                 onDeclined={() => {
+                  resolvedOfferIdsRef.current.add(activeOffer.data.offer!.id);
                   refreshOperationalState();
                 }}
               />
@@ -410,7 +431,7 @@ function ResponderWorkspace() {
           />
         ) : (
           <>
-            <section className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
+            <section className={`grid gap-5 ${pushState === "subscribed" || Capacitor.isNativePlatform() ? "" : "lg:grid-cols-[1.25fr_0.75fr]"}`}>
               <div className="rounded-3xl bg-[#174e46] p-6 text-white shadow-[0_20px_60px_-30px_rgb(21_78_70/0.75)]">
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b1dbd1]">
                   {t("responder.readiness")}
@@ -459,20 +480,22 @@ function ResponderWorkspace() {
                   ))}
                 </div>
               </div>
-              <AlertSetup
-                unread={alerts.data?.unread ?? 0}
-                state={pushState}
-                detail={pushDetail}
-                disabled={subscribePush.isPending || pushState === "subscribed"}
-                onEnable={enableAlerts}
-              />
+              {pushState !== "subscribed" && !Capacitor.isNativePlatform() && typeof Notification !== "undefined" && Notification.permission === "default" && (
+                <AlertSetup
+                  unread={alerts.data?.unread ?? 0}
+                  state={pushState}
+                  detail={pushDetail}
+                  disabled={subscribePush.isPending}
+                  onEnable={enableAlerts}
+                />
+              )}
             </section>
             <BleEmergencyRadar
               rescuerLatitude={profile.data?.lastLatitude || undefined}
               rescuerLongitude={profile.data?.lastLongitude || undefined}
             />
             <ResponderProfileCard
-              profile={profile.data ?? null}
+              profile={profile.data ? { ...profile.data, callSign: profile.data.callSign ?? "" } : null}
               hasActiveMission={hasActiveMission}
               saving={updateProfile.isPending}
               onSave={input => updateProfile.mutate(input)}
@@ -1599,7 +1622,7 @@ function PageHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
 function ResponderMissionChat({
   missions,
 }: {
-  missions: Array<{ mission: { id: number; status: string }; incident: { publicCode: string } }>;
+  missions: Array<{ mission: { id: number; status: string }; incident: { publicCode: string; voiceNoteUrl?: string | null } }>;
 }) {
   const active = missions.find(({ mission }) => mission.status !== "resolved") || missions[0];
   const [message, setMessage] = useState("");
@@ -1626,6 +1649,16 @@ function ResponderMissionChat({
           <h2 className="mt-1 text-lg font-extrabold">{active.incident.publicCode}</h2>
         </div>
       </div>
+      
+      {active.incident.voiceNoteUrl && (
+        <div className="mt-4 rounded-2xl bg-amber-50 p-4 border border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/40">
+          <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" /> Attached Emergency Voice Note
+          </p>
+          <audio controls src={active.incident.voiceNoteUrl} className="h-10 w-full" />
+        </div>
+      )}
+
       <div className="mt-4 max-h-44 space-y-2 overflow-y-auto rounded-2xl bg-[#f7faf9] p-3 dark:bg-muted/40">
         {thread.data?.length ? (
           thread.data.map(item => (

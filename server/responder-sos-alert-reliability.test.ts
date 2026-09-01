@@ -71,7 +71,7 @@ function seedOffer(id: number, rescuerId: number, incidentId: number, expiresAt:
     rescuerId,
     distanceKm: 2.5,
     matchScore: 900,
-    status: "offered" as const,
+    status: "offered" as "offered" | "accepted" | "declined" | "expired",
     offeredAt: new Date(expiresAt.getTime() - RESPONDER_OFFER_WINDOW_MS),
     expiresAt,
     respondedAt: null,

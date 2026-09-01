@@ -2722,7 +2722,18 @@ export const rescueRouter = router({
         );
         return { success: true };
       }),
-    profile: rescuerProcedure.query(({ ctx }) => getRescuerProfile(ctx.user.id)),
+    profile: rescuerProcedure.query(async ({ ctx }) => {
+      const profile = await getRescuerProfile(ctx.user.id);
+      const db = await import("../db").then(m => m.getDb());
+      let sessionMaxIncidentId = 0;
+      if (db) {
+        const { max } = await import("drizzle-orm");
+        const { incidents } = await import("../../drizzle/schema");
+        const result = await db.select({ maxId: max(incidents.id) }).from(incidents);
+        sessionMaxIncidentId = result[0]?.maxId || 0;
+      }
+      return { ...profile, sessionMaxIncidentId };
+    }),
     activeOffer: rescuerProcedure.query(async ({ ctx }) => {
       const { getActiveOfferForRescuer } = await import("../rescue.db");
       const offerData = await getActiveOfferForRescuer(ctx.user.id);
@@ -2748,6 +2759,8 @@ export const rescueRouter = router({
           severity: offerData.incident.severity,
           peopleAffected: offerData.incident.peopleAffected,
           notes: offerData.incident.notes,
+          voiceNoteUrl: (offerData.incident as any).voiceNoteUrl || null,
+          createdAt: offerData.incident.createdAt,
         },
       };
     }),

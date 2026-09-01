@@ -38,24 +38,27 @@ export function getApiBaseUrl(): string {
     }
   }
 
-  // 2. If running inside native mobile app (Capacitor Android/iOS), ALWAYS use hosted production API
+  // 2. Check build-time environment variable
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (typeof envUrl === "string" && envUrl.trim().length > 0) {
+    return envUrl.trim().replace(/\/+$/, "");
+  }
+
+  // 3. If running inside native mobile app (Capacitor Android/iOS), use production API
   if (isNativeApp()) {
+    if (import.meta.env.DEV) {
+      return "http://10.0.2.2:3000";
+    }
     return DEFAULT_PRODUCTION_API_URL;
   }
 
-  // 3. In browser development mode on localhost (vite dev server), use relative URLs for dev proxy
+  // 4. In browser development mode on localhost (vite dev server), use relative URLs for dev proxy
   if (
     import.meta.env.DEV &&
     typeof window !== "undefined" &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
   ) {
     return "";
-  }
-
-  // 4. Check build-time environment variable
-  const envUrl = import.meta.env.VITE_API_URL;
-  if (typeof envUrl === "string" && envUrl.trim().length > 0) {
-    return envUrl.trim().replace(/\/+$/, "");
   }
 
   // 5. In production web deployment on standard hosting, relative URLs are standard
