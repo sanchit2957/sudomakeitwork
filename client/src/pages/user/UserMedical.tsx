@@ -1,13 +1,12 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { RoleGate } from "@/components/RoleGate";
-import { SafetyAssistanceQueue } from "@/components/SafetyAssistanceQueue";
 import { HospitalStaffDashboard } from "@/components/HospitalStaffDashboard";
 import DashboardLayout, { type WorkspaceNavItem } from "@/components/DashboardLayout";
 import OperationsMap from "@/components/OperationsMap";
 import { Button } from "@/components/ui/button";
 import { HospitalManager } from "@/pages/Command";
 import { trpc } from "@/lib/trpc";
-import { Building2, CheckCircle2, Hospital, MapPinned, ShieldCheck, UserPlus, HeartPulse, XCircle } from "lucide-react";
+import { Building2, CheckCircle2, Hospital, MapPinned, ShieldCheck, UserPlus, XCircle } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function UserMedical() { return <RoleGate roles={["medical", "admin"]}><MedicalWorkspace /></RoleGate>; }
@@ -15,12 +14,12 @@ export default function UserMedical() { return <RoleGate roles={["medical", "adm
 function MedicalWorkspace() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const nav: WorkspaceNavItem[] = [{ label: user?.role === "admin" ? "Hospital resources" : "My hospital dashboard", path: "/medical", icon: Hospital }, { label: "Medical safety requests", path: "/medical/safety", icon: HeartPulse }, { label: "Operations map", path: "/medical/map", icon: MapPinned }, ...(user?.role === "admin" ? [{ label: "Hospital approvals", path: "/medical/access", icon: UserPlus }] : [])];
+  const nav: WorkspaceNavItem[] = [{ label: user?.role === "admin" ? "Hospital resources" : "My hospital dashboard", path: "/medical", icon: Hospital }, { label: "Operations map", path: "/medical/map", icon: MapPinned }, ...(user?.role === "admin" ? [{ label: "Hospital approvals", path: "/medical/access", icon: UserPlus }] : [])];
   const live = { refetchInterval: 6_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const hospitals = trpc.rescue.operations.hospitals.useQuery(undefined, live);
   const myHospital = trpc.rescue.operations.myHospital.useQuery(undefined, { ...live, enabled: user?.role === "medical" });
   const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, { refetchInterval: 12_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true });
-  return <DashboardLayout navItems={nav} workspace="Operations App" roleLabel={user?.role === "admin" ? "Government coordinator" : "Approved hospital staff"} desktopSidebar="fixed">{location === "/medical/map" ? <section><p className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-primary">Shared operating picture</p><h1 className="mt-1 text-2xl font-extrabold">Hospital and response map</h1><div className="mt-5"><OperationsMap layers={layers.data} /></div></section> : location === "/medical/safety" ? <SafetyAssistanceQueue title="Medical safety requests" description="Approved hospital staff see only medical-support requests from the Victim App. Acknowledge when a clinic, mobile team, medicine supply, or transport response is being coordinated." guidance={["Confirm available beds, transport, medicine, or mobile-team capacity before acknowledging.", "Escalate immediate life-threatening danger to the SOS command flow rather than treating it as a safety request.", "Publish hospital capacity changes before marking a request resolved."]} /> : location === "/medical/access" && user?.role === "admin" ? <HospitalApprovals /> : user?.role === "admin" ? <HospitalManager hospitals={hospitals.data || []} layers={layers.data} /> : <HospitalStaffDashboard hospital={myHospital.data} />}</DashboardLayout>;
+  return <DashboardLayout navItems={nav} workspace="Operations App" roleLabel={user?.role === "admin" ? "Government coordinator" : "Approved hospital staff"} desktopSidebar="fixed">{location === "/medical/map" ? <section><p className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-primary">Shared operating picture</p><h1 className="mt-1 text-2xl font-extrabold">Hospital and response map</h1><div className="mt-5"><OperationsMap layers={layers.data} /></div></section> : location === "/medical/access" && user?.role === "admin" ? <HospitalApprovals /> : user?.role === "admin" ? <HospitalManager hospitals={hospitals.data || []} layers={layers.data} /> : <HospitalStaffDashboard hospital={myHospital.data} />}</DashboardLayout>;
 }
 
 function HospitalApprovals() {

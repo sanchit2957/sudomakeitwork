@@ -1,6 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { RoleGate } from "@/components/RoleGate";
-import { SafetyAssistanceQueue } from "@/components/SafetyAssistanceQueue";
 import { HospitalStaffDashboard } from "@/components/HospitalStaffDashboard";
 import DashboardLayout, { type WorkspaceNavItem } from "@/components/DashboardLayout";
 import OperationsMap from "@/components/OperationsMap";
@@ -8,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { HospitalManager } from "@/pages/Command";
 import HospitalRegistration from "@/pages/HospitalRegistration";
 import { trpc } from "@/lib/trpc";
-import { Building2, CheckCircle2, Hospital, MapPinned, ShieldCheck, UserPlus, HeartPulse, XCircle } from "lucide-react";
+import { Building2, CheckCircle2, Hospital, MapPinned, ShieldCheck, UserPlus, XCircle } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function HospitalPortal() {
@@ -28,7 +27,6 @@ function HospitalWorkspace() {
   const { user } = useAuth();
   const nav: WorkspaceNavItem[] = [
     { label: user?.role === "admin" ? "Hospital Overview" : "Hospital Command Desk", path: "/hospital", icon: Hospital },
-    { label: "Emergency Safety Requests", path: "/hospital/safety", icon: HeartPulse },
     { label: "Operations Map", path: "/hospital/map", icon: MapPinned },
     ...(user?.role === "admin" ? [{ label: "Hospital Approvals", path: "/hospital/access", icon: UserPlus }] : []),
   ];
@@ -55,16 +53,6 @@ function HospitalWorkspace() {
             <OperationsMap layers={layers.data} />
           </div>
         </section>
-      ) : location === "/hospital/safety" ? (
-        <SafetyAssistanceQueue
-          title="Medical Safety Requests"
-          description="Approved hospital staff see triage and medical assistance requests. Coordinate triage, transport, or mobile medical units."
-          guidance={[
-            "Confirm available emergency beds, oxygen, and ambulances before acknowledging.",
-            "Escalate immediate life-threatening danger to the emergency rescue dispatch flow.",
-            "Publish hospital capacity changes when admissions occur.",
-          ]}
-        />
       ) : location === "/hospital/access" && user?.role === "admin" ? (
         <HospitalApprovals />
       ) : user?.role === "admin" ? (
