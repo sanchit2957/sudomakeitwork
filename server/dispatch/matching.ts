@@ -3,7 +3,7 @@
  * Queries and ranks available responders for an incident target.
  */
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { getDb, withDbTimeout } from "../db";
 import { missions, rescuerCapabilities, rescueProfiles, users } from "../../drizzle/schema";
 import {
@@ -40,7 +40,7 @@ export async function getRescuerCandidates(): Promise<RescuerCandidate[]> {
           })
           .from(rescueProfiles)
           .innerJoin(users, eq(rescueProfiles.userId, users.id))
-          .where(and(eq(users.role, "rescuer"), eq(users.status, "active"))),
+          .where(and(eq(users.role, "rescuer"), or(eq(users.status, "active"), isNull(users.status)))),
         4000,
         "getRescuerCandidates_roster"
       );

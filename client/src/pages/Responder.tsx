@@ -174,7 +174,8 @@ function ResponderWorkspace() {
   }, [alerts.data]);
 
   useEffect(() => {
-    if (!hasActiveMission || !navigator.geolocation) return;
+    const isAvailable = profile.data?.availability === "available";
+    if ((!isAvailable && !hasActiveMission) || !navigator.geolocation) return;
     let sending = false;
     const publishLocation = () => {
       if (sending) return;
@@ -194,7 +195,7 @@ function ResponderWorkspace() {
     publishLocation();
     const intervalId = window.setInterval(publishLocation, 5_000);
     return () => window.clearInterval(intervalId);
-  }, [hasActiveMission]);
+  }, [profile.data?.availability, hasActiveMission]);
 
   const enableAlerts = async () => {
     if (!pushConfig.data?.enabled || !pushConfig.data.publicKey) {
@@ -272,6 +273,19 @@ function ResponderWorkspace() {
   return (
     <DashboardLayout navItems={nav} workspace={t("responder.workspace")} roleLabel={t("responder.role")}>
       <div className="space-y-6">
+        {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && (
+          <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+            <EmergencyOfferCard
+              data={activeOffer.data as any}
+              onAccepted={() => {
+                void refreshOperationalState();
+              }}
+              onDeclined={() => {
+                void refreshOperationalState();
+              }}
+            />
+          </div>
+        )}
         {location === "/responder/map" ? (
           <section>
             <PageHeading eyebrow={t("responder.map")} title={t("responder.mapTitle")} />
@@ -355,19 +369,6 @@ function ResponderWorkspace() {
               rescuerLatitude={profile.data?.lastLatitude || undefined}
               rescuerLongitude={profile.data?.lastLongitude || undefined}
             />
-            {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && (
-              <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                <EmergencyOfferCard
-                  data={activeOffer.data as any}
-                  onAccepted={() => {
-                    void refreshOperationalState();
-                  }}
-                  onDeclined={() => {
-                    void refreshOperationalState();
-                  }}
-                />
-              </div>
-            )}
             <ResponderProfileCard
               profile={profile.data ?? null}
               hasActiveMission={hasActiveMission}

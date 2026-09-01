@@ -1500,7 +1500,7 @@ export async function getActiveOfferForRescuer(rescuerId: number) {
       4000,
       "getActiveOfferForRescuer"
     );
-    if (rows.length > 0 && rows[0].offer.expiresAt.getTime() > now.getTime()) {
+    if (rows.length > 0 && new Date(rows[0].offer.expiresAt).getTime() > now.getTime()) {
       return rows[0];
     }
   } catch (error) {
@@ -1508,7 +1508,7 @@ export async function getActiveOfferForRescuer(rescuerId: number) {
   }
 
   const activeOffer = Array.from(_memoryMissionOffers.values()).find(
-    o => o.rescuerId === rescuerId && o.status === "offered" && o.expiresAt.getTime() > now.getTime()
+    o => o.rescuerId === rescuerId && o.status === "offered" && new Date(o.expiresAt).getTime() > now.getTime()
   );
   if (!activeOffer) return null;
   const incident = _memoryIncidents.get(activeOffer.incidentId);

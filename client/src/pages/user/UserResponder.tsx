@@ -173,7 +173,8 @@ function ResponderWorkspace() {
   }, [alerts.data]);
 
   useEffect(() => {
-    if (!hasActiveMission || !navigator.geolocation) return;
+    const isAvailable = profile.data?.availability === "available";
+    if ((!isAvailable && !hasActiveMission) || !navigator.geolocation) return;
     let sending = false;
     const publishLocation = () => {
       if (sending) return;
@@ -193,7 +194,7 @@ function ResponderWorkspace() {
     publishLocation();
     const intervalId = window.setInterval(publishLocation, 5_000);
     return () => window.clearInterval(intervalId);
-  }, [hasActiveMission]);
+  }, [profile.data?.availability, hasActiveMission]);
 
   const enableAlerts = async () => {
     if (!pushConfig.data?.enabled || !pushConfig.data.publicKey) {
@@ -275,6 +276,22 @@ function ResponderWorkspace() {
   return (
     <DashboardLayout navItems={nav} workspace={t("responder.workspace")} roleLabel={t("responder.role")}>
       <div className="space-y-6">
+        {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && (
+          <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+            <EmergencyOfferCard
+              data={{
+                offer: activeOffer.data.offer,
+                incident: activeOffer.data.incident,
+              }}
+              onAccepted={() => {
+                refreshOperationalState();
+              }}
+              onDeclined={() => {
+                refreshOperationalState();
+              }}
+            />
+          </div>
+        )}
         {location === "/responder/map" ? (
           <section>
             <PageHeading eyebrow={t("responder.map")} title={t("responder.mapTitle")} />
@@ -297,20 +314,6 @@ function ResponderWorkspace() {
           />
         ) : (
           <>
-            {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && (
-              <EmergencyOfferCard
-                data={{
-                  offer: activeOffer.data.offer,
-                  incident: activeOffer.data.incident,
-                }}
-                onAccepted={() => {
-                  refreshOperationalState();
-                }}
-                onDeclined={() => {
-                  refreshOperationalState();
-                }}
-              />
-            )}
             <section className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
               <div className="rounded-3xl bg-[#174e46] p-6 text-white shadow-[0_20px_60px_-30px_rgb(21_78_70/0.75)]">
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b1dbd1]">

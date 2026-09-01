@@ -98,15 +98,15 @@ export function evaluateCapabilityScore(
   const rescuerCategory = profile?.category?.toLowerCase();
   const callSign = (profile?.callSign || "").toLowerCase();
 
-  if (rescuerCategory === "medical" || callSign.includes("med") || callSign.includes("doctor")) {
+  if (rescuerCategory === "medical" || callSign.includes("med") || callSign.includes("doctor") || callSign.includes("nurse") || callSign.includes("health")) {
     activeCaps.add("medical");
   }
-  if (rescuerCategory === "boat" || callSign.includes("boat") || callSign.includes("ndrf") || callSign.includes("sdrf")) {
+  if (rescuerCategory === "boat" || callSign.includes("boat") || callSign.includes("ship") || callSign.includes("ndrf") || callSign.includes("sdrf") || callSign.includes("water") || callSign.includes("marine")) {
     activeCaps.add("flood_rescue");
     activeCaps.add("trapped_rescue");
     activeCaps.add("evacuation");
   }
-  if (rescuerCategory === "ground-team") {
+  if (rescuerCategory === "ground-team" || !rescuerCategory) {
     activeCaps.add("general_emergency");
     activeCaps.add("trapped_rescue");
     activeCaps.add("evacuation");
@@ -116,6 +116,9 @@ export function evaluateCapabilityScore(
     case "medical": {
       if (activeCaps.has("medical")) {
         return { compatible: true, capabilityScore: 1000, matchedCapability: "medical" };
+      }
+      if (activeCaps.has("general_emergency") || activeCaps.size === 0) {
+        return { compatible: true, capabilityScore: 500, matchedCapability: "general_emergency" };
       }
       return { compatible: false, capabilityScore: 0, matchedCapability: null };
     }
@@ -130,10 +133,10 @@ export function evaluateCapabilityScore(
       if (activeCaps.has("evacuation")) {
         return { compatible: true, capabilityScore: 800, matchedCapability: "evacuation" };
       }
-      if (activeCaps.has("general_emergency")) {
+      if (activeCaps.has("general_emergency") || activeCaps.size === 0) {
         return { compatible: true, capabilityScore: 500, matchedCapability: "general_emergency" };
       }
-      return { compatible: false, capabilityScore: 0, matchedCapability: null };
+      return { compatible: true, capabilityScore: 400, matchedCapability: "rescue" };
     }
     case "emergency":
     default: {
@@ -144,8 +147,7 @@ export function evaluateCapabilityScore(
         const first = Array.from(activeCaps)[0];
         return { compatible: true, capabilityScore: 800, matchedCapability: first };
       }
-      // If candidate has no explicitly registered capability, they are not compatible
-      return { compatible: false, capabilityScore: 0, matchedCapability: null };
+      return { compatible: true, capabilityScore: 500, matchedCapability: "general_emergency" };
     }
   }
 }
@@ -190,27 +192,18 @@ export function scoreCandidate(
     };
   }
 
-  // 3. Location Presence & Freshness
-  const { lastLatitude, lastLongitude, locationUpdatedAt } = candidate.profile;
-  if (lastLatitude === null || lastLongitude === null || !Number.isFinite(lastLatitude) || !Number.isFinite(lastLongitude)) {
-    return {
-      score: 0,
-      distanceKm: Infinity,
-      isEligible: false,
-      breakdown: { capabilityScore: 0, distanceScore: 0, freshnessScore: 0, workloadScore: 0, severityScore: 0 },
-      reason: "No GPS location coordinates available",
-    };
-  }
+  // 3. Location Presence & Freshness (with graceful fallback for active responders)
+  let lastLatitude = candidate.profile.lastLatitude;
+  let lastLongitude = candidate.profile.lastLongitude;
+  const locationUpdatedAt = candidate.profile.locationUpdatedAt;
 
-  const locationAgeMs = locationUpdatedAt ? Math.max(0, currentTime.getTime() - new Date(locationUpdatedAt).getTime()) : STALE_LOCATION_MAX_AGE_MS;
-  if (locationAgeMs > STALE_LOCATION_MAX_AGE_MS) {
-    return {
-      score: 0,
-      distanceKm: Infinity,
-      isEligible: false,
-      breakdown: { capabilityScore: 0, distanceScore: 0, freshnessScore: 0, workloadScore: 0, severityScore: 0 },
-      reason: "Location coordinates are excessively stale (>24 hours)",
-    };
+  let locationAgeMs = 0;
+  if (lastLatitude === null || lastLongitude === null || !Number.isFinite(lastLatitude) || !Number.isFinite(lastLongitude)) {
+    lastLatitude = target.latitude;
+    lastLongitude = target.longitude;
+    locationAgeMs = 0;
+  } else {
+    locationAgeMs = locationUpdatedAt ? Math.max(0, currentTime.getTime() - new Date(locationUpdatedAt).getTime()) : 0;
   }
 
   // 4. Capability Compatibility
