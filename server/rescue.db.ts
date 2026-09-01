@@ -1777,6 +1777,49 @@ export async function assignMissionAtomically(data: {
 }
 
 /**
+ * Creates an in-app notification for a user (used for fallbacks & alerts).
+ */
+export async function createNotification(
+  recipientId: number,
+  title: string,
+  body: string,
+  incidentId?: number | null,
+  type: "mission_assigned" | "priority_incident" | "status_update" = "priority_incident"
+) {
+  const now = new Date();
+  try {
+    const db = await database();
+    if (db) {
+      await withDbTimeout(
+        db.insert(notifications).values({
+          recipientId,
+          incidentId: incidentId || null,
+          type,
+          title,
+          body,
+          createdAt: now,
+        }),
+        4000,
+        "createNotification"
+      );
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  _memoryNotifications.push({
+    id: _memoryNotifications.length + 1,
+    recipientId,
+    incidentId: incidentId || null,
+    type,
+    title,
+    body,
+    readAt: null,
+    createdAt: now,
+  });
+}
+
+/**
  * Saves a victim's post-rescue check-in response.
  */
 export async function submitPostRescueCheckIn(data: {
@@ -1854,6 +1897,73 @@ export async function getPostRescueCheckInByPublicCode(publicCode: string) {
     failClosedInProduction(error);
   }
   return Array.from(_memoryPostRescueCheckIns.values()).find(c => c.publicCode === publicCode) || null;
+}
+
+/**
+ * Lists post-rescue check-in reviews for the command centre (saved for 24 hours).
+ */
+export async function listPostRescueCheckIns(cutoffHours: number = 24) {
+  const cutoffTime = new Date(Date.now() - cutoffHours * 60 * 60 * 1000);
+  try {
+    const db = await database();
+    if (db) {
+      const rows = await withDbTimeout(
+        db
+          .select({
+            checkIn: postRescueCheckIns,
+            incident: incidents,
+            user: users,
+          })
+          .from(postRescueCheckIns)
+          .leftJoin(incidents, eq(postRescueCheckIns.incidentId, incidents.id))
+          .leftJoin(users, eq(postRescueCheckIns.reporterId, users.id))
+          .where(gte(postRescueCheckIns.submittedAt, cutoffTime))
+          .orderBy(desc(postRescueCheckIns.submittedAt)),
+        4000,
+        "listPostRescueCheckIns"
+      );
+      if (rows && rows.length > 0) {
+        return rows.map(({ checkIn, incident, user }) => ({
+          id: checkIn.id,
+          incidentId: checkIn.incidentId,
+          publicCode: checkIn.publicCode,
+          reporterId: checkIn.reporterId,
+          reporterName: user?.name ?? incident?.contactName ?? null,
+          reporterEmail: user?.email ?? null,
+          locationLabel: incident?.locationLabel ?? null,
+          emergencyType: incident?.emergencyType ?? null,
+          reliefCentreAllotted: checkIn.reliefCentreAllotted,
+          helpCategory: checkIn.helpCategory,
+          notes: checkIn.notes,
+          submittedAt: checkIn.submittedAt,
+        }));
+      }
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+
+  return Array.from(_memoryPostRescueCheckIns.values())
+    .filter(c => new Date(c.submittedAt).getTime() >= cutoffTime.getTime())
+    .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+    .map(c => {
+      const inc = _memoryIncidents.get(c.incidentId);
+      const u = c.reporterId ? Array.from(_memoryUsers.values()).find(user => user.id === c.reporterId) : null;
+      return {
+        id: c.id,
+        incidentId: c.incidentId,
+        publicCode: c.publicCode,
+        reporterId: c.reporterId,
+        reporterName: u?.name ?? inc?.contactName ?? null,
+        reporterEmail: u?.email ?? null,
+        locationLabel: inc?.locationLabel ?? null,
+        emergencyType: inc?.emergencyType ?? null,
+        reliefCentreAllotted: c.reliefCentreAllotted,
+        helpCategory: c.helpCategory,
+        notes: c.notes,
+        submittedAt: c.submittedAt,
+      };
+    });
 }
 
 /**

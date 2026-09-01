@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { showNotification } from "@/lib/nativeNotifications";
+import { Capacitor } from "@capacitor/core";
+import { showNotification, requestNotificationPermission, playEmergencyAudioAlert } from "@/lib/nativeNotifications";
 import { reconcileAvailability, reconcileMissionStatus } from "@/lib/operationalSync";
 import {
   Activity,
@@ -36,7 +37,7 @@ import {
 import { UserProfileBadge } from "@/components/ProfileAvatar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
-import React, { ChangeEvent, useEffect, useState } from "react";
+import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
 type PushState = "not_requested" | "permission_granted" | "subscribed" | "unsupported" | "failed";
@@ -141,11 +142,19 @@ function ResponderWorkspace() {
   const activeMissionRow = missions.data?.find(({ mission }) => mission.status !== "resolved") ?? null;
   const hasActiveMission = Boolean(activeMissionRow);
 
+  const lastNotifiedOfferIdRef = useRef<number | null>(null);
+
   useEffect(() => {
     const refresh = () => refreshOperationalState();
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, [utils]);
+
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      void requestNotificationPermission();
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof Notification === "undefined" || !("serviceWorker" in navigator) || !window.isSecureContext) {
@@ -159,19 +168,54 @@ function ResponderWorkspace() {
     }
   }, []);
 
+  // Generic alerts feed effect: unconditional notification (not gated on visibility)
   useEffect(() => {
     if (!alerts.data) return;
     const newest = alerts.data.items.find(item => !item.readAt);
     if (!newest) return;
-    if (document.visibilityState === "hidden") {
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        try {
-          new Notification(newest.title, { body: newest.body });
-        } catch {}
-      }
-      void showNotification({ title: newest.title, body: newest.body, id: newest.id });
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      try {
+        new Notification(newest.title, { body: newest.body });
+      } catch {}
     }
+    void showNotification({ title: newest.title, body: newest.body, id: newest.id });
   }, [alerts.data]);
+
+  // Dedicated Active Mission Offer effect: audio alert + document title flashing + unconditional OS notification
+  useEffect(() => {
+    const offerData = activeOffer.data;
+    if (offerData?.hasOffer && offerData.offer && offerData.incident) {
+      const offerId = offerData.offer.id;
+      if (lastNotifiedOfferIdRef.current !== offerId) {
+        lastNotifiedOfferIdRef.current = offerId;
+        // 1. Play immediate audio alert
+        playEmergencyAudioAlert();
+        // 2. Fire unconditional native/web notification
+        void showNotification({
+          title: `🚨 EMERGENCY SOS OFFER: ${offerData.incident.requestCategory.toUpperCase()}`,
+          body: `${offerData.incident.severity.toUpperCase()} SOS at ${offerData.incident.locationLabel}. 15s to accept!`,
+          id: offerId,
+        });
+      }
+
+      // 3. Flash document title on interval until offer is accepted/declined/expired
+      const originalTitle = document.title || "sudo MakeItWork";
+      let flashState = false;
+      const titleInterval = window.setInterval(() => {
+        flashState = !flashState;
+        document.title = flashState
+          ? `(1) 🚨 NEW SOS - sudo MakeItWork`
+          : `⚠️ MISSION OFFER PENDING`;
+      }, 800);
+
+      return () => {
+        window.clearInterval(titleInterval);
+        document.title = originalTitle;
+      };
+    } else {
+      lastNotifiedOfferIdRef.current = null;
+    }
+  }, [activeOffer.data?.hasOffer, activeOffer.data?.offer?.id]);
 
   useEffect(() => {
     const isAvailable = profile.data?.availability === "available";
@@ -274,7 +318,7 @@ function ResponderWorkspace() {
     <DashboardLayout navItems={nav} workspace={t("responder.workspace")} roleLabel={t("responder.role")}>
       <div className="space-y-6">
         {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && (
-          <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="sticky top-2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
             <EmergencyOfferCard
               data={activeOffer.data as any}
               onAccepted={() => {

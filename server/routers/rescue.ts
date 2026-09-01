@@ -48,6 +48,7 @@ import {
   getMapLayers,
   listHospitals,
   listRescuerRegistrationRequests,
+  listPostRescueCheckIns,
   getMissionForRescuer,
   getRescuerProfile,
   getRescuerRoster,
@@ -1209,6 +1210,7 @@ export const rescueRouter = router({
       .input(z.object({ status: missionStatusSchema.optional() }).optional())
       .query(({ input }) => listIncidents(input?.status)),
     analytics: adminProcedure.query(() => getAnalytics()),
+    postRescueRecords: adminProcedure.query(() => listPostRescueCheckIns(24)),
     mapLayers: operationalProcedure.query(({ ctx }) => getMapLayers(ctx.user.role !== "user")),
     hospitals: medicalOperationsProcedure.query(async ({ ctx }) => {
       if (ctx.user.role === "admin") return listHospitals();

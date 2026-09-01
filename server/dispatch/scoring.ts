@@ -94,31 +94,30 @@ export function evaluateCapabilityScore(
       .map(c => c.capability.toLowerCase().trim())
   );
 
-  // Infer capabilities from rescuer category or call sign asset tags
-  const rescuerCategory = profile?.category?.toLowerCase();
-  const callSign = (profile?.callSign || "").toLowerCase();
+  // Infer capabilities from rescuer category or call sign asset tags if profile is present
+  if (profile) {
+    const rescuerCategory = profile.category?.toLowerCase();
+    const callSign = (profile.callSign || "").toLowerCase();
 
-  if (rescuerCategory === "medical" || callSign.includes("med") || callSign.includes("doctor") || callSign.includes("nurse") || callSign.includes("health")) {
-    activeCaps.add("medical");
-  }
-  if (rescuerCategory === "boat" || callSign.includes("boat") || callSign.includes("ship") || callSign.includes("ndrf") || callSign.includes("sdrf") || callSign.includes("water") || callSign.includes("marine")) {
-    activeCaps.add("flood_rescue");
-    activeCaps.add("trapped_rescue");
-    activeCaps.add("evacuation");
-  }
-  if (rescuerCategory === "ground-team" || !rescuerCategory) {
-    activeCaps.add("general_emergency");
-    activeCaps.add("trapped_rescue");
-    activeCaps.add("evacuation");
+    if (rescuerCategory === "medical" || callSign.includes("med") || callSign.includes("doctor") || callSign.includes("nurse") || callSign.includes("health")) {
+      activeCaps.add("medical");
+    }
+    if (rescuerCategory === "boat" || callSign.includes("boat") || callSign.includes("ship") || callSign.includes("ndrf") || callSign.includes("sdrf") || callSign.includes("water") || callSign.includes("marine")) {
+      activeCaps.add("flood_rescue");
+      activeCaps.add("trapped_rescue");
+      activeCaps.add("evacuation");
+    }
+    if (rescuerCategory === "ground-team") {
+      activeCaps.add("general_emergency");
+      activeCaps.add("trapped_rescue");
+      activeCaps.add("evacuation");
+    }
   }
 
   switch (category) {
     case "medical": {
       if (activeCaps.has("medical")) {
         return { compatible: true, capabilityScore: 1000, matchedCapability: "medical" };
-      }
-      if (activeCaps.has("general_emergency") || activeCaps.size === 0) {
-        return { compatible: true, capabilityScore: 500, matchedCapability: "general_emergency" };
       }
       return { compatible: false, capabilityScore: 0, matchedCapability: null };
     }

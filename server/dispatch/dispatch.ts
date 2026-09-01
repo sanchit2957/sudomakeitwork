@@ -11,6 +11,7 @@ import {
   addIncidentEvent,
   assignMissionAtomically,
   createMissionOffer,
+  createNotification,
   getIncidentById,
   getMissionOfferById,
   listOffersForIncident,
@@ -325,17 +326,48 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
 
     // Send push / notifications to all rescuer candidates simultaneously
     try {
-      await sendRescuerPush(
-        rankedMatches.map(r => r.candidate.user.id),
-        {
-          title: `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
-          body: `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 15s to accept.`,
-          incidentId: incident.id,
-          url: "/responder",
+      const candidateUserIds = rankedMatches.map((r) => r.candidate.user.id);
+      const pushResult = await sendRescuerPush(candidateUserIds, {
+        title: `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
+        body: `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 15s to accept.`,
+        incidentId: incident.id,
+        url: "/responder",
+      });
+
+      // Insert in-app notification fallback for any rescuer recipient that did not receive a direct push
+      const unreachedUserIds = pushResult.failedUserIds?.length
+        ? pushResult.failedUserIds
+        : candidateUserIds.filter(
+            (id) => !(pushResult.successfulUserIds || []).includes(id)
+          );
+
+      if (unreachedUserIds.length > 0) {
+        console.warn(
+          `[Dispatch] Push delivery skipped/unreached for rescuer user IDs: [${unreachedUserIds.join(
+            ", "
+          )}]. Inserting in-app polling notification fallbacks.`
+        );
+        for (const rescuerId of unreachedUserIds) {
+          await createNotification(
+            rescuerId,
+            `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
+            `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 15s to accept.`,
+            incident.id,
+            "priority_incident"
+          );
         }
-      );
+      }
     } catch (pushErr) {
-      console.warn("[Dispatch] Push notification skipped:", pushErr);
+      console.warn("[Dispatch] Push notification error, inserting in-app notification fallbacks for all candidates:", pushErr);
+      for (const r of rankedMatches) {
+        await createNotification(
+          r.candidate.user.id,
+          `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
+          `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 15s to accept.`,
+          incident.id,
+          "priority_incident"
+        );
+      }
     }
 
     return { status: "offered", offers: createdOffers, candidates: rankedMatches.map(r => r.candidate) };

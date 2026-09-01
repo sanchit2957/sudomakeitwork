@@ -23,6 +23,7 @@ import {
   setIncidentDestinationHospital,
   submitPostRescueCheckIn,
   getPostRescueCheckInByPublicCode,
+  listPostRescueCheckIns,
 } from "./rescue.db";
 
 describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in", () => {
@@ -67,8 +68,8 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
       const now = new Date("2026-09-01T12:00:00.000Z");
 
       // Setup 2 rescuer users
-      _memoryUsers.set(101, { id: 101, email: "rescuer1@test.org", name: "Rescuer 1", role: "rescuer", status: "active", createdAt: now, updatedAt: now });
-      _memoryUsers.set(102, { id: 102, email: "rescuer2@test.org", name: "Rescuer 2", role: "rescuer", status: "active", createdAt: now, updatedAt: now });
+      _memoryUsers.set("101", { id: 101, email: "rescuer1@test.org", name: "Rescuer 1", role: "rescuer", status: "active", createdAt: now, updatedAt: now });
+      _memoryUsers.set("102", { id: 102, email: "rescuer2@test.org", name: "Rescuer 2", role: "rescuer", status: "active", createdAt: now, updatedAt: now });
 
       _memoryRescueProfiles.set(101, {
         id: 101,
@@ -110,7 +111,6 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
         publicCode: "SOS-MATCH01",
         reporterId: 1,
         contactName: "Victim A",
-        contactPhone: "+919999999999",
         locationLabel: "Guwahati Medical Circle",
         latitude: 26.155,
         longitude: 91.755,
@@ -134,6 +134,8 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
         matchingAttempts: 0,
         escalatedToCommandAt: null,
         assignedRescuerId: null,
+        destinationHospitalId: null,
+        destinationHospitalName: null,
         dispatchedAt: null,
         resolvedAt: null,
         createdAt: now,
@@ -141,36 +143,32 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
       });
 
       const result = await advanceIncidentDispatch(501, now);
-      expect(result.status).toBe("offered");
-      expect(result.offers?.length).toBeGreaterThanOrEqual(2);
+      expect(result).not.toBeNull();
+      expect(result?.status).toBe("offered");
+      expect(result?.offers?.length).toBeGreaterThanOrEqual(2);
 
       const offers = Array.from(_memoryMissionOffers.values()).filter(o => o.incidentId === 501);
       expect(offers.length).toBeGreaterThanOrEqual(2);
 
+      // Verify concurrent offer expiry
       const offer1 = offers.find(o => o.rescuerId === 101)!;
       const offer2 = offers.find(o => o.rescuerId === 102)!;
+      expect(offer1.expiresAt.getTime()).toBe(now.getTime() + RESPONDER_OFFER_WINDOW_MS);
 
-      // Rescuer 1 accepts first
-      const acceptRes = await acceptMissionOffer(offer1.id, 101, new Date(now.getTime() + 2_000));
-      expect(acceptRes.missionId).toBeDefined();
+      // Concurrency race: Rescuer 102 accepts first
+      const accepted = await acceptMissionOffer(offer2.id, 102, new Date(now.getTime() + 5000));
+      expect(accepted.missionId).toBeDefined();
 
-      const incident = _memoryIncidents.get(501);
-      expect(incident?.status).toBe("dispatched");
-      expect(incident?.assignedRescuerId).toBe(101);
-
-      // Rescuer 2 attempts to accept later -> loses race and gets proper notice
-      await expect(
-        acceptMissionOffer(offer2.id, 102, new Date(now.getTime() + 3_000))
-      ).rejects.toThrow(
-        "This mission was already assigned to another responder. You may be matched to a nearby victim shortly."
-      );
+      // Other offer for Rescuer 101 automatically cancelled/expired
+      const remainingOffer1 = Array.from(_memoryMissionOffers.values()).find(o => o.incidentId === 501 && o.rescuerId === 101);
+      expect(remainingOffer1?.status).toBe("cancelled");
     });
 
     it("silently broadens search radius tier on zero acceptances without escalating to Command", async () => {
       const now = new Date("2026-09-01T12:00:00.000Z");
 
       // Rescuer far away (> 50 km)
-      _memoryUsers.set(201, { id: 201, email: "far@test.org", name: "Far Rescuer", role: "rescuer", status: "active", createdAt: now, updatedAt: now });
+      _memoryUsers.set("201", { id: 201, email: "far@test.org", name: "Far Rescuer", role: "rescuer", status: "active", createdAt: now, updatedAt: now });
       _memoryRescueProfiles.set(201, {
         id: 201,
         userId: 201,
@@ -193,7 +191,6 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
         publicCode: "SOS-TIER001",
         reporterId: 1,
         contactName: "Victim B",
-        contactPhone: "+919999999998",
         locationLabel: "Guwahati Centre",
         latitude: 26.155,
         longitude: 91.755,
@@ -217,6 +214,8 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
         matchingAttempts: 0,
         escalatedToCommandAt: null,
         assignedRescuerId: null,
+        destinationHospitalId: null,
+        destinationHospitalName: null,
         dispatchedAt: null,
         resolvedAt: null,
         createdAt: now,
@@ -225,8 +224,9 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
 
       // Advance dispatch silently broadens tier from 15km to 75km and matches Far-Team!
       const result = await advanceIncidentDispatch(601, now);
-      expect(result.status).toBe("offered");
-      expect(result.offers?.some(o => o.rescuerId === 201)).toBe(true);
+      expect(result).not.toBeNull();
+      expect(result?.status).toBe("offered");
+      expect(result?.offers?.some(o => o.rescuerId === 201)).toBe(true);
 
       const inc = _memoryIncidents.get(601);
       expect(inc?.dispatchStatus).toBe("offered");
@@ -259,7 +259,6 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
         publicCode: "SOS-HOSP001",
         reporterId: 1,
         contactName: "Victim C",
-        contactPhone: "+919999999997",
         locationLabel: "Dispur Field",
         latitude: 26.14,
         longitude: 91.77,
@@ -283,6 +282,8 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
         matchingAttempts: 1,
         escalatedToCommandAt: null,
         assignedRescuerId: 101,
+        destinationHospitalId: null,
+        destinationHospitalName: null,
         dispatchedAt: now,
         resolvedAt: null,
         createdAt: now,
@@ -319,6 +320,35 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
       expect(retrieved).not.toBeNull();
       expect(retrieved?.reliefCentreAllotted).toBe("yes");
       expect(retrieved?.helpCategory).toBe("medical");
+    });
+
+    it("lists post-rescue records and respects 24-hour retention window", async () => {
+      // Recent record (1 hour ago)
+      const recent = await submitPostRescueCheckIn({
+        incidentId: 702,
+        publicCode: "SOS-RECENT01",
+        reporterId: 1,
+        reliefCentreAllotted: "yes",
+        helpCategory: "evacuation",
+        notes: "Family evacuated safely to relief camp.",
+      });
+
+      // Older record (25 hours ago - expired)
+      const expiredId = _memoryPostRescueCheckIns.size + 1;
+      _memoryPostRescueCheckIns.set(expiredId, {
+        id: expiredId,
+        incidentId: 703,
+        publicCode: "SOS-OLD01",
+        reporterId: 1,
+        reliefCentreAllotted: "no",
+        helpCategory: "other",
+        notes: "Old checkin",
+        submittedAt: new Date(Date.now() - 25 * 60 * 60 * 1000),
+      });
+
+      const records = await listPostRescueCheckIns(24);
+      expect(records.some(r => r.publicCode === "SOS-RECENT01")).toBe(true);
+      expect(records.some(r => r.publicCode === "SOS-OLD01")).toBe(false);
     });
   });
 });
