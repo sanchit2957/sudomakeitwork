@@ -15,6 +15,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
 import { getDatabasePoolMetrics, pingDatabase, runDatabaseForensicBenchmark } from "../db";
+import { isOriginAllowed } from "./cors";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -63,46 +64,13 @@ async function startServer() {
     next();
   });
 
-  // Enable CORS with explicit production allowlist & native mobile support
+  // Enable secure CORS with exact normalized allowlist matching
   const corsHandler = cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin or null (like native mobile apps, server-to-server)
-      if (!origin || origin === "null") return callback(null, true);
-      // Allow Capacitor local origins, android app packages, and localhost
-      if (
-        origin === "capacitor://localhost" ||
-        origin === "ionic://localhost" ||
-        origin === "https://localhost" ||
-        origin === "http://localhost" ||
-        origin.startsWith("http://localhost:") ||
-        origin.startsWith("https://localhost:") ||
-        origin.startsWith("http://127.0.0.1:") ||
-        origin.startsWith("https://127.0.0.1:") ||
-        origin.startsWith("http://10.0.2.2:") ||
-        origin.startsWith("android-app://") ||
-        origin.startsWith("capacitor://") ||
-        origin.startsWith("ionic://") ||
-        origin.includes("gov.in.assamrescue.app") ||
-        origin.includes("onrender.com")
-      ) {
+      if (isOriginAllowed(origin)) {
         return callback(null, true);
       }
-      // Check configured explicit allowed origins
-      const allowedOrigins = [
-        ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim()) : []),
-        ...(process.env.APP_URL ? [process.env.APP_URL.trim()] : []),
-        ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL.trim()] : []),
-        "https://assam-rescue-platform.onrender.com",
-      ].filter(Boolean);
-
-      if (allowedOrigins.some(allowed => origin === allowed || origin.startsWith(allowed))) {
-        return callback(null, true);
-      }
-      if (process.env.NODE_ENV === "production") {
-        return callback(null, false);
-      }
-      // In local development, permit the origin
-      return callback(null, true);
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -114,6 +82,7 @@ async function startServer() {
       "Origin",
       "Cache-Control",
       "Pragma",
+      "X-Webhook-Secret",
     ],
   });
 
@@ -135,34 +104,32 @@ async function startServer() {
   // Real-time SSE Live Tracking stream
   app.use(liveTrackingRouter);
 
-  // Lightweight production diagnostic /health endpoint
+  // Minimal public production health check endpoint (Render compatible)
   app.get("/health", async (_req, res) => {
-    const mem = process.memoryUsage();
     const dbPing = await pingDatabase();
-    const poolMetrics = getDatabasePoolMetrics();
-    const isDegraded = !dbPing.ok || poolMetrics.status === "circuit_broken";
+    const isDegraded = !dbPing.ok;
 
     res.status(isDegraded && process.env.NODE_ENV === "production" ? 503 : 200).json({
       status: isDegraded ? "degraded" : "ok",
       uptime: Math.floor(process.uptime()),
-      memory: {
-        rssMb: Math.round((mem.rss / (1024 * 1024)) * 10) / 10,
-        heapUsedMb: Math.round((mem.heapUsed / (1024 * 1024)) * 10) / 10,
-        heapTotalMb: Math.round((mem.heapTotal / (1024 * 1024)) * 10) / 10,
-      },
-      database: {
-        status: dbPing.ok ? "connected" : "unreachable",
-        pingLatencyMs: dbPing.latencyMs,
-        pingError: dbPing.error,
-        code: dbPing.code,
-        pool: poolMetrics,
-      },
-      version: "1.0.0",
+      timestamp: new Date().toISOString(),
     });
   });
 
-  // Deep forensic diagnostic benchmark endpoint
-  app.get("/api/forensic-db-probe", async (_req, res) => {
+  // Admin-only forensic diagnostic benchmark endpoint
+  app.get("/api/forensic-db-probe", async (req, res) => {
+    // In production, reject unless authenticated as admin
+    if (process.env.NODE_ENV === "production") {
+      try {
+        const user = await (await import("./sdk")).sdk.authenticateRequest(req);
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ error: "Access denied. Admin authorization required." });
+        }
+      } catch {
+        return res.status(403).json({ error: "Access denied. Authentication required." });
+      }
+    }
+
     try {
       const benchmark = await runDatabaseForensicBenchmark();
       res.status(200).json(benchmark);

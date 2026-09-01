@@ -23,10 +23,9 @@ export const isSupabaseConfigured = (): boolean => {
 export const supabase: SupabaseClient | null = isSupabaseConfigured()
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
-        persistSession: true,
-        autoRefreshToken: true,
+        persistSession: false, // OTP provider only; authoritative session is HTTP-only cookie
+        autoRefreshToken: false,
         detectSessionInUrl: true,
-        storage: typeof window !== "undefined" ? window.localStorage : undefined,
       },
     })
   : null;

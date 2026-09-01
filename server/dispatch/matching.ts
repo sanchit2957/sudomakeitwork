@@ -82,13 +82,25 @@ export async function getRescuerCandidates(): Promise<RescuerCandidate[]> {
 
         return rows.map(({ user, profile }) => {
           let userCaps = capsByRescuer.get(user.id) || [];
-          // Default fallback capabilities for existing accounts with no capability rows yet
+          // Default fallback capability for legacy accounts with no registered capability rows
           if (userCaps.length === 0) {
-            userCaps = [
-              { id: 0, rescuerId: user.id, capability: "general_emergency" as const, priority: 1, active: "yes" as const, createdAt: new Date(), updatedAt: new Date() },
-              { id: 0, rescuerId: user.id, capability: "flood_rescue" as const, priority: 1, active: "yes" as const, createdAt: new Date(), updatedAt: new Date() },
-              { id: 0, rescuerId: user.id, capability: "evacuation" as const, priority: 1, active: "yes" as const, createdAt: new Date(), updatedAt: new Date() },
-            ];
+            const profileCat = (profile as any).category || (profile.callSign.toLowerCase().includes("boat") ? "boat" : profile.callSign.toLowerCase().includes("med") ? "medical" : "ground-team");
+            const defaultCaps: any[] = [{ id: 0, rescuerId: user.id, capability: "general_emergency" as const, priority: 1, active: "yes" as const, createdAt: new Date(), updatedAt: new Date() }];
+            if (profileCat === "medical") {
+              defaultCaps.push({ id: 0, rescuerId: user.id, capability: "medical" as const, priority: 1, active: "yes" as const, createdAt: new Date(), updatedAt: new Date() });
+            } else if (profileCat === "boat") {
+              defaultCaps.push(
+                { id: 0, rescuerId: user.id, capability: "flood_rescue" as const, priority: 1, active: "yes" as const, createdAt: new Date(), updatedAt: new Date() },
+                { id: 0, rescuerId: user.id, capability: "evacuation" as const, priority: 1, active: "yes" as const, createdAt: new Date(), updatedAt: new Date() },
+                { id: 0, rescuerId: user.id, capability: "trapped_rescue" as const, priority: 1, active: "yes" as const, createdAt: new Date(), updatedAt: new Date() }
+              );
+            } else if (profileCat === "ground-team") {
+              defaultCaps.push(
+                { id: 0, rescuerId: user.id, capability: "evacuation" as const, priority: 1, active: "yes" as const, createdAt: new Date(), updatedAt: new Date() },
+                { id: 0, rescuerId: user.id, capability: "trapped_rescue" as const, priority: 1, active: "yes" as const, createdAt: new Date(), updatedAt: new Date() }
+              );
+            }
+            userCaps = defaultCaps;
           }
 
           return {
@@ -115,23 +127,29 @@ export async function getRescuerCandidates(): Promise<RescuerCandidate[]> {
           };
         });
       }
-    } catch (err) {
-      if (process.env.NODE_ENV === "production") {
-        throw err;
-      }
+    } catch (error: any) {
+      console.warn("[Matching] Database roster query error (using memory cache):", (error as Error)?.message || error);
     }
   }
 
-  // In-Memory Fallback (Dev/Testing)
+  // Memory fallback
   const candidates: RescuerCandidate[] = [];
-  const profiles = Array.from(_memoryRescueProfiles.values());
-  for (const profile of profiles) {
-    const user = Array.from(_memoryUsers.values()).find(u => u.id === profile.userId);
-    if (user && user.role === "rescuer" && (user.status || "active") === "active") {
+  const allUsers = Array.from(_memoryUsers.values());
+  for (const user of allUsers) {
+    if (user.role === "rescuer" && (user.status === "active" || !user.status)) {
+      const profile = _memoryRescueProfiles.get(user.id);
+      if (!profile) continue;
+
       const caps = await getRescuerCapabilities(user.id);
       const activeMissionsCount = Array.from(_memoryMissions.values()).filter(
         m => m.rescuerId === user.id && (m.status === "pending" || m.status === "dispatched")
       ).length;
+
+      const profileCat = (profile as any).category || (profile.callSign.toLowerCase().includes("boat") ? "boat" : profile.callSign.toLowerCase().includes("med") ? "medical" : "ground-team");
+      const defaultCaps: any[] = [{ capability: "general_emergency", priority: 1, active: "yes" }];
+      if (profileCat === "medical") defaultCaps.push({ capability: "medical", priority: 1, active: "yes" });
+      if (profileCat === "boat") defaultCaps.push({ capability: "flood_rescue", priority: 1, active: "yes" }, { capability: "evacuation", priority: 1, active: "yes" }, { capability: "trapped_rescue", priority: 1, active: "yes" });
+      if (profileCat === "ground-team") defaultCaps.push({ capability: "evacuation", priority: 1, active: "yes" }, { capability: "trapped_rescue", priority: 1, active: "yes" });
 
       candidates.push({
         user: {
@@ -142,19 +160,13 @@ export async function getRescuerCandidates(): Promise<RescuerCandidate[]> {
         },
         profile: {
           callSign: profile.callSign,
-          category: (profile as any).category || (profile.callSign.toLowerCase().includes("boat") ? "boat" : profile.callSign.toLowerCase().includes("med") ? "medical" : "ground-team"),
+          category: profileCat,
           availability: profile.availability,
           lastLatitude: profile.lastLatitude,
           lastLongitude: profile.lastLongitude,
           locationUpdatedAt: profile.locationUpdatedAt,
         },
-        capabilities: caps.length
-          ? caps
-          : [
-              { capability: "general_emergency", priority: 1, active: "yes" },
-              { capability: "flood_rescue", priority: 1, active: "yes" },
-              { capability: "evacuation", priority: 1, active: "yes" },
-            ],
+        capabilities: caps.length ? caps : defaultCaps,
         activeMissionsCount,
       });
     }

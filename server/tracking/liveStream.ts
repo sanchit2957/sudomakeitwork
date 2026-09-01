@@ -14,6 +14,8 @@ import { Router, Request, Response } from "express";
 import { getIncidentByCode, getActiveAssignedRescuerForIncident } from "../rescue.db";
 import { presentAssignedRescuerToVictim } from "../rescuer-profile.policy";
 import { calculateRoadRouteAndEta } from "../routing/routing.service";
+import { isOriginAllowed, normalizeOrigin } from "../_core/cors";
+import { sdk } from "../_core/sdk";
 
 export interface LiveTrackingPayload {
   type: "rescuer_location" | "eta_update" | "connected" | "mission_status";
@@ -46,7 +48,9 @@ export interface LiveTrackingPayload {
   timestamp: string;
 }
 
-// Active SSE client connections: Map<publicCode, Set<Response>>
+// Bounded active SSE client connections: Map<publicCode, Set<Response>>
+const MAX_SUBSCRIBERS_PER_INCIDENT = 20;
+const MAX_TOTAL_SUBSCRIBERS = 500;
 const activeSubscribers = new Map<string, Set<Response>>();
 
 export const liveTrackingRouter = Router();
@@ -55,6 +59,12 @@ export const liveTrackingRouter = Router();
  * Register SSE endpoint: GET /api/track/live-stream?code=SOS-XXXXXXXX
  */
 liveTrackingRouter.get("/api/track/live-stream", async (req: Request, res: Response) => {
+  const origin = req.headers.origin;
+  if (origin && !isOriginAllowed(origin)) {
+    res.status(403).json({ error: "Origin not allowed by CORS policy." });
+    return;
+  }
+
   const rawCode = req.query.code;
   const publicCode = typeof rawCode === "string" ? rawCode.trim().toUpperCase() : "";
 
@@ -71,15 +81,30 @@ liveTrackingRouter.get("/api/track/live-stream", async (req: Request, res: Respo
     return;
   }
 
+  // Capacity / Connection limit protection
+  const totalSubscribers = getActiveSseSubscriberCount();
+  if (totalSubscribers >= MAX_TOTAL_SUBSCRIBERS) {
+    res.status(503).json({ error: "Live tracking server capacity reached. Please use polling fallback." });
+    return;
+  }
+
+  const existingSubscribers = activeSubscribers.get(publicCode);
+  if (existingSubscribers && existingSubscribers.size >= MAX_SUBSCRIBERS_PER_INCIDENT) {
+    res.status(429).json({ error: "Too many concurrent tracking connections for this incident." });
+    return;
+  }
+
   // Set standard SSE HTTP headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no"); // Disable proxy buffering (Nginx, Render)
 
-  // Explicit CORS header for SSE streams
-  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
+  // Explicit, strict CORS header for authorized origin
+  if (origin && isOriginAllowed(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", normalizeOrigin(origin) || origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
 
   res.flushHeaders?.();
 

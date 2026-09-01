@@ -20,9 +20,9 @@ type UseAuthOptions = {
   redirectPath?: string;
 };
 
-// Helper for client session token persistence and native mobile bearer authorization
+// Helper for client session token persistence strictly for native mobile bearer authorization
 function storeNativeTokenIfPresent(sessionToken?: string) {
-  if (sessionToken && typeof window !== "undefined") {
+  if (sessionToken && typeof window !== "undefined" && Capacitor.isNativePlatform()) {
     try {
       localStorage.setItem("app_native_bearer_token", sessionToken);
       localStorage.setItem("app-runtime-session-token", sessionToken);

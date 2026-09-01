@@ -41,6 +41,8 @@ const SPECIAL_NEED_TAGS = [
   "Evacuation needed",
 ];
 
+export const TRIAGE_CANCEL_WINDOW_MS = 10_000;
+
 export function SosClassificationModal({
   isOpen,
   publicCode,
@@ -61,7 +63,7 @@ export function SosClassificationModal({
       const remainingMs = Math.max(0, new Date(triageDeadlineAt).getTime() - Date.now());
       return Math.ceil(remainingMs / 1000);
     }
-    return 15;
+    return 10;
   });
   const [isExpired, setIsExpired] = useState(false);
   const [isDispatchedOnServer, setIsDispatchedOnServer] = useState(false);
@@ -87,12 +89,12 @@ export function SosClassificationModal({
     selectedCategoryRef.current = selectedCategory;
   }, [selectedCategory]);
 
-  // Fixed authoritative server deadline for the initial cancellation / triage window (15s)
+  // Authoritative server deadline for the initial cancellation / triage window (10s)
   const deadlineMs = useMemo(() => {
-    return triageDeadlineAt ? new Date(triageDeadlineAt).getTime() : Date.now() + 15_000;
+    return triageDeadlineAt ? new Date(triageDeadlineAt).getTime() : Date.now() + TRIAGE_CANCEL_WINDOW_MS;
   }, [triageDeadlineAt]);
 
-  // Master 15-second timer for initial triage/cancellation window
+  // Master 10-second timer for initial triage/cancellation window
   useEffect(() => {
     if (!isOpen) return;
 

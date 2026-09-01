@@ -1368,11 +1368,26 @@ export async function getRescuerCapabilities(rescuerId: number): Promise<Array<{
   }
 
   // Default capabilities for memory rescuers
-  return [
+  const profile = _memoryRescueProfiles.get(rescuerId);
+  const profileCat = profile?.category;
+  const defaultCaps: Array<{ capability: string; priority: number; active: string }> = [
     { capability: "general_emergency", priority: 1, active: "yes" },
-    { capability: "flood_rescue", priority: 1, active: "yes" },
-    { capability: "evacuation", priority: 1, active: "yes" },
   ];
+  if (profileCat === "medical") {
+    defaultCaps.push({ capability: "medical", priority: 1, active: "yes" });
+  } else if (profileCat === "boat") {
+    defaultCaps.push(
+      { capability: "flood_rescue", priority: 1, active: "yes" },
+      { capability: "evacuation", priority: 1, active: "yes" },
+      { capability: "trapped_rescue", priority: 1, active: "yes" }
+    );
+  } else if (profileCat === "ground-team") {
+    defaultCaps.push(
+      { capability: "evacuation", priority: 1, active: "yes" },
+      { capability: "trapped_rescue", priority: 1, active: "yes" }
+    );
+  }
+  return defaultCaps;
 }
 
 export async function setRescuerCapabilities(

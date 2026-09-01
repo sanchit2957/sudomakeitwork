@@ -759,6 +759,8 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
 }
 
 export async function getDb() {
+  if (_db) return _db;
+
   const dbUrl = process.env.DATABASE_URL?.trim();
   if (!dbUrl || dbUrl === "" || dbUrl.includes("HOST")) {
     if (process.env.NODE_ENV === "production") {
@@ -766,8 +768,6 @@ export async function getDb() {
     }
     return null;
   }
-
-  if (_db) return _db;
 
   if (isDbCircuitBroken() && process.env.NODE_ENV !== "production") {
     return null;

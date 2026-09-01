@@ -806,7 +806,7 @@ export const rescueRouter = router({
             : null,
         };
       }),
-    submitPostRescueCheckIn: publicProcedure
+    submitPostRescueCheckIn: protectedProcedure
       .input(
         z.object({
           publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/),
@@ -818,11 +818,19 @@ export const rescueRouter = router({
       .mutation(async ({ input, ctx }) => {
         const incident = await getIncidentByCode(input.publicCode);
         if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
+        
+        // Authorization: Reporter or response personnel only
+        const isReporter = incident.reporterId === ctx.user.id;
+        const isStaff = ctx.user.role === "admin" || ctx.user.role === "rescuer" || ctx.user.role === "medical";
+        if (!isReporter && !isStaff) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the SOS reporter or response personnel can submit a check-in." });
+        }
+
         const { submitPostRescueCheckIn } = await import("../rescue.db");
         const result = await submitPostRescueCheckIn({
           incidentId: incident.id,
           publicCode: incident.publicCode,
-          reporterId: ctx.user?.id ?? null,
+          reporterId: ctx.user.id,
           reliefCentreAllotted: input.reliefCentreAllotted,
           helpCategory: input.helpCategory,
           notes: input.notes ?? null,
@@ -831,7 +839,19 @@ export const rescueRouter = router({
       }),
     myCheckInByCode: publicProcedure
       .input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        const incident = await getIncidentByCode(input.publicCode);
+        if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
+        
+        // Privacy check: only reporter, assigned staff, or authorized public tracking
+        if (ctx.user) {
+          const isReporter = incident.reporterId === ctx.user.id;
+          const isStaff = ctx.user.role === "admin" || ctx.user.role === "rescuer" || ctx.user.role === "medical";
+          if (!isReporter && !isStaff) {
+            return null;
+          }
+        }
+        
         const { getPostRescueCheckInByPublicCode } = await import("../rescue.db");
         return await getPostRescueCheckInByPublicCode(input.publicCode);
       }),
@@ -923,9 +943,21 @@ export const rescueRouter = router({
       }),
     chatByCode: publicProcedure
       .input(z.object({ publicCode: z.string().trim().toUpperCase().regex(/^SOS-[A-Z0-9]{8}$/) }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const incident = await getIncidentByCode(input.publicCode);
         if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
+
+        // Authorization check: reporter, assigned responder, admin, or medical
+        if (ctx.user) {
+          const isReporter = incident.reporterId === ctx.user.id;
+          const assigned = await getActiveAssignedRescuerForIncident(incident.id);
+          const isAssigned = assigned?.user.id === ctx.user.id || assigned?.profile.userId === ctx.user.id || incident.assignedRescuerId === ctx.user.id;
+          const isPrivileged = ctx.user.role === "admin" || ctx.user.role === "medical" || ctx.user.role === "hospital";
+          
+          if (!isReporter && !isAssigned && !isPrivileged) {
+            return []; // Reject unrelated users without exposing messages
+          }
+        }
         return getIncidentMessages(incident.id);
       }),
     sendChat: protectedProcedure
@@ -938,29 +970,43 @@ export const rescueRouter = router({
       .mutation(async ({ input, ctx }) => {
         const incident = await getIncidentByCode(input.publicCode);
         if (!incident) throw new TRPCError({ code: "NOT_FOUND", message: "No SOS request matches this tracking code." });
-        if (incident.reporterId !== ctx.user.id)
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only the SOS reporter can send a victim message." });
+        
+        const isReporter = incident.reporterId === ctx.user.id;
+        const assigned = await getActiveAssignedRescuerForIncident(incident.id);
+        const isAssigned = assigned?.user.id === ctx.user.id || assigned?.profile.userId === ctx.user.id || incident.assignedRescuerId === ctx.user.id;
+        const isAdmin = ctx.user.role === "admin";
+        
+        if (!isReporter && !isAssigned && !isAdmin) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the SOS reporter, assigned rescuer, or State Command Centre can send incident messages." });
+        }
         if (incident.status === "resolved")
           throw new TRPCError({ code: "BAD_REQUEST", message: "This SOS has already been resolved." });
+        
+        const authorType = isReporter ? "victim" : isAssigned ? "rescuer" : "operations";
         let messageId = _memoryIncidentMessages.length + 1;
         const db = await database();
         if (db) {
           try {
             const result = await db
               .insert(incidentMessages)
-              .values({ incidentId: incident.id, authorType: "victim", authorId: ctx.user.id, message: input.message });
-            messageId = Number(result[0].insertId);
+              .values({
+                incidentId: incident.id,
+                authorId: ctx.user.id,
+                authorType,
+                message: input.message,
+              });
+            messageId = (result as any)[0]?.insertId || messageId;
           } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
         }
         _memoryIncidentMessages.push({
           id: messageId,
           incidentId: incident.id,
-          authorType: "victim",
           authorId: ctx.user.id,
+          authorType,
           message: input.message,
           createdAt: new Date(),
         });
-        return { id: messageId };
+        return { success: true };
       }),
     mine: protectedProcedure.query(({ ctx }) => listIncidentsForReporter(ctx.user.id)),
   }),

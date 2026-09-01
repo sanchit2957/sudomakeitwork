@@ -95,14 +95,17 @@ const trpcClient = trpc.createClient({
       transformer: superjson,
       headers() {
         const headers: Record<string, string> = {};
-        try {
-          const nativeToken =
-            localStorage.getItem("app_native_bearer_token") ||
-            localStorage.getItem("app-runtime-session-token");
-          if (nativeToken) {
-            headers["Authorization"] = `Bearer ${nativeToken}`;
-          }
-        } catch {}
+        // Web browser uses secure HTTP-only cookies; native platform uses bearer token
+        if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+          try {
+            const nativeToken =
+              localStorage.getItem("app_native_bearer_token") ||
+              localStorage.getItem("app-runtime-session-token");
+            if (nativeToken) {
+              headers["Authorization"] = `Bearer ${nativeToken}`;
+            }
+          } catch {}
+        }
         return headers;
       },
       fetch(input, init) {

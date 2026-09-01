@@ -328,6 +328,9 @@ export async function triggerN8nSosWebhook(incident: TriggerN8nSosInput) {
   }
 }
 
+// In-memory idempotency deduplication registry for offline SOS sync
+const _offlineEventIdMap = new Map<string, { publicCode: string; incidentId: number; createdAt: Date }>();
+
 /**
  * Registers REST API endpoints for:
  * - Offline SOS delivery from Service Worker Background Sync
@@ -336,14 +339,36 @@ export async function triggerN8nSosWebhook(incident: TriggerN8nSosInput) {
 export function registerN8nRoutes(app: Express) {
   // POST /api/sos/offline
   // Service Worker Background Sync endpoint — accepts an SOS payload and creates
-  // an incident the same way the tRPC `rescue.emergency.create` mutation does,
-  // but without requiring tRPC context (Service Workers can only use plain fetch).
+  // an incident with idempotency and fail-closed production safety.
   app.post("/api/sos/offline", async (req: Request, res: Response) => {
     try {
       const body = req.body;
       if (!body || !body.locationLabel || typeof body.latitude !== "number" || typeof body.longitude !== "number") {
         return res.status(400).json({ error: "Missing required SOS fields (locationLabel, latitude, longitude)." });
       }
+
+      if (!Number.isFinite(body.latitude) || !Number.isFinite(body.longitude) || body.latitude < -90 || body.latitude > 90 || body.longitude < -180 || body.longitude > 180) {
+        return res.status(400).json({ error: "Invalid GPS coordinates." });
+      }
+
+      // Idempotency check: deduplicate identical offline sync events
+      const offlineEventId = typeof body.offlineEventId === "string" && body.offlineEventId.trim() !== "" ? body.offlineEventId.trim() : null;
+      if (offlineEventId && _offlineEventIdMap.has(offlineEventId)) {
+        const existing = _offlineEventIdMap.get(offlineEventId)!;
+        return res.status(200).json({
+          publicCode: existing.publicCode,
+          incidentId: existing.incidentId,
+          status: "pending",
+          deduplicated: true,
+        });
+      }
+
+      // Extract optional authenticated user if session cookie is present
+      let authUserId: number | null = null;
+      try {
+        const user = await (await import("./_core/sdk")).sdk.authenticateRequest(req);
+        if (user) authUserId = user.id;
+      } catch {}
 
       const emergencyType = ["flood", "medical", "trapped", "evacuation", "other"].includes(body.emergencyType)
         ? body.emergencyType
@@ -360,15 +385,49 @@ export function registerN8nRoutes(app: Express) {
       const generateCode = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
       const publicCode = `SOS-${generateCode()}`;
 
-      // Create the in-memory incident (same shape as the tRPC mutation)
-      const { _memoryIncidents, addIncidentEvent } = await import("./rescue.db");
+      // Database persistence (Authoritative Source of Truth)
+      let persistedId = 0;
+      const { getDb } = await import("./db");
+      const db = await getDb();
+      if (db) {
+        try {
+          const { incidents: incidentsTable } = await import("../drizzle/schema");
+          const insertRes = await db.insert(incidentsTable).values({
+            publicCode,
+            reporterId: authUserId,
+            contactName: typeof body.contactName === "string" ? body.contactName.slice(0, 160) : null,
+            locationLabel: String(body.locationLabel).slice(0, 360),
+            latitude: body.latitude,
+            longitude: body.longitude,
+            emergencyType,
+            helpNeeds: null,
+            severity,
+            peopleAffected,
+            notes: typeof body.notes === "string" ? body.notes.slice(0, 2000) : null,
+            evidenceKey: null,
+            evidenceUrl: null,
+            voiceNoteKey: null,
+            voiceNoteUrl: null,
+            voiceNoteDurationSeconds: null,
+            status: "pending",
+          });
+          persistedId = (insertRes as any)[0]?.insertId || 0;
+        } catch (dbErr: any) {
+          console.error("[Offline SOS] Database persistence error:", dbErr);
+          if (process.env.NODE_ENV === "production") {
+            return res.status(500).json({ error: "Failed to persist emergency SOS in authoritative database." });
+          }
+        }
+      }
 
-      const incidentId = _memoryIncidents.size + 1;
+      // Memory cache representation
+      const { _memoryIncidents, addIncidentEvent } = await import("./rescue.db");
+      const incidentId = persistedId || (_memoryIncidents.size + 1);
       const now = new Date();
       _memoryIncidents.set(incidentId, {
         id: incidentId,
         publicCode,
-        reporterId: null, // Offline SOS may not have auth context
+        reporterId: authUserId,
         contactName: typeof body.contactName === "string" ? body.contactName.slice(0, 160) : null,
         locationLabel: String(body.locationLabel).slice(0, 360),
         latitude: body.latitude,
@@ -401,48 +460,22 @@ export function registerN8nRoutes(app: Express) {
         updatedAt: now,
       });
 
+      if (offlineEventId) {
+        _offlineEventIdMap.set(offlineEventId, { publicCode, incidentId, createdAt: now });
+      }
+
       await addIncidentEvent(
         incidentId,
-        null,
+        authUserId,
         "sos_created",
         "Offline SOS received",
         "Queued on device during network outage. Delivered via Background Sync."
       );
 
-      // Attempt database persistence (non-blocking, same pattern as tRPC route)
-      try {
-        const { getDb } = await import("./db");
-        const db = await getDb();
-        if (db) {
-          const { incidents: incidentsTable } = await import("../drizzle/schema");
-          await db.insert(incidentsTable).values({
-            publicCode,
-            reporterId: null,
-            contactName: typeof body.contactName === "string" ? body.contactName.slice(0, 160) : null,
-            locationLabel: String(body.locationLabel).slice(0, 360),
-            latitude: body.latitude,
-            longitude: body.longitude,
-            emergencyType,
-            helpNeeds: null,
-            severity,
-            peopleAffected,
-            notes: typeof body.notes === "string" ? body.notes.slice(0, 2000) : null,
-            evidenceKey: null,
-            evidenceUrl: null,
-            voiceNoteKey: null,
-            voiceNoteUrl: null,
-            voiceNoteDurationSeconds: null,
-            status: "pending",
-          });
-        }
-      } catch (dbErr) {
-        console.warn("[Offline SOS] Database persistence warning (in-memory copy exists):", dbErr);
-      }
-
       const defaultCategory: "medical" | "rescue" | "emergency" =
         emergencyType === "medical" ? "medical" : emergencyType === "trapped" ? "rescue" : "emergency";
 
-      // Fire the n8n webhook (same as the tRPC flow)
+      // Fire the n8n webhook (async non-blocking)
       void triggerN8nSosWebhook({
         id: incidentId,
         publicCode,
@@ -452,7 +485,7 @@ export function registerN8nRoutes(app: Express) {
         requestCategory: defaultCategory,
         latitude: body.latitude,
         longitude: body.longitude,
-        reporterId: null,
+        reporterId: authUserId,
         contactName: typeof body.contactName === "string" ? body.contactName.slice(0, 160) : null,
         reporterPhone:
           typeof body.reporterPhone === "string"
@@ -479,7 +512,7 @@ export function registerN8nRoutes(app: Express) {
   });
 
   // GET /api/incidents/:incidentId/status
-  // Supports numeric ID or SOS public code (e.g. SOS-XXXXXX)
+  // Protects numeric ID queries; allows publicCode tracking with minimal public data
   app.get("/api/incidents/:incidentId/status", async (req: Request, res: Response) => {
     try {
       const rawParam = req.params.incidentId ? req.params.incidentId.trim() : "";
@@ -487,12 +520,30 @@ export function registerN8nRoutes(app: Express) {
         return res.status(400).json({ error: "Missing incidentId parameter." });
       }
 
-      let incident: MemoryIncident | null = null;
-      if (/^\d+$/.test(rawParam)) {
-        incident = await getIncidentById(parseInt(rawParam, 10));
+      const isNumeric = /^\d+$/.test(rawParam);
+
+      // If numeric ID is queried, require authentication or matching n8n secret
+      if (isNumeric) {
+        const webhookSecret = req.headers["x-webhook-secret"];
+        const secretMatches = ENV.n8nSosWebhookSecret && webhookSecret === ENV.n8nSosWebhookSecret;
+
+        let isStaff = false;
+        try {
+          const user = await (await import("./_core/sdk")).sdk.authenticateRequest(req);
+          if (user && (user.role === "admin" || user.role === "rescuer" || user.role === "medical")) {
+            isStaff = true;
+          }
+        } catch {}
+
+        if (!secretMatches && !isStaff) {
+          return res.status(403).json({ error: "Access denied. Use publicCode for public tracking status." });
+        }
       }
 
-      if (!incident) {
+      let incident: MemoryIncident | null = null;
+      if (isNumeric) {
+        incident = await getIncidentById(parseInt(rawParam, 10));
+      } else {
         incident = await getIncidentByCode(rawParam.toUpperCase());
       }
 
@@ -501,18 +552,12 @@ export function registerN8nRoutes(app: Express) {
       }
 
       return res.json({
-        incidentId: incident.id,
+        incidentId: isNumeric ? incident.id : undefined,
         publicCode: incident.publicCode,
         severity: incident.severity,
         status: incident.status,
         emergencyType: incident.emergencyType,
-        peopleAffected: incident.peopleAffected,
         locationLabel: incident.locationLabel,
-        latitude: incident.latitude,
-        longitude: incident.longitude,
-        escalationLevel: incident.escalationLevel ?? 0,
-        lastEscalatedAt: incident.lastEscalatedAt ?? null,
-        automationStatus: incident.automationStatus ?? "active",
         createdAt: incident.createdAt,
         updatedAt: incident.updatedAt,
         dispatchedAt: incident.dispatchedAt ?? null,

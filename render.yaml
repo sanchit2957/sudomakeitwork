@@ -15,6 +15,14 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      - key: APP_URL
+        sync: false
+      - key: N8N_SOS_WEBHOOK_URL
+        sync: false
+      - key: N8N_SOS_WEBHOOK_SECRET
+        sync: false
+      - key: OSRM_ROUTER_URL
+        sync: false
       - key: VAPID_SUBJECT
         sync: false
       - key: VAPID_PUBLIC_KEY

@@ -94,20 +94,16 @@ export function evaluateCapabilityScore(
       .map(c => c.capability.toLowerCase().trim())
   );
 
-  // Infer capabilities from rescuer category or call sign asset tags if profile is present
-  if (profile) {
+  // If explicit capabilities are not yet registered, use registered profile category as legacy fallback
+  if (activeCaps.size === 0 && profile) {
     const rescuerCategory = profile.category?.toLowerCase();
-    const callSign = (profile.callSign || "").toLowerCase();
-
-    if (rescuerCategory === "medical" || callSign.includes("med") || callSign.includes("doctor") || callSign.includes("nurse") || callSign.includes("health")) {
+    if (rescuerCategory === "medical") {
       activeCaps.add("medical");
-    }
-    if (rescuerCategory === "boat" || callSign.includes("boat") || callSign.includes("ship") || callSign.includes("ndrf") || callSign.includes("sdrf") || callSign.includes("water") || callSign.includes("marine")) {
+    } else if (rescuerCategory === "boat") {
       activeCaps.add("flood_rescue");
       activeCaps.add("trapped_rescue");
       activeCaps.add("evacuation");
-    }
-    if (rescuerCategory === "ground-team") {
+    } else if (rescuerCategory === "ground-team") {
       activeCaps.add("general_emergency");
       activeCaps.add("trapped_rescue");
       activeCaps.add("evacuation");
