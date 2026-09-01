@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
 import { AlertCircle, AlertTriangle, Check, CheckCircle2, Clock, HeartPulse, LifeBuoy, MapPin, Navigation, ShieldAlert, Users, Volume2, VolumeX, X } from "lucide-react";
@@ -123,10 +123,17 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
 
   const { offer, incident } = data;
 
-  const [secondsRemaining, setSecondsRemaining] = useState(() => {
-    const diffMs = new Date(offer.expiresAt).getTime() - Date.now();
-    return Math.max(0, Math.ceil(diffMs / 1000)) || 30;
-  });
+  const initialSeconds = useMemo(() => {
+    const expiresMs = new Date(offer.expiresAt).getTime();
+    const offeredMs = offer.offeredAt ? new Date(offer.offeredAt).getTime() : expiresMs - 30_000;
+    const diffMs = expiresMs - Date.now();
+    const calculated = Math.ceil(diffMs / 1000);
+    if (calculated > 0 && calculated <= 120) return calculated;
+    const duration = Math.ceil((expiresMs - offeredMs) / 1000);
+    return duration > 0 ? duration : 30;
+  }, [offer.expiresAt, offer.offeredAt]);
+
+  const [secondsRemaining, setSecondsRemaining] = useState(initialSeconds);
   const [isExpired, setIsExpired] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -139,20 +146,20 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
     alertRef.current = alert;
     alert.start();
 
-    const expiresMs = new Date(offer.expiresAt).getTime();
+    const startLocal = Date.now();
+    const totalRemaining = initialSeconds;
 
     const checkTimer = () => {
-      const now = Date.now();
-      const diffMs = expiresMs - now;
-      const sec = Math.max(0, Math.ceil(diffMs / 1000));
+      const elapsedMs = Date.now() - startLocal;
+      const sec = Math.max(0, Math.ceil(totalRemaining - elapsedMs / 1000));
       setSecondsRemaining(sec);
 
-      if (diffMs <= 0) {
+      if (sec <= 0) {
         setIsExpired(true);
         alert.stop();
         if (!autoDeclinedRef.current) {
           autoDeclinedRef.current = true;
-          // Auto-trigger decline & reassignment when 30s timer expires
+          // Auto-trigger decline & reassignment when timer expires
           declineOffer
             .mutateAsync({ offerId: offer.id })
             .catch(() => {})
@@ -164,14 +171,13 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       }
     };
 
-    checkTimer();
     const interval = setInterval(checkTimer, 250);
 
     return () => {
       clearInterval(interval);
       alert.stop();
     };
-  }, [offer.id, offer.expiresAt]);
+  }, [offer.id, initialSeconds]);
 
   const handleAccept = async () => {
     if (isExpired || acceptOffer.isPending || declineOffer.isPending) return;

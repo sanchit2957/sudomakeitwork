@@ -318,16 +318,23 @@ function ResponderWorkspace() {
     <DashboardLayout navItems={nav} workspace={t("responder.workspace")} roleLabel={t("responder.role")}>
       <div className="space-y-6">
         {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && (
-          <div className="sticky top-2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
-            <EmergencyOfferCard
-              data={activeOffer.data as any}
-              onAccepted={() => {
-                void refreshOperationalState();
-              }}
-              onDeclined={() => {
-                void refreshOperationalState();
-              }}
-            />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="New Emergency Request"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200"
+          >
+            <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto">
+              <EmergencyOfferCard
+                data={activeOffer.data as any}
+                onAccepted={() => {
+                  void refreshOperationalState();
+                }}
+                onDeclined={() => {
+                  void refreshOperationalState();
+                }}
+              />
+            </div>
           </div>
         )}
         {location === "/responder/map" ? (
