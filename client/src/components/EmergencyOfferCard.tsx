@@ -34,8 +34,10 @@ interface EmergencyOfferCardProps {
 }
 
 /**
- * Robust Web Audio Synthesizer Alert for Responder Emergency Requests.
- * Generates an unmistakable dual-tone alert chime (880Hz / 659Hz) without network latency.
+ * Emergency Siren Synthesizer — Responder Alert.
+ * Synthesizes a realistic wailing police/ambulance siren sweep:
+ * 600 Hz → 1200 Hz → 600 Hz (0.9s per full cycle) using Web Audio API.
+ * No network required; works even in background tabs.
  */
 export class EmergencyAudioAlert {
   private ctx: AudioContext | null = null;
@@ -53,6 +55,7 @@ export class EmergencyAudioAlert {
     return this.ctx;
   }
 
+  /** Play one full siren wail cycle: sweeps 600→1200→600 Hz over ~1 second */
   playBeepPulse() {
     if (this.isMuted) return;
     try {
@@ -63,23 +66,48 @@ export class EmergencyAudioAlert {
       }
 
       const now = ctx.currentTime;
+
+      // Create a compressor to keep it from clipping
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -12;
+      compressor.ratio.value = 4;
+      compressor.connect(ctx.destination);
+
+      // Master gain envelope — fast attack, sustained, fast release
+      const masterGain = ctx.createGain();
+      masterGain.gain.setValueAtTime(0.0, now);
+      masterGain.gain.linearRampToValueAtTime(0.35, now + 0.04); // fast attack
+      masterGain.gain.setValueAtTime(0.35, now + 0.82);           // sustain
+      masterGain.gain.linearRampToValueAtTime(0.0, now + 0.90);  // fast release
+      masterGain.connect(compressor);
+
+      // Primary oscillator: sawtooth for bright siren timbre
       const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      // Sweep up 600 → 1200 Hz over 0.45s, then back down 1200 → 600 Hz over 0.45s
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.linearRampToValueAtTime(1200, now + 0.45);
+      osc.frequency.linearRampToValueAtTime(600, now + 0.90);
 
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(880, now); // A5 tone
-      osc.frequency.setValueAtTime(659.25, now + 0.15); // E5 tone
+      // Second oscillator slightly detuned for richer sound (+15 cents)
+      const osc2 = ctx.createOscillator();
+      osc2.type = "sawtooth";
+      osc2.frequency.setValueAtTime(617, now);   // 600 * 2^(15/1200) ≈ 617
+      osc2.frequency.linearRampToValueAtTime(1235, now + 0.45);
+      osc2.frequency.linearRampToValueAtTime(617, now + 0.90);
+      const osc2Gain = ctx.createGain();
+      osc2Gain.gain.value = 0.4; // slightly quieter
+      osc2.connect(osc2Gain);
+      osc2Gain.connect(masterGain);
 
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+      osc.connect(masterGain);
 
       osc.start(now);
-      osc.stop(now + 0.36);
+      osc2.start(now);
+      osc.stop(now + 0.95);
+      osc2.stop(now + 0.95);
     } catch {
-      // Gracefully catch autoplay block
+      // Gracefully catch autoplay block or unsupported API
     }
   }
 
@@ -87,11 +115,12 @@ export class EmergencyAudioAlert {
     if (this.isPlaying) return;
     this.isPlaying = true;
     this.playBeepPulse();
+    // Fire another sweep every 1 second (slightly longer than cycle to chain naturally)
     this.intervalId = setInterval(() => {
       if (this.isPlaying) {
         this.playBeepPulse();
       }
-    }, 4000);
+    }, 1000);
   }
 
   stop() {
@@ -232,26 +261,26 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
 
   const severityTone =
     incident.severity === "critical"
-      ? "bg-red-500/20 text-red-300 border-red-500/40"
+      ? "bg-red-100 text-red-700 border-red-300"
       : incident.severity === "high"
-      ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-      : "bg-blue-500/20 text-blue-300 border-blue-500/40";
+      ? "bg-amber-100 text-amber-700 border-amber-300"
+      : "bg-blue-100 text-blue-700 border-blue-300";
 
   return (
     <article
       data-testid="emergency-offer-card"
       role="region"
       aria-label="New Emergency Request"
-      className="relative overflow-hidden rounded-[1.8rem] border-2 border-red-500/60 bg-gradient-to-b from-[#181113] to-[#0f1715] p-5 text-white shadow-2xl shadow-red-950/70 ring-1 ring-red-500/30"
+      className="relative overflow-hidden rounded-[1.8rem] border-2 border-red-500 bg-white p-5 text-gray-900 shadow-2xl shadow-red-200 ring-4 ring-red-100 ring-offset-2"
     >
       {/* Top Banner */}
-      <div className="flex items-center justify-between gap-3 border-b border-red-500/20 pb-3.5">
+      <div className="flex items-center justify-between gap-3 border-b border-red-200 pb-3.5">
         <div className="flex items-center gap-2">
           <span className="relative flex h-3 w-3">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
           </span>
-          <h2 className="text-sm font-black uppercase tracking-wider text-red-400">
+          <h2 className="text-sm font-black uppercase tracking-wider text-red-600">
             {t("NEW EMERGENCY REQUEST")}
           </h2>
         </div>
@@ -260,11 +289,11 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
             type="button"
             onClick={toggleSound}
             aria-label={isMuted ? "Unmute alert chime" : "Mute alert chime"}
-            className="rounded-lg bg-white/10 p-1.5 text-zinc-300 hover:bg-white/20 hover:text-white transition"
+            className="rounded-lg bg-red-50 p-1.5 text-gray-500 hover:bg-red-100 hover:text-gray-800 transition border border-red-200"
           >
-            {isMuted ? <VolumeX className="h-3.5 w-3.5 text-red-400" /> : <Volume2 className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />}
+            {isMuted ? <VolumeX className="h-3.5 w-3.5 text-red-400" /> : <Volume2 className="h-3.5 w-3.5 text-red-500 animate-pulse" />}
           </button>
-          <span className="font-mono text-xs font-bold text-zinc-400">
+          <span className="font-mono text-xs font-bold text-gray-400">
             {incident.publicCode}
           </span>
         </div>
@@ -273,19 +302,19 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       {/* Main Details Grid */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {/* Type */}
-        <div className="rounded-xl bg-white/5 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+        <div className="rounded-xl bg-red-50 border border-red-100 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
             {t("Type")}
           </p>
-          <div className="mt-1 flex items-center gap-1.5 font-bold text-white text-xs">
-            <CategoryIcon className="h-4 w-4 text-emerald-400" />
+          <div className="mt-1 flex items-center gap-1.5 font-bold text-gray-800 text-xs">
+            <CategoryIcon className="h-4 w-4 text-red-600" />
             <span className="truncate">{categoryLabel}</span>
           </div>
         </div>
 
         {/* Priority */}
-        <div className="rounded-xl bg-white/5 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+        <div className="rounded-xl bg-red-50 border border-red-100 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
             {t("Priority")}
           </p>
           <span
@@ -296,55 +325,55 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
         </div>
 
         {/* Distance */}
-        <div className="rounded-xl bg-white/5 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+        <div className="rounded-xl bg-red-50 border border-red-100 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
             {t("Distance")}
           </p>
-          <p className="mt-1 flex items-center gap-1 font-mono text-xs font-black text-emerald-300">
+          <p className="mt-1 flex items-center gap-1 font-mono text-xs font-black text-red-600">
             <Navigation className="h-3.5 w-3.5" />
             {offer.distanceKm.toFixed(1)} km
           </p>
         </div>
 
         {/* People */}
-        <div className="rounded-xl bg-white/5 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+        <div className="rounded-xl bg-red-50 border border-red-100 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
             {t("People")}
           </p>
-          <p className="mt-1 flex items-center gap-1 font-bold text-white text-xs">
-            <Users className="h-3.5 w-3.5 text-zinc-400" />
+          <p className="mt-1 flex items-center gap-1 font-bold text-gray-800 text-xs">
+            <Users className="h-3.5 w-3.5 text-gray-500" />
             {incident.peopleAffected || 1}
           </p>
         </div>
       </div>
 
       {/* Location */}
-      <div className="mt-3 flex items-start gap-2 rounded-xl bg-white/5 p-3 text-xs">
-        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-        <span className="font-semibold text-zinc-200">{incident.locationLabel}</span>
+      <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 border border-red-100 p-3 text-xs">
+        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+        <span className="font-semibold text-gray-800">{incident.locationLabel}</span>
       </div>
 
       {incident.notes && (
-        <p className="mt-2 text-xs italic text-zinc-300 line-clamp-2 px-1">
+        <p className="mt-2 text-xs italic text-gray-500 line-clamp-2 px-1">
           "{incident.notes}"
         </p>
       )}
 
       {/* 30-Second Countdown Timer & Progress Bar */}
-      <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-950/40 p-3">
+      <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-            <Clock className="h-4 w-4 animate-spin text-amber-400" />
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-700">
+            <Clock className="h-4 w-4 animate-spin text-amber-500" />
             <span>{t("Offer expires in:")}</span>
           </div>
           <span
             data-testid="offer-countdown"
-            className="font-mono text-sm font-black tracking-widest text-amber-400"
+            className="font-mono text-sm font-black tracking-widest text-amber-700"
           >
             {isExpired ? "00:00" : formattedCountdown}
           </span>
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-amber-200">
           <div
             className="h-full rounded-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 transition-all duration-300 ease-linear"
             style={{ width: `${Math.min(100, Math.max(0, (secondsRemaining / 30) * 100))}%` }}
@@ -356,7 +385,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       {errorMsg && (
         <div
           role="alert"
-          className="mt-3 flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-950/60 p-2.5 text-xs text-red-300"
+          className="mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700"
         >
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{errorMsg}</span>
@@ -369,7 +398,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
           data-testid="accept-offer-btn"
           disabled={isExpired || acceptOffer.isPending || declineOffer.isPending}
           onClick={handleAccept}
-          className="h-11 rounded-xl bg-emerald-600 font-extrabold text-white shadow-lg shadow-emerald-950/40 hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-50"
+          className="h-11 rounded-xl bg-emerald-600 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-50"
         >
           <Check className="mr-1.5 h-5 w-5" />
           {acceptOffer.isPending ? t("Accepting…") : t("ACCEPT")}
@@ -380,7 +409,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
           variant="outline"
           disabled={isExpired || acceptOffer.isPending || declineOffer.isPending}
           onClick={handleDecline}
-          className="h-11 rounded-xl border-red-500/40 bg-transparent font-extrabold text-red-400 hover:bg-red-950/40 hover:text-red-300 active:scale-[0.98] disabled:opacity-50"
+          className="h-11 rounded-xl border-red-300 bg-white font-extrabold text-red-600 hover:bg-red-50 hover:text-red-700 active:scale-[0.98] disabled:opacity-50"
         >
           <X className="mr-1.5 h-5 w-5" />
           {declineOffer.isPending ? t("Declining…") : t("DECLINE")}

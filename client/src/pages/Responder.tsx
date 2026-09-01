@@ -85,8 +85,9 @@ function ResponderWorkspace() {
   const utils = trpc.useUtils();
   const [pushState, setPushState] = useState<PushState>("not_requested");
   const [pushDetail, setPushDetail] = useState("");
-  const liveMissionQuery = { refetchInterval: 4_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
-  const liveOfferQuery = { refetchInterval: 3_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
+  const liveMissionQuery = { refetchInterval: 4_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, refetchOnReconnect: true } as const;
+  // activeOffer MUST poll at 1s: 30-second emergency window requires near-instant detection
+  const liveOfferQuery = { refetchInterval: 1_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, refetchOnReconnect: true, staleTime: 0 } as const;
   const liveLayersQuery = { refetchInterval: 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const liveProfileQuery = { refetchInterval: 15_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const profile = trpc.rescue.rescuer.profile.useQuery(undefined, liveProfileQuery);
@@ -143,6 +144,7 @@ function ResponderWorkspace() {
   const hasActiveMission = Boolean(activeMissionRow);
 
   const lastNotifiedOfferIdRef = useRef<number | null>(null);
+  const lastNotifiedAlertIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     const refresh = () => refreshOperationalState();
@@ -168,32 +170,45 @@ function ResponderWorkspace() {
     }
   }, []);
 
-  // Generic alerts feed effect: unconditional notification (not gated on visibility)
+  // Generic alerts feed effect: fires once per unique unread alert ID, not on every polling cycle.
+  // The emergency mission offer takes priority over this generic feed — it is handled separately.
   useEffect(() => {
     if (!alerts.data) return;
-    const newest = alerts.data.items.find(item => !item.readAt);
-    if (!newest) return;
+    // Only process the most-recent unread alert that is NOT a priority_incident (those are handled by activeOffer)
+    const newest = alerts.data.items.find(item => !item.readAt && item.type !== "priority_incident");
+    if (!newest) {
+      // If no non-priority unread, also reset so future ones fire
+      return;
+    }
+    // Guard: only fire once per unique alert ID to prevent duplicate notifications on every polling cycle
+    if (lastNotifiedAlertIdRef.current === newest.id) return;
+    lastNotifiedAlertIdRef.current = newest.id;
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       try {
-        new Notification(newest.title, { body: newest.body });
+        new Notification(newest.title, {
+          body: newest.body,
+          tag: `alert-${newest.id}`,
+        });
       } catch {}
     }
     void showNotification({ title: newest.title, body: newest.body, id: newest.id });
   }, [alerts.data]);
 
-  // Dedicated Active Mission Offer effect: audio alert + document title flashing + unconditional OS notification
+  // Dedicated Active Mission Offer effect: audio alert + document title flashing + unconditional OS notification.
+  // Uses lastNotifiedOfferIdRef so each offer ID only fires ONE notification, never duplicated across polling cycles.
+  // When the offer clears (no longer active), resets tracking so the NEXT offer fires fresh.
   useEffect(() => {
     const offerData = activeOffer.data;
     if (offerData?.hasOffer && offerData.offer && offerData.incident) {
       const offerId = offerData.offer.id;
       if (lastNotifiedOfferIdRef.current !== offerId) {
         lastNotifiedOfferIdRef.current = offerId;
-        // 1. Play immediate audio alert
+        // 1. Play immediate audio alert (attempt; browser autoplay policy may block silently)
         playEmergencyAudioAlert();
-        // 2. Fire unconditional native/web notification
+        // 2. Fire ONE unconditional native/web OS notification for this offer ID (requireInteraction keeps it visible)
         void showNotification({
           title: `🚨 EMERGENCY SOS OFFER: ${offerData.incident.requestCategory.toUpperCase()}`,
-          body: `${offerData.incident.severity.toUpperCase()} SOS at ${offerData.incident.locationLabel}. 15s to accept!`,
+          body: `${offerData.incident.severity.toUpperCase()} SOS at ${offerData.incident.locationLabel}. 30s to accept!`,
           id: offerId,
         });
       }
@@ -204,7 +219,7 @@ function ResponderWorkspace() {
       const titleInterval = window.setInterval(() => {
         flashState = !flashState;
         document.title = flashState
-          ? `(1) 🚨 NEW SOS - sudo MakeItWork`
+          ? `🚨 NEW SOS — ACCEPT NOW`
           : `⚠️ MISSION OFFER PENDING`;
       }, 800);
 
@@ -213,6 +228,7 @@ function ResponderWorkspace() {
         document.title = originalTitle;
       };
     } else {
+      // Offer cleared (accepted / declined / expired) — reset tracking so next offer triggers fresh alert
       lastNotifiedOfferIdRef.current = null;
     }
   }, [activeOffer.data?.hasOffer, activeOffer.data?.offer?.id]);
@@ -350,7 +366,7 @@ function ResponderWorkspace() {
             role="dialog"
             aria-modal="true"
             aria-label="New Emergency Request"
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-white/95 p-4 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200"
           >
             <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto">
               <EmergencyOfferCard

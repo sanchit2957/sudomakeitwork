@@ -321,7 +321,7 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
       null,
       "responder_offer_created",
       "Mission broadcast dispatched",
-      `Offers dispatched simultaneously to ${rankedMatches.length} nearby response unit(s). 15-second response window active.`
+      `Offers dispatched simultaneously to ${rankedMatches.length} nearby response unit(s). 30-second response window active.`
     );
 
     // Send push / notifications to all rescuer candidates simultaneously
@@ -329,7 +329,7 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
       const candidateUserIds = rankedMatches.map((r) => r.candidate.user.id);
       const pushResult = await sendRescuerPush(candidateUserIds, {
         title: `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
-        body: `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 15s to accept.`,
+        body: `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 30s to accept.`,
         incidentId: incident.id,
         url: "/responder",
       });
@@ -351,7 +351,7 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
           await createNotification(
             rescuerId,
             `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
-            `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 15s to accept.`,
+            `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 30s to accept.`,
             incident.id,
             "priority_incident"
           );
@@ -363,7 +363,7 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
         await createNotification(
           r.candidate.user.id,
           `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
-          `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 15s to accept.`,
+          `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 30s to accept.`,
           incident.id,
           "priority_incident"
         );
