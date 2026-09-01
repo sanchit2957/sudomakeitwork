@@ -10,6 +10,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { donationRouter } from "../routers/donations";
 import { registerN8nRoutes } from "../n8n";
+import { liveTrackingRouter } from "../tracking/liveStream";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
@@ -130,6 +131,9 @@ async function startServer() {
 
   // n8n webhook routes + offline SOS endpoint
   registerN8nRoutes(app);
+
+  // Real-time SSE Live Tracking stream
+  app.use(liveTrackingRouter);
 
   // Lightweight production diagnostic /health endpoint
   app.get("/health", async (_req, res) => {

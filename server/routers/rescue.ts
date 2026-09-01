@@ -103,6 +103,8 @@ import {
 } from "../safety-assistance.policy";
 import { sendRescuerPush } from "../push";
 import { triggerN8nSosWebhook } from "../n8n";
+import { calculateRoadRouteAndEta } from "../routing/routing.service";
+import { broadcastLiveTrackingUpdate, broadcastMissionStatusUpdate } from "../tracking/liveStream";
 
 const incidentCode = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
 const severitySchema = z.enum(["critical", "high", "medium", "low"]);
@@ -739,6 +741,25 @@ export const rescueRouter = router({
           getActiveAssignedRescuerForIncident(incident.id),
         ]);
         const profile = assigned?.profile;
+        const presentedRescuer = !assigned || !profile ? null : presentAssignedRescuerToVictim({ ...profile, name: assigned.user.name });
+        let computedRoute = null;
+
+        if (presentedRescuer && presentedRescuer.location) {
+          const targetPoint = { latitude: incident.latitude, longitude: incident.longitude };
+          const route = await calculateRoadRouteAndEta(
+            { latitude: presentedRescuer.location.latitude, longitude: presentedRescuer.location.longitude },
+            targetPoint
+          );
+          computedRoute = {
+            distanceKm: route.distanceKm,
+            distanceText: route.distanceText,
+            durationMinutes: route.durationMinutes,
+            etaText: route.etaText,
+            isApproximate: route.isApproximate,
+            coordinates: route.coordinates,
+          };
+        }
+
         return {
           publicCode: incident.publicCode,
           status: incident.status,
@@ -755,7 +776,11 @@ export const rescueRouter = router({
           dispatchedAt: incident.dispatchedAt,
           resolvedAt: incident.resolvedAt,
           events,
-          assignedRescuer: !assigned || !profile ? null : { ...presentAssignedRescuerToVictim({ ...profile, name: assigned.user.name }), destination: { latitude: incident.latitude, longitude: incident.longitude } },
+          assignedRescuer: !assigned || !profile ? null : {
+            ...presentedRescuer!,
+            destination: { latitude: incident.latitude, longitude: incident.longitude },
+            route: computedRoute,
+          },
           destinationHospitalId: (incident as any).destinationHospitalId || null,
           destinationHospitalName: (incident as any).destinationHospitalName || null,
           destinationHospital: (incident as any).destinationHospitalId
@@ -2846,18 +2871,31 @@ export const rescueRouter = router({
         return { success: true };
       }),
     updateLiveLocation: rescuerProcedure
-      .input(z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }))
+      .input(
+        z.object({
+          latitude: z.number().min(-90).max(90),
+          longitude: z.number().min(-180).max(180),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
+        if (isNaN(input.latitude) || isNaN(input.longitude) || !isFinite(input.latitude) || !isFinite(input.longitude)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid GPS coordinates." });
+        }
+
         const profile = await getRescuerProfile(ctx.user.id);
         if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Rescuer profile not found." });
-        const hasOpenMission = (await listMissionsForRescuer(ctx.user.id)).some(
+
+        const openMissions = (await listMissionsForRescuer(ctx.user.id)).filter(
           ({ mission }) => mission.status !== "resolved"
         );
-        if (!hasOpenMission)
+        if (openMissions.length === 0) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "Live location updates are available only during an active assigned mission.",
           });
+        }
+
+        const now = new Date();
         const db = await database();
         if (db) {
           try {
@@ -2867,19 +2905,69 @@ export const rescueRouter = router({
                 locationSharing: "yes",
                 lastLatitude: input.latitude,
                 lastLongitude: input.longitude,
-                locationUpdatedAt: new Date(),
+                locationUpdatedAt: now,
               })
               .where(eq(rescueProfiles.userId, ctx.user.id));
-          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+          } catch (err) {
+            if (process.env.NODE_ENV === "production") {
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database operation failed in production" });
+            }
+          }
         }
+
         const mem = _memoryRescueProfiles.get(ctx.user.id);
         if (mem) {
           mem.locationSharing = "yes";
           mem.lastLatitude = input.latitude;
           mem.lastLongitude = input.longitude;
-          mem.locationUpdatedAt = new Date();
-          mem.updatedAt = new Date();
+          mem.locationUpdatedAt = now;
+          mem.updatedAt = now;
         }
+
+        // Broadcast to all active open missions assigned to this rescuer
+        for (const { mission, incident } of openMissions) {
+          if (!incident) continue;
+
+          const targetPoint = { latitude: incident.latitude, longitude: incident.longitude };
+          const route = await calculateRoadRouteAndEta(
+            { latitude: input.latitude, longitude: input.longitude },
+            targetPoint
+          );
+
+          broadcastLiveTrackingUpdate(incident.publicCode, {
+            type: "rescuer_location",
+            publicCode: incident.publicCode,
+            incidentStatus: incident.status,
+            rescuer: {
+              callSign: profile.callSign,
+              name: ctx.user.name || null,
+              photoUrl: profile.photoUrl || null,
+              phone: profile.contactSharing === "yes" ? profile.phone : null,
+              locationStatus: "live",
+              latitude: input.latitude,
+              longitude: input.longitude,
+              updatedAt: now.toISOString(),
+            },
+            route: {
+              distanceKm: route.distanceKm,
+              distanceText: route.distanceText,
+              durationMinutes: route.durationMinutes,
+              etaText: route.etaText,
+              isApproximate: route.isApproximate,
+              coordinates: route.coordinates,
+            },
+            destinationHospital: (incident as any).destinationHospitalId
+              ? {
+                  id: (incident as any).destinationHospitalId,
+                  name: (incident as any).destinationHospitalName || "Hospital",
+                  latitude: targetPoint.latitude,
+                  longitude: targetPoint.longitude,
+                }
+              : null,
+            timestamp: now.toISOString(),
+          });
+        }
+
         return { success: true };
       }),
     notifyHospital: rescuerProcedure
@@ -3094,6 +3182,15 @@ export const rescueRouter = router({
           input.status === "dispatched" ? "Rescuer dispatched" : "Rescue resolved",
           input.notes ?? null
         );
+        // Broadcast mission status to all live tracking viewers
+        const incForBroadcast = _memoryIncidents.get(mission.incidentId);
+        if (incForBroadcast) {
+          broadcastMissionStatusUpdate(
+            incForBroadcast.publicCode,
+            input.status,
+            input.notes
+          );
+        }
         await writeAudit(ctx.user.id, "mission.update", "mission", mission.id, input.status);
         return { success: true };
       }),

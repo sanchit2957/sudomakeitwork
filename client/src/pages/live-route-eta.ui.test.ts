@@ -15,9 +15,13 @@ describe("live rescuer route and ETA tracking", () => {
     expect(track).toContain('title: "Assigned rescuer"');
     expect(track).toContain("travelMode: maps.TravelMode.DRIVING");
     expect(track).toContain("Live route · ETA");
-    expect(track).toContain("Route estimate is temporarily unavailable.");
-    expect(track).toContain("destination={rescuer.destination}");
+    // OSRM route unavailable shows ETA text from server SSE or null state
+    expect(track).toContain("etaText ||");
+    expect(track).toContain("rescuer.destination");
+    // Chat still polls every 5s
     expect(track).toContain("refetchInterval: 5_000");
+    // SSE hook integrated
+    expect(track).toContain("useLiveRescuerStream");
   });
 
   it("loads routing support through the existing authenticated Maps proxy", () => {

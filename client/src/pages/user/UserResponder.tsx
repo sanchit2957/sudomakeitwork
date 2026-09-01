@@ -216,29 +216,60 @@ function ResponderWorkspace() {
     }
   }, [activeOffer.data?.hasOffer, activeOffer.data?.offer?.id]);
 
+  // Live GPS tracking: only during active assigned missions
   useEffect(() => {
-    const isAvailable = profile.data?.availability === "available";
-    if ((!isAvailable && !hasActiveMission) || !navigator.geolocation) return;
-    let sending = false;
-    const publishLocation = () => {
-      if (sending) return;
-      sending = true;
-      navigator.geolocation.getCurrentPosition(
-        point =>
-          updateLiveLocation.mutate(
-            { latitude: point.coords.latitude, longitude: point.coords.longitude },
-            { onSettled: () => { sending = false; } }
-          ),
-        () => {
-          sending = false;
+    // Only track when there is an active mission — never when off-duty or available without mission
+    if (!hasActiveMission || !navigator.geolocation) return;
+
+    let watchId: number | null = null;
+    let isMounted = true;
+
+    const startWatch = () => {
+      watchId = navigator.geolocation.watchPosition(
+        (point) => {
+          if (!isMounted) return;
+          const lat = point.coords.latitude;
+          const lng = point.coords.longitude;
+          // Coordinate sanity validation before submitting to server
+          if (
+            typeof lat === "number" &&
+            typeof lng === "number" &&
+            !isNaN(lat) &&
+            !isNaN(lng) &&
+            isFinite(lat) &&
+            isFinite(lng) &&
+            lat >= -90 && lat <= 90 &&
+            lng >= -180 && lng <= 180
+          ) {
+            updateLiveLocation.mutate({ latitude: lat, longitude: lng });
+          }
         },
-        { enableHighAccuracy: true, maximumAge: 4_000, timeout: 4_500 }
+        () => {
+          // GPS error: clear watch and retry in 8 seconds (preserves last known position on server)
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+          }
+          if (isMounted) {
+            setTimeout(() => {
+              if (isMounted) startWatch();
+            }, 8_000);
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 3_000, timeout: 5_000 }
       );
     };
-    publishLocation();
-    const intervalId = window.setInterval(publishLocation, 5_000);
-    return () => window.clearInterval(intervalId);
-  }, [profile.data?.availability, hasActiveMission]);
+
+    startWatch();
+
+    return () => {
+      isMounted = false;
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+    };
+  }, [hasActiveMission]);
 
   const enableAlerts = async () => {
     if (!pushConfig.data?.enabled || !pushConfig.data.publicKey) {

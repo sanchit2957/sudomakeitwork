@@ -30,7 +30,8 @@ describe("assigned rescuer profile and location UI", () => {
   it("renders victim contact and a map only for an assigned rescuer sharing fresh live coordinates", () => {
     const markup = render(createElement(AssignedRescuerCard, { rescuer: { callSign: "Boat 4", name: "Rescue Volunteer", photoUrl: null, phone: "+919999999999", locationStatus: "live", location: { latitude: 26.1445, longitude: 91.7362, updatedAt: new Date() } } }));
     expect(markup).toContain("tel:+919999999999");
-    expect(markup).toContain("Live rescuer location · updating every 5 seconds");
+    // New dynamic GPS label (SSE-powered)
+    expect(markup).toContain("Live GPS");
     expect(markup).toContain("h-60");
   });
 
@@ -38,9 +39,10 @@ describe("assigned rescuer profile and location UI", () => {
     const paused = render(createElement(AssignedRescuerCard, { rescuer: { callSign: "Boat 4", name: null, photoUrl: null, phone: null, locationStatus: "paused", location: null } }));
     const notStarted = render(createElement(AssignedRescuerCard, { rescuer: { callSign: "Boat 4", name: null, photoUrl: null, phone: null, locationStatus: "off", location: null } }));
     expect(paused).toContain("Contact is shared when the responder enables it");
-    expect(paused).toContain("Waiting for the next automatic location update");
+    // New dynamic GPS label: 'Waiting for next location update' (shorter text)
+    expect(paused).toContain("Waiting for next location update");
     expect(paused).not.toContain("h-60");
-    expect(notStarted).toContain("Location sharing starts automatically after assignment");
+    expect(notStarted).toContain("Location sharing starts after assignment");
     expect(notStarted).not.toContain("tel:");
   });
 });
