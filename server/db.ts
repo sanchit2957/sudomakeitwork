@@ -114,7 +114,7 @@ export function recordDbFailure(error?: any, operationName?: string) {
 
 export async function withDbTimeout<T>(
   promise: Promise<T>,
-  timeoutMs: number = 4000,
+  timeoutMs: number = 10000,
   operationName: string = "db_operation"
 ): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
@@ -151,7 +151,7 @@ export function createDatabasePool(connectionUri: string): mysql.Pool {
     connectionLimit: 10,
     maxIdle: 2,
     idleTimeout: 15000,
-    connectTimeout: 5000,
+    connectTimeout: 15000,
     enableKeepAlive: true,
     keepAliveInitialDelay: 5000,
     queueLimit: 20,
@@ -225,170 +225,531 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
   if (_schemaEnsured) return;
   _schemaEnsured = true;
   try {
-    const conn = await withDbTimeout(pool.getConnection(), 5000, "ensureSchema_getConnection");
+    const conn = await withDbTimeout(pool.getConnection(), 8000, "ensureSchema_getConnection");
     try {
-      // 1. Ensure columns exist on users
-      const [cols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `users`"), 4000, "ensureSchema_showCols");
-      const colNames = new Set((cols || []).map((c: any) => c.Field));
-
-      if (!colNames.has("password")) {
-        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `password` VARCHAR(255) NULL"), 4000, "ensureSchema_alterPassword");
-      }
-      if (!colNames.has("status")) {
-        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `status` ENUM('active','disabled') NOT NULL DEFAULT 'active'"), 4000, "ensureSchema_alterStatus");
-      }
-      if (!colNames.has("loginMethod")) {
-        await withDbTimeout(conn.query("ALTER TABLE `users` ADD COLUMN `loginMethod` VARCHAR(64) NULL"), 4000, "ensureSchema_alterLoginMethod");
-      }
-
-      // Ensure role column on users supports hospital, medical, rescuer, admin, user
-      try {
-        await withDbTimeout(conn.query("ALTER TABLE `users` MODIFY COLUMN `role` VARCHAR(32) NOT NULL DEFAULT 'user'"), 4000, "ensureSchema_alterRoleVarChar");
-      } catch {
+      const execDdl = async (sql: string, tag: string) => {
         try {
-          await withDbTimeout(conn.query("ALTER TABLE `users` MODIFY COLUMN `role` ENUM('user','rescuer','hospital','admin','medical') NOT NULL DEFAULT 'user'"), 4000, "ensureSchema_alterRoleEnum");
-        } catch {}
-      }
+          await withDbTimeout(conn.query(sql), 5000, tag);
+        } catch (err: any) {
+          const code = err?.code || "";
+          if (code !== "ER_TABLE_EXISTS_ERROR" && code !== "ER_DUP_FIELDNAME" && code !== "ER_DUP_KEYNAME") {
+            console.warn(`[Database] DDL note (${tag}):`, err?.message || err);
+          }
+        }
+      };
 
-      // 2. Ensure roleAccessCodes table exists
-      await withDbTimeout(
-        conn.query(`
-          CREATE TABLE IF NOT EXISTS \`roleAccessCodes\` (
-            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-            \`role\` VARCHAR(32) NOT NULL UNIQUE,
-            \`codeHash\` VARCHAR(255) NOT NULL,
-            \`codeVersion\` INT NOT NULL DEFAULT 1,
-            \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            \`updatedBy\` INT NULL
-          )
-        `),
-        4000,
-        "ensureSchema_createRoleAccessCodes"
-      );
+      // 1. users
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`users\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`openId\` VARCHAR(64) NOT NULL UNIQUE,
+          \`name\` TEXT NULL,
+          \`email\` VARCHAR(320) NULL,
+          \`password\` VARCHAR(255) NULL,
+          \`loginMethod\` VARCHAR(64) NULL,
+          \`role\` VARCHAR(32) NOT NULL DEFAULT 'user',
+          \`status\` ENUM('active','disabled') NOT NULL DEFAULT 'active',
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          \`lastSignedIn\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `, "ensureSchema_createUsers");
 
-      // Seed initial roleAccessCodes if missing in table
       try {
-        const [existingCodes]: any = await withDbTimeout(conn.query("SELECT `role` FROM `roleAccessCodes`"), 4000, "ensureSchema_checkRoleCodes");
-        const existingRoles = new Set((existingCodes || []).map((r: any) => r.role));
-        if (!existingRoles.has("rescuer")) {
-          await withDbTimeout(
-            conn.query("INSERT IGNORE INTO `roleAccessCodes` (`role`, `codeHash`, `codeVersion`, `updatedAt`) VALUES (?, ?, 1, NOW())", ["rescuer", hashPassword("RESCUER-2026")]),
-            4000,
-            "ensureSchema_seedRescuerCode"
-          );
-        }
-        if (!existingRoles.has("hospital")) {
-          await withDbTimeout(
-            conn.query("INSERT IGNORE INTO `roleAccessCodes` (`role`, `codeHash`, `codeVersion`, `updatedAt`) VALUES (?, ?, 1, NOW())", ["hospital", hashPassword("HOSPITAL-2026")]),
-            4000,
-            "ensureSchema_seedHospitalCode"
-          );
-        }
-
-        // Ensure default dev seed users maintain their canonical roles
-        await withDbTimeout(
-          conn.query("UPDATE `users` SET `role` = 'user' WHERE `openId` = 'user-citizen' AND `role` != 'user'"),
-          4000,
-          "ensureSchema_resetCitizenRole"
-        );
-        await withDbTimeout(
-          conn.query("UPDATE `users` SET `role` = 'admin' WHERE `openId` = 'user-admin' AND `role` != 'admin'"),
-          4000,
-          "ensureSchema_resetAdminRole"
-        );
+        const [cols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `users`"), 8000, "ensureSchema_showCols");
+        const colNames = new Set((cols || []).map((c: any) => c.Field));
+        if (!colNames.has("password")) await execDdl("ALTER TABLE `users` ADD COLUMN `password` VARCHAR(255) NULL", "addCol_users_password");
+        if (!colNames.has("status")) await execDdl("ALTER TABLE `users` ADD COLUMN `status` ENUM('active','disabled') NOT NULL DEFAULT 'active'", "addCol_users_status");
+        if (!colNames.has("loginMethod")) await execDdl("ALTER TABLE `users` ADD COLUMN `loginMethod` VARCHAR(64) NULL", "addCol_users_loginMethod");
+        if (!colNames.has("lastSignedIn")) await execDdl("ALTER TABLE `users` ADD COLUMN `lastSignedIn` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP", "addCol_users_lastSignedIn");
+        await execDdl("ALTER TABLE `users` MODIFY COLUMN `role` VARCHAR(32) NOT NULL DEFAULT 'user'", "modifyCol_users_role");
       } catch {}
 
-      // 3. Ensure emergencyContacts table exists
-      await withDbTimeout(
-        conn.query(`
-          CREATE TABLE IF NOT EXISTS \`emergencyContacts\` (
-            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-            \`userId\` INT NOT NULL,
-            \`name\` VARCHAR(160) NOT NULL,
-            \`relation\` VARCHAR(64) NOT NULL,
-            \`phone\` VARCHAR(32) NOT NULL,
-            \`alternatePhone\` VARCHAR(32) NULL,
-            \`isPrimary\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
-            \`notes\` TEXT NULL,
-            \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX \`emergencyContacts_userId_idx\` (\`userId\`)
-          )
-        `),
-        4000,
-        "ensureSchema_createEmergencyContacts"
-      );
+      // 2. roleAccessCodes
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`roleAccessCodes\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`role\` VARCHAR(32) NOT NULL UNIQUE,
+          \`codeHash\` VARCHAR(255) NOT NULL,
+          \`codeVersion\` INT NOT NULL DEFAULT 1,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          \`updatedBy\` INT NULL
+        )
+      `, "ensureSchema_createRoleAccessCodes");
 
-      // 4. Ensure rescueProfiles table exists
-      await withDbTimeout(
-        conn.query(`
-          CREATE TABLE IF NOT EXISTS \`rescueProfiles\` (
-            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-            \`userId\` INT NOT NULL UNIQUE,
-            \`callSign\` VARCHAR(64) NOT NULL,
-            \`phone\` VARCHAR(32) NULL,
-            \`photoKey\` VARCHAR(255) NULL,
-            \`photoUrl\` TEXT NULL,
-            \`contactSharing\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
-            \`locationSharing\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
-            \`availability\` ENUM('available', 'on_mission', 'off_duty') NOT NULL DEFAULT 'available',
-            \`lastLatitude\` DOUBLE NULL,
-            \`lastLongitude\` DOUBLE NULL,
-            \`locationUpdatedAt\` TIMESTAMP NULL,
-            \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX \`rescueProfiles_availability_idx\` (\`availability\`)
-          )
-        `),
-        4000,
-        "ensureSchema_createRescueProfiles"
-      );
+      try {
+        await execDdl("INSERT IGNORE INTO `roleAccessCodes` (`role`, `codeHash`, `codeVersion`, `updatedAt`) VALUES ('rescuer', '" + hashPassword("RESCUER-2026") + "', 1, NOW())", "seed_rescuerCode");
+        await execDdl("INSERT IGNORE INTO `roleAccessCodes` (`role`, `codeHash`, `codeVersion`, `updatedAt`) VALUES ('hospital', '" + hashPassword("HOSPITAL-2026") + "', 1, NOW())", "seed_hospitalCode");
+        await execDdl("UPDATE `users` SET `role` = 'user' WHERE `openId` = 'user-citizen' AND `role` != 'user'", "resetCitizenRole");
+        await execDdl("UPDATE `users` SET `role` = 'admin' WHERE `openId` = 'user-admin' AND `role` != 'admin'", "resetAdminRole");
+      } catch {}
 
-      // 5. Ensure hospitalStaffProfiles table exists
-      await withDbTimeout(
-        conn.query(`
-          CREATE TABLE IF NOT EXISTS \`hospitalStaffProfiles\` (
-            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-            \`userId\` INT NOT NULL UNIQUE,
-            \`hospitalId\` INT NOT NULL,
-            \`designation\` VARCHAR(120) NULL,
-            \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX \`hospitalStaffProfiles_hospitalId_idx\` (\`hospitalId\`)
-          )
-        `),
-        4000,
-        "ensureSchema_createHospitalStaffProfiles"
-      );
+      // 3. emergencyContacts
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`emergencyContacts\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`userId\` INT NOT NULL,
+          \`name\` VARCHAR(160) NOT NULL,
+          \`relation\` VARCHAR(64) NOT NULL,
+          \`phone\` VARCHAR(32) NOT NULL,
+          \`alternatePhone\` VARCHAR(32) NULL,
+          \`isPrimary\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
+          \`notes\` TEXT NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`emergencyContacts_userId_idx\` (\`userId\`)
+        )
+      `, "ensureSchema_createEmergencyContacts");
 
-      // 6. Ensure hospitalCaseNotifications table exists
-      await withDbTimeout(
-        conn.query(`
-          CREATE TABLE IF NOT EXISTS \`hospitalCaseNotifications\` (
-            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-            \`incidentId\` INT NOT NULL,
-            \`hospitalId\` INT NOT NULL,
-            \`rescuerId\` INT NOT NULL,
-            \`severity\` ENUM('critical', 'high', 'medium', 'low') NOT NULL DEFAULT 'high',
-            \`patientCount\` INT NOT NULL DEFAULT 1,
-            \`estimatedArrivalMinutes\` INT NOT NULL DEFAULT 15,
-            \`requiredDepartment\` VARCHAR(120) NOT NULL DEFAULT 'Emergency & Trauma',
-            \`icuRequired\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
-            \`oxygenRequired\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
-            \`notes\` TEXT NULL,
-            \`status\` ENUM('notified', 'acknowledged', 'preparing', 'ready', 'received', 'completed') NOT NULL DEFAULT 'notified',
-            \`hospitalNotes\` TEXT NULL,
-            \`acknowledgedAt\` TIMESTAMP NULL,
-            \`receivedAt\` TIMESTAMP NULL,
-            \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX \`hospitalCaseNotifications_hospitalId_status_idx\` (\`hospitalId\`, \`status\`),
-            INDEX \`hospitalCaseNotifications_incidentId_idx\` (\`incidentId\`),
-            INDEX \`hospitalCaseNotifications_rescuerId_idx\` (\`rescuerId\`)
-          )
-        `),
-        4000,
-        "ensureSchema_createHospitalCaseNotifications"
-      );
+      // 4. rescueProfiles
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`rescueProfiles\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`userId\` INT NOT NULL UNIQUE,
+          \`callSign\` VARCHAR(96) NOT NULL,
+          \`phone\` VARCHAR(32) NULL,
+          \`photoKey\` VARCHAR(512) NULL,
+          \`photoUrl\` TEXT NULL,
+          \`contactSharing\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
+          \`locationSharing\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
+          \`availability\` ENUM('available', 'on_mission', 'off_duty') NOT NULL DEFAULT 'available',
+          \`category\` ENUM('medical', 'boat', 'ground-team', 'other') NOT NULL DEFAULT 'ground-team',
+          \`lastLatitude\` DOUBLE NULL,
+          \`lastLongitude\` DOUBLE NULL,
+          \`locationUpdatedAt\` TIMESTAMP NULL,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`rescueProfiles_availability_idx\` (\`availability\`)
+        )
+      `, "ensureSchema_createRescueProfiles");
+
+      try {
+        const [rCols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `rescueProfiles`"), 4000, "ensureSchema_showRCols");
+        const rColNames = new Set((rCols || []).map((c: any) => c.Field));
+        if (!rColNames.has("category")) await execDdl("ALTER TABLE `rescueProfiles` ADD COLUMN `category` ENUM('medical', 'boat', 'ground-team', 'other') NOT NULL DEFAULT 'ground-team'", "addCol_rescueProfiles_category");
+      } catch {}
+
+      // 5. rescuerRegistrationRequests
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`rescuerRegistrationRequests\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`userId\` INT NOT NULL UNIQUE,
+          \`phone\` VARCHAR(32) NULL,
+          \`note\` TEXT NULL,
+          \`status\` ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+          \`reviewedBy\` INT NULL,
+          \`reviewNote\` TEXT NULL,
+          \`reviewedAt\` TIMESTAMP NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`rescuerRegistrationRequests_status_createdAt_idx\` (\`status\`, \`createdAt\`)
+        )
+      `, "ensureSchema_createRescuerRegistrationRequests");
+
+      // 6. incidents (CRITICAL FOR SOS DISPATCH)
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`incidents\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`publicCode\` VARCHAR(24) NOT NULL UNIQUE,
+          \`reporterId\` INT NULL,
+          \`contactName\` VARCHAR(160) NULL,
+          \`locationLabel\` VARCHAR(360) NOT NULL,
+          \`latitude\` DOUBLE NOT NULL,
+          \`longitude\` DOUBLE NOT NULL,
+          \`emergencyType\` ENUM('flood', 'medical', 'trapped', 'evacuation', 'other') NOT NULL,
+          \`helpNeeds\` TEXT NULL,
+          \`severity\` ENUM('critical', 'high', 'medium', 'low') NOT NULL DEFAULT 'medium',
+          \`peopleAffected\` INT NOT NULL DEFAULT 1,
+          \`notes\` TEXT NULL,
+          \`evidenceKey\` VARCHAR(512) NULL,
+          \`evidenceUrl\` VARCHAR(1024) NULL,
+          \`voiceNoteKey\` VARCHAR(512) NULL,
+          \`voiceNoteUrl\` VARCHAR(1024) NULL,
+          \`voiceNoteDurationSeconds\` INT NULL,
+          \`status\` ENUM('pending', 'dispatched', 'resolved') NOT NULL DEFAULT 'pending',
+          \`requestCategory\` ENUM('medical', 'rescue', 'emergency') NOT NULL DEFAULT 'emergency',
+          \`triageStartedAt\` TIMESTAMP NULL,
+          \`triageDeadlineAt\` TIMESTAMP NULL,
+          \`triageSelectedAt\` TIMESTAMP NULL,
+          \`dispatchStatus\` ENUM('triage_pending', 'matching', 'offered', 'assigned', 'escalated', 'resolved') NOT NULL DEFAULT 'triage_pending',
+          \`matchingStartedAt\` TIMESTAMP NULL,
+          \`matchingAttempts\` INT NOT NULL DEFAULT 0,
+          \`escalatedToCommandAt\` TIMESTAMP NULL,
+          \`assignedRescuerId\` INT NULL,
+          \`destinationHospitalId\` INT NULL,
+          \`destinationHospitalName\` VARCHAR(180) NULL,
+          \`dispatchedAt\` TIMESTAMP NULL,
+          \`resolvedAt\` TIMESTAMP NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`incidents_status_createdAt_idx\` (\`status\`, \`createdAt\`),
+          INDEX \`incidents_assignedRescuerId_status_idx\` (\`assignedRescuerId\`, \`status\`),
+          INDEX \`incidents_dispatchStatus_createdAt_idx\` (\`dispatchStatus\`, \`createdAt\`)
+        )
+      `, "ensureSchema_createIncidents");
+
+      try {
+        const [incCols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `incidents`"), 4000, "ensureSchema_showIncCols");
+        const incColNames = new Set((incCols || []).map((c: any) => c.Field));
+        if (!incColNames.has("requestCategory")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `requestCategory` ENUM('medical', 'rescue', 'emergency') NOT NULL DEFAULT 'emergency'", "addCol_incidents_requestCategory");
+        if (!incColNames.has("dispatchStatus")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `dispatchStatus` ENUM('triage_pending', 'matching', 'offered', 'assigned', 'escalated', 'resolved') NOT NULL DEFAULT 'triage_pending'", "addCol_incidents_dispatchStatus");
+        if (!incColNames.has("triageStartedAt")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `triageStartedAt` TIMESTAMP NULL", "addCol_incidents_triageStartedAt");
+        if (!incColNames.has("triageDeadlineAt")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `triageDeadlineAt` TIMESTAMP NULL", "addCol_incidents_triageDeadlineAt");
+        if (!incColNames.has("triageSelectedAt")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `triageSelectedAt` TIMESTAMP NULL", "addCol_incidents_triageSelectedAt");
+        if (!incColNames.has("matchingStartedAt")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `matchingStartedAt` TIMESTAMP NULL", "addCol_incidents_matchingStartedAt");
+        if (!incColNames.has("matchingAttempts")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `matchingAttempts` INT NOT NULL DEFAULT 0", "addCol_incidents_matchingAttempts");
+        if (!incColNames.has("escalatedToCommandAt")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `escalatedToCommandAt` TIMESTAMP NULL", "addCol_incidents_escalatedToCommandAt");
+        if (!incColNames.has("assignedRescuerId")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `assignedRescuerId` INT NULL", "addCol_incidents_assignedRescuerId");
+        if (!incColNames.has("destinationHospitalId")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `destinationHospitalId` INT NULL", "addCol_incidents_destinationHospitalId");
+        if (!incColNames.has("destinationHospitalName")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `destinationHospitalName` VARCHAR(180) NULL", "addCol_incidents_destinationHospitalName");
+        if (!incColNames.has("dispatchedAt")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `dispatchedAt` TIMESTAMP NULL", "addCol_incidents_dispatchedAt");
+        if (!incColNames.has("resolvedAt")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `resolvedAt` TIMESTAMP NULL", "addCol_incidents_resolvedAt");
+      } catch {}
+
+      // 7. incidentMessages
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`incidentMessages\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`incidentId\` INT NOT NULL,
+          \`authorType\` ENUM('victim', 'rescuer', 'operations') NOT NULL,
+          \`authorId\` INT NULL,
+          \`message\` TEXT NOT NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX \`incidentMessages_incidentId_createdAt_idx\` (\`incidentId\`, \`createdAt\`)
+        )
+      `, "ensureSchema_createIncidentMessages");
+
+      // 8. missions
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`missions\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`incidentId\` INT NOT NULL UNIQUE,
+          \`rescuerId\` INT NOT NULL,
+          \`status\` ENUM('pending', 'dispatched', 'resolved') NOT NULL DEFAULT 'pending',
+          \`assignedBy\` INT NOT NULL,
+          \`assignedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`dispatchedAt\` TIMESTAMP NULL,
+          \`resolvedAt\` TIMESTAMP NULL,
+          \`notes\` TEXT NULL,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`missions_rescuerId_status_idx\` (\`rescuerId\`, \`status\`)
+        )
+      `, "ensureSchema_createMissions");
+
+      // 9. rescuerCapabilities
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`rescuerCapabilities\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`rescuerId\` INT NOT NULL,
+          \`capability\` ENUM('medical', 'flood_rescue', 'trapped_rescue', 'evacuation', 'general_emergency') NOT NULL,
+          \`priority\` INT NOT NULL DEFAULT 1,
+          \`active\` ENUM('yes', 'no') NOT NULL DEFAULT 'yes',
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY \`rescuerCapabilities_rescuerId_capability_unique\` (\`rescuerId\`, \`capability\`),
+          INDEX \`rescuerCapabilities_capability_active_idx\` (\`capability\`, \`active\`),
+          INDEX \`rescuerCapabilities_rescuerId_idx\` (\`rescuerId\`)
+        )
+      `, "ensureSchema_createRescuerCapabilities");
+
+      // 10. missionOffers
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`missionOffers\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`incidentId\` INT NOT NULL,
+          \`rescuerId\` INT NOT NULL,
+          \`distanceKm\` DOUBLE NOT NULL,
+          \`matchScore\` DOUBLE NOT NULL,
+          \`status\` ENUM('offered', 'accepted', 'declined', 'expired', 'cancelled') NOT NULL DEFAULT 'offered',
+          \`offeredAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`expiresAt\` TIMESTAMP NOT NULL,
+          \`respondedAt\` TIMESTAMP NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`missionOffers_incidentId_status_idx\` (\`incidentId\`, \`status\`),
+          INDEX \`missionOffers_rescuerId_status_idx\` (\`rescuerId\`, \`status\`),
+          INDEX \`missionOffers_expiresAt_status_idx\` (\`expiresAt\`, \`status\`)
+        )
+      `, "ensureSchema_createMissionOffers");
+
+      // 11. incidentEvents
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`incidentEvents\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`incidentId\` INT NOT NULL,
+          \`actorId\` INT NULL,
+          \`eventType\` VARCHAR(64) NOT NULL,
+          \`title\` VARCHAR(180) NOT NULL,
+          \`detail\` TEXT NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX \`incidentEvents_incidentId_createdAt_idx\` (\`incidentId\`, \`createdAt\`)
+        )
+      `, "ensureSchema_createIncidentEvents");
+
+      // 12. safetyAssistanceRequests
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`safetyAssistanceRequests\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`requesterId\` INT NOT NULL,
+          \`category\` ENUM('shelter', 'food', 'medical', 'protection') NOT NULL,
+          \`peopleAffected\` INT NOT NULL DEFAULT 1,
+          \`details\` TEXT NULL,
+          \`latitude\` DOUBLE NOT NULL,
+          \`longitude\` DOUBLE NOT NULL,
+          \`status\` ENUM('new', 'acknowledged', 'resolved') NOT NULL DEFAULT 'new',
+          \`reviewedBy\` INT NULL,
+          \`reviewedAt\` TIMESTAMP NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`safetyAssistanceRequests_status_createdAt_idx\` (\`status\`, \`createdAt\`),
+          INDEX \`safetyAssistanceRequests_category_status_idx\` (\`category\`, \`status\`)
+        )
+      `, "ensureSchema_createSafetyAssistanceRequests");
+
+      // 13. shelters
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`shelters\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`name\` VARCHAR(180) NOT NULL,
+          \`address\` VARCHAR(360) NOT NULL,
+          \`latitude\` DOUBLE NOT NULL,
+          \`longitude\` DOUBLE NOT NULL,
+          \`capacity\` INT NOT NULL DEFAULT 0,
+          \`occupancy\` INT NOT NULL DEFAULT 0,
+          \`status\` ENUM('open', 'limited', 'closed') NOT NULL DEFAULT 'open',
+          \`createdBy\` INT NULL,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`shelters_status_idx\` (\`status\`)
+        )
+      `, "ensureSchema_createShelters");
+
+      // 14. hospitals
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`hospitals\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`name\` VARCHAR(180) NOT NULL,
+          \`address\` VARCHAR(360) NOT NULL,
+          \`contactPhone\` VARCHAR(32) NULL,
+          \`specialty\` VARCHAR(180) NOT NULL DEFAULT 'Trauma & Emergency Care',
+          \`latitude\` DOUBLE NOT NULL,
+          \`longitude\` DOUBLE NOT NULL,
+          \`totalEmergencyBeds\` INT NOT NULL DEFAULT 0,
+          \`availableEmergencyBeds\` INT NOT NULL DEFAULT 0,
+          \`totalIcuBeds\` INT NOT NULL DEFAULT 0,
+          \`availableIcuBeds\` INT NOT NULL DEFAULT 0,
+          \`oxygenCylinderCount\` INT NOT NULL DEFAULT 0,
+          \`bloodUnitCount\` INT NOT NULL DEFAULT 0,
+          \`ambulanceCount\` INT NOT NULL DEFAULT 0,
+          \`foodSupplyStatus\` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available',
+          \`medicineSupplyStatus\` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available',
+          \`waterSupplyStatus\` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available',
+          \`powerBackupStatus\` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available',
+          \`status\` ENUM('open', 'limited', 'critical', 'closed') NOT NULL DEFAULT 'open',
+          \`updatedBy\` INT NULL,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`hospitals_status_idx\` (\`status\`)
+        )
+      `, "ensureSchema_createHospitals");
+
+      try {
+        const [hCols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `hospitals`"), 4000, "ensureSchema_showHCols");
+        const hColNames = new Set((hCols || []).map((c: any) => c.Field));
+        if (!hColNames.has("specialty")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `specialty` VARCHAR(180) NOT NULL DEFAULT 'Trauma & Emergency Care'", "addCol_hospitals_specialty");
+        if (!hColNames.has("contactPhone")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `contactPhone` VARCHAR(32) NULL", "addCol_hospitals_contactPhone");
+        if (!hColNames.has("totalEmergencyBeds")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `totalEmergencyBeds` INT NOT NULL DEFAULT 0", "addCol_hospitals_totalEmergencyBeds");
+        if (!hColNames.has("availableEmergencyBeds")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `availableEmergencyBeds` INT NOT NULL DEFAULT 0", "addCol_hospitals_availableEmergencyBeds");
+        if (!hColNames.has("totalIcuBeds")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `totalIcuBeds` INT NOT NULL DEFAULT 0", "addCol_hospitals_totalIcuBeds");
+        if (!hColNames.has("availableIcuBeds")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `availableIcuBeds` INT NOT NULL DEFAULT 0", "addCol_hospitals_availableIcuBeds");
+        if (!hColNames.has("oxygenCylinderCount")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `oxygenCylinderCount` INT NOT NULL DEFAULT 0", "addCol_hospitals_oxygenCylinderCount");
+        if (!hColNames.has("bloodUnitCount")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `bloodUnitCount` INT NOT NULL DEFAULT 0", "addCol_hospitals_bloodUnitCount");
+        if (!hColNames.has("ambulanceCount")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `ambulanceCount` INT NOT NULL DEFAULT 0", "addCol_hospitals_ambulanceCount");
+        if (!hColNames.has("foodSupplyStatus")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `foodSupplyStatus` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available'", "addCol_hospitals_foodSupplyStatus");
+        if (!hColNames.has("medicineSupplyStatus")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `medicineSupplyStatus` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available'", "addCol_hospitals_medicineSupplyStatus");
+        if (!hColNames.has("waterSupplyStatus")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `waterSupplyStatus` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available'", "addCol_hospitals_waterSupplyStatus");
+        if (!hColNames.has("powerBackupStatus")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `powerBackupStatus` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available'", "addCol_hospitals_powerBackupStatus");
+        if (!hColNames.has("status")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `status` ENUM('open', 'limited', 'critical', 'closed') NOT NULL DEFAULT 'open'", "addCol_hospitals_status");
+        if (!hColNames.has("updatedBy")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `updatedBy` INT NULL", "addCol_hospitals_updatedBy");
+      } catch {}
+
+      // 15. hospitalRegistrationRequests
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`hospitalRegistrationRequests\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`userId\` INT NOT NULL UNIQUE,
+          \`hospitalName\` VARCHAR(180) NOT NULL,
+          \`address\` VARCHAR(360) NOT NULL,
+          \`contactPhone\` VARCHAR(32) NOT NULL,
+          \`latitude\` DOUBLE NOT NULL,
+          \`longitude\` DOUBLE NOT NULL,
+          \`note\` TEXT NULL,
+          \`status\` ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+          \`reviewedBy\` INT NULL,
+          \`reviewNote\` TEXT NULL,
+          \`reviewedAt\` TIMESTAMP NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`hospitalRegistrationRequests_status_createdAt_idx\` (\`status\`, \`createdAt\`)
+        )
+      `, "ensureSchema_createHospitalRegistrationRequests");
+
+      // 16. hospitalStaffProfiles
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`hospitalStaffProfiles\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`userId\` INT NOT NULL UNIQUE,
+          \`hospitalId\` INT NOT NULL,
+          \`designation\` VARCHAR(120) NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`hospitalStaffProfiles_hospitalId_idx\` (\`hospitalId\`)
+        )
+      `, "ensureSchema_createHospitalStaffProfiles");
+
+      // 17. hospitalCaseNotifications
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`hospitalCaseNotifications\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`incidentId\` INT NOT NULL,
+          \`hospitalId\` INT NOT NULL,
+          \`rescuerId\` INT NOT NULL,
+          \`severity\` ENUM('critical', 'high', 'medium', 'low') NOT NULL DEFAULT 'high',
+          \`patientCount\` INT NOT NULL DEFAULT 1,
+          \`estimatedArrivalMinutes\` INT NOT NULL DEFAULT 15,
+          \`requiredDepartment\` VARCHAR(120) NOT NULL DEFAULT 'Emergency & Trauma',
+          \`icuRequired\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
+          \`oxygenRequired\` ENUM('yes', 'no') NOT NULL DEFAULT 'no',
+          \`notes\` TEXT NULL,
+          \`status\` ENUM('notified', 'acknowledged', 'preparing', 'ready', 'received', 'completed') NOT NULL DEFAULT 'notified',
+          \`hospitalNotes\` TEXT NULL,
+          \`acknowledgedAt\` TIMESTAMP NULL,
+          \`receivedAt\` TIMESTAMP NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`hospitalCaseNotifications_hospitalId_status_idx\` (\`hospitalId\`, \`status\`),
+          INDEX \`hospitalCaseNotifications_incidentId_idx\` (\`incidentId\`),
+          INDEX \`hospitalCaseNotifications_rescuerId_idx\` (\`rescuerId\`)
+        )
+      `, "ensureSchema_createHospitalCaseNotifications");
+
+      // 18. floodZones
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`floodZones\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`name\` VARCHAR(180) NOT NULL,
+          \`severity\` ENUM('critical', 'high', 'medium', 'low') NOT NULL DEFAULT 'medium',
+          \`polygonJson\` TEXT NOT NULL,
+          \`active\` ENUM('yes', 'no') NOT NULL DEFAULT 'yes',
+          \`createdBy\` INT NULL,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`floodZones_active_severity_idx\` (\`active\`, \`severity\`)
+        )
+      `, "ensureSchema_createFloodZones");
+
+      // 19. notifications
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`notifications\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`recipientId\` INT NOT NULL,
+          \`incidentId\` INT NULL,
+          \`type\` ENUM('mission_assigned', 'priority_incident', 'status_update') NOT NULL,
+          \`title\` VARCHAR(180) NOT NULL,
+          \`body\` TEXT NOT NULL,
+          \`readAt\` TIMESTAMP NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX \`notifications_recipientId_readAt_idx\` (\`recipientId\`, \`readAt\`)
+        )
+      `, "ensureSchema_createNotifications");
+
+      // 20. guestEmergencyRateLimits
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`guestEmergencyRateLimits\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`keyHash\` VARCHAR(64) NOT NULL UNIQUE,
+          \`windowStartedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`requestCount\` INT NOT NULL DEFAULT 1,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+      `, "ensureSchema_createGuestEmergencyRateLimits");
+
+      // 21. pushSubscriptions
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`pushSubscriptions\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`userId\` INT NOT NULL,
+          \`endpointHash\` VARCHAR(64) NOT NULL UNIQUE,
+          \`endpoint\` TEXT NOT NULL,
+          \`p256dh\` VARCHAR(512) NOT NULL,
+          \`auth\` VARCHAR(512) NOT NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`pushSubscriptions_userId_idx\` (\`userId\`)
+        )
+      `, "ensureSchema_createPushSubscriptions");
+
+      // 22. auditLogs
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`auditLogs\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`actorId\` INT NULL,
+          \`action\` VARCHAR(96) NOT NULL,
+          \`resourceType\` VARCHAR(64) NOT NULL,
+          \`resourceId\` VARCHAR(64) NULL,
+          \`detail\` TEXT NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX \`auditLogs_resource_idx\` (\`resourceType\`, \`resourceId\`)
+        )
+      `, "ensureSchema_createAuditLogs");
+
+      // 23. donation_targets
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`donation_targets\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`type\` ENUM('ngo', 'government') NOT NULL,
+          \`name\` VARCHAR(255) NOT NULL,
+          \`description\` TEXT NULL,
+          \`latitude\` DOUBLE NOT NULL,
+          \`longitude\` DOUBLE NOT NULL,
+          \`upi_id\` VARCHAR(128) NULL,
+          \`qr_code_url\` VARCHAR(1024) NULL,
+          \`contact_info\` TEXT NULL,
+          \`verified\` BOOLEAN NOT NULL DEFAULT TRUE,
+          \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX \`donation_targets_type_idx\` (\`type\`)
+        )
+      `, "ensureSchema_createDonationTargets");
+
+      // 24. donations
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`donations\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`donor_user_id\` INT NULL,
+          \`target_id\` INT NOT NULL,
+          \`donation_type\` ENUM('money', 'food', 'clothes') NOT NULL,
+          \`amount\` DOUBLE NULL,
+          \`quantity_description\` TEXT NULL,
+          \`donation_date\` VARCHAR(64) NULL,
+          \`status\` VARCHAR(64) NOT NULL DEFAULT 'completed',
+          \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX \`donations_donor_idx\` (\`donor_user_id\`),
+          INDEX \`donations_target_idx\` (\`target_id\`)
+        )
+      `, "ensureSchema_createDonations");
+
+      // 25. postRescueCheckIns
+      await execDdl(`
+        CREATE TABLE IF NOT EXISTS \`postRescueCheckIns\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`incidentId\` INT NOT NULL,
+          \`publicCode\` VARCHAR(24) NOT NULL,
+          \`reporterId\` INT NULL,
+          \`reliefCentreAllotted\` ENUM('yes', 'no') NOT NULL,
+          \`helpCategory\` ENUM('medical', 'trapped', 'evacuation', 'other') NOT NULL DEFAULT 'other',
+          \`notes\` TEXT NULL,
+          \`submittedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX \`postRescueCheckIns_incidentId_idx\` (\`incidentId\`),
+          INDEX \`postRescueCheckIns_publicCode_idx\` (\`publicCode\`)
+        )
+      `, "ensureSchema_createPostRescueCheckIns");
+
     } finally {
       conn.release();
     }
@@ -398,12 +759,6 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
 }
 
 export async function getDb() {
-  if (_db) return _db;
-
-  if (isDbCircuitBroken() && process.env.NODE_ENV !== "production") {
-    return null;
-  }
-
   const dbUrl = process.env.DATABASE_URL?.trim();
   if (!dbUrl || dbUrl === "" || dbUrl.includes("HOST")) {
     if (process.env.NODE_ENV === "production") {
@@ -412,11 +767,17 @@ export async function getDb() {
     return null;
   }
 
+  if (_db) return _db;
+
+  if (isDbCircuitBroken() && process.env.NODE_ENV !== "production") {
+    return null;
+  }
+
   if (!_db) {
     try {
       if (!_pool) {
         _pool = createDatabasePool(dbUrl);
-        ensureDatabaseSchema(_pool).catch(() => {});
+        await ensureDatabaseSchema(_pool);
       }
       _db = drizzle(_pool);
     } catch (error) {

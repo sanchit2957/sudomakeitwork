@@ -15,7 +15,7 @@ export const users = mysqlTable(
   "users",
   {
     id: int("id").autoincrement().primaryKey(),
-    openId: varchar("openId", { length: 64 }).notNull().unique(),
+    openId: varchar("openId", { length: 64 }).notNull(),
     name: text("name"),
     email: varchar("email", { length: 320 }),
     password: varchar("password", { length: 255 }),
@@ -26,7 +26,7 @@ export const users = mysqlTable(
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
     lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   },
-  table => [uniqueIndex("users_email_role_unique").on(table.email, table.role)]
+  table => [index("users_openId_idx").on(table.openId), index("users_email_role_idx").on(table.email, table.role)]
 );
 
 export const rescueProfiles = mysqlTable(
@@ -49,7 +49,7 @@ export const rescueProfiles = mysqlTable(
     locationUpdatedAt: timestamp("locationUpdatedAt"),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => [uniqueIndex("rescueProfiles_userId_unique").on(table.userId)],
+  table => [index("rescueProfiles_userId_idx").on(table.userId)],
 );
 
 export const rescuerRegistrationRequests = mysqlTable(
@@ -66,7 +66,7 @@ export const rescuerRegistrationRequests = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => [uniqueIndex("rescuerRegistrationRequests_userId_unique").on(table.userId), index("rescuerRegistrationRequests_status_createdAt_idx").on(table.status, table.createdAt)],
+  table => [index("rescuerRegistrationRequests_userId_idx").on(table.userId), index("rescuerRegistrationRequests_status_createdAt_idx").on(table.status, table.createdAt)],
 );
 
 export const incidents = mysqlTable(
@@ -108,7 +108,7 @@ export const incidents = mysqlTable(
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => [
-    uniqueIndex("incidents_publicCode_unique").on(table.publicCode),
+    index("incidents_publicCode_idx").on(table.publicCode),
     index("incidents_status_createdAt_idx").on(table.status, table.createdAt),
     index("incidents_assignedRescuerId_status_idx").on(table.assignedRescuerId, table.status),
     index("incidents_dispatchStatus_createdAt_idx").on(table.dispatchStatus, table.createdAt),
@@ -143,7 +143,7 @@ export const missions = mysqlTable(
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => [
-    uniqueIndex("missions_incidentId_unique").on(table.incidentId),
+    index("missions_incidentId_idx").on(table.incidentId),
     index("missions_rescuerId_status_idx").on(table.rescuerId, table.status),
   ],
 );
@@ -160,7 +160,7 @@ export const rescuerCapabilities = mysqlTable(
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => [
-    uniqueIndex("rescuerCapabilities_rescuerId_capability_unique").on(table.rescuerId, table.capability),
+    index("rescuerCapabilities_rescuerId_capability_idx").on(table.rescuerId, table.capability),
     index("rescuerCapabilities_capability_active_idx").on(table.capability, table.active),
     index("rescuerCapabilities_rescuerId_idx").on(table.rescuerId),
   ],
@@ -284,7 +284,7 @@ export const hospitalRegistrationRequests = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => [uniqueIndex("hospitalRegistrationRequests_userId_unique").on(table.userId), index("hospitalRegistrationRequests_status_createdAt_idx").on(table.status, table.createdAt)],
+  table => [index("hospitalRegistrationRequests_userId_idx").on(table.userId), index("hospitalRegistrationRequests_status_createdAt_idx").on(table.status, table.createdAt)],
 );
 
 export const hospitalStaffProfiles = mysqlTable(
@@ -297,7 +297,7 @@ export const hospitalStaffProfiles = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => [uniqueIndex("hospitalStaffProfiles_userId_unique").on(table.userId), index("hospitalStaffProfiles_hospitalId_idx").on(table.hospitalId)],
+  table => [index("hospitalStaffProfiles_userId_idx").on(table.userId), index("hospitalStaffProfiles_hospitalId_idx").on(table.hospitalId)],
 );
 
 export const hospitalCaseNotifications = mysqlTable(
@@ -368,7 +368,7 @@ export const guestEmergencyRateLimits = mysqlTable(
     requestCount: int("requestCount").default(1).notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => [uniqueIndex("guestEmergencyRateLimits_keyHash_unique").on(table.keyHash)],
+  table => [index("guestEmergencyRateLimits_keyHash_idx").on(table.keyHash)],
 );
 
 export const pushSubscriptions = mysqlTable(
@@ -384,7 +384,7 @@ export const pushSubscriptions = mysqlTable(
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => [
-    uniqueIndex("pushSubscriptions_endpointHash_unique").on(table.endpointHash),
+    index("pushSubscriptions_endpointHash_idx").on(table.endpointHash),
     index("pushSubscriptions_userId_idx").on(table.userId),
   ],
 );
@@ -461,13 +461,13 @@ export const roleAccessCodes = mysqlTable(
   "roleAccessCodes",
   {
     id: int("id").autoincrement().primaryKey(),
-    role: varchar("role", { length: 32 }).notNull().unique(),
+    role: varchar("role", { length: 32 }).notNull(),
     codeHash: varchar("codeHash", { length: 255 }).notNull(),
     codeVersion: int("codeVersion").default(1).notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
     updatedBy: int("updatedBy").references(() => users.id),
   },
-  table => [uniqueIndex("roleAccessCodes_role_unique").on(table.role)],
+  table => [index("roleAccessCodes_role_idx").on(table.role)],
 );
 
 export const postRescueCheckIns = mysqlTable(

@@ -10,7 +10,7 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:push": "tsx server/db-migrate.ts",
     "db:seed": "tsx server/seed.ts",
     "cap:sync": "npm run build && npx cap sync android",
     "cap:open": "npx cap open android",
