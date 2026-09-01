@@ -13,6 +13,7 @@ import {
   advanceIncidentDispatch,
   acceptMissionOffer,
   declineMissionOffer,
+  RESPONDER_OFFER_WINDOW_MS,
 } from "./dispatch/dispatch";
 
 describe("Automated SOS Triage and Dispatch Lifecycle", () => {
@@ -158,7 +159,7 @@ describe("Automated SOS Triage and Dispatch Lifecycle", () => {
     expect(offers.length).toBeGreaterThanOrEqual(1);
     expect(offers[0].rescuerId).toBe(201);
     expect(offers[0].status).toBe("offered");
-    expect(offers[0].expiresAt.getTime()).toBe(selectionTime.getTime() + 15_000);
+    expect(offers[0].expiresAt.getTime()).toBe(selectionTime.getTime() + RESPONDER_OFFER_WINDOW_MS);
   });
 
   it("safely defaults to 'emergency' category when 10-second triage timer expires", async () => {

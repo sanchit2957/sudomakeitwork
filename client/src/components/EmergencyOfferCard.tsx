@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
-import { AlertCircle, AlertTriangle, Check, CheckCircle2, Clock, HeartPulse, LifeBuoy, MapPin, Navigation, ShieldAlert, Users, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, Check, CheckCircle2, Clock, HeartPulse, LifeBuoy, MapPin, Navigation, ShieldAlert, Users, Volume2, VolumeX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface ActiveOfferData {
@@ -33,39 +33,150 @@ interface EmergencyOfferCardProps {
   onDeclined?: () => void;
 }
 
+/**
+ * Robust Web Audio Synthesizer Alert for Responder Emergency Requests.
+ * Generates an unmistakable dual-tone alert chime (880Hz / 659Hz) without network latency.
+ */
+export class EmergencyAudioAlert {
+  private ctx: AudioContext | null = null;
+  private intervalId: any = null;
+  private isPlaying = false;
+  private isMuted = false;
+
+  private getContext(): AudioContext | null {
+    if (!this.ctx && typeof window !== "undefined") {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        this.ctx = new AudioContextClass();
+      }
+    }
+    return this.ctx;
+  }
+
+  playBeepPulse() {
+    if (this.isMuted) return;
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return;
+      if (ctx.state === "suspended") {
+        void ctx.resume();
+      }
+
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, now); // A5 tone
+      osc.frequency.setValueAtTime(659.25, now + 0.15); // E5 tone
+
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.36);
+    } catch {
+      // Gracefully catch autoplay block
+    }
+  }
+
+  start() {
+    if (this.isPlaying) return;
+    this.isPlaying = true;
+    this.playBeepPulse();
+    this.intervalId = setInterval(() => {
+      if (this.isPlaying) {
+        this.playBeepPulse();
+      }
+    }, 4000);
+  }
+
+  stop() {
+    this.isPlaying = false;
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+  }
+
+  toggleMute(): boolean {
+    this.isMuted = !this.isMuted;
+    if (!this.isMuted && this.isPlaying) {
+      this.playBeepPulse();
+    }
+    return this.isMuted;
+  }
+
+  getMuted(): boolean {
+    return this.isMuted;
+  }
+}
+
 export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOfferCardProps) {
   const { t } = useLanguage();
   const utils = trpc.useUtils();
   const acceptOffer = trpc.rescue.rescuer.acceptMissionOffer.useMutation();
   const declineOffer = trpc.rescue.rescuer.declineMissionOffer.useMutation();
 
-  const [secondsRemaining, setSecondsRemaining] = useState(15);
-  const [isExpired, setIsExpired] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
   const { offer, incident } = data;
 
+  const [secondsRemaining, setSecondsRemaining] = useState(() => {
+    const diffMs = new Date(offer.expiresAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diffMs / 1000)) || 30;
+  });
+  const [isExpired, setIsExpired] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const alertRef = useRef<EmergencyAudioAlert | null>(null);
+  const autoDeclinedRef = useRef(false);
+
   useEffect(() => {
+    const alert = new EmergencyAudioAlert();
+    alertRef.current = alert;
+    alert.start();
+
     const expiresMs = new Date(offer.expiresAt).getTime();
 
-    const interval = setInterval(() => {
+    const checkTimer = () => {
       const now = Date.now();
       const diffMs = expiresMs - now;
       const sec = Math.max(0, Math.ceil(diffMs / 1000));
       setSecondsRemaining(sec);
 
       if (diffMs <= 0) {
-        clearInterval(interval);
         setIsExpired(true);
+        alert.stop();
+        if (!autoDeclinedRef.current) {
+          autoDeclinedRef.current = true;
+          // Auto-trigger decline & reassignment when 30s timer expires
+          declineOffer
+            .mutateAsync({ offerId: offer.id })
+            .catch(() => {})
+            .finally(() => {
+              void utils.rescue.rescuer.activeOffer.invalidate();
+              onDeclined?.();
+            });
+        }
       }
-    }, 250);
+    };
 
-    return () => clearInterval(interval);
-  }, [offer.expiresAt]);
+    checkTimer();
+    const interval = setInterval(checkTimer, 250);
+
+    return () => {
+      clearInterval(interval);
+      alert.stop();
+    };
+  }, [offer.id, offer.expiresAt]);
 
   const handleAccept = async () => {
     if (isExpired || acceptOffer.isPending || declineOffer.isPending) return;
     setErrorMsg("");
+    alertRef.current?.stop();
     try {
       const result = await acceptOffer.mutateAsync({ offerId: offer.id });
       void utils.rescue.rescuer.activeOffer.invalidate();
@@ -80,12 +191,20 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
   const handleDecline = async () => {
     if (isExpired || acceptOffer.isPending || declineOffer.isPending) return;
     setErrorMsg("");
+    alertRef.current?.stop();
     try {
       await declineOffer.mutateAsync({ offerId: offer.id });
       void utils.rescue.rescuer.activeOffer.invalidate();
       onDeclined?.();
     } catch (err: any) {
       setErrorMsg(err.message || t("Failed to decline mission offer."));
+    }
+  };
+
+  const toggleSound = () => {
+    if (alertRef.current) {
+      const muted = alertRef.current.toggleMute();
+      setIsMuted(muted);
     }
   };
 
@@ -130,9 +249,19 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
             {t("NEW EMERGENCY REQUEST")}
           </h2>
         </div>
-        <span className="font-mono text-xs font-bold text-zinc-400">
-          {incident.publicCode}
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleSound}
+            aria-label={isMuted ? "Unmute alert chime" : "Mute alert chime"}
+            className="rounded-lg bg-white/10 p-1.5 text-zinc-300 hover:bg-white/20 hover:text-white transition"
+          >
+            {isMuted ? <VolumeX className="h-3.5 w-3.5 text-red-400" /> : <Volume2 className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />}
+          </button>
+          <span className="font-mono text-xs font-bold text-zinc-400">
+            {incident.publicCode}
+          </span>
+        </div>
       </div>
 
       {/* Main Details Grid */}
@@ -189,18 +318,32 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
         <span className="font-semibold text-zinc-200">{incident.locationLabel}</span>
       </div>
 
-      {/* Countdown Timer */}
-      <div className="mt-4 flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-950/40 px-3.5 py-2.5">
-        <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-          <Clock className="h-4 w-4 animate-spin" />
-          <span>{t("Offer expires in:")}</span>
+      {incident.notes && (
+        <p className="mt-2 text-xs italic text-zinc-300 line-clamp-2 px-1">
+          "{incident.notes}"
+        </p>
+      )}
+
+      {/* 30-Second Countdown Timer & Progress Bar */}
+      <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-950/40 p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+            <Clock className="h-4 w-4 animate-spin text-amber-400" />
+            <span>{t("Offer expires in:")}</span>
+          </div>
+          <span
+            data-testid="offer-countdown"
+            className="font-mono text-sm font-black tracking-widest text-amber-400"
+          >
+            {isExpired ? "00:00" : formattedCountdown}
+          </span>
         </div>
-        <span
-          data-testid="offer-countdown"
-          className="font-mono text-sm font-black tracking-widest text-amber-400"
-        >
-          {isExpired ? "00:00" : formattedCountdown}
-        </span>
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 transition-all duration-300 ease-linear"
+            style={{ width: `${Math.min(100, Math.max(0, (secondsRemaining / 30) * 100))}%` }}
+          />
+        </div>
       </div>
 
       {/* Error Feedback */}

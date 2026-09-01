@@ -25,7 +25,7 @@ import type { IncidentDispatchTarget, SOSCategory } from "./scoring";
 import { sendRescuerPush } from "../push";
 
 export const CITIZEN_TRIAGE_WINDOW_MS = 15_000; // 15 seconds
-export const RESPONDER_OFFER_WINDOW_MS = 15_000; // 15 seconds
+export const RESPONDER_OFFER_WINDOW_MS = Number(process.env.RESPONDER_OFFER_WINDOW_MS) || 30_000; // 30 seconds (configurable)
 export const DISPATCH_RADIUS_TIERS_KM = [15, 35, 75, 150, Infinity];
 
 /**

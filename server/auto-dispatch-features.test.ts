@@ -36,9 +36,9 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
   });
 
   describe("1. Timers & Radius Tier Constants", () => {
-    it("configures 15-second triage and offer countdown windows", () => {
+    it("configures 15-second citizen triage and 30-second responder offer countdown windows", () => {
       expect(CITIZEN_TRIAGE_WINDOW_MS).toBe(15_000);
-      expect(RESPONDER_OFFER_WINDOW_MS).toBe(15_000);
+      expect(RESPONDER_OFFER_WINDOW_MS).toBe(30_000);
       expect(DISPATCH_RADIUS_TIERS_KM).toEqual([15, 35, 75, 150, Infinity]);
     });
   });
