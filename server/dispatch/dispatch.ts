@@ -551,14 +551,23 @@ export async function checkAndAdvanceAllDispatches(currentTime: Date = new Date(
 }
 
 let _dispatchWorkerInterval: NodeJS.Timeout | null = null;
+let _isDispatchWorkerRunning = false;
 
 /**
- * Starts the global background dispatch worker (every 2 seconds).
+ * Starts the global background dispatch worker (every 4 seconds, non-overlapping).
  */
-export function startDispatchWorker(intervalMs: number = 2000) {
+export function startDispatchWorker(intervalMs: number = 4000) {
   if (_dispatchWorkerInterval) return;
-  _dispatchWorkerInterval = setInterval(() => {
-    void checkAndAdvanceAllDispatches(new Date());
+  _dispatchWorkerInterval = setInterval(async () => {
+    if (_isDispatchWorkerRunning) return;
+    _isDispatchWorkerRunning = true;
+    try {
+      await checkAndAdvanceAllDispatches(new Date());
+    } catch (err) {
+      console.warn("[Dispatch] Worker iteration error:", err);
+    } finally {
+      _isDispatchWorkerRunning = false;
+    }
   }, intervalMs);
 }
 

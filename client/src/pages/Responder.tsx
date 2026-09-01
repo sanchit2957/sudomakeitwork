@@ -488,7 +488,13 @@ function ResponderWorkspace() {
               rescuerLongitude={profile.data?.lastLongitude || undefined}
             />
             <ResponderProfileCard
-              profile={profile.data ? { ...profile.data, callSign: profile.data.callSign ?? "" } : null}
+              profile={profile.data ? {
+                callSign: profile.data.callSign ?? "",
+                phone: profile.data.phone ?? null,
+                photoUrl: profile.data.photoUrl ?? null,
+                contactSharing: profile.data.contactSharing ?? "no",
+                locationSharing: profile.data.locationSharing ?? "no",
+              } : null}
               hasActiveMission={hasActiveMission}
               saving={updateProfile.isPending}
               onSave={input => updateProfile.mutate(input)}

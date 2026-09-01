@@ -282,19 +282,21 @@ class SDKServer {
     }
 
     const sessionUserId = session.openId;
-    const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
     if (!user) {
       throw ForbiddenError("User not found");
     }
 
-    try {
-      await db.upsertUser({
+    // Throttle lastSignedIn update: only write once every 15 minutes per active user session
+    // instead of hammering the users table with write locks on every 1s polling tick
+    const lastSigned = user.lastSignedIn ? new Date(user.lastSignedIn).getTime() : 0;
+    if (!lastSigned || Date.now() - lastSigned > 15 * 60 * 1000) {
+      db.upsertUser({
         openId: user.openId,
-        lastSignedIn: signedInAt,
-      });
-    } catch {}
+        lastSignedIn: new Date(),
+      }).catch(() => {});
+    }
 
     return {
       ...user,

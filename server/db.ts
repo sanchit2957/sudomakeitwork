@@ -150,17 +150,16 @@ export function createDatabasePool(connectionUri: string): mysql.Pool {
     uri: connectionUri,
     waitForConnections: true,
     connectionLimit: 10,
-    maxIdle: 3,
-    // 60s: longer than mysql2 default but shorter than TiDB Cloud's ~300s idle eviction.
-    // Ensures stale connections are pruned from the pool before TiDB kills them server-side.
+    // Keep up to 10 idle connections warm in the pool to avoid TLS handshake churn on every burst.
+    maxIdle: 10,
+    // Prune connections that are idle for more than 60s
     idleTimeout: 60000,
     connectTimeout: 15000,
-    // Enable TCP keepalives at the OS level; fire after 1s idle so the OS refreshes
-    // the connection state before TiDB's server-side idle timeout (default 8h, but
-    // proxy/NAT can evict after ~90s on TiDB Cloud's free tier).
+    // Enable TCP keepalives at the OS level (1s initial delay)
     enableKeepAlive: true,
     keepAliveInitialDelay: 1000,
-    queueLimit: 20,
+    // 0 = unbounded queue (bounded by query timeout instead of hard queue capacity drop)
+    queueLimit: 0,
     ssl: isRemoteOrTiDB ? { minVersion: "TLSv1.2", rejectUnauthorized: true } : undefined,
   });
 
