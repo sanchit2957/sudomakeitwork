@@ -102,6 +102,7 @@ import {
   visibleSafetyCategoriesForRole,
 } from "../safety-assistance.policy";
 import { sendRescuerPush } from "../push";
+import { triggerN8nSosWebhook } from "../n8n";
 
 const incidentCode = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
 const severitySchema = z.enum(["critical", "high", "medium", "low"]);
@@ -572,6 +573,43 @@ export const rescueRouter = router({
           input.latitude,
           input.longitude
         );
+
+        // Resolve reporter's primary emergency contact phone if available
+        let reporterPhone: string | null = null;
+        let resolvedContactName: string | null = input.contactName ?? null;
+        try {
+          const userContacts = await getEmergencyContactsByUserId(ctx.user.id);
+          if (userContacts && userContacts.length > 0) {
+            const primaryContact = userContacts.find(c => c.isPrimary === "yes") || userContacts[0];
+            reporterPhone = primaryContact.phone || primaryContact.alternatePhone || null;
+            if (!resolvedContactName && primaryContact.name) {
+              resolvedContactName = primaryContact.name;
+            }
+          }
+        } catch (contactErr) {
+          console.warn("[SOS] Emergency contact query note:", contactErr);
+        }
+
+        void triggerN8nSosWebhook({
+          incidentId,
+          publicCode,
+          emergencyType: input.emergencyType,
+          requestCategory: defaultCategory,
+          severity: input.severity,
+          status: "pending",
+          latitude: input.latitude,
+          longitude: input.longitude,
+          reporterId: ctx.user.id,
+          contactName: resolvedContactName,
+          reporterPhone,
+          peopleAffected: input.peopleAffected,
+          locationLabel: input.locationLabel,
+          helpNeeds: input.helpNeeds ?? null,
+          notes: input.notes ?? null,
+          evidenceUrl: uploadedEvidence?.url ?? null,
+          voiceNoteUrl: uploadedVoiceNote?.url ?? null,
+          createdAt: now,
+        });
         return { incidentId, publicCode, status: "pending" as const, triageDeadlineAt, requestCategory: defaultCategory };
       }),
     selectCategory: publicProcedure

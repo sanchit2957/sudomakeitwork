@@ -13,4 +13,6 @@ export const ENV = {
   adminEmail: process.env.ADMIN_EMAIL ?? "",
   adminContactNumber: process.env.ADMIN_CONTACT_NUMBER || process.env.VITE_ADMIN_CONTACT_NUMBER || "+91-361-2237011",
   n8nSosWebhookUrl: process.env.N8N_SOS_WEBHOOK_URL ?? "",
+  n8nSosWebhookSecret: process.env.N8N_SOS_WEBHOOK_SECRET ?? process.env.N8N_WEBHOOK_SECRET ?? "",
+  appBaseUrl: process.env.APP_URL ?? process.env.PUBLIC_APP_URL ?? process.env.RENDER_EXTERNAL_URL ?? "https://assam-rescue-platform.onrender.com",
 };
