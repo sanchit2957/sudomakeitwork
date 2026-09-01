@@ -7,6 +7,7 @@ import {
   hospitals,
   hospitalStaffProfiles,
   rescueProfiles,
+  rescuerCapabilities,
   shelters,
   users,
 } from "../drizzle/schema";
@@ -78,6 +79,57 @@ export async function seedDatabase(): Promise<SeedResult> {
       role: "user" as const,
       loginMethod: "platform-login",
     },
+    {
+      openId: "user-rescuer-medical",
+      name: "Dr. Rupam Hazarika",
+      email: "rescuer.medical@assamrescue.gov.in",
+      rawPassword: getInitialSeedPassword("rescuer", "Medic@2026Assam"),
+      role: "rescuer" as const,
+      loginMethod: "platform-login",
+      callSign: "SDRF-MEDIC-01",
+      category: "medical" as const,
+      phone: "+91 94350 11221",
+      lat: 26.1558,
+      lng: 91.7645,
+      capabilities: [
+        { capability: "medical" as const, priority: 1 },
+        { capability: "general_emergency" as const, priority: 2 },
+      ],
+    },
+    {
+      openId: "user-rescuer-boat",
+      name: "Commander Bikram Kalita",
+      email: "rescuer.boat@assamrescue.gov.in",
+      rawPassword: getInitialSeedPassword("rescuer", "Boat@2026Assam"),
+      role: "rescuer" as const,
+      loginMethod: "platform-login",
+      callSign: "NDRF-BOAT-01",
+      category: "boat" as const,
+      phone: "+91 94350 22332",
+      lat: 26.1850,
+      lng: 91.7450,
+      capabilities: [
+        { capability: "flood_rescue" as const, priority: 1 },
+        { capability: "evacuation" as const, priority: 2 },
+      ],
+    },
+    {
+      openId: "user-rescuer-ground",
+      name: "Inspector Debajit Bora",
+      email: "rescuer.ground@assamrescue.gov.in",
+      rawPassword: getInitialSeedPassword("rescuer", "Ground@2026Assam"),
+      role: "rescuer" as const,
+      loginMethod: "platform-login",
+      callSign: "QRF-GROUND-01",
+      category: "ground-team" as const,
+      phone: "+91 94350 33443",
+      lat: 26.1400,
+      lng: 91.7900,
+      capabilities: [
+        { capability: "trapped_rescue" as const, priority: 1 },
+        { capability: "evacuation" as const, priority: 2 },
+      ],
+    },
   ];
 
   const userIdMap: Record<string, number> = {};
@@ -89,8 +141,10 @@ export async function seedDatabase(): Promise<SeedResult> {
       .where(eq(users.email, item.email))
       .limit(1);
 
+    let uid: number;
     if (existing.length > 0) {
-      userIdMap[item.email] = existing[0].id;
+      uid = existing[0].id;
+      userIdMap[item.email] = uid;
       result.usersExisting++;
       console.log(`[Seed] User already exists: ${item.email} (Role: ${existing[0].role})`);
     } else {
@@ -106,9 +160,56 @@ export async function seedDatabase(): Promise<SeedResult> {
         updatedAt: new Date(),
         lastSignedIn: new Date(),
       });
-      userIdMap[item.email] = insertRes.insertId;
+      uid = insertRes.insertId;
+      userIdMap[item.email] = uid;
       result.usersSeeded++;
       console.log(`[Seed] Seeded user: ${item.email} (Role: ${item.role})`);
+    }
+
+    if (item.role === "rescuer" && "callSign" in item) {
+      const existingProf = await db
+        .select()
+        .from(rescueProfiles)
+        .where(eq(rescueProfiles.userId, uid))
+        .limit(1);
+
+      if (!existingProf.length) {
+        await db.insert(rescueProfiles).values({
+          userId: uid,
+          callSign: item.callSign,
+          phone: item.phone,
+          category: item.category,
+          availability: "available",
+          contactSharing: "yes",
+          locationSharing: "yes",
+          lastLatitude: item.lat,
+          lastLongitude: item.lng,
+          locationUpdatedAt: new Date(),
+          updatedAt: new Date(),
+        });
+        result.rescueProfilesSeeded++;
+        console.log(`[Seed] Seeded rescue profile for: ${item.name} (${item.callSign})`);
+      }
+
+      if ("capabilities" in item && Array.isArray(item.capabilities)) {
+        for (const cap of item.capabilities) {
+          const existingCap = await db
+            .select()
+            .from(rescuerCapabilities)
+            .where(eq(rescuerCapabilities.rescuerId, uid))
+            .limit(10);
+          if (!existingCap.some(c => c.capability === cap.capability)) {
+            await db.insert(rescuerCapabilities).values({
+              rescuerId: uid,
+              capability: cap.capability,
+              priority: cap.priority,
+              active: "yes",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
+        }
+      }
     }
   }
 
