@@ -143,6 +143,46 @@ describe("EmergencyOfferCard Component", () => {
     expect(declineMutateMock).toHaveBeenCalledWith({ offerId: 55 });
   });
 
+  it("ignores duplicate clicks on Accept", async () => {
+    render(<EmergencyOfferCard data={sampleOfferData} />);
+    const acceptBtn = screen.getByTestId("accept-offer-btn");
+    
+    await act(async () => {
+      fireEvent.click(acceptBtn);
+      fireEvent.click(acceptBtn);
+    });
+
+    // Should only call mutate once because of actionLockRef
+    expect(acceptMutateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores duplicate clicks on Decline", async () => {
+    render(<EmergencyOfferCard data={sampleOfferData} />);
+    const declineBtn = screen.getByTestId("decline-offer-btn");
+    
+    await act(async () => {
+      fireEvent.click(declineBtn);
+      fireEvent.click(declineBtn);
+    });
+
+    expect(declineMutateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not trigger timer decline if Accept is already in progress", async () => {
+    render(<EmergencyOfferCard data={sampleOfferData} />);
+    const acceptBtn = screen.getByTestId("accept-offer-btn");
+    
+    await act(async () => {
+      fireEvent.click(acceptBtn);
+      // While accept is happening, timer expires
+      vi.advanceTimersByTime(31_000);
+    });
+
+    // Accept should be called, but auto-decline should NOT be called
+    expect(acceptMutateMock).toHaveBeenCalled();
+    expect(declineMutateMock).not.toHaveBeenCalled();
+  });
+
   it("starts and stops emergency audio alert chime gracefully", () => {
     const alert = new EmergencyAudioAlert();
     alert.start();

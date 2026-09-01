@@ -33,6 +33,8 @@ interface EmergencyOfferCardProps {
   onDeclined?: () => void;
 }
 
+type ActionState = "idle" | "accepting" | "declining" | "expired" | "success" | "error";
+
 /**
  * Emergency Siren Synthesizer — Responder Alert.
  * Synthesizes a realistic wailing police/ambulance siren sweep:
@@ -163,12 +165,12 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
   }, [offer.expiresAt, offer.offeredAt]);
 
   const [secondsRemaining, setSecondsRemaining] = useState(initialSeconds);
-  const [isExpired, setIsExpired] = useState(false);
+  const [actionState, setActionState] = useState<ActionState>("idle");
   const [isMuted, setIsMuted] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   const alertRef = useRef<EmergencyAudioAlert | null>(null);
-  const autoDeclinedRef = useRef(false);
+  const actionLockRef = useRef<boolean>(false);
 
   useEffect(() => {
     const alert = new EmergencyAudioAlert();
@@ -179,24 +181,25 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
     const totalRemaining = initialSeconds;
 
     const checkTimer = () => {
+      // Prevent timer action if a user action is already in progress
+      if (actionLockRef.current) return;
+
       const elapsedMs = Date.now() - startLocal;
       const sec = Math.max(0, Math.ceil(totalRemaining - elapsedMs / 1000));
       setSecondsRemaining(sec);
 
-      if (sec <= 0) {
-        setIsExpired(true);
+      if (sec <= 0 && !actionLockRef.current) {
+        actionLockRef.current = true;
+        setActionState("expired");
         alert.stop();
-        if (!autoDeclinedRef.current) {
-          autoDeclinedRef.current = true;
-          // Auto-trigger decline & reassignment when timer expires
-          declineOffer
-            .mutateAsync({ offerId: offer.id })
-            .catch(() => {})
-            .finally(() => {
-              void utils.rescue.rescuer.activeOffer.invalidate();
-              onDeclined?.();
-            });
-        }
+        // Auto-trigger decline & reassignment when timer expires
+        declineOffer
+          .mutateAsync({ offerId: offer.id })
+          .catch(() => {})
+          .finally(() => {
+            void utils.rescue.rescuer.activeOffer.invalidate();
+            onDeclined?.();
+          });
       }
     };
 
@@ -209,30 +212,45 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
   }, [offer.id, initialSeconds]);
 
   const handleAccept = async () => {
-    if (isExpired || acceptOffer.isPending || declineOffer.isPending) return;
+    if (actionLockRef.current || actionState === "expired") return;
+    actionLockRef.current = true;
+    setActionState("accepting");
     setErrorMsg("");
     alertRef.current?.stop();
     try {
       const result = await acceptOffer.mutateAsync({ offerId: offer.id });
+      setActionState("success");
       void utils.rescue.rescuer.activeOffer.invalidate();
       void utils.rescue.rescuer.missions.invalidate();
       void utils.rescue.rescuer.profile.invalidate();
       onAccepted?.(result.missionId);
     } catch (err: any) {
       setErrorMsg(err.message || t("Failed to accept mission offer."));
+      setActionState("error");
+      actionLockRef.current = false; // Allow retry if not expired
+      // Do not silently fail. If it was already assigned, we still show the error and wait for the parent to close if it wants, or user clicks away. But the parent handles activeOffer change.
+      // Wait, if it failed, activeOffer might still be valid or not.
+      if (err.message?.includes("already assigned") || err.message?.includes("expired")) {
+        // If it's permanently invalid, wait for polling to clean it up or decline it
+      }
     }
   };
 
   const handleDecline = async () => {
-    if (isExpired || acceptOffer.isPending || declineOffer.isPending) return;
+    if (actionLockRef.current || actionState === "expired") return;
+    actionLockRef.current = true;
+    setActionState("declining");
     setErrorMsg("");
     alertRef.current?.stop();
     try {
       await declineOffer.mutateAsync({ offerId: offer.id });
+      setActionState("success");
       void utils.rescue.rescuer.activeOffer.invalidate();
       onDeclined?.();
     } catch (err: any) {
       setErrorMsg(err.message || t("Failed to decline mission offer."));
+      setActionState("error");
+      actionLockRef.current = false; // Allow retry
     }
   };
 
@@ -370,7 +388,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
             data-testid="offer-countdown"
             className="font-mono text-sm font-black tracking-widest text-amber-700"
           >
-            {isExpired ? "00:00" : formattedCountdown}
+            {actionState === "expired" ? "00:00" : formattedCountdown}
           </span>
         </div>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-amber-200">
@@ -396,23 +414,23 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       <div className="mt-4 grid grid-cols-2 gap-3">
         <Button
           data-testid="accept-offer-btn"
-          disabled={isExpired || acceptOffer.isPending || declineOffer.isPending}
+          disabled={actionState !== "idle" && actionState !== "error"}
           onClick={handleAccept}
           className="h-11 rounded-xl bg-emerald-600 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-50"
         >
           <Check className="mr-1.5 h-5 w-5" />
-          {acceptOffer.isPending ? t("Accepting…") : t("ACCEPT")}
+          {actionState === "accepting" ? t("Accepting…") : t("ACCEPT")}
         </Button>
 
         <Button
           data-testid="decline-offer-btn"
           variant="outline"
-          disabled={isExpired || acceptOffer.isPending || declineOffer.isPending}
+          disabled={actionState !== "idle" && actionState !== "error"}
           onClick={handleDecline}
           className="h-11 rounded-xl border-red-300 bg-white font-extrabold text-red-600 hover:bg-red-50 hover:text-red-700 active:scale-[0.98] disabled:opacity-50"
         >
           <X className="mr-1.5 h-5 w-5" />
-          {declineOffer.isPending ? t("Declining…") : t("DECLINE")}
+          {actionState === "declining" ? t("Declining…") : t("DECLINE")}
         </Button>
       </div>
     </article>

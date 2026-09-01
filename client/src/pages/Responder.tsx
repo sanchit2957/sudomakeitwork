@@ -145,6 +145,7 @@ function ResponderWorkspace() {
 
   const lastNotifiedOfferIdRef = useRef<number | null>(null);
   const lastNotifiedAlertIdRef = useRef<number | null>(null);
+  const resolvedOfferIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     const refresh = () => refreshOperationalState();
@@ -361,7 +362,7 @@ function ResponderWorkspace() {
   return (
     <DashboardLayout navItems={nav} workspace={t("responder.workspace")} roleLabel={t("responder.role")}>
       <div className="space-y-6">
-        {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && (
+        {activeOffer.data?.hasOffer && activeOffer.data.offer && activeOffer.data.incident && !resolvedOfferIdsRef.current.has(activeOffer.data.offer.id) && (
           <div
             role="dialog"
             aria-modal="true"
@@ -372,9 +373,11 @@ function ResponderWorkspace() {
               <EmergencyOfferCard
                 data={activeOffer.data as any}
                 onAccepted={() => {
+                  resolvedOfferIdsRef.current.add(activeOffer.data.offer!.id);
                   void refreshOperationalState();
                 }}
                 onDeclined={() => {
+                  resolvedOfferIdsRef.current.add(activeOffer.data.offer!.id);
                   void refreshOperationalState();
                 }}
               />

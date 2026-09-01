@@ -480,6 +480,10 @@ export async function declineMissionOffer(
     throw new Error("You are not authorized to decline this offer.");
   }
 
+  if (offer.status === "declined") {
+    return { success: true, message: "Already declined." };
+  }
+
   if (offer.status !== "offered") {
     throw new Error(`This offer cannot be declined (status: ${offer.status}).`);
   }
