@@ -107,12 +107,40 @@ async function startServer() {
   // Minimal public production health check endpoint (Render compatible)
   app.get("/health", async (_req, res) => {
     const dbPing = await pingDatabase();
-    const isDegraded = !dbPing.ok;
+    const poolMetrics = getDatabasePoolMetrics();
 
-    res.status(isDegraded && process.env.NODE_ENV === "production" ? 503 : 200).json({
-      status: isDegraded ? "degraded" : "ok",
+    // Three-tier status: healthy / degraded / unhealthy
+    let dbStatus: "healthy" | "degraded" | "unhealthy";
+    if (dbPing.ok && poolMetrics.consecutiveFailures === 0) {
+      dbStatus = "healthy";
+    } else if (dbPing.ok || poolMetrics.consecutiveFailures < 5) {
+      dbStatus = "degraded";
+    } else {
+      dbStatus = "unhealthy";
+    }
+
+    const appStatus = dbStatus === "unhealthy" ? "degraded" : "ok";
+    const httpStatus = dbStatus === "unhealthy" && process.env.NODE_ENV === "production" ? 503 : 200;
+
+    res.status(httpStatus).json({
+      status: appStatus,
       uptime: Math.floor(process.uptime()),
       timestamp: new Date().toISOString(),
+      db: {
+        status: dbStatus,
+        pingLatencyMs: dbPing.latencyMs,
+        errorCode: dbPing.code ?? null,
+        consecutiveFailures: poolMetrics.consecutiveFailures,
+        lastErrorCode: poolMetrics.lastErrorCode ?? null,
+        lastSuccessfulQuery: poolMetrics.lastSuccessfulQuery ?? null,
+        poolStatus: poolMetrics.status,
+        totalConnections: poolMetrics.totalConnections,
+        freeConnections: poolMetrics.freeConnections,
+        queuedRequests: poolMetrics.queuedRequests,
+        staleRetries: poolMetrics.counters?.staleRetries ?? 0,
+        queriesExecuted: poolMetrics.counters?.queriesExecuted ?? 0,
+        queriesFailed: poolMetrics.counters?.queriesFailed ?? 0,
+      },
     });
   });
 

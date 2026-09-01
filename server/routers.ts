@@ -112,7 +112,10 @@ export const appRouter = router({
           if (sbUser && sbUser.email) {
             const emailVal = sbUser.email.trim().toLowerCase();
             const requestedRole = input.role ? (input.role === "medical" ? "hospital" : input.role) : undefined;
-            let dbUser = (await getUserByEmail(emailVal, requestedRole)) || (await getUserByOpenId(sbUser.id));
+            // Look up by email only. The getUserByOpenId(sbUser.id) fallback was incorrect:
+            // sbUser.id is the raw Supabase UUID but our openId format is "${role}-${uuid}".
+            // That incorrect lookup generated a wasted DB query that would never match.
+            let dbUser = await getUserByEmail(emailVal, requestedRole);
             const roleVal = requestedRole || resolveVerifiedRole(emailVal, dbUser?.role);
             const openId = `${roleVal}-${sbUser.id}`.slice(0, 64);
             if (!dbUser) {

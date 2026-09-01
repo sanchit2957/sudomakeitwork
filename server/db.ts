@@ -91,7 +91,8 @@ export function recordDbFailure(error?: any, operationName?: string) {
   _lastDbError = `${safe.code}${safe.errno !== undefined ? `:${safe.errno}` : ""}: ${safe.message}`;
 
   // Only trip circuit breaker for hard network connection failures, NOT SQL schema / constraint errors
-  const isNetworkFailure = ["ECONNREFUSED", "ETIMEDOUT", "PROTOCOL_CONNECTION_LOST", "DATABASE_TIMEOUT", "ER_CON_COUNT_ERROR"].includes(safe.code);
+  // ECONNRESET added: TiDB Cloud closes idle TCP sockets causing this on the first use of a stale pooled connection
+  const isNetworkFailure = ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "PROTOCOL_CONNECTION_LOST", "PROTOCOL_SEQUENCE_TIMEOUT", "DATABASE_TIMEOUT", "ER_CON_COUNT_ERROR"].includes(safe.code);
   if (isNetworkFailure && _consecutiveFailures >= 3) {
     _dbCircuitBrokenUntil = Date.now() + 5000; // 5s circuit breaker
   }
@@ -149,11 +150,16 @@ export function createDatabasePool(connectionUri: string): mysql.Pool {
     uri: connectionUri,
     waitForConnections: true,
     connectionLimit: 10,
-    maxIdle: 2,
-    idleTimeout: 15000,
+    maxIdle: 3,
+    // 60s: longer than mysql2 default but shorter than TiDB Cloud's ~300s idle eviction.
+    // Ensures stale connections are pruned from the pool before TiDB kills them server-side.
+    idleTimeout: 60000,
     connectTimeout: 15000,
+    // Enable TCP keepalives at the OS level; fire after 1s idle so the OS refreshes
+    // the connection state before TiDB's server-side idle timeout (default 8h, but
+    // proxy/NAT can evict after ~90s on TiDB Cloud's free tier).
     enableKeepAlive: true,
-    keepAliveInitialDelay: 5000,
+    keepAliveInitialDelay: 1000,
     queueLimit: 20,
     ssl: isRemoteOrTiDB ? { minVersion: "TLSv1.2", rejectUnauthorized: true } : undefined,
   });
@@ -280,6 +286,18 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
       try {
         await execDdl("INSERT IGNORE INTO `roleAccessCodes` (`role`, `codeHash`, `codeVersion`, `updatedAt`) VALUES ('rescuer', '" + hashPassword("RESCUER-2026") + "', 1, NOW())", "seed_rescuerCode");
         await execDdl("INSERT IGNORE INTO `roleAccessCodes` (`role`, `codeHash`, `codeVersion`, `updatedAt`) VALUES ('hospital', '" + hashPassword("HOSPITAL-2026") + "', 1, NOW())", "seed_hospitalCode");
+        // Ensure seed demo accounts exist in TiDB production. INSERT IGNORE is safe/idempotent.
+        // These are required for platform login (citizen@assamrescue.gov.in / admin@assamrescue.gov.in).
+        const adminHash = hashPassword(process.env.ADMIN_INITIAL_PASSWORD || "admin");
+        const citizenHash = hashPassword(process.env.CITIZEN_INITIAL_PASSWORD || "citizen");
+        await execDdl(
+          `INSERT IGNORE INTO \`users\` (\`openId\`, \`name\`, \`email\`, \`password\`, \`role\`, \`status\`, \`loginMethod\`, \`lastSignedIn\`) VALUES ('user-admin', 'Superadmin', 'admin@assamrescue.gov.in', '${adminHash}', 'admin', 'active', 'platform-login', NOW())`,
+          "seed_adminUser"
+        );
+        await execDdl(
+          `INSERT IGNORE INTO \`users\` (\`openId\`, \`name\`, \`email\`, \`password\`, \`role\`, \`status\`, \`loginMethod\`, \`lastSignedIn\`) VALUES ('user-citizen', 'Anamika Das', 'citizen@assamrescue.gov.in', '${citizenHash}', 'user', 'active', 'platform-login', NOW())`,
+          "seed_citizenUser"
+        );
         await execDdl("UPDATE `users` SET `role` = 'user' WHERE `openId` = 'user-citizen' AND `role` != 'user'", "resetCitizenRole");
         await execDdl("UPDATE `users` SET `role` = 'admin' WHERE `openId` = 'user-admin' AND `role` != 'admin'", "resetAdminRole");
       } catch {}
@@ -914,16 +932,19 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   _memoryUsers.set(user.openId, merged);
 }
 
-export async function getUserByOpenId(openId: string) {
+export async function getUserByOpenId(openId: string, _retried = false): Promise<any> {
   const db = await getDb();
   if (db) {
+    const t0 = performance.now();
     try {
       const result = await withDbTimeout(
         db.select().from(users).where(eq(users.openId, openId)).limit(1),
         4000,
         "getUserByOpenId"
       );
+      const elapsedMs = Math.round((performance.now() - t0) * 10) / 10;
       if (result.length > 0) {
+        recordDbSuccess();
         const row = result[0];
         const normalizedRole = row.role === "medical" ? "hospital" : row.role;
         return {
@@ -932,11 +953,43 @@ export async function getUserByOpenId(openId: string) {
           status: row.status || "active",
         };
       }
+      // No matching row — user does not exist
+      return null;
     } catch (error: any) {
-      console.error(`[Database] User query by openId error: ${(error as Error)?.message || "DB error"}`);
+      const elapsedMs = Math.round((performance.now() - t0) * 10) / 10;
+      const safe = extractSafeDbError(error);
+      // Log the REAL error details — not just the message string
+      console.error(
+        `[Database] getUserByOpenId failed: code=${safe.code} errno=${safe.errno ?? "N/A"} sqlState=${safe.sqlState ?? "N/A"} elapsed=${elapsedMs}ms openId="${openId}" message="${safe.message}"`
+      );
+      recordDbFailure(error, "getUserByOpenId");
+
+      // Single safe retry for connection-level errors on this idempotent read.
+      // ECONNRESET / PROTOCOL_CONNECTION_LOST happen when TiDB evicts a stale
+      // pooled socket. Retrying once forces mysql2 to acquire a fresh connection.
+      // SQL logic errors (ER_BAD_FIELD_ERROR etc.) are NOT retried.
+      const isConnectionError = [
+        "ECONNRESET",
+        "ETIMEDOUT",
+        "PROTOCOL_CONNECTION_LOST",
+        "PROTOCOL_SEQUENCE_TIMEOUT",
+        "ECONNREFUSED",
+      ].includes(safe.code);
+
+      if (isConnectionError && !_retried) {
+        console.warn(
+          `[Database] getUserByOpenId: connection-level error (${safe.code}), retrying once with fresh connection...`
+        );
+        _poolCounters.staleRetries++;
+        // Brief pause to let the pool discard the stale socket
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return getUserByOpenId(openId, true);
+      }
+
       throw error;
     }
   }
+  // No database available — fall back to in-memory (non-production only)
   const memUser = _memoryUsers.get(openId) || null;
   if (memUser) {
     if (memUser.role === "medical") memUser.role = "hospital";
