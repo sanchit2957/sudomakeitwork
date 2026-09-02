@@ -228,7 +228,7 @@ function ResponderWorkspace() {
       }
 
       // 3. Flash document title on interval until offer is accepted/declined/expired
-      const originalTitle = document.title || "sudo MakeItWork";
+      const originalTitle = document.title || "Sahay";
       let flashState = false;
       const titleInterval = window.setInterval(() => {
         flashState = !flashState;
@@ -1921,7 +1921,7 @@ function describePushFailure(error: unknown, t: (key: string) => string) {
   const message = error instanceof Error ? error.message : "";
   if (/could not retrieve the public key/i.test(message))
     return t(
-      "This browser’s PushManager key store did not respond. sudo MakeItWork’s VAPID pair is valid. Restart the browser or device, then retry; if it persists, clear this site’s storage and notification permission or use another current browser. In-app alerts remain available."
+      "This browser’s PushManager key store did not respond. Sahay’s VAPID pair is valid. Restart the browser or device, then retry; if it persists, clear this site’s storage and notification permission or use another current browser. In-app alerts remain available."
     );
   if (/no active Service Worker/i.test(message))
     return t("The alert worker is still starting. Wait a few seconds, refresh this page, and try again.");

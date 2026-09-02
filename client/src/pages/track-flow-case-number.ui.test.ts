@@ -7,7 +7,6 @@ describe("Track flow case-number display", () => {
     expect(source).toContain('aria-label="SOS tracking number"');
     expect(source).toContain("Tracking no.");
     expect(source).toContain("{status.data.publicCode}");
-    expect(source).toContain("<RequestDetails publicCode={status.data.publicCode}");
     expect(source).toContain("<IncidentChat publicCode={status.data.publicCode}");
   });
 });

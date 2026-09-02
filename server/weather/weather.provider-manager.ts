@@ -1,3 +1,4 @@
+import { INDIA_CENTER } from "../../shared/india-locations";
 import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
 import { OpenMeteoProvider } from "./providers/openMeteo.provider";
 import { OpenWeatherProvider } from "./providers/openWeather.provider";
@@ -79,13 +80,13 @@ export class WeatherProviderManager {
    * Main entrypoint to obtain weather for coordinates
    */
   public async getWeather(
-    latitude: number = 26.1445,
-    longitude: number = 91.7362,
+    latitude: number = INDIA_CENTER.lat,
+    longitude: number = INDIA_CENTER.lng,
     activeFloodZonesCount: number = 0
   ): Promise<NormalizedWeatherReport> {
     // Validate coordinates
-    const validLat = Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 ? latitude : 26.1445;
-    const validLng = Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 ? longitude : 91.7362;
+    const validLat = Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 ? latitude : INDIA_CENTER.lat;
+    const validLng = Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 ? longitude : INDIA_CENTER.lng;
 
     const cacheKey = getCacheKey(validLat, validLng);
     const now = Date.now();

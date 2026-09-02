@@ -15,15 +15,28 @@ function kilometresBetween(position: Position, latitude: number, longitude: numb
 function supplyTone(status: SupplyStatus) { return status === "available" ? "bg-[#e7f6ef] text-[#197654]" : status === "limited" ? "bg-[#fff4df] text-[#9d6a16]" : status === "critical" ? "bg-[#fff0ee] text-[#b44742]" : "bg-[#eef0f1] text-[#59666b]"; }
 function humanStatus(status: string) { return status === "unavailable" ? "Not available" : status[0].toUpperCase() + status.slice(1); }
 
+import { getCurrentCoordinates, getLastKnownCoordinates } from "@/lib/nativeLocation";
+
 export default function UserSafety() {
   const [, setLocation] = useLocation();
   const { t } = useLanguage();
-  const [position, setPosition] = useState<Position>(null);
-  const [positionState, setPositionState] = useState<PositionState>("finding");
+  const [position, setPosition] = useState<Position>(() => getLastKnownCoordinates());
+  const [positionState, setPositionState] = useState<PositionState>(() => getLastKnownCoordinates() ? "ready" : "finding");
   const resources = trpc.rescue.safety.resources.useQuery(undefined, { refetchInterval: 15_000, refetchOnWindowFocus: true });
   const conditions = trpc.rescue.emergency.conditions.useQuery(position ? { latitude: position.latitude, longitude: position.longitude } : {}, { refetchInterval: 15 * 60_000, refetchOnWindowFocus: true });
-  const requestPosition = () => { if (!navigator.geolocation) { setPositionState("unavailable"); return; } setPositionState("finding"); navigator.geolocation.getCurrentPosition(point => { setPosition({ latitude: point.coords.latitude, longitude: point.coords.longitude }); setPositionState("ready"); }, () => setPositionState("unavailable"), { enableHighAccuracy: true, timeout: 8_000, maximumAge: 60_000 }); };
-  useEffect(() => { requestPosition(); }, []);
+  const requestPosition = async () => {
+    setPositionState("finding");
+    try {
+      const res = await getCurrentCoordinates({ enableHighAccuracy: true, timeout: 5000 });
+      setPosition({ latitude: res.latitude, longitude: res.longitude });
+      setPositionState("ready");
+    } catch {
+      if (!getLastKnownCoordinates()) {
+        setPositionState("unavailable");
+      }
+    }
+  };
+  useEffect(() => { void requestPosition(); }, []);
   const hospitals = useMemo(() => ((resources.data?.hospitals || []) as HospitalResource[]).map(hospital => ({ ...hospital, distance: kilometresBetween(position, hospital.latitude, hospital.longitude) })).sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY)), [resources.data, position]);
   const locationCopy = positionState === "ready" ? t("Nearest verified hospital shown first") : positionState === "finding" ? t("Finding hospitals near you…") : t("Use location to sort hospitals by distance");
   return <div className="victim-page min-h-screen bg-[#f6f8f7]"><main className="victim-main mx-auto min-h-screen max-w-lg bg-[#fcfdfd] px-5 pb-28 pt-6 md:my-6 md:min-h-[850px] md:rounded-[2.75rem] md:border"><header className="flex items-start justify-between"><button onClick={() => setLocation("/")} className="flex items-center gap-2 text-left"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#174e46] text-white"><ShieldCheck className="h-5 w-5" /></span><span><span className="block text-lg font-black tracking-[-.05em]">{t("Safety")}</span><span className="block text-[10px] font-bold text-[#6b8780]">{t("Nearby hospital information")}</span></span></button><LanguageSelector compact /></header><section className="mt-6 rounded-[1.8rem] bg-[#174e46] p-5 text-white"><div className="flex gap-4"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10"><ShieldCheck className="h-6 w-6 text-[#d3eee6]" /></span><div><h1 className="text-xl font-black tracking-[-.04em]">{t("Stay safe, stay informed")}</h1><p className="mt-2 text-sm leading-6 text-[#c7e1da]">{t("Find verified nearby medical care. For immediate danger, send an SOS now.")}</p></div></div><div className="mt-5 grid grid-cols-2 gap-2"><a href="tel:112" className="inline-flex items-center justify-center rounded-xl bg-[#fff2ef] px-3 py-3 text-xs font-black text-[#c14544]"><PhoneCall className="mr-2 h-4 w-4" />{t("Call 112")}</a><button onClick={() => setLocation("/")} className="inline-flex items-center justify-center rounded-xl bg-white px-3 py-3 text-xs font-black text-[#174e46]"><AlertTriangle className="mr-2 h-4 w-4 text-[#df3e43]" />{t("Rapid SOS")}</button></div></section><VerifiedMedicalCare hospitals={hospitals} loading={resources.isLoading} locationCopy={locationCopy} refresh={requestPosition} /><SafetyConditionsCard conditions={conditions.data} loading={conditions.isLoading} /><FloodSafety /></main><VictimNavigation current="safety" /></div>;
@@ -36,6 +49,55 @@ function HospitalLoading() { const { t } = useLanguage(); return <div className=
 function NoHospitalCard() { const { t } = useLanguage(); return <div className="mt-4 rounded-[1.6rem] border border-dashed bg-white p-7 text-center"><Building2 className="mx-auto h-9 w-9 text-[#6d8f84]" /><p className="mt-3 text-base font-black">{t("No verified hospital listed nearby")}</p><p className="mt-2 text-xs leading-5 text-[#698077]">{t("Hospital information appears here after a hospital is verified and staff publish its current capacity.")}</p></div>; }
 function FloodSafety() { const { t } = useLanguage(); return <section className="mt-5 rounded-[1.55rem] border border-[#f1d4c8] bg-[#fff9f6] p-4"><div className="flex gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#b9423d]" /><div><p className="text-sm font-black text-[#9f413f]">{t("Flood safety now")}</p><div className="mt-3 grid gap-2 sm:grid-cols-3"><SafetyTip icon={TentTree} title={t("Move higher")} copy={t("Leave low ground before water rises.")} /><SafetyTip icon={Waves} title={t("Avoid water")} copy={t("Never walk or drive through moving water.")} /><SafetyTip icon={Smartphone} title={t("Keep contact")} copy={t("Charge your phone and keep emergency numbers ready.")} /></div></div></div></section>; }
 function SafetyTip({ icon: Icon, title, copy }: { icon: typeof TentTree; title: string; copy: string }) { return <div className="rounded-xl bg-white/75 p-3"><Icon className="h-4 w-4 text-[#b9423d]" /><p className="mt-2 text-xs font-black text-[#9f413f]">{title}</p><p className="mt-1 text-[10px] leading-4 text-[#885854]">{copy}</p></div>; }
+import { getWeatherRiskPresentation } from "@/lib/weatherRisk";
 type RiverConditions = { available: boolean; levelMetres: number | null; trend: "rising" | "falling" | "steady" | null; stationName: string | null; updatedAt: Date | string | null; sourceName: string | null; sourceUrl: string | null; message: string | null };
 type SafetyConditions = { available: boolean; source: string; risk: string; forecast: { rainChance: number | null; rainAmountMm: number | null }; river?: RiverConditions | null };
-export function SafetyConditionsCard({ conditions, loading }: { conditions?: SafetyConditions; loading: boolean }) { const { t } = useLanguage(); const title = loading ? t("Checking conditions") : conditions?.available ? conditions.risk === "high" ? t("High rainfall risk") : conditions.risk === "elevated" ? t("Elevated rainfall risk") : t("Current model conditions") : t("Weather source unavailable"); const tone = conditions?.risk === "high" ? "bg-[#fff0ee] text-[#b83f43]" : conditions?.risk === "elevated" ? "bg-[#fff4df] text-[#9a681d]" : "bg-[#e7f6ef] text-[#197654]"; const detail = conditions?.available ? `${conditions.forecast.rainChance ?? "—"}% ${t("chance of rain today")}${conditions.forecast.rainAmountMm !== null ? ` · ${conditions.forecast.rainAmountMm} mm ${t("forecast")}` : ""}. ${conditions.risk === "high" ? t("Avoid low-lying routes and move early if local authorities advise.") : t("Keep monitoring local authority alerts before travelling.")}` : t("Live weather information is temporarily unavailable. Follow official local authority warnings and do not rely on this screen alone."); const river = conditions?.river; const riverCopy = river?.available && river.levelMetres !== null ? `${river.stationName || t("Official river gauge")} · ${river.levelMetres.toFixed(2)} m${river.trend ? ` · ${t(river.trend)}` : ""}` : river?.message ? t(river.message) : t("Official river-gauge data is temporarily unavailable."); return <section className="mt-5 rounded-[1.55rem] border border-[#e7ece9] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.06)]"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-primary">{t("Local alert")}</p><h2 className="mt-1 text-base font-black">{title}</h2></div><span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${tone}`}>{conditions?.risk ? t(conditions.risk) : t("loading")}</span></div><p className="mt-2 text-xs leading-5 text-[#6c847c]">{detail}</p><div className="mt-3 rounded-xl bg-[#f4f8f6] px-3 py-2 text-[10px] leading-4 text-[#6f8780]"><span>{riverCopy}</span>{river?.sourceUrl ? <a href={river.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 block font-bold text-[#277b6b] underline underline-offset-2">{river.sourceName || t("Official source")}{river.updatedAt ? ` · ${t("observed")} ${new Date(river.updatedAt).toLocaleString()}` : ""}</a> : <span> · {conditions?.source || t("Weather model loading")}</span>}</div></section>; }
+export function SafetyConditionsCard({ conditions, loading }: { conditions?: SafetyConditions; loading: boolean }) {
+  const { t } = useLanguage();
+  const riskInfo = getWeatherRiskPresentation(conditions?.risk);
+  const title = loading
+    ? t("Checking conditions")
+    : conditions?.available
+    ? t(riskInfo.safetyTitleKey)
+    : t("Weather source unavailable");
+  const tone = riskInfo.badgeTone;
+  const detail = conditions?.available
+    ? `${conditions.forecast.rainChance ?? "—"}% ${t("chance of rain today")}${
+        conditions.forecast.rainAmountMm !== null ? ` · ${conditions.forecast.rainAmountMm} mm ${t("forecast")}` : ""
+      }. ${
+        riskInfo.level === "critical"
+          ? t("Avoid low-lying routes and move early if local authorities advise.")
+          : t("Keep monitoring local authority alerts before travelling.")
+      }`
+    : t("Live weather information is temporarily unavailable. Follow official local authority warnings and do not rely on this screen alone.");
+  const river = conditions?.river;
+  const riverCopy =
+    river?.available && river.levelMetres !== null
+      ? `${river.stationName || t("Official river gauge")} · ${river.levelMetres.toFixed(2)} m${river.trend ? ` · ${t(river.trend)}` : ""}`
+      : river?.message
+      ? t(river.message)
+      : t("Official river-gauge data is temporarily unavailable.");
+  return (
+    <section className="mt-5 rounded-[1.55rem] border border-[#e7ece9] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.06)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-primary">{t("Local alert")}</p>
+          <h2 className="mt-1 text-base font-black">{title}</h2>
+        </div>
+        <span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${tone}`}>
+          {conditions?.risk ? t(riskInfo.badgeLabelKey) : t("loading")}
+        </span>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-[#6c847c]">{detail}</p>
+      <div className="mt-3 rounded-xl bg-[#f4f8f6] px-3 py-2 text-[10px] leading-4 text-[#6f8780]">
+        <span>{riverCopy}</span>
+        {river?.sourceUrl && river?.sourceName ? (
+          <a href={river.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 block font-bold text-[#277b6b] underline underline-offset-2">
+            {river.sourceName}
+            {river.updatedAt ? ` · ${t("observed")} ${new Date(river.updatedAt).toLocaleString()}` : ""}
+          </a>
+        ) : null}
+      </div>
+    </section>
+  );
+}

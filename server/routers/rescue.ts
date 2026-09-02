@@ -26,7 +26,15 @@ import {
 import { getDb, withDbTimeout, getEmergencyContactsByUserId, upsertEmergencyContact, deleteEmergencyContact, getUserByOpenId, getUserById, upsertUser, getAllUsers } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
-import { ASSAM_DISTRICT_LOCATIONS, getComprehensiveWeather, weatherProviderManager } from "../weather.service";
+import {
+  ASSAM_DISTRICT_LOCATIONS,
+  classifyWeatherRisk,
+  getComprehensiveWeather,
+  getIndiaWeatherRiskGrid,
+  INDIA_CENTER,
+  POPULAR_INDIAN_LOCATIONS,
+  weatherProviderManager,
+} from "../weather.service";
 import {
   adminProcedure,
   medicalOperationsProcedure,
@@ -305,6 +313,32 @@ async function enforceGuestSosRateLimit(guestKey: string) {
 const _conditionsCache = new Map<string, { timestamp: number; data: any }>();
 const _conditionsInFlight = new Map<string, Promise<any>>();
 
+function calculateGeoDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function isPointNearPolygonZone(lat: number, lng: number, polygon: Array<{ lat: number; lng: number }>, maxDistanceKm = 35): boolean {
+  if (!Array.isArray(polygon) || polygon.length === 0) return false;
+  for (const pt of polygon) {
+    if (typeof pt.lat === "number" && typeof pt.lng === "number") {
+      if (calculateGeoDistanceKm(lat, lng, pt.lat, pt.lng) <= maxDistanceKm) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export const rescueRouter = router({
   emergency: router({
     conditions: publicProcedure
@@ -317,8 +351,8 @@ export const rescueRouter = router({
           .optional()
       )
       .query(async ({ input }) => {
-        const latitude = input?.latitude ?? 26.1445;
-        const longitude = input?.longitude ?? 91.7362;
+        const latitude = input?.latitude ?? INDIA_CENTER.lat;
+        const longitude = input?.longitude ?? INDIA_CENTER.lng;
         const cacheKey = `${latitude.toFixed(2)}_${longitude.toFixed(2)}`;
         const now = Date.now();
 
@@ -334,89 +368,129 @@ export const rescueRouter = router({
         }
 
         const fetchPromise = (async () => {
-          const db = await database();
-          let activeZones: Array<{ id: number; severity: string }> = [];
-          if (db) {
-            try {
-              activeZones = await withDbTimeout(
+          let nearbyFloodZonesCount = 0;
+          try {
+            const db = await database();
+            if (db) {
+              const allActive = await withDbTimeout(
                 db
-                  .select({ id: floodZones.id, severity: floodZones.severity })
+                  .select({ id: floodZones.id, severity: floodZones.severity, polygonJson: floodZones.polygonJson })
                   .from(floodZones)
                   .where(eq(floodZones.active, "yes")),
                 3000,
                 "conditions_activeZones"
               );
-            } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
-          } else {
-            activeZones = Array.from(_memoryFloodZones.values())
-              .filter(z => z.active === "yes")
-              .map(z => ({ id: z.id, severity: z.severity }));
+              nearbyFloodZonesCount = allActive.filter((zone) => {
+                try {
+                  const poly = JSON.parse(zone.polygonJson) as Array<{ lat: number; lng: number }>;
+                  return isPointNearPolygonZone(latitude, longitude, poly, 35);
+                } catch {
+                  return false;
+                }
+              }).length;
+            } else {
+              nearbyFloodZonesCount = Array.from(_memoryFloodZones.values())
+                .filter((z) => z.active === "yes")
+                .filter((z) => {
+                  try {
+                    const poly = JSON.parse(z.polygonJson) as Array<{ lat: number; lng: number }>;
+                    return isPointNearPolygonZone(latitude, longitude, poly, 35);
+                  } catch {
+                    return false;
+                  }
+                }).length;
+            }
+          } catch (err) {
+            if (process.env.NODE_ENV === "production") throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database operation failed in production" });
           }
-          const river = await getOfficialAssamRiverGauge(latitude, longitude);
+
           try {
-            const endpoint = new URL("https://api.open-meteo.com/v1/forecast");
-            endpoint.searchParams.set("latitude", String(latitude));
-            endpoint.searchParams.set("longitude", String(longitude));
-            endpoint.searchParams.set("current", "temperature_2m,precipitation,weather_code,wind_speed_10m");
-            endpoint.searchParams.set(
-              "daily",
-              "temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,weather_code,wind_speed_10m_max"
-            );
-            endpoint.searchParams.set("past_days", "7");
-            endpoint.searchParams.set("forecast_days", "7");
-            endpoint.searchParams.set("timezone", "auto");
-            const response = await fetch(endpoint, {
-              signal: AbortSignal.timeout(6_000),
-              headers: { accept: "application/json" },
-            });
-            if (!response.ok) throw new Error(`Weather source responded ${response.status}`);
-            const weather = (await response.json()) as {
-              current?: { temperature_2m?: number; precipitation?: number; weather_code?: number; wind_speed_10m?: number };
-              daily?: {
-                time?: string[];
-                temperature_2m_max?: number[];
-                temperature_2m_min?: number[];
-                precipitation_probability_max?: number[];
-                precipitation_sum?: number[];
-                weather_code?: number[];
-                wind_speed_10m_max?: number[];
-              };
-            };
-            const rainChance = weather.daily?.precipitation_probability_max?.[0] ?? null;
-            const rainAmount = weather.daily?.precipitation_sum?.[0] ?? null;
-            const risk =
-              rainChance !== null && (rainChance >= 80 || (rainAmount ?? 0) >= 40)
-                ? "high"
-                : rainChance !== null && (rainChance >= 50 || (rainAmount ?? 0) >= 15)
-                ? "elevated"
-                : "normal";
-            const daily = weather.daily;
-            const dailyRows = (daily?.time || []).map((date, index) => ({
-              date,
-              temperatureHighC: daily?.temperature_2m_max?.[index] ?? null,
-              temperatureLowC: daily?.temperature_2m_min?.[index] ?? null,
-              rainChance: daily?.precipitation_probability_max?.[index] ?? null,
-              rainMm: daily?.precipitation_sum?.[index] ?? null,
-              windKmh: daily?.wind_speed_10m_max?.[index] ?? null,
-              weatherCode: daily?.weather_code?.[index] ?? null,
+            const report = await weatherProviderManager.getWeather(latitude, longitude, nearbyFloodZonesCount);
+            const { riskLevel } = classifyWeatherRisk(report);
+
+            const dailyRows = (report.forecast.days7 || []).map((d) => ({
+              date: d.date,
+              temperatureHighC: d.temperatureHighC,
+              temperatureLowC: d.temperatureLowC,
+              rainChance: d.rainChance,
+              rainMm: d.rainMm,
+              windKmh: d.windKmh,
+              weatherCode: d.weatherCode,
+              condition: d.condition,
+              icon: d.icon,
+              uvIndexMax: d.uvIndexMax,
+              sunrise: d.sunrise,
+              sunset: d.sunset,
             }));
-            const forecastDays = dailyRows.slice(-7);
-            const trendDays = dailyRows.slice(0, Math.max(0, dailyRows.length - 7)).slice(-7);
+
+            const hourlyRows = (report.forecast.hourly24h || []).map((h) => ({
+              time: h.time,
+              temperatureC: h.temperatureC,
+              feelsLikeC: h.feelsLikeC ?? null,
+              humidityPercent: h.humidityPercent,
+              precipitationProbability: h.precipitationProbability,
+              precipitationMm: h.precipitationMm,
+              weatherCode: h.weatherCode,
+              condition: h.condition,
+              icon: h.icon,
+              windKmh: h.windKmh,
+            }));
+
+            const trendRows = (report.trend.pastDays7 || []).map((d) => ({
+              date: d.date,
+              temperatureHighC: d.temperatureHighC,
+              temperatureLowC: d.temperatureLowC,
+              rainChance: d.rainChance,
+              rainMm: d.rainMm,
+              windKmh: d.windKmh,
+              weatherCode: d.weatherCode,
+            }));
+
             const result = {
-              available: true,
-              source: "Open-Meteo weather model",
-              updatedAt: new Date(),
-              risk,
-              activeFloodZones: activeZones.length,
-              current: {
-                temperatureC: weather.current?.temperature_2m ?? null,
-                precipitationMm: weather.current?.precipitation ?? null,
-                windKmh: weather.current?.wind_speed_10m ?? null,
-                weatherCode: weather.current?.weather_code ?? null,
+              available: report.available,
+              source: report.available ? (report.source?.provider || "Open-Meteo weather model") : "Weather source unavailable",
+              updatedAt: report.updatedAt,
+              risk: riskLevel,
+              activeFloodZones: nearbyFloodZonesCount,
+              location: {
+                name: report.location.name,
+                latitude: report.location.latitude,
+                longitude: report.location.longitude,
+                country: report.location.country,
+                region: report.location.region,
               },
-              forecast: { rainChance, rainAmountMm: rainAmount, days: forecastDays },
-              trend: { source: "Modelled daily weather history", days: trendDays },
-              river,
+              current: {
+                temperatureC: report.current.temperatureC,
+                feelsLikeC: report.current.feelsLikeC,
+                humidityPercent: report.current.humidityPercent,
+                pressureHpa: report.current.pressureHpa,
+                precipitationMm: report.current.precipitationMm ?? report.current.rainMm ?? 0,
+                windKmh: report.current.windKmh,
+                windDirectionDeg: report.current.windDirectionDeg,
+                windGustsKmh: report.current.windGustsKmh,
+                visibilityKm: report.current.visibilityKm,
+                cloudCoverPercent: report.current.cloudCoverPercent,
+                condition: report.current.condition,
+                category: report.current.category,
+                icon: report.current.icon,
+                weatherCode: report.current.weatherCode,
+                uvIndex: report.current.uvIndex,
+              },
+              forecast: {
+                rainChance: report.forecast.rainChance,
+                rainAmountMm: report.forecast.rainAmountMm,
+                days: dailyRows,
+                hourly24h: hourlyRows,
+              },
+              trend: {
+                source: report.trend.source || "Modelled daily weather history",
+                days: trendRows,
+              },
+              airQuality: report.airQuality,
+              floodRisk: report.floodRisk,
+              river: report.river,
+              alerts: report.alerts,
+              dataSource: report.source,
             };
 
             // Maintain bounded cache size (<= 50 locations)
@@ -432,10 +506,22 @@ export const rescueRouter = router({
               source: "Weather source unavailable",
               updatedAt: new Date(),
               risk: "unknown" as const,
-              activeFloodZones: activeZones.length,
+              activeFloodZones: nearbyFloodZonesCount,
               current: { temperatureC: null, precipitationMm: null, windKmh: null, weatherCode: null },
-              forecast: { rainChance: null, rainAmountMm: null },
-              river,
+              forecast: { rainChance: null, rainAmountMm: null, days: [] },
+              trend: { source: "Unavailable", days: [] },
+              river: {
+                available: false,
+                levelMetres: null,
+                trend: null,
+                updatedAt: null,
+                stationName: null,
+                riverName: null,
+                distanceKm: null,
+                sourceName: "",
+                sourceUrl: "",
+                message: "No nearby official flood gauge available",
+              },
             };
             return fallback;
           }
@@ -3399,7 +3485,13 @@ export const rescueRouter = router({
         return getComprehensiveWeather(latitude, longitude);
       }),
     locations: publicProcedure.query(() => {
+      return POPULAR_INDIAN_LOCATIONS;
+    }),
+    assamLocations: publicProcedure.query(() => {
       return ASSAM_DISTRICT_LOCATIONS;
+    }),
+    riskHeatmap: publicProcedure.query(async () => {
+      return getIndiaWeatherRiskGrid();
     }),
     providerHealth: publicProcedure.query(() => {
       return weatherProviderManager.getHealthReport();

@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { getWeatherRiskPresentation } from "@/lib/weatherRisk";
 
 export type WeatherDay = {
   date: string;
@@ -142,23 +143,10 @@ export type FloodConditionsData = {
   };
 };
 
-export const POPULAR_ASSAM_LOCATIONS = [
-  { name: "Guwahati (Kamrup Metro)", lat: 26.1445, lng: 91.7362 },
-  { name: "Silchar (Cachar)", lat: 24.8333, lng: 92.7789 },
-  { name: "Dibrugarh", lat: 27.4728, lng: 94.912 },
-  { name: "Jorhat", lat: 26.7509, lng: 94.2037 },
-  { name: "Tezpur (Sonitpur)", lat: 26.6528, lng: 92.7926 },
-  { name: "Nagaon", lat: 26.3452, lng: 92.684 },
-  { name: "Bongaigaon", lat: 26.4952, lng: 90.5432 },
-  { name: "Tinsukia", lat: 27.4922, lng: 95.3468 },
-  { name: "Dhubri", lat: 26.0197, lng: 89.9749 },
-  { name: "Karimganj", lat: 24.8649, lng: 92.3592 },
-  { name: "Golaghat", lat: 26.5167, lng: 93.9667 },
-  { name: "Barpeta", lat: 26.3216, lng: 91.0069 },
-  { name: "North Lakhimpur", lat: 27.2366, lng: 94.1037 },
-  { name: "Dhemaji", lat: 27.4817, lng: 94.5824 },
-  { name: "Haflong (Dima Hasao)", lat: 25.1764, lng: 93.0177 },
-];
+import { POPULAR_INDIAN_LOCATIONS } from "@shared/india-locations";
+
+export const POPULAR_LOCATIONS = POPULAR_INDIAN_LOCATIONS;
+export const POPULAR_ASSAM_LOCATIONS = POPULAR_LOCATIONS;
 
 function Stat({
   icon: Icon,
@@ -192,9 +180,13 @@ function getWeatherIconComponent(iconName?: string, category?: string) {
   return Cloud;
 }
 
+import { fetchDirectClientWeather } from "@/lib/clientWeather";
+
 export function FloodConditionsPanel({
   conditions,
   loading,
+  latitude,
+  longitude,
   onRefresh,
   onLocationChange,
   selectedLocationName,
@@ -203,6 +195,8 @@ export function FloodConditionsPanel({
 }: {
   conditions?: FloodConditionsData;
   loading: boolean;
+  latitude?: number;
+  longitude?: number;
   onRefresh?: () => void;
   onLocationChange?: (lat: number, lng: number, name: string) => void;
   selectedLocationName?: string;
@@ -212,18 +206,54 @@ export function FloodConditionsPanel({
   const { t } = useLanguage();
   const [trendOpen, setTrendOpen] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [clientConditions, setClientConditions] = useState<FloodConditionsData | null>(null);
+  const [clientLoading, setClientLoading] = useState(false);
 
-  const riskTone =
-    conditions?.risk === "high" || conditions?.risk === "critical"
-      ? "bg-[#fff0ee] text-[#b83f43]"
-      : conditions?.risk === "elevated"
-      ? "bg-[#fff5df] text-[#9a681d]"
-      : "bg-[#e6f6ef] text-[#197654]";
+  // When server weather is unavailable or missing forecast days, hydrate directly from real Open-Meteo
+  React.useEffect(() => {
+    const hasValidServerConditions = Boolean(
+      conditions?.available && conditions?.forecast?.days && conditions.forecast.days.length > 0
+    );
+    if (hasValidServerConditions) {
+      setClientConditions(null);
+      return;
+    }
 
-  const trendDays = conditions?.trend?.days || [];
-  const forecastDays = conditions?.forecast.days || [];
-  const hourlyItems = conditions?.forecast.hourly24h || [];
-  const alerts = conditions?.alerts || [];
+    const targetLat = latitude ?? (conditions?.location?.latitude !== undefined ? conditions.location.latitude : undefined);
+    const targetLng = longitude ?? (conditions?.location?.longitude !== undefined ? conditions.location.longitude : undefined);
+
+    if (targetLat != null && targetLng != null) {
+      let active = true;
+      setClientLoading(true);
+      void fetchDirectClientWeather(targetLat, targetLng)
+        .then((data) => {
+          if (active && data.available) {
+            setClientConditions(data);
+          }
+        })
+        .finally(() => {
+          if (active) setClientLoading(false);
+        });
+
+      return () => {
+        active = false;
+      };
+    }
+  }, [conditions, latitude, longitude]);
+
+  const effectiveConditions =
+    (conditions?.available && conditions?.forecast?.days && conditions.forecast.days.length > 0
+      ? conditions
+      : clientConditions) || conditions;
+
+  const effectiveLoading = loading || (clientLoading && !effectiveConditions?.available);
+
+  const riskInfo = getWeatherRiskPresentation(effectiveConditions?.risk);
+
+  const trendDays = effectiveConditions?.trend?.days || [];
+  const forecastDays = effectiveConditions?.forecast?.days || [];
+  const hourlyItems = effectiveConditions?.forecast?.hourly24h || [];
+  const alerts = effectiveConditions?.alerts || [];
 
   const maxRain = Math.max(1, ...trendDays.map((day) => day.rainMm || 0));
   const pointX = (index: number, size: number) => (size > 1 ? (index / (size - 1)) * 176 + 8 : 92);
@@ -244,7 +274,7 @@ export function FloodConditionsPanel({
     }
   };
 
-  const WeatherIcon = getWeatherIconComponent(conditions?.current.icon, conditions?.current.category);
+  const WeatherIcon = getWeatherIconComponent(effectiveConditions?.current?.icon, effectiveConditions?.current?.category);
 
   return (
     <section className="mt-5 rounded-[1.55rem] bg-white p-5 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10">
@@ -257,36 +287,32 @@ export function FloodConditionsPanel({
               <button
                 type="button"
                 onClick={onRefresh}
-                disabled={loading}
+                disabled={effectiveLoading}
                 title={t("Refresh weather data")}
                 aria-label={t("Refresh weather data")}
                 className="rounded-full p-1 text-[#789087] hover:bg-[#eef7f5] hover:text-[#277b6b] active:scale-95 disabled:opacity-50 dark:hover:bg-[#252528] dark:hover:text-[#7fd6bb]"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-[#277b6b]" : ""}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${effectiveLoading ? "animate-spin text-[#277b6b]" : ""}`} />
               </button>
             )}
           </div>
           <p className="mt-0.5 text-[11px] font-semibold text-[#789087]">
-            {loading
+            {effectiveLoading
               ? t("Updating local forecast")
-              : conditions?.available
-              ? conditions.source || t("Weather model based")
+              : effectiveConditions?.available
+              ? effectiveConditions.source || t("Weather model based")
               : t("Weather source unavailable")}
           </p>
         </div>
 
         <div className="flex flex-col items-end gap-1">
           <span
-            className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${riskTone}`}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${riskInfo.badgeTone}`}
           >
-            {conditions?.risk === "high" || conditions?.risk === "critical"
-              ? t("High rain risk")
-              : conditions?.risk === "elevated"
-              ? t("Watch conditions")
-              : t("Normal")}
+            {t(riskInfo.badgeLabelKey)}
           </span>
 
-          {conditions?.dataSource?.isCached && (
+          {effectiveConditions?.dataSource?.isCached && (
             <span className="rounded-md bg-[#f1f5f4] px-1.5 py-0.5 text-[9px] font-bold text-[#627c73] dark:bg-[#28282b] dark:text-[#a5c0b7]">
               {t("Cached data")}
             </span>
@@ -303,7 +329,7 @@ export function FloodConditionsPanel({
         >
           <MapPin className="h-3.5 w-3.5 shrink-0 text-[#277b6b] dark:text-[#7fd6bb]" />
           <span className="truncate max-w-[200px] sm:max-w-[280px]">
-            {selectedLocationName || conditions?.location?.name || "Assam (Region)"}
+            {selectedLocationName || effectiveConditions?.location?.name || "India (National)"}
           </span>
         </button>
 
@@ -327,7 +353,7 @@ export function FloodConditionsPanel({
       {showLocationPicker && (
         <div className="mt-2 rounded-xl border border-[#d8eae2] bg-[#fbfdfc] p-2.5 dark:border-[#353538] dark:bg-[#1e1e21]">
           <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#698a81] dark:text-[#9bb7ad]">
-            {t("Select Assam Location:")}
+            {t("Select Location:")}
           </p>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             {POPULAR_ASSAM_LOCATIONS.map((loc) => (
@@ -371,19 +397,19 @@ export function FloodConditionsPanel({
       )}
 
       {/* Current Condition Summary Banner */}
-      {conditions?.current?.condition && (
+      {effectiveConditions?.current?.condition && (
         <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-[#edf6f3] px-3.5 py-2.5 text-xs font-bold text-[#23584d] dark:bg-[#252528] dark:text-[#aee3d1]">
           <div className="flex items-center gap-2">
             <WeatherIcon className="h-4 w-4 shrink-0 text-[#277b6b] dark:text-[#7fd6bb]" />
-            <span>{conditions.current.condition}</span>
+            <span>{effectiveConditions.current.condition}</span>
           </div>
 
           <div className="flex items-center gap-3 text-[11px] font-semibold opacity-90">
-            {conditions.current.temperatureC !== null && conditions.current.temperatureC !== undefined && (
-              <span className="text-sm font-black">{Math.round(conditions.current.temperatureC)}°C</span>
+            {effectiveConditions.current.temperatureC !== null && effectiveConditions.current.temperatureC !== undefined && (
+              <span className="text-sm font-black">{Math.round(effectiveConditions.current.temperatureC)}°C</span>
             )}
-            {conditions.current.feelsLikeC !== null && conditions.current.feelsLikeC !== undefined && (
-              <span>{t("Feels like")} {Math.round(conditions.current.feelsLikeC)}°C</span>
+            {effectiveConditions.current.feelsLikeC !== null && effectiveConditions.current.feelsLikeC !== undefined && (
+              <span>{t("Feels like")} {Math.round(effectiveConditions.current.feelsLikeC)}°C</span>
             )}
           </div>
         </div>
@@ -395,42 +421,42 @@ export function FloodConditionsPanel({
           icon={Droplets}
           label={t("Rainfall now")}
           value={
-            conditions?.current.precipitationMm !== null &&
-            conditions?.current.precipitationMm !== undefined
-              ? `${conditions.current.precipitationMm} mm`
+            effectiveConditions?.current?.precipitationMm !== null &&
+            effectiveConditions?.current?.precipitationMm !== undefined
+              ? `${effectiveConditions.current.precipitationMm} mm`
               : "—"
           }
           detail={
-            conditions?.forecast.rainAmountMm !== null &&
-            conditions?.forecast.rainAmountMm !== undefined
-              ? `${conditions.forecast.rainAmountMm} mm expected today`
+            effectiveConditions?.forecast?.rainAmountMm !== null &&
+            effectiveConditions?.forecast?.rainAmountMm !== undefined
+              ? `${effectiveConditions.forecast.rainAmountMm} mm expected today`
               : t("No reading")}
         />
         <Stat
           icon={Wind}
           label={t("Wind speed")}
           value={
-            conditions?.current.windKmh !== null && conditions?.current.windKmh !== undefined
-              ? `${Math.round(conditions.current.windKmh)} km/h`
+            effectiveConditions?.current?.windKmh !== null && effectiveConditions?.current?.windKmh !== undefined
+              ? `${Math.round(effectiveConditions.current.windKmh)} km/h`
               : "—"
           }
           detail={
-            conditions?.current.windGustsKmh
-              ? `Gusts to ${Math.round(conditions.current.windGustsKmh)} km/h`
-              : conditions?.current.temperatureC !== null && conditions?.current.temperatureC !== undefined
-              ? `${Math.round(conditions.current.temperatureC)}° now`
+            effectiveConditions?.current?.windGustsKmh
+              ? `Gusts to ${Math.round(effectiveConditions.current.windGustsKmh)} km/h`
+              : effectiveConditions?.current?.temperatureC !== null && effectiveConditions?.current?.temperatureC !== undefined
+              ? `${Math.round(effectiveConditions.current.temperatureC)}° now`
               : t("No reading")}
         />
         <Stat
           icon={Gauge}
           label={t("River level")}
           value={
-            conditions?.river?.available &&
-            conditions.river.levelMetres !== null &&
-            conditions?.river.levelMetres !== undefined
-              ? `${conditions.river.levelMetres} m`
+            effectiveConditions?.river?.available &&
+            effectiveConditions.river.levelMetres !== null &&
+            effectiveConditions?.river.levelMetres !== undefined
+              ? `${effectiveConditions.river.levelMetres} m`
               : t("Unavailable")}
-          detail={conditions?.river?.message || t("No official gauge linked")}
+          detail={effectiveConditions?.river?.message || t("No official gauge linked")}
         />
         <button
           type="button"
@@ -449,33 +475,33 @@ export function FloodConditionsPanel({
       </div>
 
       {/* Secondary Weather Stats (Humidity, Pressure, Visibility, UV) */}
-      {(conditions?.current.humidityPercent != null ||
-        conditions?.current.visibilityKm != null ||
-        conditions?.current.pressureHpa != null ||
-        conditions?.current.uvIndex != null) && (
+      {(effectiveConditions?.current?.humidityPercent != null ||
+        effectiveConditions?.current?.visibilityKm != null ||
+        effectiveConditions?.current?.pressureHpa != null ||
+        effectiveConditions?.current?.uvIndex != null) && (
         <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
-          {conditions.current.humidityPercent != null && (
+          {effectiveConditions.current.humidityPercent != null && (
             <div className="rounded-xl border border-[#e8f0ec] bg-[#fafcfb] p-2 dark:border-[#323236] dark:bg-[#202023]">
               <span className="text-[#6d8a81] dark:text-[#a4bebc]">{t("Humidity")}</span>
-              <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{conditions.current.humidityPercent}%</p>
+              <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{effectiveConditions.current.humidityPercent}%</p>
             </div>
           )}
-          {conditions.current.pressureHpa != null && (
+          {effectiveConditions.current.pressureHpa != null && (
             <div className="rounded-xl border border-[#e8f0ec] bg-[#fafcfb] p-2 dark:border-[#323236] dark:bg-[#202023]">
               <span className="text-[#6d8a81] dark:text-[#a4bebc]">{t("Pressure")}</span>
-              <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{Math.round(conditions.current.pressureHpa)} hPa</p>
+              <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{Math.round(effectiveConditions.current.pressureHpa)} hPa</p>
             </div>
           )}
-          {conditions.current.visibilityKm != null && (
+          {effectiveConditions.current.visibilityKm != null && (
             <div className="rounded-xl border border-[#e8f0ec] bg-[#fafcfb] p-2 dark:border-[#323236] dark:bg-[#202023]">
               <span className="text-[#6d8a81] dark:text-[#a4bebc]">{t("Visibility")}</span>
-              <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{conditions.current.visibilityKm} km</p>
+              <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{effectiveConditions.current.visibilityKm} km</p>
             </div>
           )}
-          {conditions.current.uvIndex != null && (
+          {effectiveConditions.current.uvIndex != null && (
             <div className="rounded-xl border border-[#e8f0ec] bg-[#fafcfb] p-2 dark:border-[#323236] dark:bg-[#202023]">
               <span className="text-[#6d8a81] dark:text-[#a4bebc]">{t("UV Index")}</span>
-              <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{conditions.current.uvIndex}</p>
+              <p className="font-bold text-[#1f4c41] dark:text-[#d8eae4]">{effectiveConditions.current.uvIndex}</p>
             </div>
           )}
         </div>
@@ -516,15 +542,15 @@ export function FloodConditionsPanel({
       )}
 
       {/* Air Quality Badge */}
-      {conditions?.airQuality?.aqiUs !== null && conditions?.airQuality?.aqiUs !== undefined && (
+      {effectiveConditions?.airQuality?.aqiUs !== null && effectiveConditions?.airQuality?.aqiUs !== undefined && (
         <div className="mt-3 flex items-center justify-between rounded-xl border border-[#e2ede8] bg-[#f8fcfb] px-3.5 py-2 text-xs font-semibold dark:border-[#37373c] dark:bg-[#202023]">
           <span className="flex items-center gap-2 text-[#43655d] dark:text-[#b5cdc5]">
             <Compass className="h-4 w-4 text-[#277b6b] dark:text-[#7fd6bb]" />
-            {t("Air Quality:")} <strong className="text-[#1d4c42] dark:text-[#e4f5ef]">{conditions.airQuality.category}</strong> (AQI {conditions.airQuality.aqiUs})
+            {t("Air Quality:")} <strong className="text-[#1d4c42] dark:text-[#e4f5ef]">{effectiveConditions.airQuality.category}</strong> (AQI {effectiveConditions.airQuality.aqiUs})
           </span>
-          {conditions.airQuality.pm25 !== null && (
+          {effectiveConditions.airQuality.pm25 !== null && (
             <span className="text-[10px] text-[#718d84] dark:text-[#a3b8b1]">
-              PM2.5: {conditions.airQuality.pm25} µg/m³
+              PM2.5: {effectiveConditions.airQuality.pm25} µg/m³
             </span>
           )}
         </div>
@@ -541,7 +567,7 @@ export function FloodConditionsPanel({
               {t("Seven-day rainfall trend")}
             </p>
             <span className="text-right text-[10px] font-semibold text-[#708981] dark:text-[#b5cdc5]">
-              {conditions?.trend?.source || t("No model history")}
+              {effectiveConditions?.trend?.source || t("No model history")}
             </span>
           </div>
           {trendDays.length ? (
@@ -621,7 +647,9 @@ export function FloodConditionsPanel({
               );
             })
           ) : (
-            <p className="col-span-7 text-xs text-[#6f8880]">{t("Forecast is loading.")}</p>
+            <p className="col-span-7 text-xs text-[#6f8880]">
+              {effectiveLoading ? t("Forecast is loading.") : t("Forecast temporarily unavailable")}
+            </p>
           )}
         </div>
       </section>
@@ -631,24 +659,24 @@ export function FloodConditionsPanel({
         <div className="flex items-center gap-3">
           <Waves className="h-5 w-5 shrink-0 text-[#277b6b] dark:text-[#7fd6bb]" />
           <span>
-            {conditions?.activeFloodZones
-              ? `${conditions.activeFloodZones} ${t("active flood-zone alerts nearby")}`
-              : conditions?.river?.message || t("Official river-gauge data is temporarily unavailable.")}
+            {effectiveConditions?.activeFloodZones && effectiveConditions.activeFloodZones > 0
+              ? `${effectiveConditions.activeFloodZones} ${t("active flood-zone alerts nearby")}`
+              : effectiveConditions?.river?.message || t("No nearby official flood alerts detected")}
           </span>
         </div>
-        {conditions?.river?.sourceUrl && (
+        {effectiveConditions?.river?.sourceUrl && effectiveConditions?.river?.sourceName ? (
           <a
-            href={conditions.river.sourceUrl}
+            href={effectiveConditions.river.sourceUrl}
             target="_blank"
             rel="noreferrer"
             className="ml-8 mt-1 inline-block text-[10px] font-bold text-[#277b6b] underline underline-offset-2 dark:text-[#9ce4cc]"
           >
-            {conditions.river.sourceName || t("Official source")}
-            {conditions.river.updatedAt
-              ? ` · ${t("Observed")} ${new Date(conditions.river.updatedAt).toLocaleString()}`
+            {effectiveConditions.river.sourceName}
+            {effectiveConditions.river.updatedAt
+              ? ` · ${t("Observed")} ${new Date(effectiveConditions.river.updatedAt).toLocaleString()}`
               : ""}
           </a>
-        )}
+        ) : null}
       </div>
     </section>
   );

@@ -23,8 +23,8 @@ describe("live operational API cache policy", () => {
   it("never serves API requests from the offline app-shell cache", () => {
     const serviceWorker = projectFile("../client/public/sw.js");
 
-    expect(serviceWorker).toContain('const CACHE = "sudo-makeitwork-offline-shell-v3"');
+    expect(serviceWorker).toContain('const CACHE = "sahay-offline-shell-v4"');
     expect(serviceWorker).toContain('if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return;');
-    expect(serviceWorker).toContain('key.startsWith("rescue-offline-shell-") || key.startsWith("sudo-makeitwork-offline-shell-")');
+    expect(serviceWorker).toContain('key.startsWith("rescue-offline-shell-") || key.startsWith("sudo-makeitwork-offline-shell-") || key.startsWith("sahay-offline-shell-")');
   });
 });

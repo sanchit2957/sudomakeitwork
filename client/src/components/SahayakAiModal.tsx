@@ -235,7 +235,7 @@ export function SahayakAiModal({ isOpen, onClose }: SahayakAiModalProps) {
                 </h2>
               </div>
               <p className="text-[11px] font-bold text-[#63817b] dark:text-[#a1a1aa]">
-                {t("Assam Emergency Assistant")}
+                {t("Sahay Emergency Assistant")}
               </p>
             </div>
           </div>

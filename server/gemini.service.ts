@@ -28,31 +28,31 @@ export const PLATFORM_GUIDE = {
   safety: "To view flood preparedness: Open the 'Safety' tab in bottom navigation for offline evacuation checklists, kit preparation guides, disaster survival rules, and the district emergency directory.",
   hospital: "To find medical resources: Check the Hospital directory to view real-time bed availability, ICU capacity, oxygen cylinder counts, and 108 ambulance dispatch contacts.",
   shelter: "To find relief shelters: Access the Relief Camps directory to view active government evacuation centers, verified capacity, current occupancy, and district control room contacts (1077).",
-  all_features: `Assam Rescue Platform Core Features:
+  all_features: `Sahay Emergency & Disaster Response Platform Core Features:
 1. 🚨 Rapid SOS: One-tap red emergency button with automatic GPS location dispatch.
 2. 🎙️ Voice Notes: In-card audio recording (up to 2 min) attached to your rescue ticket.
 3. 📍 Live Case Tracking: Real-time rescuer route, ETA, and status tracking using your 8-character case code.
-4. 🌊 River Levels & Flood Forecast: Live CWC river gauge readings (metres & trend) and 7-day rainfall forecasts.
+4. 🌊 River Levels & Flood Forecast: Live river gauge readings and 7-day weather/rain forecasts across India.
 5. 🛡️ Safety & Evacuation Guide: Offline checklists, emergency kit advice, and survival protocols.
 6. 🏥 Hospital & Medical Tracker: Real-time emergency beds, ICU beds, oxygen availability, and 108 ambulance.
 7. ⛺ Relief Camp Directory: Active evacuation shelters, capacity, and supply distribution info.
-8. 🌐 Multilingual Support: Full support for English, Assamese (অসমীয়া), Bengali (বাংলা), Hindi (हिन्दी), and more.`,
+8. 🌐 Multilingual Support: Full support for English, Hindi, Assamese, Bengali, Odia, Marathi, Gujarati, Tamil, Telugu, and Kannada.`,
 };
 
 export const SAHAYAK_REDIRECT_MESSAGE =
-  "I'm here to help with flood safety, emergencies, disaster response, and Assam Rescue app features only. For other questions, please use a general assistant. Is there anything about the app, flood situation, or your safety I can help with?";
+  "I'm here to help with flood safety, emergencies, disaster response, and Sahay app features only. For other questions, please use a general assistant. Is there anything about the app, disaster situation, or your safety I can help with?";
 
 export const SAHAYAK_REDIRECT_MESSAGES: Record<string, string> = {
-  en: "I'm here to help with flood safety, emergencies, disaster response, and Assam Rescue app features only. For other questions, please use a general assistant. Is there anything about the app, flood situation, or your safety I can help with?",
-  as: "মই কেৱল বানপানীৰ সুৰক্ষা, জৰুৰীকালীন সাহায্য, দুৰ্যোগ সঁহাৰি আৰু অসম উদ্ধাৰ এপ্পৰ বৈশিষ্ট্যসমূহৰ বাবে সহায় কৰিব পাৰোঁ। আন প্ৰশ্নৰ বাবে অনুগ্ৰহ কৰি সাধাৰণ সহায়ক ব্যৱহাৰ কৰক। আপোনাৰ সুৰক্ষা বা এপ্পৰ বিষয়ে মই কিবা সহায় কৰিব পাৰোঁনে?",
-  hi: "मैं केवल बाढ़ सुरक्षा, आपातकालीन सहायता, आपदा प्रबंधन और असम रेस्क्यू ऐप की सुविधाओं में मदद करने के लिए यहाँ हूँ। अन्य प्रश्नों के लिए कृपया सामान्य सहायक का उपयोग करें। क्या मैं आपकी सुरक्षा, बाढ़ की स्थिति या ऐप के बारे में कोई सहायता कर सकता हूँ?",
-  bn: "আমি শুধুমাত্র বন্যা নিরাপত্তা, জরুরি সহায়তা, দুর্যোগ প্রতিক্রিয়া এবং আসাম রেসকিউ অ্যাপের বৈশিষ্ট্যগুলির জন্য সাহায্য করতে পারি। অন্যান্য প্রশ্নের জন্য সাধারণ সহকারী ব্যবহার করুন। আপনার নিরাপত্তা বা অ্যাপ সম্পর্কে আমি কি সাহায্য করতে পারি?",
-  or: "ମୁଁ କେବଳ ବନ୍ୟା ସୁରକ୍ଷା, ଜରୁରୀକାଳୀନ ସହାୟତା ଏବଂ ଆସାମ ରେସକ୍ୟୁ ଆପ୍ ବିଷୟରେ ସାହାଯ୍ୟ କରିପାରିବି। ଅନ୍ୟ ପ୍ରଶ୍ନ ପାଇଁ ସାଧାରଣ ସହାୟକ ବ୍ୟବହାର କରନ୍ତୁ।",
-  mr: "मी केवळ पूर सुरक्षा, आपत्कालीन मदत, आपत्ती निवारण आणि आसाम रेस्क्यू ॲपच्या वैशिष्ट्यांसाठी मदत करू शकतो.",
-  gu: "હું ફક્ત પૂર સુરક્ષા, કટોકટી સહાય, આપત્તિ વ્યવસ્થાપન અને આસામ રેસ્ક્યુ એપની સુવિધાઓ માટે મદદ કરી શકું છું.",
-  ta: "நான் வெள்ள பாதுகாப்பு, அவசர உதவி மற்றும் அசாம் மீட்பு செயலி அம்சங்களுக்கு மட்டுமே உதவ முடியும்.",
-  te: "నేను వరద భద్రత, అత్యవసర సహాయం మరియు అస్సాం రెస్క్యూ యాప్ ఫీచర్‌ల కోసం మాత్రమే సహాయం చేయగలను.",
-  kn: "ನಾನು ಪ್ರವಾಹ ಸುರಕ್ಷತೆ, ತುರ್ತು ನೆರವು ಮತ್ತು ಅಸ್ಸಾಂ ಪಾರುಗಾಣಿಕಾ ಅಪ್ಲಿಕೇಶನ್ ವೈಶಿಷ್ಟ್ಯಗಳಿಗೆ ಮಾತ್ರ ಸಹಾಯ ಮಾಡಬಲ್ಲೆ.",
+  en: "I'm here to help with flood safety, emergencies, disaster response, and Sahay app features only. For other questions, please use a general assistant. Is there anything about the app, disaster situation, or your safety I can help with?",
+  as: "মই কেৱল বানপানী আৰু দুৰ্যোগ সুৰক্ষা, জৰুৰীকালীন সাহায্য আৰু সহায় (Sahay) এপ্পৰ বৈশিষ্ট্যসমূহৰ বাবে সহায় কৰিব পাৰোঁ। আন প্ৰশ্নৰ বাবে অনুগ্ৰহ কৰি সাধাৰণ সহায়ক ব্যৱহাৰ কৰক।",
+  hi: "मैं केवल आपदा व बाढ़ सुरक्षा, आपातकालीन सहायता, और सहाय (Sahay) ऐप की सुविधाओं में मदद करने के लिए यहाँ हूँ। अन्य प्रश्नों के लिए कृपया सामान्य सहायक का उपयोग करें।",
+  bn: "আমি শুধুমাত্র দুর্যোগ ও বন্যা নিরাপত্তা, জরুরি সহায়তা এবং সহায় (Sahay) অ্যাপের বৈশিষ্ট্যের জন্য সাহায্য করতে পারি।",
+  or: "ମୁଁ କେବଳ ଦୁର୍ଯ୍ୟୋଗ ସୁରକ୍ଷା, ଜରୁରୀକାଳୀନ ସହାୟତା ଏବଂ ସହାୟ (Sahay) ଆପ୍ ବିଷୟରେ ସାହାଯ୍ୟ କରିପାରିବି।",
+  mr: "मी केवळ आपत्ती निवारण, पूर सुरक्षा आणि सहाय (Sahay) ॲपच्या वैशिष्ट्यांसाठी मदत करू शकतो.",
+  gu: "હું ફક્ત આપત્તિ વ્યવસ્થાપન, કટોકટી સહાય અને સહાય (Sahay) એપની સુવિધાઓ માટે મદદ કરી શકું છું.",
+  ta: "நான் பேரிடர் பாதுகாப்பு, அவசர உதவி மற்றும் சஹாய் (Sahay) செயலி அம்சங்களுக்கு மட்டுமே உதவ முடியும்.",
+  te: "నేను విపత్తు భద్రత, అత్యవసర సహాయం మరియు సహాయ్ (Sahay) యాప్ ఫీచర్‌ల కోసం మాత్రమే సహాయం చేయగలను.",
+  kn: "ನಾನು ವಿಪತ್ತು ಸುರಕ್ಷತೆ, ತುರ್ತು ನೆರವು ಮತ್ತು ಸಹಾಯ್ (Sahay) ಅಪ್ಲಿಕೇಶನ್ ವೈಶಿಷ್ಟ್ಯಗಳಿಗೆ ಮಾತ್ರ ಸಹಾಯ ಮಾಡಬಲ್ಲೆ.",
 };
 
 export function getSahayakRedirectMessage(language?: string): string {
@@ -60,7 +60,7 @@ export function getSahayakRedirectMessage(language?: string): string {
   return SAHAYAK_REDIRECT_MESSAGES[langKey] || SAHAYAK_REDIRECT_MESSAGES.en;
 }
 
-export const SAHAYAK_SYSTEM_INSTRUCTIONS = `You are Sahayak AI, the official Assam Emergency & Disaster Response Assistant for the Assam Rescue Platform. You ONLY answer questions about flood safety, emergency preparedness, disaster response, weather/rain forecasts, river levels & gauge monitoring, hospitals/medical beds/ICU/oxygen, relief shelters, first aid, emergency helplines, and how to use this app's features (Rapid SOS, Voice Notes, Case Tracking, Live Flood & River Gauges, Safety Checklists, Hospital Portal, and Responder Dashboard). When finding hospitals or medical assistance and user location/coordinates are available, call the findNearbyHospitals tool with lat and lng coordinates, and present the nearest hospitals first including their distance in kilometres (e.g., "X.X km away"), address, phone, emergency beds, ICU beds, and oxygen capacity. Do NOT give a generic 108 helpline fallback message when real hospital data is available for their location. If a user asks anything unrelated (physics, math, coding, trivia, homework, entertainment, general knowledge, recipes, sports, politics, etc.), respond ONLY with: '${SAHAYAK_REDIRECT_MESSAGE}' Do not explain or entertain the off-topic subject even briefly. This applies even if the user insists or rephrases.`;
+export const SAHAYAK_SYSTEM_INSTRUCTIONS = `You are Sahayak AI, the official Emergency & Disaster Response Assistant for Sahay - Pan-India Emergency & Disaster Response Platform. You ONLY answer questions about flood safety, emergency preparedness, disaster response, weather/rain forecasts, river levels & gauge monitoring, hospitals/medical beds/ICU/oxygen, relief shelters, first aid, emergency helplines, and how to use this app's features (Rapid SOS, Voice Notes, Case Tracking, Live Weather Risk Heatmaps, Safety Checklists, Hospital Portal, and Responder Dashboard). When finding hospitals or medical assistance and user location/coordinates are available, call the findNearbyHospitals tool with lat and lng coordinates, and present the nearest hospitals first including their distance in kilometres (e.g., "X.X km away"), address, phone, emergency beds, ICU beds, and oxygen capacity. Do NOT give a generic 108 helpline fallback message when real hospital data is available for their location. If a user asks anything unrelated (physics, math, coding, trivia, homework, entertainment, general knowledge, recipes, sports, politics, etc.), respond ONLY with: '${SAHAYAK_REDIRECT_MESSAGE}' Do not explain or entertain the off-topic subject even briefly. This applies even if the user insists or rephrases.`;
 
 export const DISASTER_KEYWORDS = [
   // River Levels & Gauges
@@ -589,7 +589,7 @@ const geminiFunctionDeclarations: FunctionDeclaration[] = [
   },
   {
     name: "getPlatformAssistanceGuide",
-    description: "Get instructions on how to use the Assam Rescue Platform features such as Rapid SOS, Voice Notes, Case Tracking, River Gauges, Safety Checklists, and Hospital Portal.",
+    description: "Get instructions on how to use the Sahay Emergency Platform features such as Rapid SOS, Voice Notes, Case Tracking, River Gauges, Safety Checklists, and Hospital Portal.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -808,7 +808,7 @@ ${PLATFORM_GUIDE.tracking}`;
 ${PLATFORM_GUIDE.safety}`;
     }
 
-    return `📱 **Assam Rescue Platform Features**:
+    return `📱 **Sahay Platform Features**:
 ${PLATFORM_GUIDE.all_features}
 
 How can I assist you further with any of these tools?`;

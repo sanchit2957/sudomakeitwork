@@ -13,7 +13,7 @@ describe("emergencyDispatch cellular radio SMS utility", () => {
       notes: "Trapped on roof",
     });
 
-    expect(text).toContain("ASSAM RESCUE SOS [SOS-8K2N9X1Y]");
+    expect(text).toContain("SAHAY SOS [SOS-8K2N9X1Y]");
     expect(text).toContain("LOC:26.14450,91.73620");
     expect(text).toContain("TYPE:FLOOD");
     expect(text).toContain("PEOPLE:4");

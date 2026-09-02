@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">sudo MakeItWork</string>
-    <string name="title_activity_main">sudo MakeItWork</string>
+    <string name="app_name">Sahay</string>
+    <string name="title_activity_main">Sahay</string>
     <string name="package_name">gov.in.assamrescue.app</string>
     <string name="custom_url_scheme">gov.in.assamrescue.app</string>
 </resources>

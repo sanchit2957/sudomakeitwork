@@ -343,11 +343,11 @@ export class OpenMeteoProvider implements IWeatherProvider {
     let riskTitle = "Normal Monsoon Conditions";
     let riskSummary = "Rainfall within typical regional drainage capacity.";
 
-    if (maxRainChance >= 85 || maxRainAmount >= 50 || dischargeData.trend === "rising") {
+    if (maxRainAmount >= 50 || (maxRainChance >= 85 && maxRainAmount >= 30) || (dischargeData.trend === "rising" && (dischargeData.dischargeM3s ?? 0) > 800)) {
       riskLevel = "high";
       riskTitle = "High Flood & Waterlogging Risk";
-      riskSummary = "Intense rainfall and rising river drainage detected in nearby zones.";
-    } else if (maxRainChance >= 50 || maxRainAmount >= 20 || (dischargeData.dischargeM3s !== null && dischargeData.dischargeM3s > 500)) {
+      riskSummary = "Intense rainfall and major river discharge detected in nearby zones.";
+    } else if (maxRainAmount >= 20 || maxRainChance >= 70 || (dischargeData.dischargeM3s !== null && dischargeData.dischargeM3s > 500)) {
       riskLevel = "elevated";
       riskTitle = "Elevated Flood Watch";
       riskSummary = "Moderate precipitation and localized water runoff expected.";

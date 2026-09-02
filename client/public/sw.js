@@ -1,9 +1,9 @@
-const CACHE = "sudo-makeitwork-offline-shell-v3";
+const CACHE = "sahay-offline-shell-v4";
 const APP_SHELL = ["/", "/emergency", "/track", "/safety", "/more"];
 
 // ─── IndexedDB helpers (duplicated here because SW can't import from app bundle) ─
 
-const DB_NAME = "sudo-makeitwork-sos";
+const DB_NAME = "sahay-sos";
 const DB_VERSION = 1;
 const STORE_NAME = "outbox";
 
@@ -147,7 +147,7 @@ self.addEventListener("activate", function (event) {
   event.waitUntil(
     caches
       .keys()
-      .then(function (keys) { return Promise.all(keys.filter(function (key) { return key.startsWith("rescue-offline-shell-") || key.startsWith("sudo-makeitwork-offline-shell-"); }).filter(function (key) { return key !== CACHE; }).map(function (key) { return caches.delete(key); })); })
+      .then(function (keys) { return Promise.all(keys.filter(function (key) { return key.startsWith("rescue-offline-shell-") || key.startsWith("sudo-makeitwork-offline-shell-") || key.startsWith("sahay-offline-shell-"); }).filter(function (key) { return key !== CACHE; }).map(function (key) { return caches.delete(key); })); })
       .then(function () { return self.clients.claim(); })
   );
 });
@@ -177,7 +177,7 @@ self.addEventListener("sync", function (event) {
 
 self.addEventListener("push", function (event) {
   var payload = event.data ? event.data.json() : {};
-  var title = payload.title || "sudo MakeItWork";
+  var title = payload.title || "Sahay";
   event.waitUntil(self.registration.showNotification(title, { body: payload.body || "You have a new emergency update.", icon: "/favicon.ico", badge: "/favicon.ico", data: { url: payload.url || "/responder/alerts", incidentId: payload.incidentId }, tag: payload.incidentId ? "incident-" + payload.incidentId : undefined }));
 });
 

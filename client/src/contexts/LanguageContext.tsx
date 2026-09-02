@@ -17,7 +17,7 @@ export const localeOptions: Array<{ code: Locale; label: string; nativeLabel: st
   { code: "kn", label: "Kannada", nativeLabel: "ಕನ್ನಡ" },
 ];
 
-const storageKey = "sudo-makeitwork-language";
+const storageKey = "sahay-language";
 const originalText = new WeakMap<Text, string>();
 const originalAttributes = new WeakMap<Element, Map<string, string>>();
 const universalTerms: Record<string, Partial<Record<Locale, string>>> = {
@@ -30,7 +30,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "language.english": "English",
     "language.assamese": "Assamese",
     "language.hindi": "Hindi",
-    "brand.network": "Assam emergency network",
+    "brand.network": "Sahay emergency network",
     "general.sos": "SOS",
     "general.safetyHub": "Safety hub",
     "general.connected": "Connected",
@@ -143,7 +143,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "responder.people": "people",
     "responder.priority": "priority",
     "responder.noMission": "No mission has been assigned to this account. Keep your availability current so dispatchers can find you.",
-    "responder.alertCopy": "Register this device to receive mission assignments and nearby priority SOS alerts even when sudo MakeItWork is not open.",
+    "responder.alertCopy": "Register this device to receive mission assignments and nearby priority SOS alerts even when Sahay is not open.",
     "responder.retryAlerts": "Retry browser alert registration",
     "responder.missionAlerts": "Mission alerts",
     "responder.operationalNotifications": "Operational notifications",
@@ -157,7 +157,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "command.postRescueRecords": "Post rescue records",
     "command.requests": "Rescuer requests",
     "command.team": "Team roster",
-    "command.overview": "Assam · operational overview",
+    "command.overview": "National · operational overview",
     "command.heading": "Triage with confidence.",
     "command.liveFeed": "Live operational feed",
     "command.incidents": "Incident feed",
@@ -290,7 +290,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "responder.people": "লোক",
     "responder.priority": "অগ্ৰাধিকাৰ",
     "responder.noMission": "এই একাউণ্টত কোনো অভিযান নিযুক্ত কৰা হোৱা নাই। ডিছপেচাৰে আপোনাক বিচাৰি পাবলৈ আপোনাৰ উপলব্ধতা সঠিক ৰাখক।",
-    "responder.alertCopy": "sudo MakeItWork খোলা নাথাকিলেও অভিযান দায়িত্ব আৰু ওচৰৰ অগ্ৰাধিকাৰ SOS সতৰ্কবাণী পাবলৈ এই ডিভাইচ পঞ্জীয়ন কৰক।",
+    "responder.alertCopy": "Sahay খোলা নাথাকিলেও অভিযান দায়িত্ব আৰু ওচৰৰ অগ্ৰাধিকাৰ SOS সতৰ্কবাণী পাবলৈ এই ডিভাইচ পঞ্জীয়ন কৰক।",
     "responder.retryAlerts": "ব্ৰাউজাৰ সতৰ্কবাণী পঞ্জীয়ন পুনৰ চেষ্টা কৰক",
     "responder.missionAlerts": "অভিযান সতৰ্কবাণী",
     "responder.operationalNotifications": "কাৰ্যকৰী অধিসূচনা",
@@ -436,7 +436,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "responder.people": "लोग",
     "responder.priority": "प्राथमिकता",
     "responder.noMission": "इस खाते को कोई मिशन नहीं दिया गया है। डिस्पैचर आपको ढूंढ सकें इसलिए उपलब्धता अद्यतन रखें।",
-    "responder.alertCopy": "sudo MakeItWork खुला न होने पर भी मिशन असाइनमेंट और निकटवर्ती प्राथमिक SOS अलर्ट पाने के लिए इस डिवाइस को पंजीकृत करें।",
+    "responder.alertCopy": "Sahay खुला न होने पर भी मिशन असाइनमेंट और निकटवर्ती प्राथमिक SOS अलर्ट पाने के लिए इस डिवाइस को पंजीकृत करें।",
     "responder.retryAlerts": "ब्राउज़र अलर्ट पंजीकरण फिर से आज़माएँ",
     "responder.missionAlerts": "मिशन अलर्ट",
     "responder.operationalNotifications": "संचालन सूचनाएँ",

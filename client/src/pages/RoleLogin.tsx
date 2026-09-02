@@ -177,9 +177,9 @@ export function RoleLogin({ role }: { role: PortalRole }) {
               <ArrowLeft className="h-4 w-4" />
             </span>
             <span>
-              <span className="block text-base font-black tracking-tight leading-tight">Assam Emergency Network</span>
+              <span className="block text-base font-black tracking-tight leading-tight">Sahay Emergency Network</span>
               <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-[#5d7c74] dark:text-[#94a3b8]">
-                Disaster Management Authority
+                Emergency & Disaster Response Platform
               </span>
             </span>
           </button>

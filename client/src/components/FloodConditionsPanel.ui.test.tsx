@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
-import { fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FloodConditionsPanel } from "./FloodConditionsPanel";
 
 vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: () => ({ t: (value: string) => value }) }));
+
+afterEach(() => {
+  cleanup();
+});
 
 const days = Array.from({ length: 7 }, (_, index) => ({
   date: `2026-08-${String(index + 10).padStart(2, "0")}`,
@@ -96,11 +100,11 @@ describe("FloodConditionsPanel", () => {
     // Open Location Dropdown & pick Silchar
     const locBtn = view.getByText("Guwahati (Kamrup Metro)");
     fireEvent.click(locBtn);
-    expect(view.getByText(/Select Assam Location/i)).toBeTruthy();
+    expect(view.getByText(/Select Location/i)).toBeTruthy();
 
-    const silcharBtn = view.getByRole("button", { name: /Silchar \(Cachar\)/i });
+    const silcharBtn = view.getByRole("button", { name: /Silchar \(Assam\)/i });
     fireEvent.click(silcharBtn);
-    expect(onLocationChange).toHaveBeenCalledWith(24.8333, 92.7789, "Silchar (Cachar)");
+    expect(onLocationChange).toHaveBeenCalledWith(24.8333, 92.7789, "Silchar (Assam)");
 
     // Verify Alerts & AQI & Cached Badge
     expect(view.getByText("Thunderstorm Warning")).toBeTruthy();
@@ -108,5 +112,76 @@ describe("FloodConditionsPanel", () => {
     expect(view.getByText("Good")).toBeTruthy();
     expect(view.getByText(/Cached data/i)).toBeTruthy();
     expect(view.getByText(/Hourly Forecast/i)).toBeTruthy();
+  });
+
+  it("renders 'Watch conditions' and orange badge when server returns canonical 'moderate' risk", () => {
+    const view = render(
+      <FloodConditionsPanel
+        loading={false}
+        conditions={{
+          available: true,
+          risk: "moderate", // Server canonical output for e.g. Maharashtra
+          activeFloodZones: 0,
+          current: { temperatureC: 26.7, precipitationMm: 0.1, windKmh: 9.5 },
+          forecast: { rainChance: 45, rainAmountMm: 2, days },
+        }}
+      />
+    );
+
+    expect(view.getByText("Watch conditions")).toBeTruthy();
+    expect(view.queryByText("Normal")).toBeNull();
+  });
+
+  it("renders 'High rain risk' and red badge when server returns 'critical'", () => {
+    const view = render(
+      <FloodConditionsPanel
+        loading={false}
+        conditions={{
+          available: true,
+          risk: "critical",
+          activeFloodZones: 2,
+          current: { temperatureC: 24, precipitationMm: 35, windKmh: 45 },
+          forecast: { rainChance: 95, rainAmountMm: 60, days },
+        }}
+      />
+    );
+
+    expect(view.getByText("High rain risk")).toBeTruthy();
+    expect(view.queryByText("Watch conditions")).toBeNull();
+  });
+
+  it("displays 'Forecast temporarily unavailable' when forecast is empty and loading is false", () => {
+    const view = render(
+      <FloodConditionsPanel
+        loading={false}
+        conditions={{
+          available: false,
+          risk: "good",
+          activeFloodZones: 0,
+          current: { temperatureC: null, precipitationMm: null, windKmh: null },
+          forecast: { rainChance: null, rainAmountMm: null, days: [] },
+        }}
+      />
+    );
+
+    expect(view.getByText("Forecast temporarily unavailable")).toBeTruthy();
+    expect(view.queryByText("Forecast is loading.")).toBeNull();
+  });
+
+  it("displays 'Forecast is loading.' when loading is true", () => {
+    const view = render(
+      <FloodConditionsPanel
+        loading={true}
+        conditions={{
+          available: false,
+          risk: "good",
+          activeFloodZones: 0,
+          current: { temperatureC: null, precipitationMm: null, windKmh: null },
+          forecast: { rainChance: null, rainAmountMm: null, days: [] },
+        }}
+      />
+    );
+
+    expect(view.getByText("Forecast is loading.")).toBeTruthy();
   });
 });

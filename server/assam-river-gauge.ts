@@ -32,25 +32,53 @@ function distanceKm(latitudeA: number, longitudeA: number, latitudeB: number, lo
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function unavailable(message: string): OfficialRiverGauge {
-  return { available: false, levelMetres: null, trend: null, updatedAt: null, stationName: null, riverName: null, distanceKm: null, sourceName: "Assam Department telemetry via National Water Data Portal", sourceUrl: ASSAM_RIVER_GAUGE_SOURCE_PAGE, message };
+function unavailable(message: string, isAssamContext = false): OfficialRiverGauge {
+  return {
+    available: false,
+    levelMetres: null,
+    trend: null,
+    updatedAt: null,
+    stationName: null,
+    riverName: null,
+    distanceKm: null,
+    sourceName: isAssamContext ? "Assam Department telemetry via National Water Data Portal" : "",
+    sourceUrl: isAssamContext ? ASSAM_RIVER_GAUGE_SOURCE_PAGE : "",
+    message: isAssamContext ? message : "No nearby official flood gauge available",
+  };
 }
 
-function unavailableCwcRelay(message: string): OfficialRiverGauge {
-  return { available: false, levelMetres: null, trend: null, updatedAt: null, stationName: null, riverName: null, distanceKm: null, sourceName: "Central Water Commission (via Axom Flood)", sourceUrl: "https://ffs.india-water.gov.in/", message };
+function unavailableCwcRelay(message: string, isAssamContext = false): OfficialRiverGauge {
+  return {
+    available: false,
+    levelMetres: null,
+    trend: null,
+    updatedAt: null,
+    stationName: null,
+    riverName: null,
+    distanceKm: null,
+    sourceName: isAssamContext ? "Central Water Commission (via Axom Flood)" : "",
+    sourceUrl: isAssamContext ? "https://ffs.india-water.gov.in/" : "",
+    message: isAssamContext ? message : "No nearby official flood gauge available",
+  };
+}
+
+export function isNorthEastRiverGaugeRegion(latitude: number, longitude: number): boolean {
+  return latitude >= 23.0 && latitude <= 29.0 && longitude >= 88.0 && longitude <= 97.5;
 }
 
 export function selectOfficialAssamRiverGauge(csv: string, latitude: number, longitude: number, now = new Date()): OfficialRiverGauge {
-  const lines = csv.trim().split(/\r?\n/); if (lines.length < 2) return unavailable("Official Assam telemetry has no readable observations at the moment.");
+  const isAssam = isNorthEastRiverGaugeRegion(latitude, longitude);
+  const lines = csv.trim().split(/\r?\n/); if (lines.length < 2) return unavailable("Official Assam telemetry has no readable observations at the moment.", isAssam);
   const headers = parseCsvLine(lines[0]); const column = (name: string) => headers.indexOf(name);
   const stationColumn = column("Station"); const riverColumn = column("River"); const latitudeColumn = column("Latitude"); const longitudeColumn = column("Longitude"); const timeColumn = column("Data Acquisition Time"); const levelColumn = column("River Water Level Telemetry Hourly (meter)");
-  if ([stationColumn, latitudeColumn, longitudeColumn, timeColumn, levelColumn].some(index => index < 0)) return unavailable("Official Assam telemetry format is temporarily unavailable.");
+  if ([stationColumn, latitudeColumn, longitudeColumn, timeColumn, levelColumn].some(index => index < 0)) return unavailable("Official Assam telemetry format is temporarily unavailable.", isAssam);
   const observations: Observation[] = [];
   for (const line of lines.slice(1)) { const row = parseCsvLine(line); const observedAt = parseIndiaObservationTime(row[timeColumn] || ""); const rowLatitude = Number(row[latitudeColumn]); const rowLongitude = Number(row[longitudeColumn]); const levelMetres = Number(row[levelColumn]); if (!observedAt || !Number.isFinite(rowLatitude) || !Number.isFinite(rowLongitude) || !Number.isFinite(levelMetres)) continue; observations.push({ stationName: row[stationColumn] || "Unnamed Assam gauge", riverName: row[riverColumn] || null, latitude: rowLatitude, longitude: rowLongitude, observedAt, levelMetres }); }
-  if (!observations.length) return unavailable("Official Assam telemetry has no usable observations at the moment.");
+  if (!observations.length) return unavailable("Official Assam telemetry has no usable observations at the moment.", isAssam);
   const stationDistances = new Map<string, number>();
   for (const observation of observations) stationDistances.set(observation.stationName, distanceKm(latitude, longitude, observation.latitude, observation.longitude));
-  const nearestStation = Array.from(stationDistances.entries()).sort((a, b) => a[1] - b[1])[0]; if (!nearestStation || nearestStation[1] > MAX_STATION_DISTANCE_KM) return unavailable("No official Assam gauge is available near this location.");
+  const nearestStation = Array.from(stationDistances.entries()).sort((a, b) => a[1] - b[1])[0];
+  if (!nearestStation || nearestStation[1] > MAX_STATION_DISTANCE_KM) return unavailable("No nearby official flood gauge available", isAssam);
   const stationObservations = observations.filter(observation => observation.stationName === nearestStation[0]).sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime());
   const latest = stationObservations[0]; const ageHours = (now.getTime() - latest.observedAt.getTime()) / 3_600_000;
   const comparison = stationObservations.find(observation => latest.observedAt.getTime() - observation.observedAt.getTime() >= 18 * 3_600_000) || stationObservations[stationObservations.length - 1];
@@ -61,9 +89,10 @@ export function selectOfficialAssamRiverGauge(csv: string, latitude: number, lon
 }
 
 export function selectCwcAssamRiverGauge(payload: string, latitude: number, longitude: number, now = new Date()): OfficialRiverGauge {
+  const isAssam = isNorthEastRiverGaugeRegion(latitude, longitude);
   let parsed: { gauges?: unknown };
-  try { parsed = JSON.parse(payload) as { gauges?: unknown }; } catch { return unavailableCwcRelay("Current CWC gauge data is temporarily unavailable."); }
-  if (!Array.isArray(parsed.gauges)) return unavailableCwcRelay("Current CWC gauge data has no readable observations at the moment.");
+  try { parsed = JSON.parse(payload) as { gauges?: unknown }; } catch { return unavailableCwcRelay("Current CWC gauge data is temporarily unavailable.", isAssam); }
+  if (!Array.isArray(parsed.gauges)) return unavailableCwcRelay("Current CWC gauge data has no readable observations at the moment.", isAssam);
 
   const observations = parsed.gauges.flatMap((candidate): Observation[] => {
     const gauge = candidate as CwcRelayGauge;
@@ -75,10 +104,10 @@ export function selectCwcAssamRiverGauge(payload: string, latitude: number, long
     if (gauge.agency !== "Central Water Commission" || gauge.source !== "CWC FFS" || gauge.state !== "Assam" || gauge.station_operational !== true || !stationName || !observedAt || Number.isNaN(observedAt.getTime()) || !Number.isFinite(Number(candidateLatitude)) || !Number.isFinite(Number(candidateLongitude)) || !Number.isFinite(levelMetres)) return [];
     return [{ stationName, riverName, latitude: Number(candidateLatitude), longitude: Number(candidateLongitude), observedAt, levelMetres }];
   });
-  if (!observations.length) return unavailableCwcRelay("Current CWC gauge data has no usable Assam observations at the moment.");
+  if (!observations.length) return unavailableCwcRelay("Current CWC gauge data has no usable observations at the moment.", isAssam);
 
   const nearest = observations.map(observation => ({ observation, distance: distanceKm(latitude, longitude, observation.latitude, observation.longitude) })).sort((a, b) => a.distance - b.distance)[0];
-  if (!nearest || nearest.distance > MAX_STATION_DISTANCE_KM) return unavailableCwcRelay("No current CWC Assam gauge is available near this location.");
+  if (!nearest || nearest.distance > MAX_STATION_DISTANCE_KM) return unavailableCwcRelay("No nearby official flood gauge available", isAssam);
   const sourceGauge = parsed.gauges.find(candidate => {
     const gauge = candidate as CwcRelayGauge;
     return gauge.site_name === nearest.observation.stationName && gauge.river === nearest.observation.riverName;
@@ -98,6 +127,7 @@ export function resolveCwcRelayContentUrl(contentUrl: unknown): URL | null {
 }
 
 async function getCurrentCwcAssamRiverGauge(latitude: number, longitude: number, now: Date): Promise<OfficialRiverGauge> {
+  const isAssam = isNorthEastRiverGaugeRegion(latitude, longitude);
   try {
     if (Date.now() >= cwcCache.expiresAt) {
       const indexResponse = await fetch(CWC_ASSAM_GAUGE_FEED_URL, { signal: AbortSignal.timeout(8_000), headers: { accept: "application/json" } });
@@ -111,13 +141,27 @@ async function getCurrentCwcAssamRiverGauge(latitude: number, longitude: number,
       cwcCache.expiresAt = Date.now() + 5 * 60_000;
     }
     return selectCwcAssamRiverGauge(cwcCache.payload, latitude, longitude, now);
-  } catch { return unavailableCwcRelay("Current CWC gauge data is temporarily unavailable."); }
+  } catch { return unavailableCwcRelay("Current CWC gauge data is temporarily unavailable.", isAssam); }
 }
 
 export async function getOfficialAssamRiverGauge(latitude: number, longitude: number, now = new Date()): Promise<OfficialRiverGauge> {
+  const isAssam = isNorthEastRiverGaugeRegion(latitude, longitude);
+  if (!isAssam) {
+    return unavailable("No nearby official flood gauge available", false);
+  }
+
   let primary: OfficialRiverGauge;
-  try { if (Date.now() >= cache.expiresAt) { const response = await fetch(ASSAM_RIVER_GAUGE_SOURCE_URL, { signal: AbortSignal.timeout(8_000), headers: { accept: "text/csv" } }); if (!response.ok) throw new Error(`Gauge source responded ${response.status}`); cache.csv = await response.text(); cache.expiresAt = Date.now() + 15 * 60_000; } primary = selectOfficialAssamRiverGauge(cache.csv, latitude, longitude, now); }
-  catch { primary = unavailable("Official Assam gauge data is temporarily unavailable."); }
+  try {
+    if (Date.now() >= cache.expiresAt) {
+      const response = await fetch(ASSAM_RIVER_GAUGE_SOURCE_URL, { signal: AbortSignal.timeout(8_000), headers: { accept: "text/csv" } });
+      if (!response.ok) throw new Error(`Gauge source responded ${response.status}`);
+      cache.csv = await response.text();
+      cache.expiresAt = Date.now() + 15 * 60_000;
+    }
+    primary = selectOfficialAssamRiverGauge(cache.csv, latitude, longitude, now);
+  } catch {
+    primary = unavailable("Official Assam gauge data is temporarily unavailable.", isAssam);
+  }
   if (primary.available) return primary;
   const currentCwcGauge = await getCurrentCwcAssamRiverGauge(latitude, longitude, now);
   return currentCwcGauge.available ? currentCwcGauge : primary;

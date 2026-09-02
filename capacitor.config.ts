@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "gov.in.assamrescue.app",
-  appName: "sudo MakeItWork",
+  appName: "Sahay",
   webDir: "dist/public",
   server: {
     androidScheme: "https",

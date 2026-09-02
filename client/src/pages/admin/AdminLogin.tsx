@@ -84,10 +84,10 @@ export default function AdminLogin() {
             </span>
             <span>
               <span className="block text-base font-black tracking-tight">
-                Assam Emergency Network
+                Sahay Emergency Network
               </span>
               <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-[#5d7c74] dark:text-[#94a3b8]">
-                State Disaster Management
+                Emergency & Disaster Response Platform
               </span>
             </span>
           </button>

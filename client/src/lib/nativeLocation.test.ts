@@ -62,4 +62,34 @@ describe("nativeLocation adapter", () => {
 
     await expect(getCurrentCoordinates()).rejects.toThrow();
   });
+
+  it("remembers and returns last known coordinates", async () => {
+    const mockCoords = {
+      latitude: 19.1998,
+      longitude: 73.1091,
+      accuracy: 15,
+    };
+
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success: PositionCallback) => {
+          success({
+            coords: {
+              ...mockCoords,
+              altitude: null,
+              altitudeAccuracy: null,
+              heading: null,
+              speed: null,
+            },
+            timestamp: Date.now(),
+          } as GeolocationPosition);
+        },
+      },
+    });
+
+    const acquired = await getCurrentCoordinates();
+    expect(acquired.latitude).toBe(19.1998);
+    expect(acquired.longitude).toBe(73.1091);
+  });
 });

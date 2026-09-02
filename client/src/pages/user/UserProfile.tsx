@@ -585,17 +585,17 @@ export default function UserProfile() {
             </div>
           </div>
 
-          {/* Section 4: Location & Assam Region */}
+          {/* Section 4: Location & Region */}
           <div className="rounded-[1.6rem] border border-black/5 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#16171a]">
             <div className="flex items-center gap-2 border-b border-black/5 pb-3 text-xs font-black uppercase tracking-wider text-[#0f766e] dark:border-white/10 dark:text-[#2dd4bf]">
               <MapPin className="h-4 w-4" />
-              <span>{t("Assam District & Locality")}</span>
+              <span>{t("State, District & Locality")}</span>
             </div>
 
             <div className="mt-4 space-y-3.5">
               <div>
                 <Label htmlFor="prof-district" className="text-xs font-bold text-[#122824] dark:text-[#f3f4f6]">
-                  {t("Home District in Assam")}
+                  {t("State & District")}
                 </Label>
                 <select
                   id="prof-district"
@@ -610,7 +610,7 @@ export default function UserProfile() {
                   ))}
                 </select>
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  {t("Configures default weather forecast & local flood alerts for your area.")}
+                  {t("Configures default weather forecast & local environmental alerts for your area.")}
                 </p>
               </div>
 

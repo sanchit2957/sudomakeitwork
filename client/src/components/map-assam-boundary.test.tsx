@@ -2,7 +2,7 @@
 import { cleanup, render, waitFor } from "@testing-library/react";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ASSAM_CENTER } from "@shared/assam-boundary";
+import { INDIA_CENTER } from "@shared/india-locations";
 import { MapView } from "./Map";
 
 describe("temporary unrestricted map configuration", () => {
@@ -14,7 +14,7 @@ describe("temporary unrestricted map configuration", () => {
     (window as any).google = { maps: { Map } };
     const view = render(<MapView className="h-48" initialZoom={7} />);
     await waitFor(() => expect(Map).toHaveBeenCalledTimes(1));
-    expect(Map.mock.calls[0]?.[1]).toMatchObject({ center: ASSAM_CENTER, zoom: 7 });
+    expect(Map.mock.calls[0]?.[1]).toMatchObject({ center: INDIA_CENTER, zoom: 7 });
     expect(Map.mock.calls[0]?.[1]).not.toHaveProperty("restriction");
     const currentLocation = { lat: 19.083, lng: 72.9159 };
     view.rerender(<MapView className="h-48" initialCenter={currentLocation} initialZoom={14} />);

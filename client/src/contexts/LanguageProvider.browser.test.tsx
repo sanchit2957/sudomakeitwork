@@ -30,7 +30,7 @@ describe("LanguageProvider browser persistence", () => {
     fireEvent.click(view.getByRole("button", { name: /sign in to activate/i }));
 
     expect(view.getByRole("button", { name: /सक्रिय करने के लिए साइन इन करें/i })).toBeTruthy();
-    expect(localStorage.getItem("sudo-makeitwork-language")).toBe("hi");
+    expect(localStorage.getItem("sahay-language")).toBe("hi");
     expect(document.documentElement.lang).toBe("hi");
     expect(window.location.search).toBe("?lang=hi");
   });

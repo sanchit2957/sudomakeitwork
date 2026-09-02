@@ -120,7 +120,7 @@ describe("UserProfile & UserMore UI Component", () => {
     expect(markup).toContain("+91 94350 98765");
     expect(markup).toContain("Personal Identity &amp; Phone");
     expect(markup).toContain("Medical &amp; Disaster Assistance");
-    expect(markup).toContain("Assam District &amp; Locality");
+    expect(markup).toContain("State, District &amp; Locality");
     expect(markup).toContain("Save Profile Changes");
     expect(markup).toContain("Sign Out of Account");
     expect(markup).toContain("Kamrup Metropolitan");
