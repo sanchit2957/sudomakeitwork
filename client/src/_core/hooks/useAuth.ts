@@ -180,13 +180,18 @@ export function useAuth(options: UseAuthOptions = {}) {
       role?: "user" | "rescuer" | "hospital" | "medical" | "admin";
       governmentCode?: string;
       supabaseToken?: string;
+      isNative?: boolean;
     }) => {
       if (_inFlightLoginPromise) {
         return _inFlightLoginPromise;
       }
       _inFlightLoginPromise = (async () => {
         try {
-          const res = await loginMutation.mutateAsync(params);
+          const isNative = typeof params.isNative === "boolean" ? params.isNative : Capacitor.isNativePlatform();
+          const res = await loginMutation.mutateAsync({
+            ...params,
+            isNative,
+          });
           storeNativeTokenIfPresent((res as any).sessionToken);
           utils.auth.me.setData(undefined, res.user as any);
           await utils.auth.me.invalidate();
@@ -222,8 +227,13 @@ export function useAuth(options: UseAuthOptions = {}) {
       callSign?: string;
       supabaseUserId?: string;
       supabaseToken?: string;
+      isNative?: boolean;
     }) => {
-      const res = await registerMutation.mutateAsync(params);
+      const isNative = typeof params.isNative === "boolean" ? params.isNative : Capacitor.isNativePlatform();
+      const res = await registerMutation.mutateAsync({
+        ...params,
+        isNative,
+      });
       storeNativeTokenIfPresent((res as any).sessionToken);
       utils.auth.me.setData(undefined, res.user as any);
       await utils.auth.me.invalidate();
