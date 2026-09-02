@@ -1,3 +1,5 @@
+import dns from "node:dns";
+dns.setDefaultResultOrder?.("ipv4first");
 import { getOfficialAssamRiverGauge } from "../../assam-river-gauge";
 import type {
   AirQualityNormalized,

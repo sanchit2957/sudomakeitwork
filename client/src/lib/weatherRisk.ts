@@ -37,7 +37,7 @@ export function getWeatherRiskPresentation(risk?: string | null): WeatherRiskPre
       badgeTone: "bg-[#fff0ee] text-[#b83f43]",
       hexColor: "#ef4444",
       strokeColor: "#dc2626",
-      fillOpacity: 0.35,
+      fillOpacity: 0.45,
       safetyTitleKey: "High rainfall risk",
     };
   }
@@ -54,7 +54,7 @@ export function getWeatherRiskPresentation(risk?: string | null): WeatherRiskPre
       badgeTone: "bg-[#fff5df] text-[#9a681d]",
       hexColor: "#f59e0b",
       strokeColor: "#d97706",
-      fillOpacity: 0.28,
+      fillOpacity: 0.38,
       safetyTitleKey: "Elevated rainfall risk",
     };
   }
@@ -71,7 +71,7 @@ export function getWeatherRiskPresentation(risk?: string | null): WeatherRiskPre
       badgeTone: "bg-[#e6f6ef] text-[#197654]",
       hexColor: "#10b981",
       strokeColor: "#059669",
-      fillOpacity: 0.22,
+      fillOpacity: 0.32,
       safetyTitleKey: "Current model conditions",
     };
   }
