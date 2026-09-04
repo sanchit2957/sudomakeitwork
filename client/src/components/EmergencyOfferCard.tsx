@@ -3,6 +3,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
 import { AlertCircle, AlertTriangle, Check, CheckCircle2, Clock, HeartPulse, LifeBuoy, MapPin, Navigation, ShieldAlert, Users, Volume2, VolumeX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getApiUrl } from "@/lib/apiConfig";
 
 export interface ActiveOfferData {
   offer: {
@@ -24,6 +25,8 @@ export interface ActiveOfferData {
     severity: "critical" | "high" | "medium" | "low";
     peopleAffected: number;
     notes?: string | null;
+    voiceNoteUrl?: string | null;
+    voiceNoteDurationSeconds?: number | null;
   };
 }
 
@@ -375,6 +378,30 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
         <p className="mt-2 text-xs italic text-gray-500 line-clamp-2 px-1">
           "{incident.notes}"
         </p>
+      )}
+
+      {incident.voiceNoteUrl && (
+        <div
+          data-testid="offer-voice-note"
+          className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="flex items-center gap-1.5 font-bold text-amber-900">
+              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+              {t("Voice message attached")}
+              {incident.voiceNoteDurationSeconds ? ` (${incident.voiceNoteDurationSeconds}s)` : ""}
+            </span>
+            <span className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider">
+              {t("Citizen audio")}
+            </span>
+          </div>
+          <audio
+            controls
+            preload="metadata"
+            src={getApiUrl(incident.voiceNoteUrl)}
+            className="h-9 w-full rounded-lg"
+          />
+        </div>
       )}
 
       {/* 30-Second Countdown Timer & Progress Bar */}

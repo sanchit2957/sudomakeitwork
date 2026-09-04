@@ -327,9 +327,13 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
     // Send push / notifications to all rescuer candidates simultaneously
     try {
       const candidateUserIds = rankedMatches.map((r) => r.candidate.user.id);
+      const categoryLabel = (incident.requestCategory || (incident as any).emergencyType || "SOS").toUpperCase();
+      const severityLabel = (incident.severity || "HIGH").toUpperCase();
+      const locationText = incident.locationLabel || "Disaster Zone";
+
       const pushResult = await sendRescuerPush(candidateUserIds, {
-        title: `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
-        body: `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 30s to accept.`,
+        title: `🚨 EMERGENCY OFFER: ${categoryLabel}`,
+        body: `${severityLabel} SOS at ${locationText}. 30s to accept.`,
         incidentId: incident.id,
         url: "/responder",
       });
@@ -350,8 +354,8 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
         for (const rescuerId of unreachedUserIds) {
           await createNotification(
             rescuerId,
-            `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
-            `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 30s to accept.`,
+            `🚨 EMERGENCY OFFER: ${categoryLabel}`,
+            `${severityLabel} SOS at ${locationText}. 30s to accept.`,
             incident.id,
             "priority_incident"
           );
@@ -359,11 +363,14 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
       }
     } catch (pushErr) {
       console.warn("[Dispatch] Push notification error, inserting in-app notification fallbacks for all candidates:", pushErr);
+      const fallbackCat = (incident.requestCategory || (incident as any).emergencyType || "SOS").toUpperCase();
+      const fallbackSev = (incident.severity || "HIGH").toUpperCase();
+      const fallbackLoc = incident.locationLabel || "Disaster Zone";
       for (const r of rankedMatches) {
         await createNotification(
           r.candidate.user.id,
-          `🚨 EMERGENCY OFFER: ${incident.requestCategory.toUpperCase()}`,
-          `${incident.severity.toUpperCase()} SOS at ${incident.locationLabel}. 30s to accept.`,
+          `🚨 EMERGENCY OFFER: ${fallbackCat}`,
+          `${fallbackSev} SOS at ${fallbackLoc}. 30s to accept.`,
           incident.id,
           "priority_incident"
         );

@@ -1,9 +1,15 @@
+import { Capacitor } from "@capacitor/core";
+
 export type MicPermissionState = "prompt" | "granted" | "denied" | "unsupported";
 
 const MIC_SESSION_PROMPTED_KEY = "sudo-makeitwork-mic-session-prompted";
 const MIC_STATUS_KEY = "sudo-makeitwork-mic-status";
 
 const listeners = new Set<(status: MicPermissionState) => void>();
+
+export function isCapacitorApp(): boolean {
+  return typeof window !== "undefined" && Boolean(Capacitor?.isNativePlatform?.());
+}
 
 function notifyMicListeners(status: MicPermissionState) {
   listeners.forEach(fn => {
@@ -22,11 +28,17 @@ export function subscribeMicPermission(listener: (status: MicPermissionState) =>
 
 export function isMicSupported(): boolean {
   if (typeof window === "undefined" || typeof navigator === "undefined") return false;
-  return Boolean(
+  const hasMediaDevices = Boolean(
     navigator.mediaDevices &&
-    typeof navigator.mediaDevices.getUserMedia === "function" &&
-    typeof MediaRecorder !== "undefined"
+    typeof navigator.mediaDevices.getUserMedia === "function"
   );
+  const hasMediaRecorder = typeof MediaRecorder !== "undefined";
+  if (!hasMediaDevices || !hasMediaRecorder) {
+    console.warn(
+      `[MicPermission] isMicSupported check failed: hasMediaDevices=${hasMediaDevices}, hasMediaRecorder=${hasMediaRecorder}, isSecureContext=${typeof window !== "undefined" ? window.isSecureContext : "N/A"}, isCapacitor=${isCapacitorApp()}`
+    );
+  }
+  return hasMediaDevices && hasMediaRecorder;
 }
 
 export async function checkCurrentMicPermission(): Promise<MicPermissionState> {
@@ -50,6 +62,8 @@ export async function checkCurrentMicPermission(): Promise<MicPermissionState> {
 
 export async function requestMicPermission(force: boolean = false): Promise<MicPermissionState> {
   if (!isMicSupported()) return "unsupported";
+
+  console.log(`[MicPermission] requestMicPermission(force=${force}), isCapacitor=${isCapacitorApp()}`);
 
   if (!force) {
     const isPrompted = sessionStorage.getItem(MIC_SESSION_PROMPTED_KEY) === "true";
@@ -81,6 +95,7 @@ export async function requestMicPermission(force: boolean = false): Promise<MicP
     notifyMicListeners("granted");
     return "granted";
   } catch (err: any) {
+    console.error(`[MicPermission] getUserMedia prompt error:`, err?.name, err?.message, err);
     sessionStorage.setItem(MIC_SESSION_PROMPTED_KEY, "true");
     sessionStorage.setItem(MIC_STATUS_KEY, "denied");
     notifyMicListeners("denied");

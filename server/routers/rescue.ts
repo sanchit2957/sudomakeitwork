@@ -150,6 +150,28 @@ const hospitalRegistrationInput = z.object({
 
 const _memoryGuestRateLimits = new Map<string, { requestCount: number; windowStartedAt: Date }>();
 
+export const rescuerSessionStartRegistry = new Map<number, number>();
+
+export function setRescuerSessionStartedAt(rescuerId: number, timestamp: number | Date = Date.now()): void {
+  const ts = typeof timestamp === "number" ? timestamp : timestamp.getTime();
+  rescuerSessionStartRegistry.set(rescuerId, ts);
+}
+
+export function getRescuerSessionStartedAt(user: { id: number; sessionStartedAt?: number; lastSignedIn?: Date | string | null }): number {
+  if (typeof user.sessionStartedAt === "number" && !isNaN(user.sessionStartedAt) && user.sessionStartedAt > 0) {
+    return user.sessionStartedAt;
+  }
+  const inMemory = rescuerSessionStartRegistry.get(user.id);
+  if (typeof inMemory === "number" && inMemory > 0) {
+    return inMemory;
+  }
+  if (user.lastSignedIn) {
+    const ts = new Date(user.lastSignedIn).getTime();
+    if (!isNaN(ts) && ts > 0) return ts;
+  }
+  return 0;
+}
+
 async function database() {
   return await getDb();
 }
@@ -176,18 +198,24 @@ function readProfilePhoto(dataUrl?: string | null) {
 
 function readVoiceNote(dataUrl?: string, durationSeconds?: number) {
   if (!dataUrl) return null;
-  const matched = /^data:(audio\/(?:webm|ogg|mp4))(?:;codecs=[A-Za-z0-9._-]+)?;base64,([A-Za-z0-9+/=\s]+)$/.exec(
+  const matched = /^data:(audio\/(?:webm|ogg|mp4|m4a|aac|wav|mpeg|3gpp|x-[a-z0-9._-]+))(?:\s*;[^;]+)*;base64,([A-Za-z0-9+/=\s]+)$/i.exec(
     dataUrl
   );
-  if (!matched)
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Voice notes must be recorded as WebM, OGG, or M4A audio." });
+  if (!matched) {
+    console.warn("[VoiceNote] Unrecognized data URL MIME type or format, skipping voice note");
+    return null;
+  }
   const bytes = Buffer.from(matched[2].replace(/\s/g, ""), "base64");
-  if (bytes.byteLength > 3_000_000)
-    throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Voice notes must be 3 MB or smaller." });
-  if (!durationSeconds || durationSeconds < 1 || durationSeconds > 120)
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Voice notes must be between 1 second and 2 minutes." });
-  const extension = matched[1] === "audio/ogg" ? "ogg" : matched[1] === "audio/mp4" ? "m4a" : "webm";
-  return { bytes, contentType: matched[1], extension, durationSeconds };
+  if (bytes.byteLength > 4_000_000) {
+    console.warn("[VoiceNote] Voice note exceeded 4 MB limit, skipping");
+    return null;
+  }
+  const validDuration = typeof durationSeconds === "number" && durationSeconds >= 1 && durationSeconds <= 120
+    ? Math.round(durationSeconds)
+    : 10;
+  const mime = matched[1].toLowerCase();
+  const extension = mime.includes("ogg") ? "ogg" : mime.includes("mp4") || mime.includes("m4a") ? "m4a" : mime.includes("aac") ? "aac" : mime.includes("wav") ? "wav" : "webm";
+  return { bytes, contentType: mime, extension, durationSeconds: validDuration };
 }
 
 async function emitIncidentAlerts(
@@ -554,7 +582,12 @@ export const rescueRouter = router({
       .mutation(async ({ input, ctx }) => {
         const publicCode = `SOS-${incidentCode()}`;
         const evidence = readEvidence(input.evidenceDataUrl);
-        const voiceNote = readVoiceNote(input.voiceNoteDataUrl, input.voiceNoteDurationSeconds);
+        let voiceNote: ReturnType<typeof readVoiceNote> = null;
+        try {
+          voiceNote = readVoiceNote(input.voiceNoteDataUrl, input.voiceNoteDurationSeconds);
+        } catch (audioErr) {
+          console.warn("[VoiceNote] Audio parsing error, proceeding safely without audio:", audioErr);
+        }
         let uploadedEvidence: { key: string; url: string } | null = null;
         let uploadedVoiceNote: { key: string; url: string } | null = null;
         if (evidence)
@@ -563,12 +596,17 @@ export const rescueRouter = router({
             evidence.bytes,
             evidence.contentType
           );
-        if (voiceNote)
-          uploadedVoiceNote = await storagePut(
-            `incidents/${publicCode}/voice-note.${voiceNote.extension}`,
-            voiceNote.bytes,
-            voiceNote.contentType
-          );
+        if (voiceNote) {
+          try {
+            uploadedVoiceNote = await storagePut(
+              `incidents/${publicCode}/voice-note.${voiceNote.extension}`,
+              voiceNote.bytes,
+              voiceNote.contentType
+            );
+          } catch (storageErr) {
+            console.warn("[VoiceNote] Storage upload notice, proceeding with incident creation:", storageErr);
+          }
+        }
         let incidentId = nextIncidentId();
         const now = new Date();
         const triageDeadlineAt = new Date(now.getTime() + 10_000);
@@ -698,7 +736,7 @@ export const rescueRouter = router({
           voiceNoteUrl: uploadedVoiceNote?.url ?? null,
           createdAt: now,
         });
-        return { incidentId, publicCode, status: "pending" as const, triageDeadlineAt, requestCategory: defaultCategory };
+        return { incidentId, publicCode, status: "pending" as const, triageDeadlineAt, requestCategory: defaultCategory, voiceNoteUrl: uploadedVoiceNote?.url ?? null };
       }),
     selectCategory: publicProcedure
       .input(
@@ -2818,12 +2856,24 @@ export const rescueRouter = router({
         const result = await db.select({ maxId: max(incidents.id) }).from(incidents);
         sessionMaxIncidentId = result[0]?.maxId || 0;
       }
-      return { ...profile, sessionMaxIncidentId };
+      const sessionStartedAt = getRescuerSessionStartedAt(ctx.user);
+      return { ...profile, sessionMaxIncidentId, sessionStartedAt };
     }),
     activeOffer: rescuerProcedure.query(async ({ ctx }) => {
       const { getActiveOfferForRescuer } = await import("../rescue.db");
       const offerData = await getActiveOfferForRescuer(ctx.user.id);
       if (!offerData) return { hasOffer: false, offer: null, incident: null };
+
+      // AUTHORITATIVE BUSINESS RULE:
+      // A rescuer may receive an Accept/Decline popup ONLY when the SOS incident itself
+      // was created AFTER the rescuer's current responder session began.
+      // (incident.createdAt > responderSessionStartedAt)
+      const sessionStartedAt = getRescuerSessionStartedAt(ctx.user);
+      const incidentCreatedAt = new Date(offerData.incident.createdAt).getTime();
+
+      if (sessionStartedAt > 0 && incidentCreatedAt <= sessionStartedAt) {
+        return { hasOffer: false, offer: null, incident: null };
+      }
       return {
         hasOffer: true,
         offer: {
@@ -2846,6 +2896,7 @@ export const rescueRouter = router({
           peopleAffected: offerData.incident.peopleAffected,
           notes: offerData.incident.notes,
           voiceNoteUrl: (offerData.incident as any).voiceNoteUrl || null,
+          voiceNoteDurationSeconds: (offerData.incident as any).voiceNoteDurationSeconds || null,
           createdAt: offerData.incident.createdAt,
         },
       };
@@ -2989,9 +3040,9 @@ export const rescueRouter = router({
             contactSharing: input.contactSharing || "no",
             locationSharing: "no",
             availability: "available",
-            lastLatitude: 26.1445,
-            lastLongitude: 91.7362,
-            locationUpdatedAt: new Date(),
+            lastLatitude: null,
+            lastLongitude: null,
+            locationUpdatedAt: null,
             updatedAt: new Date(),
           };
           _memoryRescueProfiles.set(ctx.user.id, mem);

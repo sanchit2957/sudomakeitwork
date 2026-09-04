@@ -156,7 +156,7 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
       setMicState("granted");
 
       const chunks: BlobPart[] = [];
-      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg"].find(type =>
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4", "audio/aac"].find(type =>
         typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)
       );
 
@@ -222,9 +222,13 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
           stopRecording();
         }
       }, 500);
-    } catch {
+    } catch (err: any) {
+      console.error("[VoiceNote] getUserMedia error:", err?.name, err?.message, err);
       setMicState("denied");
-      setMessage(t("Microphone access is off. Enable it in your device settings to use voice notes."));
+      const errDetail = err?.name ? ` (${err.name}: ${err.message || "Microphone access denied"})` : "";
+      setMessage(
+        t("Microphone access is off. Enable it in your device settings to use voice notes.") + errDetail
+      );
     }
   };
 

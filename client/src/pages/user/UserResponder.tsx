@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { Capacitor } from "@capacitor/core";
+import { getApiUrl } from "@/lib/apiConfig";
 import { showNotification, requestNotificationPermission, playEmergencyAudioAlert } from "@/lib/nativeNotifications";
 import { reconcileAvailability, reconcileMissionStatus } from "@/lib/operationalSync";
 import {
@@ -382,8 +383,6 @@ function ResponderWorkspace() {
         {activeOffer.data?.hasOffer && 
          activeOffer.data.offer && 
          activeOffer.data.incident && 
-         sessionMaxIncidentIdRef.current !== null &&
-         activeOffer.data.incident.id > sessionMaxIncidentIdRef.current &&
          !resolvedOfferIdsRef.current.has(activeOffer.data.offer.id) && (
           <div
             role="dialog"
@@ -557,8 +556,8 @@ function RescuerHospitalsView({
 
   const origin = activeMission?.incident
     ? {
-        lat: Number(activeMission.incident.latitude) || 26.1445,
-        lng: Number(activeMission.incident.longitude) || 91.7362,
+        lat: Number(activeMission.incident.latitude) || (rescuerLocation?.latitude ?? null),
+        lng: Number(activeMission.incident.longitude) || (rescuerLocation?.longitude ?? null),
         label: `Victim GPS: SOS #${activeMission.incident.publicCode} (${activeMission.incident.locationLabel || "Incident Location"})`,
         isVictim: true,
       }
@@ -570,9 +569,9 @@ function RescuerHospitalsView({
         isVictim: false,
       }
     : {
-        lat: 26.1445,
-        lng: 91.7362,
-        label: "Assam Emergency Operations Network (Central Guwahati)",
+        lat: null,
+        lng: null,
+        label: "Awaiting responder GPS coordinates",
         isVictim: false,
       };
 
@@ -580,7 +579,7 @@ function RescuerHospitalsView({
     .map(hospital => {
       const lat = Number(hospital.latitude) || 0;
       const lng = Number(hospital.longitude) || 0;
-      const distanceKm = lat && lng ? calculateDistanceKm(origin.lat, origin.lng, lat, lng) : 9999;
+      const distanceKm = origin.lat && origin.lng && lat && lng ? calculateDistanceKm(origin.lat, origin.lng, lat, lng) : 9999;
       return { ...hospital, distanceKm };
     })
     .sort((a, b) => a.distanceKm - b.distanceKm);
@@ -1661,7 +1660,7 @@ function ResponderMissionChat({
           <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" /> Attached Emergency Voice Note
           </p>
-          <audio controls src={active.incident.voiceNoteUrl} className="h-10 w-full" />
+          <audio controls preload="metadata" src={getApiUrl(active.incident.voiceNoteUrl)} className="h-10 w-full" />
         </div>
       )}
 
@@ -1802,6 +1801,19 @@ function UserRescuerMissionCard({
           <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
             {mission.notes}
           </p>
+        )}
+        {incident.voiceNoteUrl && (
+          <div
+            data-testid="mission-voice-note"
+            className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20"
+          >
+            <p className="mb-2 flex items-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-400">
+              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+              Attached Emergency Voice Note
+              {incident.voiceNoteDurationSeconds ? ` (${incident.voiceNoteDurationSeconds}s)` : ""}
+            </p>
+            <audio controls preload="metadata" src={getApiUrl(incident.voiceNoteUrl)} className="h-10 w-full" />
+          </div>
         )}
       </div>
 

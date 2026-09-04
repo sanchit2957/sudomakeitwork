@@ -818,27 +818,32 @@ export async function listIncidentsForReporter(reporterId: number) {
 export async function listMissionsForRescuer(rescuerId: number) {
   try {
     const db = await database();
-    return await withDbTimeout(
-      db
-        .select({ mission: missions, incident: incidents })
-        .from(missions)
-        .innerJoin(incidents, eq(missions.incidentId, incidents.id))
-        .where(eq(missions.rescuerId, rescuerId))
-        .orderBy(desc(missions.assignedAt)),
-      4000,
-      "listMissionsForRescuer"
-    );
+    if (db) {
+      const rows = await withDbTimeout(
+        db
+          .select({ mission: missions, incident: incidents })
+          .from(missions)
+          .innerJoin(incidents, eq(missions.incidentId, incidents.id))
+          .where(eq(missions.rescuerId, rescuerId))
+          .orderBy(desc(missions.assignedAt)),
+        4000,
+        "listMissionsForRescuer"
+      );
+      if (rows && rows.length > 0) {
+        return rows;
+      }
+    }
   } catch (error) {
     failClosedInProduction(error);
-    const userMissions = Array.from(_memoryMissions.values()).filter(m => m.rescuerId === rescuerId);
-    return userMissions
-      .map(mission => {
-        const incident = _memoryIncidents.get(mission.incidentId);
-        if (!incident) return null;
-        return { mission, incident };
-      })
-      .filter((m): m is { mission: MemoryMission; incident: MemoryIncident } => m !== null);
   }
+  const userMissions = Array.from(_memoryMissions.values()).filter(m => m.rescuerId === rescuerId);
+  return userMissions
+    .map(mission => {
+      const incident = _memoryIncidents.get(mission.incidentId);
+      if (!incident) return null;
+      return { mission, incident };
+    })
+    .filter((m): m is { mission: MemoryMission; incident: MemoryIncident } => m !== null);
 }
 
 export async function getMissionForRescuer(missionId: number, rescuerId: number) {
@@ -919,9 +924,9 @@ export async function getRescuerProfile(userId: number) {
       contactSharing: "no",
       locationSharing: "no",
       availability: "available",
-      lastLatitude: 26.1445,
-      lastLongitude: 91.7362,
-      locationUpdatedAt: new Date(),
+      lastLatitude: null,
+      lastLongitude: null,
+      locationUpdatedAt: null,
       updatedAt: new Date(),
     };
     _memoryRescueProfiles.set(userId, profile);
@@ -1020,7 +1025,11 @@ export async function getMapLayers(includeOperational: boolean) {
 export async function listHospitals() {
   try {
     const db = await database();
-    return await withDbTimeout(db.select().from(hospitals).orderBy(hospitals.name), 4000, "listHospitals");
+    const rows = await withDbTimeout(db.select().from(hospitals).orderBy(hospitals.name), 4000, "listHospitals");
+    if (rows.length === 0) {
+      return Array.from(_memoryHospitals.values());
+    }
+    return rows;
   } catch (error) {
     failClosedInProduction(error);
     return Array.from(_memoryHospitals.values());
@@ -1522,9 +1531,9 @@ export async function getActiveOfferForRescuer(rescuerId: number) {
     failClosedInProduction(error);
   }
 
-  const activeOffer = Array.from(_memoryMissionOffers.values()).find(
-    o => o.rescuerId === rescuerId && o.status === "offered" && new Date(o.expiresAt).getTime() > now.getTime()
-  );
+  const activeOffer = Array.from(_memoryMissionOffers.values())
+    .filter(o => o.rescuerId === rescuerId && o.status === "offered" && new Date(o.expiresAt).getTime() > now.getTime())
+    .sort((a, b) => new Date(b.offeredAt || b.createdAt || 0).getTime() - new Date(a.offeredAt || a.createdAt || 0).getTime())[0];
   if (!activeOffer) return null;
   const incident = _memoryIncidents.get(activeOffer.incidentId);
   if (!incident) return null;
