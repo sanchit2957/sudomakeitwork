@@ -60,6 +60,7 @@ import {
   getMissionForRescuer,
   getRescuerProfile,
   getRescuerRoster,
+  getSosHeatmapPoints,
   listIncidents,
   listIncidentsForReporter,
   listMissionsForRescuer,
@@ -149,6 +150,28 @@ const hospitalRegistrationInput = z.object({
 });
 
 const _memoryGuestRateLimits = new Map<string, { requestCount: number; windowStartedAt: Date }>();
+
+export const rescuerSessionStartRegistry = new Map<number, number>();
+
+export function setRescuerSessionStartedAt(rescuerId: number, timestamp: number | Date = Date.now()): void {
+  const ts = typeof timestamp === "number" ? timestamp : timestamp.getTime();
+  rescuerSessionStartRegistry.set(rescuerId, ts);
+}
+
+export function getRescuerSessionStartedAt(user: { id: number; sessionStartedAt?: number; lastSignedIn?: Date | string | null }): number {
+  if (typeof user.sessionStartedAt === "number" && !isNaN(user.sessionStartedAt) && user.sessionStartedAt > 0) {
+    return user.sessionStartedAt;
+  }
+  const inMemory = rescuerSessionStartRegistry.get(user.id);
+  if (typeof inMemory === "number" && inMemory > 0) {
+    return inMemory;
+  }
+  if (user.lastSignedIn) {
+    const ts = new Date(user.lastSignedIn).getTime();
+    if (!isNaN(ts) && ts > 0) return ts;
+  }
+  return 0;
+}
 
 async function database() {
   return await getDb();
@@ -534,6 +557,38 @@ export const rescueRouter = router({
           _conditionsInFlight.delete(cacheKey);
         }
       }),
+    heatmap: publicProcedure.query(async () => {
+      const records = await getSosHeatmapPoints();
+      const points: Array<{
+        lat: number;
+        lng: number;
+        severity: "critical" | "high" | "medium" | "low";
+        emergencyType: string;
+        weight: number;
+      }> = [];
+
+      for (const rec of records) {
+        const lat = typeof rec.latitude === "number" ? rec.latitude : parseFloat(String(rec.latitude));
+        const lng = typeof rec.longitude === "number" ? rec.longitude : parseFloat(String(rec.longitude));
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          continue;
+        }
+
+        const severity = (rec.severity || "medium") as "critical" | "high" | "medium" | "low";
+        const weight = severity === "critical" ? 1.0 : severity === "high" ? 0.75 : severity === "medium" ? 0.5 : 0.25;
+
+        points.push({
+          lat,
+          lng,
+          severity,
+          emergencyType: rec.emergencyType || "other",
+          weight,
+        });
+      }
+
+      return points;
+    }),
     create: protectedProcedure
       .input(
         z.object({
@@ -2818,12 +2873,24 @@ export const rescueRouter = router({
         const result = await db.select({ maxId: max(incidents.id) }).from(incidents);
         sessionMaxIncidentId = result[0]?.maxId || 0;
       }
-      return { ...profile, sessionMaxIncidentId };
+      const sessionStartedAt = getRescuerSessionStartedAt(ctx.user);
+      return { ...profile, sessionMaxIncidentId, sessionStartedAt };
     }),
     activeOffer: rescuerProcedure.query(async ({ ctx }) => {
       const { getActiveOfferForRescuer } = await import("../rescue.db");
       const offerData = await getActiveOfferForRescuer(ctx.user.id);
       if (!offerData) return { hasOffer: false, offer: null, incident: null };
+
+      // AUTHORITATIVE BUSINESS RULE:
+      // A rescuer may receive an Accept/Decline popup ONLY when the SOS incident itself
+      // was created AFTER the rescuer's current responder session began.
+      // (incident.createdAt > responderSessionStartedAt)
+      const sessionStartedAt = getRescuerSessionStartedAt(ctx.user);
+      const incidentCreatedAt = new Date(offerData.incident.createdAt).getTime();
+
+      if (sessionStartedAt > 0 && incidentCreatedAt <= sessionStartedAt) {
+        return { hasOffer: false, offer: null, incident: null };
+      }
       return {
         hasOffer: true,
         offer: {
@@ -2989,9 +3056,9 @@ export const rescueRouter = router({
             contactSharing: input.contactSharing || "no",
             locationSharing: "no",
             availability: "available",
-            lastLatitude: 26.1445,
-            lastLongitude: 91.7362,
-            locationUpdatedAt: new Date(),
+            lastLatitude: null,
+            lastLongitude: null,
+            locationUpdatedAt: null,
             updatedAt: new Date(),
           };
           _memoryRescueProfiles.set(ctx.user.id, mem);

@@ -22,7 +22,7 @@ import {
   upsertUser,
   verifyRoleAccessCode,
 } from "./db";
-import { rescueRouter } from "./routers/rescue";
+import { rescueRouter, setRescuerSessionStartedAt } from "./routers/rescue";
 import { ENV } from "./_core/env";
 import { aiRouter } from "./routers/ai";
 
@@ -150,7 +150,11 @@ export const appRouter = router({
                 await ensureHospitalStaffProfile(dbUser.id);
               }
 
-              const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User", codeVersion });
+              const sessionStartedAt = Date.now();
+              if (roleVal === "rescuer") {
+                setRescuerSessionStartedAt(dbUser.id, sessionStartedAt);
+              }
+              const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User", codeVersion, sessionStartedAt });
               const cookieOptions = getSessionCookieOptions(ctx.req);
               ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
               return {
@@ -245,7 +249,11 @@ export const appRouter = router({
 
         await upsertUser({ ...user, lastSignedIn: new Date() });
 
-        const sessionToken = await sdk.createSessionToken(user.openId, { name: user.name || "User", codeVersion });
+        const sessionStartedAt = Date.now();
+        if (user.role === "rescuer") {
+          setRescuerSessionStartedAt(user.id, sessionStartedAt);
+        }
+        const sessionToken = await sdk.createSessionToken(user.openId, { name: user.name || "User", codeVersion, sessionStartedAt });
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
 
@@ -326,7 +334,11 @@ export const appRouter = router({
           await ensureHospitalStaffProfile(dbUser.id);
         }
 
-        const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User", codeVersion });
+        const sessionStartedAt = Date.now();
+        if (assignedRole === "rescuer") {
+          setRescuerSessionStartedAt(dbUser.id, sessionStartedAt);
+        }
+        const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User", codeVersion, sessionStartedAt });
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
         return {

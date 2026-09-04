@@ -23,6 +23,7 @@ export type SessionPayload = {
   appId: string;
   name: string;
   codeVersion?: number;
+  sessionStartedAt?: number;
 };
 
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
@@ -163,14 +164,16 @@ class SDKServer {
    */
   async createSessionToken(
     openId: string,
-    options: { expiresInMs?: number; name?: string; codeVersion?: number } = {}
+    options: { expiresInMs?: number; name?: string; codeVersion?: number; sessionStartedAt?: number } = {}
   ): Promise<string> {
+    const sessionStartedAt = options.sessionStartedAt ?? Date.now();
     return this.signSession(
       {
         openId,
         appId: ENV.appId || "local-app",
         name: options.name || "User",
         codeVersion: options.codeVersion,
+        sessionStartedAt,
       },
       options
     );
@@ -181,6 +184,7 @@ class SDKServer {
     options: { expiresInMs?: number } = {}
   ): Promise<string> {
     const issuedAt = Date.now();
+    const sessionStartedAt = payload.sessionStartedAt ?? issuedAt;
     const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
@@ -189,16 +193,18 @@ class SDKServer {
       openId: payload.openId,
       appId: payload.appId || "local-app",
       name: payload.name || "User",
+      sessionStartedAt,
       ...(payload.codeVersion !== undefined ? { codeVersion: payload.codeVersion } : {}),
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuedAt(Math.floor(issuedAt / 1000))
       .setExpirationTime(expirationSeconds)
       .sign(secretKey);
   }
 
   async verifySession(
     cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string; codeVersion?: number } | null> {
+  ): Promise<{ openId: string; appId: string; name: string; codeVersion?: number; sessionStartedAt?: number } | null> {
     if (!cookieValue) {
       return null;
     }
@@ -208,18 +214,26 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
-      const { openId, appId, name, codeVersion } = payload as Record<string, unknown>;
+      const { openId, appId, name, codeVersion, sessionStartedAt, iat } = payload as Record<string, unknown>;
 
       if (!isNonEmptyString(openId)) {
         console.warn("[Auth] Session payload missing openId");
         return null;
       }
 
+      const startedAt =
+        typeof sessionStartedAt === "number" && !isNaN(sessionStartedAt) && sessionStartedAt > 0
+          ? sessionStartedAt
+          : typeof iat === "number" && !isNaN(iat) && iat > 0
+            ? iat * 1000
+            : undefined;
+
       return {
         openId,
         appId: typeof appId === "string" && appId ? appId : "local-app",
         name: typeof name === "string" && name ? name : "User",
         codeVersion: typeof codeVersion === "number" ? codeVersion : undefined,
+        sessionStartedAt: startedAt,
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
@@ -301,6 +315,7 @@ class SDKServer {
     return {
       ...user,
       codeVersion: session.codeVersion,
+      sessionStartedAt: session.sessionStartedAt ?? (user.lastSignedIn ? new Date(user.lastSignedIn).getTime() : undefined),
     };
   }
 }
@@ -312,6 +327,7 @@ export type AuthenticatedUser = User & {
   taskUid?: string;
   isCron?: boolean;
   codeVersion?: number;
+  sessionStartedAt?: number;
 };
 
 function buildCronUser(

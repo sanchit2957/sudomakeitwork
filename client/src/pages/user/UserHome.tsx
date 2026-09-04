@@ -81,6 +81,7 @@ export default function UserHome() {
       })
     : { data: undefined, isLoading: false };
 
+  const utils = trpc.useUtils();
   const createSos = trpc.rescue.emergency.create.useMutation();
 
   const refreshPending = () => {
@@ -178,6 +179,7 @@ export default function UserHome() {
       const result = await flushOfflineSos(payload => createSos.mutateAsync(payload));
       refreshPending();
       if (result.delivered.length > 0) {
+        void utils.rescue.emergency.heatmap.invalidate();
         clearSosVoiceNote();
         setRapidStatus("idle");
         setRapidNotice(t("Offline SOS successfully dispatched to State Command Centre!"));
@@ -238,6 +240,7 @@ export default function UserHome() {
       try {
         setRapidStatus("sending");
         const created = await createSos.mutateAsync(payload);
+        void utils.rescue.emergency.heatmap.invalidate();
         rememberLatestSos(created.publicCode);
         clearSosVoiceNote();
         setRapidStatus("idle");
@@ -568,6 +571,7 @@ function LocationPreview({
           initialCenter={center}
           initialZoom={zoom}
           showWeatherHeatmap={true}
+          showSosHeatmap={true}
           hospitals={hospitals}
           shelters={shelters}
           onRecenter={onRecenter}

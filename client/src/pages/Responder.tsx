@@ -378,8 +378,6 @@ function ResponderWorkspace() {
         {activeOffer.data?.hasOffer && 
          activeOffer.data.offer && 
          activeOffer.data.incident && 
-         sessionMaxIncidentIdRef.current !== null &&
-         activeOffer.data.incident.id > sessionMaxIncidentIdRef.current &&
          !resolvedOfferIdsRef.current.has(activeOffer.data.offer.id) && (
           <div
             role="dialog"
@@ -549,8 +547,8 @@ function RescuerHospitalsView({
 
   const origin = activeMission?.incident
     ? {
-        lat: Number(activeMission.incident.latitude) || 26.1445,
-        lng: Number(activeMission.incident.longitude) || 91.7362,
+        lat: Number(activeMission.incident.latitude) || (rescuerLocation?.latitude ?? null),
+        lng: Number(activeMission.incident.longitude) || (rescuerLocation?.longitude ?? null),
         label: `Victim GPS: SOS #${activeMission.incident.publicCode} (${activeMission.incident.locationLabel || "Incident Location"})`,
         isVictim: true,
       }
@@ -562,9 +560,9 @@ function RescuerHospitalsView({
         isVictim: false,
       }
     : {
-        lat: 26.1445,
-        lng: 91.7362,
-        label: "Assam Emergency Operations Network (Central Guwahati)",
+        lat: null,
+        lng: null,
+        label: "Awaiting responder GPS coordinates",
         isVictim: false,
       };
 
@@ -572,7 +570,7 @@ function RescuerHospitalsView({
     .map(hospital => {
       const lat = Number(hospital.latitude) || 0;
       const lng = Number(hospital.longitude) || 0;
-      const distanceKm = lat && lng ? calculateDistanceKm(origin.lat, origin.lng, lat, lng) : 9999;
+      const distanceKm = origin.lat && origin.lng && lat && lng ? calculateDistanceKm(origin.lat, origin.lng, lat, lng) : 9999;
       return { ...hospital, distanceKm };
     })
     .sort((a, b) => a.distanceKm - b.distanceKm);

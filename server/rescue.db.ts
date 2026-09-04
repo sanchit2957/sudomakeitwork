@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
 import {
   auditLogs,
   floodZones,
@@ -919,9 +919,9 @@ export async function getRescuerProfile(userId: number) {
       contactSharing: "no",
       locationSharing: "no",
       availability: "available",
-      lastLatitude: 26.1445,
-      lastLongitude: 91.7362,
-      locationUpdatedAt: new Date(),
+      lastLatitude: null,
+      lastLongitude: null,
+      locationUpdatedAt: null,
       updatedAt: new Date(),
     };
     _memoryRescueProfiles.set(userId, profile);
@@ -1522,9 +1522,9 @@ export async function getActiveOfferForRescuer(rescuerId: number) {
     failClosedInProduction(error);
   }
 
-  const activeOffer = Array.from(_memoryMissionOffers.values()).find(
-    o => o.rescuerId === rescuerId && o.status === "offered" && new Date(o.expiresAt).getTime() > now.getTime()
-  );
+  const activeOffer = Array.from(_memoryMissionOffers.values())
+    .filter(o => o.rescuerId === rescuerId && o.status === "offered" && new Date(o.expiresAt).getTime() > now.getTime())
+    .sort((a, b) => new Date(b.offeredAt || b.createdAt || 0).getTime() - new Date(a.offeredAt || a.createdAt || 0).getTime())[0];
   if (!activeOffer) return null;
   const incident = _memoryIncidents.get(activeOffer.incidentId);
   if (!incident) return null;
@@ -2036,4 +2036,51 @@ export async function setIncidentDestinationHospital(incidentId: number, hospita
   return { success: true, hospital };
 }
 
-
+export async function getSosHeatmapPoints() {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  try {
+    const db = await database();
+    if (db) {
+      const rows = await withDbTimeout(
+        db
+          .select({
+            latitude: incidents.latitude,
+            longitude: incidents.longitude,
+            severity: incidents.severity,
+            emergencyType: incidents.emergencyType,
+            status: incidents.status,
+            createdAt: incidents.createdAt,
+          })
+          .from(incidents)
+          .where(
+            or(
+              inArray(incidents.status, ["pending", "dispatched"]),
+              gte(incidents.createdAt, cutoff)
+            )
+          )
+          .orderBy(desc(incidents.createdAt))
+          .limit(200),
+        4000,
+        "getSosHeatmapPoints"
+      );
+      return rows;
+    }
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+  return Array.from(_memoryIncidents.values())
+    .filter(
+      i =>
+        i.status === "pending" ||
+        i.status === "dispatched" ||
+        (i.createdAt && new Date(i.createdAt).getTime() >= cutoff.getTime())
+    )
+    .map(i => ({
+      latitude: i.latitude,
+      longitude: i.longitude,
+      severity: i.severity,
+      emergencyType: i.emergencyType,
+      status: i.status,
+      createdAt: i.createdAt,
+    }));
+}

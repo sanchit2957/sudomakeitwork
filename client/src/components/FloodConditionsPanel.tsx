@@ -329,7 +329,11 @@ export function FloodConditionsPanel({
         >
           <MapPin className="h-3.5 w-3.5 shrink-0 text-[#277b6b] dark:text-[#7fd6bb]" />
           <span className="truncate max-w-[200px] sm:max-w-[280px]">
-            {selectedLocationName || effectiveConditions?.location?.name || "India (National)"}
+            {selectedLocationName ||
+              effectiveConditions?.location?.name ||
+              (latitude !== undefined && longitude !== undefined
+                ? `${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E`
+                : "India (National)")}
           </span>
         </button>
 

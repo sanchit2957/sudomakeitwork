@@ -69,6 +69,7 @@ interface MapViewProps {
   initialCenter?: { lat: number; lng: number };
   initialZoom?: number;
   showWeatherHeatmap?: boolean;
+  showSosHeatmap?: boolean;
   hospitals?: MapHospital[];
   shelters?: MapShelter[];
   onRecenter?: () => void;
@@ -142,11 +143,59 @@ function WeatherHeatmapConsumer({ onPoints }: { onPoints: (points: any[]) => voi
   return <WeatherHeatmapClient onPoints={onPoints} />;
 }
 
+export type SosHeatPoint = {
+  lat: number;
+  lng: number;
+  severity: "critical" | "high" | "medium" | "low";
+  emergencyType: string;
+  weight: number;
+};
+
+function SosHeatmapClient({
+  onPoints,
+  onLoaded,
+}: {
+  onPoints: (points: SosHeatPoint[]) => void;
+  onLoaded: () => void;
+}) {
+  const { data, isSuccess, isError } = trpc.rescue.emergency.heatmap.useQuery(undefined, {
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (isSuccess && data) {
+      onPoints(Array.isArray(data) ? data : []);
+      onLoaded();
+    } else if (isError) {
+      onLoaded();
+    }
+  }, [data, isSuccess, isError, onPoints, onLoaded]);
+
+  return null;
+}
+
+function SosHeatmapConsumer({
+  onPoints,
+  onLoaded,
+}: {
+  onPoints: (points: SosHeatPoint[]) => void;
+  onLoaded: () => void;
+}) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return <SosHeatmapClient onPoints={onPoints} onLoaded={onLoaded} />;
+}
+
 export function MapView({
   className,
   initialCenter = { lat: 20.5937, lng: 78.9629 },
   initialZoom = 5,
   showWeatherHeatmap = true,
+  showSosHeatmap = true,
   hospitals,
   shelters,
   onRecenter,
@@ -159,12 +208,15 @@ export function MapView({
   const mapContainer = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
   const leafletWeatherLayerRef = useRef<any>(null);
+  const leafletSosHeatLayerRef = useRef<any>(null);
   const googleMapRef = useRef<google.maps.Map | null>(null);
   const googleMarkerRef = useRef<any>(null);
   const googleWeatherCirclesRef = useRef<any[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [mapEngine, setMapEngine] = useState<"google" | "leaflet" | "none">("none");
   const [weatherPoints, setWeatherPoints] = useState<any[]>([]);
+  const [sosPoints, setSosPoints] = useState<SosHeatPoint[]>([]);
+  const [sosLoaded, setSosLoaded] = useState(false);
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -259,6 +311,9 @@ export function MapView({
         const weatherLayer = L.layerGroup().addTo(lMap);
         leafletWeatherLayerRef.current = weatherLayer;
 
+        const sosLayer = L.layerGroup().addTo(lMap);
+        leafletSosHeatLayerRef.current = sosLayer;
+
         const customPin = L.divIcon({
           className: "custom-map-pin",
           html: `<div style="background:#0f766e;color:#fff;border-radius:50%;width:30px;height:30px;display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,0.35);border:2px solid #fff;font-size:15px;position:relative;z-index:1000;">📍</div>`,
@@ -317,6 +372,10 @@ export function MapView({
       googleWeatherCirclesRef.current.forEach((c) => c?.setMap?.(null));
       googleWeatherCirclesRef.current = [];
       googleMapRef.current = null;
+      if (leafletSosHeatLayerRef.current) {
+        leafletSosHeatLayerRef.current.clearLayers();
+        leafletSosHeatLayerRef.current = null;
+      }
       if (leafletMapRef.current) {
         leafletMapRef.current.remove();
         leafletMapRef.current = null;
@@ -395,6 +454,88 @@ export function MapView({
       });
     }
   }, [mapEngine, showWeatherHeatmap, weatherPoints]);
+
+  // Sync Real SOS Incident Heatmap Overlay
+  useEffect(() => {
+    if (!showSosHeatmap || !sosPoints || sosPoints.length === 0) {
+      if (leafletSosHeatLayerRef.current) leafletSosHeatLayerRef.current.clearLayers();
+      return;
+    }
+
+    if (mapEngine === "leaflet" && leafletSosHeatLayerRef.current) {
+      (async () => {
+        const L = (await import("leaflet")).default;
+        const layer = leafletSosHeatLayerRef.current;
+        if (!layer) return;
+        layer.clearLayers();
+
+        sosPoints.forEach((pt) => {
+          const lat = Number(pt.lat);
+          const lng = Number(pt.lng);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+          // Severity weighting: critical (1.0) > high (0.75) > medium (0.5) > low (0.25)
+          const isCritical = pt.severity === "critical";
+          const isHigh = pt.severity === "high";
+          const isMed = pt.severity === "medium";
+
+          const coreColor = isCritical ? "#dc2626" : isHigh ? "#ea580c" : isMed ? "#eab308" : "#3b82f6";
+          const glowRadius = isCritical ? 4500 : isHigh ? 3200 : isMed ? 2200 : 1500;
+          const coreRadius = isCritical ? 2500 : isHigh ? 1800 : isMed ? 1200 : 800;
+          const coreOpacity = isCritical ? 0.65 : isHigh ? 0.52 : isMed ? 0.40 : 0.28;
+          const glowOpacity = isCritical ? 0.22 : isHigh ? 0.17 : isMed ? 0.12 : 0.08;
+
+          // 1. Soft outer blur / heat glow
+          const glow = L.circle([lat, lng], {
+            radius: glowRadius,
+            stroke: false,
+            fillColor: coreColor,
+            fillOpacity: glowOpacity,
+          });
+          layer.addLayer(glow);
+
+          // 2. Core heat hotspot
+          const core = L.circle([lat, lng], {
+            radius: coreRadius,
+            color: coreColor,
+            weight: 1.5,
+            fillColor: coreColor,
+            fillOpacity: coreOpacity,
+          });
+
+          const popupContent = `
+            <div style="font-family:Inter,system-ui,sans-serif;padding:6px;min-width:160px;font-size:12px;line-height:1.4;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
+                <strong style="color:#111827;font-size:13px;text-transform:capitalize;">${pt.emergencyType} SOS</strong>
+                <span style="background:${coreColor};color:#fff;padding:2px 6px;border-radius:9999px;font-size:9px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;">
+                  ${pt.severity}
+                </span>
+              </div>
+              <div style="color:#6b7280;font-size:11px;margin-top:2px;">
+                Active Incident Hotspot
+              </div>
+              <div style="font-size:10px;color:#9ca3af;margin-top:4px;font-family:monospace;">
+                ${lat.toFixed(4)}°, ${lng.toFixed(4)}° · Weight: ${pt.weight}
+              </div>
+            </div>
+          `;
+          core.bindPopup(popupContent);
+          layer.addLayer(core);
+
+          // 3. Focal pulse dot
+          const pulseDot = L.circleMarker([lat, lng], {
+            radius: isCritical ? 6 : isHigh ? 5 : 4,
+            color: "#ffffff",
+            weight: 2,
+            fillColor: coreColor,
+            fillOpacity: 1.0,
+          });
+          pulseDot.bindPopup(popupContent);
+          layer.addLayer(pulseDot);
+        });
+      })();
+    }
+  }, [mapEngine, showSosHeatmap, sosPoints]);
 
   const leafletResourcesLayerRef = useRef<any>(null);
   const googleResourcesMarkersRef = useRef<any[]>([]);
@@ -479,6 +620,18 @@ export function MapView({
         <SafeErrorBoundary>
           <WeatherHeatmapConsumer onPoints={setWeatherPoints} />
         </SafeErrorBoundary>
+      )}
+
+      {showSosHeatmap && (
+        <SafeErrorBoundary>
+          <SosHeatmapConsumer onPoints={setSosPoints} onLoaded={() => setSosLoaded(true)} />
+        </SafeErrorBoundary>
+      )}
+
+      {showSosHeatmap && sosLoaded && sosPoints.length === 0 && (
+        <div className="pointer-events-none absolute top-3 right-3 z-[400] rounded-md bg-white/90 px-2 py-0.5 text-[9px] font-semibold text-[#58746c] shadow-xs backdrop-blur-xs dark:bg-[#1a1a1c]/90 dark:text-[#a5c0b7]">
+          No recent SOS incidents to display
+        </div>
       )}
 
       {/* Floating Recenter / Locate Button */}
