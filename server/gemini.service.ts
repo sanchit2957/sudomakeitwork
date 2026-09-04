@@ -396,19 +396,45 @@ export const realDataTools = {
       let filtered = allHospitals;
 
       if (args?.district) {
-        const districtTerm = args.district.toLowerCase();
-        filtered = filtered.filter(h =>
-          h.address?.toLowerCase().includes(districtTerm) ||
-          h.name.toLowerCase().includes(districtTerm)
-        );
+        const districtTerm = args.district.toLowerCase().trim();
+        const districtSynonyms: Record<string, string[]> = {
+          "kamrup metro": ["kamrup metro", "kamrup metropolitan", "kamrup", "guwahati", "dispur", "bhangagarh"],
+          "kamrup": ["kamrup", "guwahati", "hajo", "rangia", "bhangagarh"],
+          "cachar": ["cachar", "silchar"],
+          "dibrugarh": ["dibrugarh", "barbari"],
+          "nagaon": ["nagaon", "nowgong"],
+          "jorhat": ["jorhat"],
+          "sonitpur": ["sonitpur", "tezpur"],
+          "barpeta": ["barpeta"],
+          "dhubri": ["dhubri"],
+          "tinsukia": ["tinsukia"],
+          "darrang": ["darrang", "mangaldai"],
+          "bongaigaon": ["bongaigaon"],
+        };
+
+        const terms = districtSynonyms[districtTerm] || [districtTerm];
+        const byDistrict = filtered.filter(h => {
+          const addr = (h.address || "").toLowerCase();
+          const name = (h.name || "").toLowerCase();
+          return terms.some(t => addr.includes(t) || name.includes(t));
+        });
+
+        if (byDistrict.length > 0) {
+          filtered = byDistrict;
+        } else {
+          console.log(`[Hospitals] District '${args.district}' yielded 0 direct matches in addresses/names. Falling back to all ${allHospitals.length} available hospitals.`);
+        }
       }
 
       if (args?.query) {
-        const queryTerm = args.query.toLowerCase();
-        filtered = filtered.filter(h =>
+        const queryTerm = args.query.toLowerCase().trim();
+        const byQuery = filtered.filter(h =>
           h.name.toLowerCase().includes(queryTerm) ||
           h.address?.toLowerCase().includes(queryTerm)
         );
+        if (byQuery.length > 0) {
+          filtered = byQuery;
+        }
       }
 
       let mapped = filtered.map(h => {
@@ -865,6 +891,9 @@ Stay alert and move to higher ground if heavy rain continues. Dial 112 / 1070 fo
         lat: options.userLocation?.lat,
         lng: options.userLocation?.lng,
       });
+      console.log(
+        `[AI Hospital Detection] Incoming message: "${options.message}", matchedDistrict: "${matchedDistrict}", userLocation: ${JSON.stringify(options.userLocation)}, hospData.hospitals.length: ${hospData.hospitals?.length ?? 0}`
+      );
       if (hospData.hospitals && hospData.hospitals.length > 0) {
         const listStr = hospData.hospitals
           .map(

@@ -15,4 +15,9 @@ export const ENV = {
   n8nSosWebhookUrl: process.env.N8N_SOS_WEBHOOK_URL ?? "",
   n8nSosWebhookSecret: process.env.N8N_SOS_WEBHOOK_SECRET ?? process.env.N8N_WEBHOOK_SECRET ?? "",
   appBaseUrl: process.env.APP_URL ?? process.env.PUBLIC_APP_URL ?? process.env.RENDER_EXTERNAL_URL ?? "https://assam-rescue-platform.onrender.com",
+  s3Bucket: process.env.AWS_S3_BUCKET ?? "",
+  s3Region: process.env.AWS_S3_REGION ?? process.env.AWS_REGION ?? "us-east-1",
+  s3AccessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
+  s3SecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
+  s3Endpoint: process.env.AWS_S3_ENDPOINT ?? "",
 };

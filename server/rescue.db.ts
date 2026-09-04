@@ -1020,10 +1020,18 @@ export async function getMapLayers(includeOperational: boolean) {
 export async function listHospitals() {
   try {
     const db = await database();
-    return await withDbTimeout(db.select().from(hospitals).orderBy(hospitals.name), 4000, "listHospitals");
+    const rows = await withDbTimeout(db.select().from(hospitals).orderBy(hospitals.name), 4000, "listHospitals");
+    console.log(`[Hospitals] DB query returned ${rows.length} hospitals`);
+    if (rows.length === 0) {
+      const fallback = Array.from(_memoryHospitals.values());
+      console.log(`[Hospitals] DB returned 0 rows, falling back to _memoryHospitals (${fallback.length} hospitals)`);
+      return fallback;
+    }
+    return rows;
   } catch (error) {
-    failClosedInProduction(error);
-    return Array.from(_memoryHospitals.values());
+    const fallback = Array.from(_memoryHospitals.values());
+    console.warn(`[Hospitals] listHospitals DB error, falling back to _memoryHospitals (${fallback.length} hospitals):`, error);
+    return fallback;
   }
 }
 

@@ -207,6 +207,16 @@ async function startServer() {
     import("../push").then(p => p.verifyVapidConfiguration()).catch(console.warn);
     // Start automated emergency dispatch background orchestrator
     import("../dispatch/dispatch").then(d => d.startDispatchWorker()).catch(console.warn);
+    // Non-blocking operational data seed on boot (ensures hospitals, shelters, and flood zones exist)
+    import("../seed").then(s => {
+      s.seedDatabase()
+        .then(res => {
+          console.log(`[AutoSeed] Database initialized: ${res.hospitalsSeeded} hospitals, ${res.sheltersSeeded} shelters, ${res.floodZonesSeeded} flood zones seeded.`);
+        })
+        .catch(err => {
+          console.warn(`[AutoSeed] Startup seed skipped or encountered notice:`, err?.message || err);
+        });
+    }).catch(console.warn);
   });
 }
 
