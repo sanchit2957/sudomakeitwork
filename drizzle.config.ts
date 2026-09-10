@@ -14,8 +14,8 @@ const isRemoteOrTiDB =
   !connectionString.includes("localhost");
 
 export default defineConfig({
-  schema: "./drizzle/schema.ts",
-  out: "./drizzle",
+  schema: "./database/schema.ts",
+  out: "./database",
   dialect: "mysql",
   dbCredentials: {
     host: url.hostname,

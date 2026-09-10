@@ -7,8 +7,9 @@ export default defineConfig({
   root: templateRoot,
   resolve: {
     alias: {
-      "@": path.resolve(templateRoot, "client", "src"),
+      "@": path.resolve(templateRoot, "frontend", "src"),
       "@shared": path.resolve(templateRoot, "shared"),
+      "@database": path.resolve(templateRoot, "database"),
       "@assets": path.resolve(templateRoot, "attached_assets"),
     },
   },
@@ -16,6 +17,13 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["dotenv/config"],
     testTimeout: 20000,
-    include: ["server/**/*.test.ts", "server/**/*.spec.ts", "client/src/**/*.test.ts", "client/src/**/*.spec.ts", "client/src/**/*.test.tsx", "client/src/**/*.spec.tsx"],
+    include: [
+      "backend/**/*.test.ts",
+      "backend/**/*.spec.ts",
+      "frontend/src/**/*.test.ts",
+      "frontend/src/**/*.spec.ts",
+      "frontend/src/**/*.test.tsx",
+      "frontend/src/**/*.spec.tsx",
+    ],
   },
 });
