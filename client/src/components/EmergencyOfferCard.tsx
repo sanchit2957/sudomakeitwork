@@ -292,16 +292,16 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       data-testid="emergency-offer-card"
       role="region"
       aria-label="New Emergency Request"
-      className="relative overflow-hidden rounded-[1.8rem] border-2 border-red-500 bg-white p-5 text-gray-900 shadow-2xl shadow-red-200 ring-4 ring-red-100 ring-offset-2"
+      className="relative overflow-hidden rounded-[1.8rem] border-2 border-red-500 bg-white/95 p-5 text-[#111C44] shadow-2xl backdrop-blur-md dark:bg-[#111C44]/95 dark:text-[#F8F1E4] ring-4 ring-red-500/20"
     >
       {/* Top Banner */}
-      <div className="flex items-center justify-between gap-3 border-b border-red-200 pb-3.5">
+      <div className="flex items-center justify-between gap-3 border-b border-red-500/20 pb-3.5">
         <div className="flex items-center gap-2">
           <span className="relative flex h-3 w-3">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
             <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
           </span>
-          <h2 className="text-sm font-black uppercase tracking-wider text-red-600">
+          <h2 className="text-sm font-black uppercase tracking-wider text-red-600 dark:text-red-400">
             {t("NEW EMERGENCY REQUEST")}
           </h2>
         </div>
@@ -310,11 +310,11 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
             type="button"
             onClick={toggleSound}
             aria-label={isMuted ? "Unmute alert chime" : "Mute alert chime"}
-            className="rounded-lg bg-red-50 p-1.5 text-gray-500 hover:bg-red-100 hover:text-gray-800 transition border border-red-200"
+            className="rounded-lg bg-red-500/10 p-1.5 text-muted-foreground hover:bg-red-500/20 hover:text-red-600 transition border border-red-500/20"
           >
             {isMuted ? <VolumeX className="h-3.5 w-3.5 text-red-400" /> : <Volume2 className="h-3.5 w-3.5 text-red-500 animate-pulse" />}
           </button>
-          <span className="font-mono text-xs font-bold text-gray-400">
+          <span className="font-mono text-xs font-bold text-[#111C44]/50 dark:text-[#D8E3FF]/50">
             {incident.publicCode}
           </span>
         </div>
@@ -323,19 +323,19 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       {/* Main Details Grid */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {/* Type */}
-        <div className="rounded-xl bg-red-50 border border-red-100 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+        <div className="glass-card border border-red-500/20 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
             {t("Type")}
           </p>
-          <div className="mt-1 flex items-center gap-1.5 font-bold text-gray-800 text-xs">
-            <CategoryIcon className="h-4 w-4 text-red-600" />
+          <div className="mt-1 flex items-center gap-1.5 font-bold text-[#111C44] dark:text-[#F8F1E4] text-xs">
+            <CategoryIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
             <span className="truncate">{categoryLabel}</span>
           </div>
         </div>
 
         {/* Priority */}
-        <div className="rounded-xl bg-red-50 border border-red-100 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+        <div className="glass-card border border-red-500/20 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
             {t("Priority")}
           </p>
           <span
@@ -346,36 +346,36 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
         </div>
 
         {/* Distance */}
-        <div className="rounded-xl bg-red-50 border border-red-100 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+        <div className="glass-card border border-red-500/20 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
             {t("Distance")}
           </p>
-          <p className="mt-1 flex items-center gap-1 font-mono text-xs font-black text-red-600">
+          <p className="mt-1 flex items-center gap-1 font-mono text-xs font-black text-red-600 dark:text-red-400">
             <Navigation className="h-3.5 w-3.5" />
             {offer.distanceKm.toFixed(1)} km
           </p>
         </div>
 
         {/* People */}
-        <div className="rounded-xl bg-red-50 border border-red-100 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+        <div className="glass-card border border-red-500/20 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
             {t("People")}
           </p>
-          <p className="mt-1 flex items-center gap-1 font-bold text-gray-800 text-xs">
-            <Users className="h-3.5 w-3.5 text-gray-500" />
+          <p className="mt-1 flex items-center gap-1 font-bold text-[#111C44] dark:text-[#F8F1E4] text-xs">
+            <Users className="h-3.5 w-3.5 text-[#111C44]/50 dark:text-[#D8E3FF]/50" />
             {incident.peopleAffected || 1}
           </p>
         </div>
       </div>
 
       {/* Location */}
-      <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 border border-red-100 p-3 text-xs">
-        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-        <span className="font-semibold text-gray-800">{incident.locationLabel}</span>
+      <div className="mt-3 flex items-start gap-2 rounded-xl glass-card border border-red-500/20 p-3 text-xs">
+        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+        <span className="font-semibold text-[#111C44] dark:text-[#F8F1E4]">{incident.locationLabel}</span>
       </div>
 
       {incident.notes && (
-        <p className="mt-2 text-xs italic text-gray-500 line-clamp-2 px-1">
+        <p className="mt-2 text-xs italic text-[#111C44]/70 dark:text-[#D8E3FF]/70 line-clamp-2 px-1">
           "{incident.notes}"
         </p>
       )}
@@ -383,15 +383,15 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       {incident.voiceNoteUrl && (
         <div
           data-testid="offer-voice-note"
-          className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs"
+          className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="flex items-center gap-1.5 font-bold text-amber-900">
+            <span className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-300">
               <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
               {t("Voice message attached")}
               {incident.voiceNoteDurationSeconds ? ` (${incident.voiceNoteDurationSeconds}s)` : ""}
             </span>
-            <span className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider">
+            <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
               {t("Citizen audio")}
             </span>
           </div>
@@ -405,20 +405,20 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       )}
 
       {/* 30-Second Countdown Timer & Progress Bar */}
-      <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
+      <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-700">
-            <Clock className="h-4 w-4 animate-spin text-amber-500" />
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-300">
+            <Clock className="h-4 w-4 animate-spin text-amber-600 dark:text-amber-400" />
             <span>{t("Offer expires in:")}</span>
           </div>
           <span
             data-testid="offer-countdown"
-            className="font-mono text-sm font-black tracking-widest text-amber-700"
+            className="font-mono text-sm font-black tracking-widest text-amber-800 dark:text-amber-300"
           >
             {actionState === "expired" ? "00:00" : formattedCountdown}
           </span>
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-amber-200">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-amber-200 dark:bg-amber-950">
           <div
             className="h-full rounded-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 transition-all duration-300 ease-linear"
             style={{ width: `${Math.min(100, Math.max(0, (secondsRemaining / 30) * 100))}%` }}
@@ -430,7 +430,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       {errorMsg && (
         <div
           role="alert"
-          className="mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700"
+          className="mt-3 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-700 dark:text-red-300"
         >
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{errorMsg}</span>
@@ -443,7 +443,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
           data-testid="accept-offer-btn"
           disabled={actionState !== "idle" && actionState !== "error"}
           onClick={handleAccept}
-          className="h-11 rounded-xl bg-emerald-600 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-50"
+          className="h-11 rounded-xl bg-emerald-600 font-extrabold text-white shadow-md shadow-emerald-600/30 hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-50"
         >
           <Check className="mr-1.5 h-5 w-5" />
           {actionState === "accepting" ? t("Accepting…") : t("ACCEPT")}
@@ -454,7 +454,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
           variant="outline"
           disabled={actionState !== "idle" && actionState !== "error"}
           onClick={handleDecline}
-          className="h-11 rounded-xl border-red-300 bg-white font-extrabold text-red-600 hover:bg-red-50 hover:text-red-700 active:scale-[0.98] disabled:opacity-50"
+          className="h-11 rounded-xl border-red-500/30 glass-card font-extrabold text-red-600 hover:bg-red-500/10 hover:text-red-700 active:scale-[0.98] disabled:opacity-50 dark:text-red-400"
         >
           <X className="mr-1.5 h-5 w-5" />
           {actionState === "declining" ? t("Declining…") : t("DECLINE")}

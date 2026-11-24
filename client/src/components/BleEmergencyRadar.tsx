@@ -38,18 +38,18 @@ export function BleEmergencyRadar({
   }, [rescuerLatitude, rescuerLongitude]);
 
   return (
-    <div className="rounded-[1.6rem] border border-cyan-500/20 bg-gradient-to-br from-[#0c2229] via-[#0f2d37] to-[#0a1b20] p-4 text-white shadow-xl">
+    <div className="glass-panel overflow-hidden border border-[#2457FF]/30 bg-[#111C44] p-4.5 text-white shadow-xl dark:bg-[#182353]">
       <div className="flex items-center justify-between border-b border-white/10 pb-3">
         <div className="flex items-center gap-2.5">
-          <div className="relative grid h-8 w-8 place-items-center rounded-xl bg-cyan-500/20 text-cyan-400">
+          <div className="relative grid h-8 w-8 place-items-center rounded-xl bg-[#2457FF]/20 text-[#D8E3FF]">
             <Radio className={`h-4 w-4 ${scanning ? "animate-spin" : "animate-pulse"}`} />
-            {scanning && <span className="absolute inset-0 rounded-xl bg-cyan-400/20 animate-ping" />}
+            {scanning && <span className="absolute inset-0 rounded-xl bg-[#2457FF]/30 animate-ping" />}
           </div>
           <div>
-            <h3 className="text-xs font-black uppercase tracking-wider text-cyan-300">
+            <h3 className="text-xs font-black uppercase tracking-wider text-[#D8E3FF]">
               {t("Offline BLE Distress Radar")}
             </h3>
-            <p className="text-[10px] text-cyan-200/70">
+            <p className="text-[10px] text-[#D8E3FF]/70">
               {t("Peer-to-Peer Bluetooth (~50-100m range)")}
             </p>
           </div>
@@ -59,7 +59,7 @@ export function BleEmergencyRadar({
           variant="outline"
           disabled={scanning}
           onClick={runScan}
-          className="h-7 rounded-xl border-cyan-500/40 bg-cyan-950/60 px-2.5 text-[11px] font-bold text-cyan-200 hover:bg-cyan-900"
+          className="h-7 rounded-xl border-[#2457FF]/40 bg-[#2457FF]/20 px-2.5 text-[11px] font-bold text-[#D8E3FF] hover:bg-[#2457FF]/30"
         >
           <RefreshCw className={`mr-1 h-3 w-3 ${scanning ? "animate-spin" : ""}`} />
           {scanning ? t("Scanning…") : t("Scan Radio")}

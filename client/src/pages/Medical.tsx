@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { RoleGate } from "@/components/RoleGate";
+import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import { HospitalStaffDashboard } from "@/components/HospitalStaffDashboard";
 import DashboardLayout, { type WorkspaceNavItem } from "@/components/DashboardLayout";
 import OperationsMap from "@/components/OperationsMap";
@@ -16,9 +17,11 @@ export default function Medical() {
     return <HospitalRegistration />;
   }
   return (
-    <RoleGate roles={["medical", "admin"]}>
-      <MedicalWorkspace />
-    </RoleGate>
+    <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
+      <RoleGate roles={["medical", "admin"]}>
+        <MedicalWorkspace />
+      </RoleGate>
+    </DesktopOnlyGate>
   );
 }
 

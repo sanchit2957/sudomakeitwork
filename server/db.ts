@@ -820,6 +820,8 @@ export function setDbInstanceForTesting(dbInstance: any) {
 // Default development seed accounts with salted scrypt hashed passwords
 const defaultAdminHash = hashPassword("admin");
 const defaultCitizenHash = hashPassword("citizen");
+const defaultRescuerHash = hashPassword("rescuer");
+const defaultHospitalHash = hashPassword("hospital");
 
 export const _memoryUsers: Map<string, any> = new Map([
   [
@@ -831,6 +833,38 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "admin@assamrescue.gov.in",
       password: defaultAdminHash,
       role: "admin",
+      status: "active",
+      loginMethod: "platform-login",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "user-rescuer",
+    {
+      id: 2,
+      openId: "user-rescuer",
+      name: "NDRF Field Officer",
+      email: "rescuer@assamrescue.gov.in",
+      password: defaultRescuerHash,
+      role: "rescuer",
+      status: "active",
+      loginMethod: "platform-login",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "user-hospital",
+    {
+      id: 3,
+      openId: "user-hospital",
+      name: "GMCH Emergency Desk",
+      email: "hospital@assamrescue.gov.in",
+      password: defaultHospitalHash,
+      role: "hospital",
       status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),

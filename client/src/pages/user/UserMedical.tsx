@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { RoleGate } from "@/components/RoleGate";
+import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import { HospitalStaffDashboard } from "@/components/HospitalStaffDashboard";
 import DashboardLayout, { type WorkspaceNavItem } from "@/components/DashboardLayout";
 import OperationsMap from "@/components/OperationsMap";
@@ -9,7 +10,15 @@ import { trpc } from "@/lib/trpc";
 import { Building2, CheckCircle2, Hospital, MapPinned, ShieldCheck, UserPlus, XCircle } from "lucide-react";
 import { useLocation } from "wouter";
 
-export default function UserMedical() { return <RoleGate roles={["medical", "admin"]}><MedicalWorkspace /></RoleGate>; }
+export default function UserMedical() {
+  return (
+    <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
+      <RoleGate roles={["medical", "admin"]}>
+        <MedicalWorkspace />
+      </RoleGate>
+    </DesktopOnlyGate>
+  );
+}
 
 function MedicalWorkspace() {
   const [location] = useLocation();

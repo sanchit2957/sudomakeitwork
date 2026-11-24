@@ -8,21 +8,197 @@ import { VictimNavigation } from "@/pages/Home";
 import { AssignedRescuerCard, IncidentChat, PostRescueCheckInCard } from "@/pages/Track";
 import { useLiveRescuerStream } from "@/hooks/useLiveRescuerStream";
 import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, MapPin, Radio, ShieldCheck, Siren } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 
 export default function UserTrackFlow() {
-  const [, setLocation] = useLocation(); const { t } = useLanguage(); const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const { t } = useLanguage();
+  const { user } = useAuth();
   const codeFromPath = new URLSearchParams(window.location.search).get("code")?.toUpperCase() || "";
   const publicCode = codeFromPath || getLatestSos();
-  useEffect(() => { if (publicCode) rememberLatestSos(publicCode); }, [publicCode]);
+
+  useEffect(() => {
+    if (publicCode) rememberLatestSos(publicCode);
+  }, [publicCode]);
+
   const liveStream = useLiveRescuerStream(/^SOS-[A-Z0-9]{8}$/.test(publicCode) ? publicCode : null);
-  const status = trpc.rescue.emergency.statusByCode.useQuery({ publicCode }, { enabled: /^SOS-[A-Z0-9]{8}$/.test(publicCode), refetchInterval: liveStream.pollingIntervalMs ?? 20_000, refetchIntervalInBackground: true, retry: false });
-  const stages = useMemo(() => [
-    { key: "pending", label: t("SOS received"), copy: t("Searching for rescuer..."), icon: Siren },
-    { key: "dispatched", label: t("Rescuer assigned"), copy: t("Your responder’s profile and live updates appear here"), icon: Radio },
-    { key: "resolved", label: t("Rescue completed"), copy: t("This rescue flow is recorded on this device"), icon: CheckCircle2 }
-  ] as const, [t]);
-  const activeIndex = status.data ? Math.max(0, stages.findIndex(stage => stage.key === status.data!.status)) : 0;
-  return <div className="victim-page min-h-screen bg-[#f6f8f7]"><main className="victim-main mx-auto min-h-screen max-w-lg bg-[#fcfdfd] px-5 pb-28 pt-6 md:my-6 md:min-h-[850px] md:rounded-[2.75rem] md:border"><header className="flex items-start justify-between"><button onClick={() => setLocation("/")} className="flex items-center gap-2 text-left"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#174e46] text-white"><ArrowLeft className="h-5 w-5" /></span><span><span className="block text-xl font-black tracking-[-.05em]">{t("Your rescue flow")}</span><span className="block text-[10px] font-bold text-[#6b8780]">{t("Saved on this device")}</span></span></button><LanguageSelector compact /></header>{!publicCode && <section className="mt-8 rounded-[1.8rem] border border-dashed border-[#b9d8cf] bg-[#f2faf7] p-7 text-center"><Siren className="mx-auto h-10 w-10 text-primary" /><h1 className="mt-4 text-xl font-black text-[#173d37]">{t("No active SOS yet")}</h1><p className="mt-2 text-sm leading-6 text-[#58746c]">{t("When you activate SOS, your rescue flow will remain here—even after refresh.")}</p><Button onClick={() => setLocation("/")} className="mt-5 rounded-xl bg-[#174e46]">{t("Go to SOS")}</Button></section>}{status.isFetching && <p className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground"><Clock3 className="h-3.5 w-3.5 animate-spin" /> {t("Updating rescue flow")}</p>}{status.error && <div role="alert" className="mt-5 flex gap-3 rounded-2xl border border-[#f3c4c1] bg-[#fff5f4] p-4 text-sm text-[#a53d38]"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><p>{status.error.message}</p></div>}{status.data && <section className="mt-6 overflow-hidden rounded-[1.8rem] bg-white shadow-[0_18px_40px_-28px_rgb(21_75_67/0.35)] ring-1 ring-black/[.035]"><div className="bg-[#174e46] p-5 text-white"><p className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-[#b1dbd1]">{t("Live rescue flow")}</p><h1 className="mt-2 text-2xl font-black">{stages[activeIndex]?.label}</h1><p className="mt-2 text-sm text-[#c7e5dc]">{stages[activeIndex]?.copy}</p><p aria-label={t("SOS tracking number")} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 font-mono text-xs font-bold tracking-wide text-white"><span className="text-[#b1dbd1]">{t("Tracking no.")}</span><span>{status.data.publicCode}</span></p><div className="mt-4 flex items-center gap-2 text-xs font-bold text-[#daf0e9]"><MapPin className="h-4 w-4" />{status.data.locationLabel}</div></div><div className="p-5"><ol className="relative ml-3 border-l-2 border-[#c9e5dc] pl-6">{stages.map((stage, index) => { const Icon = stage.icon; const reached = index <= activeIndex; return <li key={stage.key} className="relative pb-7 last:pb-0"><span className={`absolute -left-[2.35rem] grid h-7 w-7 place-items-center rounded-full border-2 ${reached ? "border-[#27806b] bg-[#27806b] text-white" : "border-[#d4e4df] bg-white text-[#9bb4ac]"}`}><Icon className="h-3.5 w-3.5" /></span><p className={`text-sm font-black ${reached ? "text-[#173d37]" : "text-[#7b918a]"}`}>{stage.label}</p><p className="mt-1 text-xs leading-5 text-[#6f8780]">{index === 1 && !status.data.assignedRescuer ? t("Searching for rescuer...") : stage.copy}</p></li>; })}</ol>{(status.data as any).destinationHospitalName && <div className="mt-4 flex items-center gap-2.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs font-extrabold text-emerald-950 dark:text-emerald-200"><span>🏥</span><span>{t("En route to")} {(status.data as any).destinationHospitalName}</span></div>}{status.data.assignedRescuer && <AssignedRescuerCard rescuer={status.data.assignedRescuer} hospital={(status.data as any).destinationHospital} liveRescuer={liveStream.rescuer} liveRoute={liveStream.route} isStale={liveStream.isStale} lastEventAt={liveStream.lastEventAt} />}{status.data.status === "resolved" && <PostRescueCheckInCard publicCode={status.data.publicCode} />}<IncidentChat publicCode={status.data.publicCode} active={status.data.status !== "resolved"} /><div className="mt-4 rounded-xl border border-[#b8ded4] bg-[#f8fcfa] p-3 text-xs leading-5 text-[#285f55]"><ShieldCheck className="mr-2 inline h-4 w-4 text-primary" /> {user ? t("Only your authorized account can add details or message the rescue team.") : t("Sign in with the reporting account to add details or message the rescue team.")}</div></div></section>}</main><VictimNavigation current="track" /></div>;
+  const status = trpc.rescue.emergency.statusByCode.useQuery(
+    { publicCode },
+    {
+      enabled: /^SOS-[A-Z0-9]{8}$/.test(publicCode),
+      refetchInterval: liveStream.pollingIntervalMs ?? 20_000,
+      refetchIntervalInBackground: true,
+      retry: false,
+    }
+  );
+
+  const stages = useMemo(
+    () =>
+      [
+        { key: "pending", label: t("SOS received"), copy: t("Searching for rescuer..."), icon: Siren },
+        { key: "dispatched", label: t("Rescuer assigned"), copy: t("Your responder’s profile and live updates appear here"), icon: Radio },
+        { key: "resolved", label: t("Rescue completed"), copy: t("This rescue flow is recorded on this device"), icon: CheckCircle2 },
+      ] as const,
+    [t]
+  );
+
+  const activeIndex = status.data ? Math.max(0, stages.findIndex((stage) => stage.key === status.data!.status)) : 0;
+
+  return (
+    <div className="victim-page relative min-h-screen bg-[#F8F1E4] text-[#111C44] transition-colors dark:bg-[#111C44] dark:text-[#F8F1E4] overflow-x-hidden">
+      {/* iOS Liquid Glass Ambient Refraction Layer */}
+      <div className="liquid-ambient-bg" />
+
+      <main className="victim-main relative z-10 mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-32 pt-5">
+        {/* Top Header Card */}
+        <header className="glass-card mb-5 flex items-center justify-between p-3.5 shadow-sm">
+          <button
+            onClick={() => setLocation("/")}
+            className="flex items-center gap-3 text-left transition hover:opacity-85 active:scale-95"
+          >
+            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/20">
+              <ArrowLeft className="h-5 w-5" />
+            </span>
+            <span>
+              <span className="block text-lg font-black tracking-tight text-[#111C44] dark:text-[#F8F1E4]">
+                {t("Your rescue flow")}
+              </span>
+              <span className="block text-[10px] font-bold text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+                {t("Saved on this device")}
+              </span>
+            </span>
+          </button>
+          <LanguageSelector compact />
+        </header>
+
+        {/* Empty State when no SOS is recorded */}
+        {!publicCode && (
+          <section className="glass-panel mt-6 border-dashed border-[#B7AD9E]/40 p-8 text-center dark:border-[#D8E3FF]/20">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#2457FF]/10 text-[#2457FF] dark:bg-[#2457FF]/25 dark:text-[#D8E3FF]">
+              <Siren className="h-8 w-8" />
+            </div>
+            <h1 className="mt-4 text-xl font-black text-[#111C44] dark:text-[#F8F1E4]">{t("No active SOS yet")}</h1>
+            <p className="mt-2 text-sm leading-6 text-[#111C44]/70 dark:text-[#D8E3FF]/70 max-w-md mx-auto">
+              {t("When you activate SOS, your rescue flow will remain here—even after refresh.")}
+            </p>
+            <Button
+              onClick={() => setLocation("/")}
+              className="mt-6 rounded-xl bg-[#2457FF] px-6 py-2.5 font-bold text-white shadow-md shadow-[#2457FF]/25 hover:bg-[#1d47db]"
+            >
+              {t("Go to SOS")}
+            </Button>
+          </section>
+        )}
+
+        {status.isFetching && (
+          <p className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+            <Clock3 className="h-3.5 w-3.5 animate-spin text-[#2457FF]" /> {t("Updating rescue flow")}
+          </p>
+        )}
+
+        {status.error && (
+          <div role="alert" className="mt-4 flex gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-semibold text-red-700 dark:text-red-300">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+            <p>{status.error.message}</p>
+          </div>
+        )}
+
+        {status.data && (
+          <section className="glass-panel mt-6 overflow-hidden">
+            {/* Dark Navy Header Showcase */}
+            <div className="bg-[#111C44] p-5 text-white dark:bg-[#0c1433]">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-[#D8E3FF]">
+                {t("Live rescue flow")}
+              </p>
+              <h1 className="mt-2 text-2xl font-black text-[#F8F1E4]">{stages[activeIndex]?.label}</h1>
+              <p className="mt-1 text-sm text-[#D8E3FF]/80">{stages[activeIndex]?.copy}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <p
+                  aria-label={t("SOS tracking number")}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-1.5 font-mono text-xs font-bold text-[#F8F1E4] backdrop-blur-xs"
+                >
+                  <span className="text-[#D8E3FF]">{t("Tracking no.")}</span>
+                  <span>{status.data.publicCode}</span>
+                </p>
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#D8E3FF]">
+                  <MapPin className="h-3.5 w-3.5 text-[#2457FF]" />
+                  <span>{status.data.locationLabel}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stepper & Details */}
+            <div className="p-5">
+              <ol className="relative ml-3 border-l-2 border-[#D8E3FF]/40 pl-6 dark:border-[#2457FF]/30">
+                {stages.map((stage, index) => {
+                  const Icon = stage.icon;
+                  const reached = index <= activeIndex;
+                  return (
+                    <li key={stage.key} className="relative pb-7 last:pb-0">
+                      <span
+                        className={`absolute -left-[2.35rem] grid h-7 w-7 place-items-center rounded-full border-2 transition-all ${
+                          reached
+                            ? "border-[#2457FF] bg-[#2457FF] text-white shadow-sm"
+                            : "border-[#B7AD9E]/40 bg-white text-[#B7AD9E] dark:bg-[#111C44] dark:border-[#D8E3FF]/20"
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <p className={`text-sm font-black ${reached ? "text-[#111C44] dark:text-[#F8F1E4]" : "text-[#B7AD9E] dark:text-[#D8E3FF]/50"}`}>
+                        {stage.label}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+                        {index === 1 && !status.data.assignedRescuer ? t("Searching for rescuer...") : stage.copy}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ol>
+
+              {(status.data as any).destinationHospitalName && (
+                <div className="mt-5 flex items-center gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-extrabold text-emerald-900 dark:text-emerald-300">
+                  <span>🏥</span>
+                  <span>
+                    {t("En route to")} {(status.data as any).destinationHospitalName}
+                  </span>
+                </div>
+              )}
+
+              {status.data.assignedRescuer && (
+                <div className="mt-5">
+                  <AssignedRescuerCard
+                    rescuer={status.data.assignedRescuer}
+                    hospital={(status.data as any).destinationHospital}
+                    liveRescuer={liveStream.rescuer}
+                    liveRoute={liveStream.route}
+                    isStale={liveStream.isStale}
+                    lastEventAt={liveStream.lastEventAt}
+                  />
+                </div>
+              )}
+
+              {status.data.status === "resolved" && (
+                <div className="mt-5">
+                  <PostRescueCheckInCard publicCode={status.data.publicCode} />
+                </div>
+              )}
+
+              <div className="mt-5">
+                <IncidentChat publicCode={status.data.publicCode} active={status.data.status !== "resolved"} />
+              </div>
+
+              <div className="mt-5 rounded-xl border border-[#2457FF]/20 bg-[#2457FF]/5 p-3.5 text-xs leading-5 text-[#111C44] dark:text-[#D8E3FF]">
+                <ShieldCheck className="mr-2 inline h-4 w-4 text-[#2457FF]" />
+                {user
+                  ? t("Only your authorized account can add details or message the rescue team.")
+                  : t("Sign in with the reporting account to add details or message the rescue team.")}
+              </div>
+            </div>
+          </section>
+        )}
+      </main>
+      <VictimNavigation current="track" />
+    </div>
+  );
 }

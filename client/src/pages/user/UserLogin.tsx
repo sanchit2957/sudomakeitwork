@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/input-otp";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { isNativeApp } from "@/lib/apiConfig";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import {
   ArrowLeft,
   ArrowRight,
@@ -73,7 +74,9 @@ export default function UserLogin() {
 
   // Top level auth mode: "signin" or "register"
   const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
-  const [signinMethod, setSigninMethod] = useState<"otp" | "password">("otp");
+  const [signinMethod, setSigninMethod] = useState<"otp" | "password">(() =>
+    isSupabaseConfigured() ? "otp" : "password"
+  );
   
   // OTP Verification flow state
   const [otpStep, setOtpStep] = useState<"input" | "verify">("input");
@@ -614,6 +617,23 @@ export default function UserLogin() {
                         Use the password created during registration or provisioned by your system administrator.
                       </p>
                     </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <p className="text-[11px] text-muted-foreground">
+                          Testing locally?
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEmail("citizen@assamrescue.gov.in");
+                            setPassword("citizen");
+                            setErrorMessage("");
+                          }}
+                          className="font-mono text-[11px] font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
+                        >
+                          Fill Demo Citizen
+                        </button>
+                      </div>
 
                     <div className="pt-2">
                       <Button

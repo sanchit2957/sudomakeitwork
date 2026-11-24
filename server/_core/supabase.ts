@@ -29,7 +29,7 @@ export async function verifySupabaseToken(token: string) {
   // 1. Verify via Supabase Client getUser if configured
   if (serverSupabase) {
     try {
-      const { data: { user }, error } = await serverSupabase.auth.getUser(token);
+      const { data: { user }, error } = await (serverSupabase.auth as any).getUser(token);
       if (!error && user && user.email) {
         return user;
       }

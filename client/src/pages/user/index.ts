@@ -7,3 +7,4 @@ export { default as UserMedical } from "./UserMedical";
 export { default as UserHospitalRegister } from "./UserHospitalRegister";
 export { default as UserMore } from "./UserMore";
 export { default as UserProfile } from "./UserProfile";
+export { default as UserDonations } from "./UserDonations";

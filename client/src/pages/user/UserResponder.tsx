@@ -431,8 +431,8 @@ function ResponderWorkspace() {
         ) : (
           <>
             <section className={`grid gap-5 ${pushState === "subscribed" || Capacitor.isNativePlatform() ? "" : "lg:grid-cols-[1.25fr_0.75fr]"}`}>
-              <div className="rounded-3xl bg-[#174e46] p-6 text-white shadow-[0_20px_60px_-30px_rgb(21_78_70/0.75)]">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b1dbd1]">
+              <div className="glass-panel overflow-hidden rounded-3xl bg-[#111C44] p-6 text-white shadow-xl dark:bg-[#182353]">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#D8E3FF]">
                   {t("responder.readiness")}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -448,12 +448,12 @@ function ResponderWorkspace() {
                     textClassName="text-2xl font-extrabold tracking-tight text-white"
                   />
                   {profile.data?.callSign && (
-                    <span className="rounded-lg bg-white/15 px-2.5 py-1 font-mono text-xs font-bold text-[#b1dbd1]">
+                    <span className="rounded-lg bg-white/15 px-2.5 py-1 font-mono text-xs font-bold text-[#D8E3FF]">
                       {profile.data.callSign}
                     </span>
                   )}
                 </div>
-                <p className="mt-2 max-w-lg text-sm leading-6 text-[#c2e1d9]">
+                <p className="mt-2 max-w-lg text-sm leading-6 text-[#D8E3FF]/80">
                   {t("responder.readinessCopy")}
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -468,10 +468,10 @@ function ResponderWorkspace() {
                       key={value}
                       onClick={() => withCurrentLocation(value)}
                       disabled={setAvailability.isPending || !profile.data}
-                      className={`rounded-xl px-4 py-2.5 text-sm font-extrabold transition ${
+                      className={`rounded-xl px-4 py-2.5 text-sm font-extrabold transition active:scale-95 ${
                         profile.data?.availability === value
-                          ? "bg-white text-[#174e46]"
-                          : "bg-white/10 text-[#d8eee8] hover:bg-white/20"
+                          ? "bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/30"
+                          : "bg-white/10 text-[#D8E3FF] hover:bg-white/20"
                       }`}
                     >
                       {setAvailability.isPending ? t("responder.updating") : label}
@@ -1778,19 +1778,19 @@ function UserRescuerMissionCard({
   const currentHospital = hospitals.find(h => h.id === Number(selectedHospitalId)) || hospitals[0];
 
   return (
-    <article className="grid gap-4 rounded-2xl border bg-white p-5 shadow-sm md:grid-cols-[1fr_auto] dark:bg-card">
+    <article className="glass-panel grid gap-4 p-5 shadow-sm md:grid-cols-[1fr_auto]">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-xs font-medium text-primary">{incident.publicCode}</span>
+          <span className="font-mono text-xs font-bold text-[#2457FF] dark:text-[#D8E3FF]">{incident.publicCode}</span>
           <StatusBadge status={mission.status} />
           {incident.destinationHospitalName && (
-            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 ring-1 ring-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300">
+            <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 ring-1 ring-emerald-500/30 dark:bg-emerald-950/50 dark:text-emerald-300">
               🏥 En route: {incident.destinationHospitalName}
             </span>
           )}
         </div>
-        <h2 className="mt-2 text-lg font-extrabold">{incident.locationLabel}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h2 className="mt-2 text-lg font-extrabold text-[#111C44] dark:text-[#F8F1E4]">{incident.locationLabel}</h2>
+        <p className="mt-1 text-sm text-[#111C44]/70 dark:text-[#D8E3FF]/70">
           {incident.peopleAffected} {t("responder.people")} · {incident.emergencyType} ·{" "}
           <strong className={incident.severity === "critical" ? "text-destructive" : ""}>
             {incident.severity}
@@ -1798,14 +1798,14 @@ function UserRescuerMissionCard({
           {t("responder.priority")}
         </p>
         {mission.notes && (
-          <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+          <p className="mt-3 rounded-lg glass-card px-3 py-2 text-xs leading-5 text-[#111C44]/80 dark:text-[#D8E3FF]/80">
             {mission.notes}
           </p>
         )}
         {incident.voiceNoteUrl && (
           <div
             data-testid="mission-voice-note"
-            className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20"
+            className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 dark:border-amber-500/20"
           >
             <p className="mb-2 flex items-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-400">
               <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
@@ -1825,7 +1825,7 @@ function UserRescuerMissionCard({
               variant="outline"
               size="sm"
               onClick={() => setShowHospitalDialog(true)}
-              className="rounded-xl border-[#0f766e]/40 bg-[#0f766e]/10 text-xs font-bold text-[#0f766e] hover:bg-[#0f766e]/20 dark:text-emerald-300"
+              className="rounded-xl border-[#2457FF]/40 bg-[#2457FF]/10 text-xs font-bold text-[#2457FF] hover:bg-[#2457FF]/20 dark:text-[#D8E3FF]"
             >
               <Hospital className="mr-1.5 h-3.5 w-3.5" />
               {incident.destinationHospitalName ? "Change Hospital" : "Route to Hospital"}
@@ -1833,14 +1833,14 @@ function UserRescuerMissionCard({
           )}
 
           {mission.status === "resolved" ? (
-            <span className="flex items-center gap-2 text-sm font-bold text-[#19755f] dark:text-emerald-400">
+            <span className="flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-400">
               <CheckCircle2 className="h-5 w-5" /> {t("responder.completed")}
             </span>
           ) : (
             <Button
               disabled={isUpdating}
               onClick={() => onUpdateStatus(mission.status === "pending" ? "dispatched" : "resolved")}
-              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+              className="rounded-xl bg-[#2457FF] text-white hover:bg-[#1d47db] shadow-md shadow-[#2457FF]/20"
             >
               {isUpdating ? (
                 t("responder.updating")

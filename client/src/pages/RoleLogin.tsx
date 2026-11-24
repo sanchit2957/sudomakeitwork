@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   UserPlus,
 } from "lucide-react";
+import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import React, { FormEvent, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -347,6 +348,30 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                   </p>
                 </div>
 
+                  <div className="flex items-center justify-between pt-1">
+                    <p className="text-[11px] text-muted-foreground">
+                      Default Demo Credentials
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (role === "rescuer") {
+                          setEmail("rescuer@assamrescue.gov.in");
+                          setPassword("rescuer");
+                          setGovernmentCode("RESCUER-2026");
+                        } else {
+                          setEmail("hospital@assamrescue.gov.in");
+                          setPassword("hospital");
+                          setGovernmentCode("HOSPITAL-2026");
+                        }
+                        setErrorMessage("");
+                      }}
+                      className="font-mono text-[11px] font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
+                    >
+                      Fill Demo {role === "rescuer" ? "Rescuer" : "Hospital"}
+                    </button>
+                  </div>
+
                 <div className="pt-2">
                   <Button
                     type="submit"
@@ -496,7 +521,11 @@ export function RescuerLogin() {
 }
 
 export function HospitalLogin() {
-  return <RoleLogin role="hospital" />;
+  return (
+    <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
+      <RoleLogin role="hospital" />
+    </DesktopOnlyGate>
+  );
 }
 
 export const MedicalLogin = HospitalLogin;

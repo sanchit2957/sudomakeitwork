@@ -291,13 +291,13 @@ export function useAuth(options: UseAuthOptions = {}) {
       }
     };
 
-    supabase.auth.getSession().then(({ data }) => {
+    (supabase.auth as any).getSession().then(({ data }: any) => {
       if (data?.session) {
         handleSession(data.session);
       }
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = (supabase.auth as any).onAuthStateChange((_event: any, session: any) => {
       if (session) {
         handleSession(session);
       }

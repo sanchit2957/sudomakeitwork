@@ -21,10 +21,22 @@ export function RoleGate({
   }
 
   if (!user) {
+    if (roles && roles.length === 1 && roles[0] === "admin") {
+      return <Redirect to="/admin/login" />;
+    }
+    if (roles && roles.includes("rescuer") && !roles.includes("user")) {
+      return <Redirect to="/responder/login" />;
+    }
+    if (roles && (roles.includes("hospital") || roles.includes("medical")) && !roles.includes("user")) {
+      return <Redirect to="/hospital/login" />;
+    }
     return <Redirect to="/login" />;
   }
 
-  if (roles && roles.length > 0 && !roles.includes(user.role)) {
+  // Superadmins can access operational dashboards for oversight
+  const isAuthorized = !roles || roles.length === 0 || roles.includes(user.role) || (user.role === "admin" && (roles.includes("rescuer") || roles.includes("hospital") || roles.includes("medical")));
+
+  if (!isAuthorized) {
     // If the user's role is not in the allowed list, send them to their role dashboard
     const dashboard =
       user.role === "admin"

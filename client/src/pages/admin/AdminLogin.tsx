@@ -15,31 +15,14 @@ import {
   User,
   Users,
 } from "lucide-react";
-import MobileCommandRestricted from "@/components/MobileCommandRestricted";
-import { isNativeApp } from "@/lib/apiConfig";
-import React, { FormEvent, useEffect, useState } from "react";
+import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
+import React, { FormEvent, useState } from "react";
 import { useLocation } from "wouter";
 
 export default function AdminLogin() {
   const { user, login, logout } = useAuth();
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
-
-  const [isPhoneScreen, setIsPhoneScreen] = useState(() => {
-    return isNativeApp() || (typeof window !== "undefined" && window.innerWidth < 768);
-  });
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsPhoneScreen(isNativeApp() || (typeof window !== "undefined" && window.innerWidth < 768));
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  if (isPhoneScreen) {
-    return <MobileCommandRestricted />;
-  }
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -71,7 +54,8 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f7f6] text-[#122824] transition-colors dark:bg-[#090a0a] dark:text-[#f3f4f6]">
+    <DesktopOnlyGate portalName="State Command Centre" portalType="admin">
+      <div className="min-h-screen bg-[#F8F1E4] text-[#111C44] transition-colors dark:bg-[#111C44] dark:text-[#F8F1E4]">
       {/* Top Header */}
       <header className="sticky top-0 z-30 border-b border-black/5 bg-white/85 px-4 py-3 backdrop-blur-md dark:border-white/10 dark:bg-[#111214]/85">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
@@ -207,6 +191,23 @@ export default function AdminLogin() {
                 />
               </div>
 
+              <div className="flex items-center justify-between pt-1">
+                <p className="text-[11px] text-muted-foreground">
+                  Default Demo Credentials
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("admin@assamrescue.gov.in");
+                    setPassword("admin");
+                    setErrorMessage("");
+                  }}
+                  className="font-mono text-[11px] font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
+                >
+                  Fill Demo Admin
+                </button>
+              </div>
+
               <div className="pt-2">
                 <Button
                   type="submit"
@@ -234,5 +235,6 @@ export default function AdminLogin() {
         </div>
       </main>
     </div>
+    </DesktopOnlyGate>
   );
 }

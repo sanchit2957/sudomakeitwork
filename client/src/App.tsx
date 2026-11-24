@@ -17,11 +17,12 @@ import { UserHome, UserLogin } from "./pages/user";
 import { HospitalLogin, RescuerLogin } from "./pages/RoleLogin";
 import { isNativeApp } from "./lib/apiConfig";
 import MobileCommandRestricted from "./components/MobileCommandRestricted";
+import { DesktopOnlyGate } from "./components/DesktopOnlyGate";
 import { useMobileLifecycle } from "./hooks/useMobileLifecycle";
 
 // Code-split heavy operational workspaces
 const AdminCommand = lazy(() => import("./pages/admin/AdminCommand"));
-const HospitalPortal = lazy(() => import("./pages/HospitalPortal"));
+const HospitalPortal = lazy(() => import("./pages/hospital/HospitalPortal"));
 const UserResponder = lazy(() => import("./pages/user/UserResponder"));
 const Emergency = lazy(() => import("./pages/Emergency"));
 const UserSafety = lazy(() => import("./pages/user/UserSafety"));
@@ -61,29 +62,41 @@ function Router() {
           <Route path={"/login"} component={UserLogin} />
           <Route path={"/user/login"} component={UserLogin} />
           <Route path={"/admin/login"}>
-            {native ? <MobileCommandRestricted /> : <AdminLogin />}
+            <DesktopOnlyGate portalName="State Command Centre" portalType="admin">
+              <AdminLogin />
+            </DesktopOnlyGate>
           </Route>
           <Route path={"/admin"}>
-            {native ? <MobileCommandRestricted /> : <AdminLogin />}
+            <DesktopOnlyGate portalName="State Command Centre" portalType="admin">
+              <AdminLogin />
+            </DesktopOnlyGate>
           </Route>
           <Route path={"/responder/login"} component={RescuerLogin} />
-          <Route path={"/hospital/login"} component={HospitalLogin} />
-          <Route path={"/medical/login"} component={HospitalLogin} />
+          <Route path={"/hospital/login"}>
+            <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
+              <HospitalLogin />
+            </DesktopOnlyGate>
+          </Route>
+          <Route path={"/medical/login"}>
+            <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
+              <HospitalLogin />
+            </DesktopOnlyGate>
+          </Route>
 
           {/* Main Entry: User Home Emergency Hub */}
           <Route path={"/"}>
-            <RoleGate roles={["user"]}><UserHome /></RoleGate>
+            <UserHome />
           </Route>
 
         {/* User Section Routes */}
         <Route path={"/emergency"}>
-          <RoleGate roles={["user"]}><Emergency /></RoleGate>
+          <Emergency />
         </Route>
         <Route path={"/track"}>
-          <RoleGate roles={["user"]}><UserTrackFlow /></RoleGate>
+          <UserTrackFlow />
         </Route>
         <Route path={"/safety"}>
-          <RoleGate roles={["user"]}><UserSafety /></RoleGate>
+          <UserSafety />
         </Route>
         <Route path={"/profile"}>
           <RoleGate><UserProfile /></RoleGate>
@@ -92,7 +105,7 @@ function Router() {
           <RoleGate><UserProfile /></RoleGate>
         </Route>
         <Route path={"/more"}>
-          <RoleGate><UserMore /></RoleGate>
+          <UserMore />
         </Route>
         <Route path={"/donations"}>
           <UserDonations />
@@ -107,34 +120,46 @@ function Router() {
           <RoleGate><UserHospitalRegister /></RoleGate>
         </Route>
 
-        {/* Single Canonical Hospital Operations Portal */}
+        {/* Single Canonical Hospital Operations Portal - Desktop Only */}
         <Route path={"/hospital/:rest*"}>
-          <RoleGate roles={["hospital", "medical"]}><HospitalPortal /></RoleGate>
+          <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
+            <HospitalPortal />
+          </DesktopOnlyGate>
         </Route>
         <Route path={"/hospital"}>
-          <RoleGate roles={["hospital", "medical"]}><HospitalPortal /></RoleGate>
+          <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
+            <HospitalPortal />
+          </DesktopOnlyGate>
         </Route>
         <Route path={"/medical/:rest*"}>
-          <RoleGate roles={["hospital", "medical"]}><HospitalPortal /></RoleGate>
+          <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
+            <HospitalPortal />
+          </DesktopOnlyGate>
         </Route>
         <Route path={"/medical"}>
-          <RoleGate roles={["hospital", "medical"]}><HospitalPortal /></RoleGate>
+          <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
+            <HospitalPortal />
+          </DesktopOnlyGate>
         </Route>
 
-        {/* Rescuer Portal */}
+        {/* Rescuer Portal - Fully Responsive Across All Devices */}
         <Route path={"/responder/:rest*"}>
-          <RoleGate roles={["rescuer"]}><UserResponder /></RoleGate>
+          <UserResponder />
         </Route>
         <Route path={"/responder"}>
-          <RoleGate roles={["rescuer"]}><UserResponder /></RoleGate>
+          <UserResponder />
         </Route>
 
-        {/* Admin Section Routes - Restricted in Mobile Native App */}
+        {/* Admin Section Routes - Desktop Only */}
         <Route path={"/command/:rest*"}>
-          {native ? <MobileCommandRestricted /> : <RoleGate roles={["admin"]}><AdminCommand /></RoleGate>}
+          <DesktopOnlyGate portalName="State Command Centre" portalType="admin">
+            <RoleGate roles={["admin"]}><AdminCommand /></RoleGate>
+          </DesktopOnlyGate>
         </Route>
         <Route path={"/command"}>
-          {native ? <MobileCommandRestricted /> : <RoleGate roles={["admin"]}><AdminCommand /></RoleGate>}
+          <DesktopOnlyGate portalName="State Command Centre" portalType="admin">
+            <RoleGate roles={["admin"]}><AdminCommand /></RoleGate>
+          </DesktopOnlyGate>
         </Route>
 
         {/* Fallback Routes */}

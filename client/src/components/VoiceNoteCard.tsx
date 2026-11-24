@@ -337,7 +337,7 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
           type="button"
           onClick={togglePlayback}
           aria-label={isPlaying ? t("Pause voice note") : t("Play voice note")}
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#174e46] text-white shadow-sm transition active:scale-95 hover:bg-[#1f6359]"
+          className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/20 transition active:scale-95 hover:bg-[#1d47db]`}
         >
           {isPlaying ? (
             <Pause className="h-5 w-5 fill-current" />
@@ -351,8 +351,8 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
           onClick={recording ? stopRecording : startRecording}
           aria-label={recording ? t("Stop recording") : t("Record voice note")}
           disabled={micState === "unsupported"}
-          className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white shadow-sm transition active:scale-95 disabled:opacity-50 ${
-            recording ? "bg-[#df3e43] animate-pulse" : "bg-[#174e46] hover:bg-[#1f6359]"
+          className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white shadow-md transition active:scale-95 disabled:opacity-50 ${
+            recording ? "bg-[#DC2626] animate-pulse shadow-red-500/30" : "bg-[#2457FF] shadow-[#2457FF]/20 hover:bg-[#1d47db]"
           }`}
         >
           {recording ? (
@@ -366,9 +366,9 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
       {/* Card Title */}
       <div className="mt-2 flex items-center justify-center gap-1.5">
         {recording && (
-          <span className="inline-block h-2 w-2 rounded-full bg-[#df3e43] animate-ping" />
+          <span className="inline-block h-2 w-2 rounded-full bg-[#DC2626] animate-ping" />
         )}
-        <p className="text-sm font-extrabold text-[#142c2b] dark:text-[#f4f4f5]">
+        <p className="text-sm font-extrabold text-[#111C44] dark:text-[#F8F1E4]">
           {recording
             ? t("Stop and save voice note")
             : draft
@@ -378,7 +378,7 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
       </div>
 
       {/* Card Subtitle */}
-      <p className="mt-0.5 text-xs text-[#708881] dark:text-[#b9b9c0]">
+      <p className="mt-0.5 text-xs text-[#111C44]/70 dark:text-[#D8E3FF]/70">
         {recording
           ? `${formatSeconds(recordSeconds)} / 02:00 · ${t("Tap to stop")}`
           : draft
@@ -391,7 +391,7 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
       </p>
 
       {message && (
-        <p role="status" className="mt-1 text-[10px] font-semibold text-[#54746b] dark:text-[#b9b9c0]">
+        <p role="status" className="mt-1 text-[10px] font-semibold text-[#2457FF] dark:text-[#D8E3FF]">
           {message}
         </p>
       )}

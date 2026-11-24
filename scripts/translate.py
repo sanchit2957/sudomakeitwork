@@ -1,7 +1,9 @@
 import re
 import json
+import os
 
-file_path = r"d:\sudomakeitwork-1\client\src\contexts\currentInterfaceTerms.ts"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.abspath(os.path.join(script_dir, "..", "client", "src", "contexts", "currentInterfaceTerms.ts"))
 
 with open(file_path, "r", encoding="utf-8") as f:
     content = f.read()

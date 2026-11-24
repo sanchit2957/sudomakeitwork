@@ -34,7 +34,7 @@ export async function supabaseSignIn(email: string, password: string) {
   if (!supabase) {
     throw new Error("Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
   }
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await (supabase as any).auth.signInWithPassword({
     email,
     password,
   });
@@ -46,7 +46,7 @@ export async function supabaseSignUp(email: string, password: string, metadata?:
   if (!supabase) {
     throw new Error("Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
   }
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await (supabase as any).auth.signUp({
     email,
     password,
     options: {
@@ -75,7 +75,7 @@ export async function supabaseSendOtp(email: string, options?: { shouldCreateUse
     throw new Error("Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
   }
   const emailRedirectTo = options?.emailRedirectTo || getRedirectUrl();
-  const { data, error } = await supabase.auth.signInWithOtp({
+  const { data, error } = await (supabase as any).auth.signInWithOtp({
     email: email.trim(),
     options: {
       shouldCreateUser: options?.shouldCreateUser ?? true,
@@ -93,20 +93,20 @@ export async function supabaseVerifyOtp(email: string, token: string, type: "ema
   }
   // Try with specified type first, with cascade fallbacks for magiclink and signup
   try {
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { data, error } = await (supabase as any).auth.verifyOtp({
       email: email.trim(),
       token: token.trim(),
       type: type as any,
     });
     if (error) {
-      const retry1 = await supabase.auth.verifyOtp({
+      const retry1 = await (supabase as any).auth.verifyOtp({
         email: email.trim(),
         token: token.trim(),
         type: "magiclink",
       });
       if (!retry1.error) return retry1.data;
 
-      const retry2 = await supabase.auth.verifyOtp({
+      const retry2 = await (supabase as any).auth.verifyOtp({
         email: email.trim(),
         token: token.trim(),
         type: "signup",
@@ -125,7 +125,7 @@ export async function supabaseResendOtp(email: string, type: "signup" | "email_c
   if (!supabase) {
     throw new Error("Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
   }
-  const { data, error } = await supabase.auth.resend({
+  const { data, error } = await (supabase as any).auth.resend({
     type,
     email: email.trim(),
   });
@@ -135,7 +135,7 @@ export async function supabaseResendOtp(email: string, type: "signup" | "email_c
 
 export async function supabaseSignOut() {
   if (!supabase) return;
-  const { error } = await supabase.auth.signOut();
+  const { error } = await (supabase as any).auth.signOut();
   if (error) {
     console.warn("[Supabase] SignOut error:", error.message);
   }
@@ -143,7 +143,7 @@ export async function supabaseSignOut() {
 
 export async function getSupabaseSession() {
   if (!supabase) return null;
-  const { data } = await supabase.auth.getSession();
+  const { data } = await (supabase as any).auth.getSession();
   return data.session;
 }
 
