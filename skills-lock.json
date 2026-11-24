@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "skills": {
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "83485963700bcf11d5bf78118facb301676b69d918fee2e45a95e7f1a2840f6c"
+    },
+    "mobile-design": {
+      "source": "vudovn/ag-kit",
+      "commit": "549ba3dc2eb1d40fccb5b6d792eba4101c80cd69",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/mobile-design/SKILL.md",
+      "computedHash": "6bf3dc0de6d45edb3415f4f5d161721cd898aadc4701f9ddc457d0b4f8ab1f11"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "a4fc248f6136552cb881e298847abc7ddce84e6b",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "b2defbac0cde30996f120c953d243b5ccd396c55e550a98a08d4206eaadac670"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "commit": "5a37a6329fbad3666c3207392a6a7c0110e92efb",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "5994e4cfd86144903d2ba750f862b9e36af15e3297aac983679e347b99f6cb71"
+    }
+  }
+}

@@ -103,18 +103,18 @@ export function PostRescueRecords() {
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#0f766e] dark:text-emerald-400">
               Post-Rescue Audit & Citizen Reviews
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-700">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 dark:text-emerald-300">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
               24-Hour Rolling Retention
             </span>
           </div>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-[#173d37]">
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
             Post-Rescue Records
           </h1>
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">
+          <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-muted-foreground sm:text-sm">
             Citizen confirmations recorded following rescue operations. Track relief
             center allotment status, follow-up medical needs, and survivor review notes.
           </p>
@@ -124,7 +124,7 @@ export function PostRescueRecords() {
           size="sm"
           onClick={() => void utils.rescue.operations.postRescueRecords.invalidate()}
           disabled={recordsQuery.isRefetching}
-          className="rounded-xl border-primary/20 text-primary hover:bg-primary/5"
+          className="rounded-xl border-border text-xs font-bold hover:bg-muted"
         >
           <RefreshCw
             className={`mr-2 h-3.5 w-3.5 ${recordsQuery.isRefetching ? "animate-spin" : ""}`}
@@ -135,29 +135,29 @@ export function PostRescueRecords() {
 
       {/* Overview Analytics Cards */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-3xl border bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm dark:border-white/10 dark:bg-[#141517]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Total 24h Check-Ins
             </span>
-            <div className="grid h-8 w-8 place-items-center rounded-xl bg-teal-50 text-teal-700">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-teal-500/10 text-teal-700 dark:text-teal-300">
               <HeartHandshake className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-3xl font-black text-slate-800">{totalCount}</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-black text-foreground">{totalCount}</p>
           <p className="mt-1 text-xs text-muted-foreground">Verified post-rescue responses</p>
         </div>
 
-        <div className="rounded-3xl border bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm dark:border-white/10 dark:bg-[#141517]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Relief Shelter Allotted
             </span>
-            <div className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-50 text-emerald-700">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
               <Home className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-3xl font-black text-emerald-700">
+          <p className="mt-2 text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-400">
             {reliefAllottedCount}{" "}
             <span className="text-sm font-semibold text-muted-foreground">
               ({reliefRate}%)
@@ -166,35 +166,35 @@ export function PostRescueRecords() {
           <p className="mt-1 text-xs text-muted-foreground">Housed in registered relief centers</p>
         </div>
 
-        <div className="rounded-3xl border bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm dark:border-white/10 dark:bg-[#141517]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Evacuation Cases
             </span>
-            <div className="grid h-8 w-8 place-items-center rounded-xl bg-blue-50 text-blue-700">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-sky-500/10 text-sky-700 dark:text-sky-300">
               <LifeBuoy className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-3xl font-black text-blue-800">{evacuationCount}</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-black text-foreground">{evacuationCount}</p>
           <p className="mt-1 text-xs text-muted-foreground">Evacuated from flood zones</p>
         </div>
 
-        <div className="rounded-3xl border bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm dark:border-white/10 dark:bg-[#141517]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Medical Care Follow-Ups
             </span>
-            <div className="grid h-8 w-8 place-items-center rounded-xl bg-rose-50 text-rose-700">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-rose-500/10 text-rose-700 dark:text-rose-300">
               <ShieldCheck className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-3xl font-black text-rose-800">{medicalCount}</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-black text-foreground">{medicalCount}</p>
           <p className="mt-1 text-xs text-muted-foreground">Reported ongoing medical needs</p>
         </div>
       </section>
 
       {/* Filters & Search Toolbar */}
-      <div className="flex flex-col justify-between gap-4 rounded-3xl border bg-white p-4 shadow-sm md:flex-row md:items-center">
+      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm dark:border-white/10 dark:bg-[#141517] md:flex-row md:items-center">
         <div className="relative min-w-72 flex-1">
           <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
           <Input
@@ -250,13 +250,13 @@ export function PostRescueRecords() {
             return (
               <article
                 key={item.id}
-                className="flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                className="flex flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:border-[#0f766e]/40 hover:shadow-md dark:border-white/10 dark:bg-[#141517]"
               >
                 <div>
                   {/* Top Header */}
-                  <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3.5">
+                  <div className="flex items-start justify-between gap-3 border-b border-border dark:border-white/5 pb-3.5">
                     <div>
-                      <span className="font-mono text-xs font-extrabold text-primary">
+                      <span className="font-mono text-xs font-extrabold text-[#0f766e] dark:text-emerald-400">
                         {item.publicCode}
                       </span>
                       <p className="mt-0.5 text-xs text-muted-foreground flex items-center gap-1.5">
@@ -264,29 +264,29 @@ export function PostRescueRecords() {
                         {formatRelativeTime(item.submittedAt)}
                       </p>
                     </div>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600">
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
                       {formatRemainingTime(item.submittedAt)}
                     </span>
                   </div>
 
                   {/* Badges Grid */}
                   <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-2.5">
+                    <div className="rounded-xl border border-border bg-muted/40 p-2.5 dark:border-white/5 dark:bg-white/5">
                       <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                         Relief Centre
                       </p>
                       <div className="mt-1 flex items-center gap-1.5">
                         {isReliefYes ? (
                           <>
-                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                            <span className="font-bold uppercase text-emerald-700">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            <span className="font-bold uppercase text-emerald-700 dark:text-emerald-400">
                               Allotted (Yes)
                             </span>
                           </>
                         ) : (
                           <>
-                            <XCircle className="h-4 w-4 text-amber-600" />
-                            <span className="font-bold uppercase text-amber-700">
+                            <XCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                            <span className="font-bold uppercase text-amber-700 dark:text-amber-400">
                               Not Allotted
                             </span>
                           </>
@@ -294,30 +294,30 @@ export function PostRescueRecords() {
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-2.5">
+                    <div className="rounded-xl border border-border bg-muted/40 p-2.5 dark:border-white/5 dark:bg-white/5">
                       <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                         Category Details
                       </p>
-                      <p className="mt-1 font-bold uppercase text-slate-800">
+                      <p className="mt-1 font-bold uppercase text-foreground">
                         {item.helpCategory}
                       </p>
                     </div>
                   </div>
 
                   {/* Citizen / Reporter Info */}
-                  <div className="mt-3.5 space-y-1.5 text-xs text-slate-600">
+                  <div className="mt-3.5 space-y-1.5 text-xs text-muted-foreground">
                     {item.reporterName && (
                       <div className="flex items-center gap-2">
-                        <User className="h-3.5 w-3.5 text-slate-400" />
-                        <span className="font-semibold text-slate-700">
+                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-semibold text-foreground">
                           {item.reporterName}
                         </span>
                       </div>
                     )}
                     {item.locationLabel && (
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                        <span className="truncate text-slate-600">
+                        <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="truncate text-muted-foreground">
                           {item.locationLabel}
                         </span>
                       </div>
@@ -326,8 +326,8 @@ export function PostRescueRecords() {
 
                   {/* Citizen Notes / Feedback Review */}
                   {item.notes && (
-                    <div className="mt-3 rounded-2xl bg-amber-500/5 border border-amber-500/20 p-3 text-xs leading-relaxed text-slate-700">
-                      <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1">
+                    <div className="mt-3 rounded-xl bg-amber-500/5 border border-amber-500/20 p-3 text-xs leading-relaxed text-foreground">
+                      <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 flex items-center gap-1">
                         <MessageSquareQuote className="h-3 w-3" /> Citizen Note
                       </p>
                       <p className="mt-1 italic">"{item.notes}"</p>
@@ -335,7 +335,7 @@ export function PostRescueRecords() {
                   )}
                 </div>
 
-                <div className="mt-4 border-t border-slate-100 pt-3 text-right">
+                <div className="mt-4 border-t border-border dark:border-white/5 pt-3 text-right">
                   <span className="font-mono text-[10px] text-muted-foreground">
                     Recorded: {new Date(item.submittedAt).toLocaleTimeString()} ·{" "}
                     {new Date(item.submittedAt).toLocaleDateString()}
@@ -346,11 +346,11 @@ export function PostRescueRecords() {
           })}
         </div>
       ) : (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-slate-50 text-muted-foreground">
+        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center shadow-sm dark:border-white/10 dark:bg-[#141517]">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
             <HeartHandshake className="h-6 w-6" />
           </div>
-          <h3 className="mt-4 text-base font-extrabold text-slate-800">
+          <h3 className="mt-4 text-base font-extrabold text-foreground">
             No Post-Rescue Records Found
           </h3>
           <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
