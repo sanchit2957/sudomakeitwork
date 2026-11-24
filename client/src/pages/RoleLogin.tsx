@@ -1,4 +1,9 @@
+/*
+From Uiverse.io by kyle1dev - https://uiverse.io/kyle1dev/honest-snail-17
+MIT License, Copyright (c) kyle1dev (Kyle)
+*/
 import { useAuth } from "@/_core/hooks/useAuth";
+import "@/components/ModernAuthForm.css";
 import { formatAuthError } from "./user/UserLogin";
 import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
@@ -239,11 +244,11 @@ export function RoleLogin({ role }: { role: PortalRole }) {
           </button>
         </div>
 
-        {/* Form Card */}
-        <div className="mt-4 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#141517]">
-          <div className="border-b border-black/5 bg-[#fafcfb] p-4 dark:border-white/5 dark:bg-[#18191c]">
+        {/* Form Card - Modern Form */}
+        <div className="modern-form mt-4 !max-w-xl !p-6 sm:!p-8 shadow-xl">
+          <div className="border-b border-black/5 bg-[#fafcfb] p-4 rounded-2xl mb-5 dark:border-white/5 dark:bg-[#18191c]">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#0f766e]/10 text-[#0f766e] dark:text-emerald-400">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <KeyRound className="h-4 w-4" />
               </span>
               <div>
@@ -259,7 +264,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
             </div>
           </div>
 
-          <div className="p-5 sm:p-6">
+          <div>
             {errorMessage && (
               <div
                 role="alert"
@@ -280,34 +285,36 @@ export function RoleLogin({ role }: { role: PortalRole }) {
             {authMode === "signin" ? (
               /* SIGN IN FORM */
               <form onSubmit={handleSignIn} className="space-y-4">
-                <div>
-                  <Label htmlFor={`${role}-email`} className="text-xs font-bold">
+                <div className="input-group">
+                  <Label htmlFor={`${role}-email`} className="text-xs font-bold mb-1 block">
                     Email or Username
                   </Label>
-                  <Input
-                    id={`${role}-email`}
-                    type="text"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. officer@assamrescue.gov.in"
-                    className="mt-1.5 h-11 rounded-xl text-sm"
-                    autoComplete="username"
-                    required
-                  />
+                  <div className="input-wrapper">
+                    <Input
+                      id={`${role}-email`}
+                      type="text"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="e.g. officer@assamrescue.gov.in"
+                      className="form-input !h-11 text-sm"
+                      autoComplete="username"
+                      required
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <Label htmlFor={`${role}-password`} className="text-xs font-bold">
+                <div className="input-group">
+                  <Label htmlFor={`${role}-password`} className="text-xs font-bold mb-1 block">
                     Password
                   </Label>
-                  <div className="relative mt-1.5">
+                  <div className="input-wrapper">
                     <Input
                       id={`${role}-password`}
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter account password"
-                      className="h-11 rounded-xl pr-11 text-sm"
+                      className="form-input !h-11 !pr-11 text-sm"
                       autoComplete="current-password"
                       required
                     />
@@ -315,15 +322,15 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                       type="button"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground hover:text-foreground"
+                      className="password-toggle"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between">
+                <div className="input-group">
+                  <div className="flex items-center justify-between mb-1">
                     <Label htmlFor={`${role}-gov-code`} className="text-xs font-bold text-amber-700 dark:text-amber-400">
                       Government Code <span className="text-destructive">*</span>
                     </Label>
@@ -331,14 +338,14 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                       Required
                     </span>
                   </div>
-                  <div className="relative mt-1.5">
+                  <div className="input-wrapper">
                     <Input
                       id={`${role}-gov-code`}
                       type="text"
                       value={governmentCode}
                       onChange={(e) => setGovernmentCode(e.target.value)}
                       placeholder="Enter active Government Access Code"
-                      className="h-11 rounded-xl border-amber-500/40 bg-amber-50/40 font-mono text-sm font-bold tracking-wider text-amber-950 focus:border-amber-600 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200"
+                      className="form-input !h-11 border-amber-500/40 bg-amber-50/40 font-mono text-sm font-bold tracking-wider text-amber-950 focus:border-amber-600 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200"
                       autoComplete="off"
                       required
                     />
@@ -348,39 +355,42 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                   </p>
                 </div>
 
-                  <div className="flex items-center justify-between pt-1">
-                    <p className="text-[11px] text-muted-foreground">
-                      Default Demo Credentials
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (role === "rescuer") {
-                          setEmail("rescuer@assamrescue.gov.in");
-                          setPassword("rescuer");
-                          setGovernmentCode("RESCUER-2026");
-                        } else {
-                          setEmail("hospital@assamrescue.gov.in");
-                          setPassword("hospital");
-                          setGovernmentCode("HOSPITAL-2026");
-                        }
-                        setErrorMessage("");
-                      }}
-                      className="font-mono text-[11px] font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
-                    >
-                      Fill Demo {role === "rescuer" ? "Rescuer" : "Hospital"}
-                    </button>
-                  </div>
+                <div className="flex items-center justify-between pt-1">
+                  <p className="text-[11px] text-muted-foreground">
+                    Default Demo Credentials
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (role === "rescuer") {
+                        setEmail("rescuer@assamrescue.gov.in");
+                        setPassword("rescuer");
+                        setGovernmentCode("RESCUER-2026");
+                      } else {
+                        setEmail("hospital@assamrescue.gov.in");
+                        setPassword("hospital");
+                        setGovernmentCode("HOSPITAL-2026");
+                      }
+                      setErrorMessage("");
+                    }}
+                    className="font-mono text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    Fill Demo {role === "rescuer" ? "Rescuer" : "Hospital"}
+                  </button>
+                </div>
 
                 <div className="pt-2">
-                  <Button
+                  <button
                     type="submit"
                     disabled={isSubmitting || !email.trim() || !password || !governmentCode.trim()}
-                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                    className="submit-button !h-12 w-full text-sm font-bold"
                   >
-                    <Icon className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Authenticating…" : `Sign In as ${role === "rescuer" ? "Rescuer" : "Hospital Staff"}`}
-                  </Button>
+                    <span className="button-text flex items-center justify-center gap-2">
+                      <Icon className="h-4 w-4" />
+                      {isSubmitting ? "Authenticating…" : `Sign In as ${role === "rescuer" ? "Rescuer" : "Hospital Staff"}`}
+                    </span>
+                    <div className="button-glow"></div>
+                  </button>
                 </div>
               </form>
             ) : (
@@ -483,7 +493,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                 </div>
 
                 <div className="pt-2">
-                  <Button
+                  <button
                     type="submit"
                     disabled={
                       isSubmitting ||
@@ -492,11 +502,14 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                       !regPassword ||
                       !regGovernmentCode.trim()
                     }
-                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                    className="submit-button !h-12 w-full text-sm font-bold"
                   >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Registering…" : `Sign Up as ${role === "rescuer" ? "Rescuer" : "Hospital Staff"}`}
-                  </Button>
+                    <span className="button-text flex items-center justify-center gap-2">
+                      <UserPlus className="h-4 w-4" />
+                      {isSubmitting ? "Registering…" : `Sign Up as ${role === "rescuer" ? "Rescuer" : "Hospital Staff"}`}
+                    </span>
+                    <div className="button-glow"></div>
+                  </button>
                 </div>
               </form>
             )}

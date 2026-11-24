@@ -2,7 +2,7 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import Login from "./Login";
+import Login from "./user/UserLogin";
 import { RoleGate } from "@/components/RoleGate";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";

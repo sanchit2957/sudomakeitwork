@@ -1,4 +1,9 @@
+/*
+From Uiverse.io by kyle1dev - https://uiverse.io/kyle1dev/honest-snail-17
+MIT License, Copyright (c) kyle1dev (Kyle)
+*/
 import { useAuth } from "@/_core/hooks/useAuth";
+import "@/components/ModernAuthForm.css";
 import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -405,9 +410,9 @@ export default function UserLogin() {
               </button>
             </div>
 
-        {/* Main Auth Container */}
-        <div className="mt-5 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#141517]">
-          <div className="p-5 sm:p-6">
+        {/* Main Auth Container - Modern Form Adapted from Uiverse.io honest-snail-17 */}
+        <div className="modern-form mt-5 !max-w-xl !p-6 sm:!p-8 shadow-xl">
+          <div>
             {errorMessage && (
               <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-semibold text-destructive">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -425,7 +430,7 @@ export default function UserLogin() {
             {/* STEP: OTP VERIFICATION VIEW */}
             {otpStep === "verify" ? (
               <div className="py-2 text-center">
-                <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#0f766e]/10 text-[#0f766e] dark:text-emerald-400">
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
                   <Mail className="h-6 w-6" />
                 </div>
                 <h3 className="mt-3 text-lg font-black tracking-tight">Enter Verification Code</h3>
@@ -483,7 +488,7 @@ export default function UserLogin() {
                       className={`flex items-center gap-1 font-bold ${
                         otpCountdown > 0
                           ? "cursor-not-allowed text-muted-foreground"
-                          : "text-[#0f766e] hover:underline dark:text-emerald-400"
+                          : "text-blue-600 hover:underline dark:text-blue-400"
                       }`}
                     >
                       <RefreshCw className={`h-3 w-3 ${otpCountdown > 0 ? "animate-spin" : ""}`} />
@@ -491,14 +496,17 @@ export default function UserLogin() {
                     </button>
                   </div>
 
-                  <Button
+                  <button
                     type="submit"
                     disabled={isSubmitting || otpCode.length < 6}
-                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                    className="submit-button !h-12 w-full text-sm font-bold"
                   >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Verifying…" : "Verify & Sign In"}
-                  </Button>
+                    <span className="button-text flex items-center justify-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      {isSubmitting ? "Verifying…" : "Verify & Sign In"}
+                    </span>
+                    <div className="button-glow"></div>
+                  </button>
                 </form>
               </div>
             ) : authMode === "signin" ? (
@@ -546,71 +554,112 @@ export default function UserLogin() {
                     }}
                     className="space-y-4"
                   >
-                    <div>
-                      <Label htmlFor="email" className="text-xs font-bold text-foreground">Email Address</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Enter your registered email"
-                        className="mt-1.5 h-11 rounded-xl text-sm"
-                        autoComplete="email"
-                        required
-                      />
+                    <div className="input-group">
+                      <Label htmlFor="email" className="text-xs font-bold text-foreground mb-1 block">Email Address</Label>
+                      <div className="input-wrapper">
+                        <svg fill="none" viewBox="0 0 24 24" className="input-icon">
+                          <path
+                            strokeWidth="1.5"
+                            stroke="currentColor"
+                            d="M3 8L10.8906 13.2604C11.5624 13.7083 12.4376 13.7083 13.1094 13.2604L21 8M5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V17C3 18.1046 3.89543 19 5 19Z"
+                          />
+                        </svg>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="Enter your registered email"
+                          className="form-input !h-11 !pl-10 text-sm"
+                          autoComplete="email"
+                          required
+                        />
+                      </div>
                       <p className="mt-1.5 text-[11px] text-muted-foreground">
                         We will send a 6-digit login verification code directly to your email address.
                       </p>
                     </div>
 
                     <div className="pt-2">
-                      <Button
+                      <button
                         type="submit"
                         disabled={isSubmitting || !email.trim()}
-                        className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                        className="submit-button !h-12 w-full text-sm font-bold"
                       >
-                        <Mail className="mr-2 h-4 w-4" />
-                        {isSubmitting ? "Sending Code…" : "Send Verification Code"}
-                      </Button>
+                        <span className="button-text flex items-center justify-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          {isSubmitting ? "Sending Code…" : "Send Verification Code"}
+                        </span>
+                        <div className="button-glow"></div>
+                      </button>
                     </div>
                   </form>
                 ) : (
                   <form onSubmit={handlePasswordLogin} className="space-y-4">
-                    <div>
-                      <Label htmlFor="pwd-email" className="text-xs font-bold text-foreground">Email Address</Label>
-                      <Input
-                        id="pwd-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="e.g. citizen@assamrescue.gov.in"
-                        className="mt-1.5 h-11 rounded-xl text-sm"
-                        autoComplete="email"
-                        required
-                      />
+                    <div className="input-group">
+                      <Label htmlFor="pwd-email" className="text-xs font-bold text-foreground mb-1 block">Email Address</Label>
+                      <div className="input-wrapper">
+                        <svg fill="none" viewBox="0 0 24 24" className="input-icon">
+                          <path
+                            strokeWidth="1.5"
+                            stroke="currentColor"
+                            d="M3 8L10.8906 13.2604C11.5624 13.7083 12.4376 13.7083 13.1094 13.2604L21 8M5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V17C3 18.1046 3.89543 19 5 19Z"
+                          />
+                        </svg>
+                        <Input
+                          id="pwd-email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="e.g. citizen@assamrescue.gov.in"
+                          className="form-input !h-11 !pl-10 text-sm"
+                          autoComplete="email"
+                          required
+                        />
+                      </div>
                     </div>
 
-                    <div>
-                      <Label htmlFor="pwd-password" className="text-xs font-bold text-foreground">Password</Label>
-                      <div className="relative mt-1.5">
+                    <div className="input-group">
+                      <Label htmlFor="pwd-password" className="text-xs font-bold text-foreground mb-1 block">Password</Label>
+                      <div className="input-wrapper">
+                        <svg fill="none" viewBox="0 0 24 24" className="input-icon">
+                          <path
+                            strokeWidth="1.5"
+                            stroke="currentColor"
+                            d="M12 10V14M8 6H16C17.1046 6 18 6.89543 18 8V16C18 17.1046 17.1046 18 16 18H8C6.89543 18 6 17.1046 6 16V8C6 6.89543 6.89543 6 8 6Z"
+                          />
+                        </svg>
                         <Input
                           id="pwd-password"
                           type={showPassword ? "text" : "password"}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="Enter your account password"
-                          className="h-11 rounded-xl pr-10 text-sm"
+                          className="form-input !h-11 !pl-10 !pr-10 text-sm"
                           autoComplete="current-password"
                           required
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          className="password-toggle"
                           tabIndex={-1}
                           aria-label={showPassword ? "Hide password" : "Show password"}
                         >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          <svg fill="none" viewBox="0 0 24 24" className="eye-icon">
+                            <path
+                              strokeWidth="1.5"
+                              stroke="currentColor"
+                              d="M2 12C2 12 5 5 12 5C19 5 22 12 22 12C22 12 19 19 12 19C5 19 2 12 2 12Z"
+                            />
+                            <circle
+                              strokeWidth="1.5"
+                              stroke="currentColor"
+                              r="3"
+                              cy="12"
+                              cx="12"
+                            />
+                          </svg>
                         </button>
                       </div>
                       <p className="mt-1.5 text-[11px] text-muted-foreground">
@@ -618,35 +667,51 @@ export default function UserLogin() {
                       </p>
                     </div>
 
-                      <div className="flex items-center justify-between pt-1">
-                        <p className="text-[11px] text-muted-foreground">
-                          Testing locally?
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEmail("citizen@assamrescue.gov.in");
-                            setPassword("citizen");
-                            setErrorMessage("");
-                          }}
-                          className="font-mono text-[11px] font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
-                        >
-                          Fill Demo Citizen
-                        </button>
-                      </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <p className="text-[11px] text-muted-foreground">
+                        Testing locally?
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmail("citizen@assamrescue.gov.in");
+                          setPassword("citizen");
+                          setErrorMessage("");
+                        }}
+                        className="font-mono text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        Fill Demo Citizen
+                      </button>
+                    </div>
 
                     <div className="pt-2">
-                      <Button
+                      <button
                         type="submit"
                         disabled={isSubmitting || !email.trim() || !password.trim()}
-                        className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                        className="submit-button !h-12 w-full text-sm font-bold"
                       >
-                        <Lock className="mr-2 h-4 w-4" />
-                        {isSubmitting ? "Signing In…" : "Sign In with Password"}
-                      </Button>
+                        <span className="button-text flex items-center justify-center gap-2">
+                          <Lock className="h-4 w-4" />
+                          {isSubmitting ? "Signing In…" : "Sign In with Password"}
+                        </span>
+                        <div className="button-glow"></div>
+                      </button>
                     </div>
                   </form>
                 )}
+
+                <div className="form-footer mt-4">
+                  <button
+                    type="button"
+                    className="login-link text-xs"
+                    onClick={() => {
+                      setAuthMode("register");
+                      setErrorMessage("");
+                    }}
+                  >
+                    Don't have an account? <span>Register</span>
+                  </button>
+                </div>
               </div>
             ) : registrationSubmitted ? (
               /* REGISTRATION SUCCESS NOTICE */
@@ -659,7 +724,7 @@ export default function UserLogin() {
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                   <Button
                     onClick={() => setLocation("/")}
-                    className="flex-1 h-11 rounded-xl bg-[#0f766e] text-xs font-bold text-white hover:bg-[#0f766e]/90"
+                    className="flex-1 h-11 rounded-xl bg-blue-600 text-xs font-bold text-white hover:bg-blue-700"
                   >
                     Go to Home & SOS Hub
                   </Button>
@@ -677,86 +742,150 @@ export default function UserLogin() {
               </div>
             ) : (
               /* CITIZEN REGISTRATION FORM - SELF-SERVICE SIGNUP */
-              <form onSubmit={handleRegister} className="space-y-3.5">
-                <div>
-                  <Label htmlFor="reg-name" className="text-xs font-bold">Full Name</Label>
-                  <Input
-                    id="reg-name"
-                    type="text"
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="e.g. Rahul Sharma"
-                    className="mt-1 h-10 rounded-xl text-sm"
-                    autoComplete="name"
-                    required
-                  />
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div className="input-group">
+                  <Label htmlFor="reg-name" className="text-xs font-bold mb-1 block">Full Name</Label>
+                  <div className="input-wrapper">
+                    <svg fill="none" viewBox="0 0 24 24" className="input-icon">
+                      <circle
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                        r="4"
+                        cy="8"
+                        cx="12"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                        d="M5 20C5 17.2386 8.13401 15 12 15C15.866 15 19 17.2386 19 20"
+                      />
+                    </svg>
+                    <Input
+                      id="reg-name"
+                      type="text"
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
+                      className="form-input !h-11 !pl-10 text-sm"
+                      autoComplete="name"
+                      required
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="reg-email" className="text-xs font-bold">Email Address</Label>
-                  <Input
-                    id="reg-email"
-                    type="email"
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    className="mt-1 h-10 rounded-xl text-sm"
-                    autoComplete="email"
-                    required
-                  />
+                <div className="input-group">
+                  <Label htmlFor="reg-email" className="text-xs font-bold mb-1 block">Email Address</Label>
+                  <div className="input-wrapper">
+                    <svg fill="none" viewBox="0 0 24 24" className="input-icon">
+                      <path
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                        d="M3 8L10.8906 13.2604C11.5624 13.7083 12.4376 13.7083 13.1094 13.2604L21 8M5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V17C3 18.1046 3.89543 19 5 19Z"
+                      />
+                    </svg>
+                    <Input
+                      id="reg-email"
+                      type="email"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="form-input !h-11 !pl-10 text-sm"
+                      autoComplete="email"
+                      required
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="reg-pwd" className="text-xs font-bold">Create Password</Label>
-                  <div className="relative mt-1">
+                <div className="input-group">
+                  <Label htmlFor="reg-pwd" className="text-xs font-bold mb-1 block">Create Password</Label>
+                  <div className="input-wrapper">
+                    <svg fill="none" viewBox="0 0 24 24" className="input-icon">
+                      <path
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                        d="M12 10V14M8 6H16C17.1046 6 18 6.89543 18 8V16C18 17.1046 17.1046 18 16 18H8C6.89543 18 6 17.1046 6 16V8C6 6.89543 6.89543 6 8 6Z"
+                      />
+                    </svg>
                     <Input
                       id="reg-pwd"
                       type={showRegPassword ? "text" : "password"}
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
                       placeholder="Enter a secure password (min. 4 characters)"
-                      className="h-10 rounded-xl pr-10 text-sm"
+                      className="form-input !h-11 !pl-10 !pr-10 text-sm"
                       autoComplete="new-password"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowRegPassword(!showRegPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="password-toggle"
                       tabIndex={-1}
                       aria-label={showRegPassword ? "Hide password" : "Show password"}
                     >
-                      {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      <svg fill="none" viewBox="0 0 24 24" className="eye-icon">
+                        <path
+                          strokeWidth="1.5"
+                          stroke="currentColor"
+                          d="M2 12C2 12 5 5 12 5C19 5 22 12 22 12C22 12 19 19 12 19C5 19 2 12 2 12Z"
+                        />
+                        <circle
+                          strokeWidth="1.5"
+                          stroke="currentColor"
+                          r="3"
+                          cy="12"
+                          cx="12"
+                        />
+                      </svg>
                     </button>
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="reg-phone" className="text-xs font-bold">Phone Number (Optional)</Label>
-                  <Input
-                    id="reg-phone"
-                    type="tel"
-                    value={regPhone}
-                    onChange={(e) => setRegPhone(e.target.value)}
-                    placeholder="+91 98640 XXXXX"
-                    className="mt-1 h-10 rounded-xl text-sm"
-                    autoComplete="tel"
-                  />
+                <div className="input-group">
+                  <Label htmlFor="reg-phone" className="text-xs font-bold mb-1 block">Phone Number (Optional)</Label>
+                  <div className="input-wrapper">
+                    <Input
+                      id="reg-phone"
+                      type="tel"
+                      value={regPhone}
+                      onChange={(e) => setRegPhone(e.target.value)}
+                      placeholder="+91 98640 XXXXX"
+                      className="form-input !h-11 text-sm"
+                      autoComplete="tel"
+                    />
+                  </div>
                 </div>
 
-                <p className="rounded-xl bg-[#f0faf6] p-3 text-[11px] font-semibold leading-relaxed text-[#285f55] dark:bg-emerald-950/30 dark:text-emerald-300">
+                <p className="rounded-xl bg-blue-50/70 p-3 text-[11px] font-semibold leading-relaxed text-blue-900 dark:bg-blue-950/30 dark:text-blue-300">
                   🛡️ Instant self-service registration. Set your own password to access citizen disaster alerts and SOS features.
                 </p>
 
                 <div className="pt-2">
-                  <Button
+                  <button
                     type="submit"
                     disabled={isSubmitting || !regName.trim() || !regEmail.trim() || !regPassword.trim()}
-                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                    className="submit-button !h-12 w-full text-sm font-bold"
                   >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    {isSubmitting ? "Creating Account…" : "Create Citizen Account"}
-                  </Button>
+                    <span className="button-text flex items-center justify-center gap-2">
+                      <UserPlus className="h-4 w-4" />
+                      {isSubmitting ? "Creating Account…" : "Create Citizen Account"}
+                    </span>
+                    <div className="button-glow"></div>
+                  </button>
+                </div>
+
+                <div className="form-footer mt-4">
+                  <button
+                    type="button"
+                    className="login-link text-xs"
+                    onClick={() => {
+                      setAuthMode("signin");
+                      setErrorMessage("");
+                    }}
+                  >
+                    Already have an account? <span>Login</span>
+                  </button>
                 </div>
               </form>
             )}

@@ -1,4 +1,9 @@
+/*
+From Uiverse.io by kyle1dev - https://uiverse.io/kyle1dev/honest-snail-17
+MIT License, Copyright (c) kyle1dev (Kyle)
+*/
 import { useAuth } from "@/_core/hooks/useAuth";
+import "@/components/ModernAuthForm.css";
 import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +60,7 @@ export default function AdminLogin() {
 
   return (
     <DesktopOnlyGate portalName="State Command Centre" portalType="admin">
-      <div className="min-h-screen bg-[#F8F1E4] text-[#111C44] transition-colors dark:bg-[#111C44] dark:text-[#F8F1E4]">
+      <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] transition-colors dark:bg-[#0F172A] dark:text-[#F8FAFC]">
       {/* Top Header */}
       <header className="sticky top-0 z-30 border-b border-black/5 bg-white/85 px-4 py-3 backdrop-blur-md dark:border-white/10 dark:bg-[#111214]/85">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
@@ -140,11 +145,11 @@ export default function AdminLogin() {
           </div>
         )}
 
-        {/* Admin Login Card */}
-        <div className="mt-6 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#141517]">
-          <div className="border-b border-black/5 bg-[#fafcfb] p-4 dark:border-white/5 dark:bg-[#18191c]">
+        {/* Admin Login Card - Modern Form */}
+        <div className="modern-form mt-6 !max-w-xl !p-6 sm:!p-8 shadow-xl">
+          <div className="border-b border-black/5 bg-[#fafcfb] p-4 rounded-2xl mb-5 dark:border-white/5 dark:bg-[#18191c]">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#0f766e]/10 text-[#0f766e] dark:text-emerald-400">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <Lock className="h-4 w-4" />
               </span>
               <div>
@@ -158,7 +163,7 @@ export default function AdminLogin() {
             </div>
           </div>
 
-          <div className="p-6">
+          <div>
             {errorMessage && (
               <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-semibold text-destructive">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -167,28 +172,32 @@ export default function AdminLogin() {
             )}
 
             <form onSubmit={handleAdminSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="admin-email" className="text-xs font-bold">Email or Username</Label>
-                <Input
-                  id="admin-email"
-                  type="text"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1.5 h-11 rounded-xl"
-                  required
-                />
+              <div className="input-group">
+                <Label htmlFor="admin-email" className="text-xs font-bold mb-1 block">Email or Username</Label>
+                <div className="input-wrapper">
+                  <Input
+                    id="admin-email"
+                    type="text"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="form-input !h-11 text-sm"
+                    required
+                  />
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="admin-password" className="text-xs font-bold">Password</Label>
-                <Input
-                  id="admin-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1.5 h-11 rounded-xl"
-                  required
-                />
+              <div className="input-group">
+                <Label htmlFor="admin-password" className="text-xs font-bold mb-1 block">Password</Label>
+                <div className="input-wrapper">
+                  <Input
+                    id="admin-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="form-input !h-11 text-sm"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-between pt-1">
@@ -202,26 +211,27 @@ export default function AdminLogin() {
                     setPassword("admin");
                     setErrorMessage("");
                   }}
-                  className="font-mono text-[11px] font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
+                  className="font-mono text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400"
                 >
                   Fill Demo Admin
                 </button>
               </div>
 
               <div className="pt-2">
-                <Button
+                <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="h-12 w-full rounded-xl bg-[#0f766e] font-bold text-white shadow-md hover:bg-[#0f766e]/90"
+                  className="submit-button !h-12 w-full text-sm font-bold"
                 >
-                  <ShieldCheck className="mr-2 h-4 w-4" />
-                  {isSubmitting ? "Verifying Authorization…" : "Sign In to Command"}
-                </Button>
+                  <span className="button-text flex items-center justify-center gap-2">
+                    <ShieldCheck className="h-4 w-4" />
+                    {isSubmitting ? "Verifying Authorization…" : "Sign In to Command"}
+                  </span>
+                  <div className="button-glow"></div>
+                </button>
               </div>
             </form>
           </div>
-
-          {/* Quick Prefill Bar */}
         </div>
 
         {/* User Portal Link */}
