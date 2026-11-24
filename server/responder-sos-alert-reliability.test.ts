@@ -312,7 +312,7 @@ describe("Test 14 \u2014 Multiple rescuer candidates receive independent offers"
 
 describe("Frontend contract \u2014 activeOffer polling interval (1s)", () => {
   const responderSrc = readFileSync(
-    new URL("../client/src/pages/Responder.tsx", import.meta.url),
+    new URL("../client/src/pages/user/UserResponder.tsx", import.meta.url),
     "utf8"
   );
   const userResponderSrc = readFileSync(
@@ -347,7 +347,7 @@ describe("Frontend contract \u2014 activeOffer polling interval (1s)", () => {
 
 describe("Frontend contract \u2014 notification deduplication", () => {
   const responderSrc = readFileSync(
-    new URL("../client/src/pages/Responder.tsx", import.meta.url),
+    new URL("../client/src/pages/user/UserResponder.tsx", import.meta.url),
     "utf8"
   );
   const userResponderSrc = readFileSync(
@@ -384,7 +384,7 @@ describe("Frontend contract \u2014 notification deduplication", () => {
 
 describe("Frontend contract \u2014 30s messaging (not 15s)", () => {
   const responderSrc = readFileSync(
-    new URL("../client/src/pages/Responder.tsx", import.meta.url),
+    new URL("../client/src/pages/user/UserResponder.tsx", import.meta.url),
     "utf8"
   );
   const userResponderSrc = readFileSync(
@@ -478,7 +478,7 @@ describe("Backend contract \u2014 push.ts cleans stale subscriptions", () => {
 
 describe("Test 12 \u2014 Navigation: emergency overlay is above all page sections", () => {
   const responderSrc = readFileSync(
-    new URL("../client/src/pages/Responder.tsx", import.meta.url),
+    new URL("../client/src/pages/user/UserResponder.tsx", import.meta.url),
     "utf8"
   );
   const userResponderSrc = readFileSync(
@@ -507,7 +507,7 @@ describe("Test 12 \u2014 Navigation: emergency overlay is above all page section
 
 describe("Test 9 \u2014 Visual popup works even if notification permission denied", () => {
   const responderSrc = readFileSync(
-    new URL("../client/src/pages/Responder.tsx", import.meta.url),
+    new URL("../client/src/pages/user/UserResponder.tsx", import.meta.url),
     "utf8"
   );
 
