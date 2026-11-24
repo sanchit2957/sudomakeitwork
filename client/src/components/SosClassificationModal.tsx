@@ -269,37 +269,40 @@ export function SosClassificationModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="triage-modal-heading"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0F172A]/70 p-3 sm:p-4 backdrop-blur-xl animate-in fade-in duration-200"
     >
-      <div className="relative flex w-full max-w-md max-h-[92vh] flex-col overflow-hidden rounded-[2.2rem] border border-[#b8ded4] bg-white text-[#122824] shadow-[0_24px_60px_rgba(23,78,70,0.22)] ring-1 ring-black/[0.04] dark:border-white/10 dark:bg-[#15171a] dark:text-[#f3f4f6]">
+      <div className="relative flex w-full max-w-lg max-h-[92vh] flex-col overflow-hidden rounded-[2.5rem] border border-white/80 dark:border-white/15 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-2xl text-[#0F172A] shadow-[0_24px_70px_rgba(17,28,68,0.35)] ring-1 ring-black/[0.04] dark:text-[#F8FAFC] dark:shadow-black/80">
         
         {/* Top Header Bar */}
-        <div className="border-b border-[#e5f1ec] bg-[#f8fbf9] px-6 py-4 dark:border-white/10 dark:bg-[#191b1f]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 rounded-full bg-[#fff0ee] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#d23f43] ring-1 ring-[#f3c4c1] dark:bg-rose-950/60 dark:text-rose-300 dark:ring-rose-500/40">
-              <ShieldAlert className="h-4 w-4 animate-pulse text-[#d23f43] dark:text-rose-400" />
+        <div className="border-b border-[#E2E8F0]/25 bg-white/60 px-5 sm:px-6 py-4 dark:border-white/10 dark:bg-white/5">
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 rounded-full bg-red-500/15 px-3 py-1 text-xs font-black uppercase tracking-wider text-red-600 ring-1 ring-red-500/30 dark:bg-red-500/25 dark:text-red-400">
+              <ShieldAlert className="h-4 w-4 animate-pulse text-red-600 dark:text-red-400" />
               <span>{currentStep === "categories" ? t("SOS ACTIVATED") : t("SOS IS ACTIVE")}</span>
             </div>
-            <span className="rounded-lg bg-[#e7f6ef] px-2.5 py-1 font-mono text-xs font-extrabold text-[#174e46] dark:bg-emerald-950/50 dark:text-emerald-400">
-              {publicCode}
-            </span>
+            
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg bg-[#F1F5F9]/70 px-2.5 py-1 font-mono text-xs font-black text-[#1D4ED8] dark:bg-[#1D4ED8]/25 dark:text-[#F1F5F9]">
+                {publicCode}
+              </span>
+            </div>
           </div>
 
           {/* Countdown timer is ONLY visible on Step 1 (Cancellation / Initial Triage Window), NEVER on Details screen */}
           {currentStep === "categories" && (
             <div className="mt-3.5">
-              <div className="flex items-center justify-between text-xs font-bold text-[#58746c] dark:text-zinc-400">
+              <div className="flex items-center justify-between text-xs font-bold text-[#0F172A]/75 dark:text-[#F1F5F9]/75">
                 <span className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-[#174e46] dark:text-emerald-400" />
+                  <Clock className="h-3.5 w-3.5 text-[#1D4ED8] dark:text-[#F1F5F9]" />
                   <span>{t("Automatic emergency dispatch if not cancelled")}</span>
                 </span>
-                <span className="font-mono text-sm font-black text-[#d23f43] dark:text-rose-400">
+                <span className="font-mono text-sm font-black text-red-600 dark:text-red-400">
                   {`00:${String(Math.max(0, timeLeft)).padStart(2, "0")}`}
                 </span>
               </div>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e3efe9] dark:bg-zinc-800">
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E2E8F0]/25 dark:bg-white/10">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#d23f43] via-amber-500 to-[#174e46] transition-all duration-200 ease-linear dark:from-rose-500 dark:via-amber-500 dark:to-emerald-500"
+                  className="h-full rounded-full bg-gradient-to-r from-red-500 via-amber-500 to-[#1D4ED8] transition-all duration-200 ease-linear"
                   style={{ width: `${Math.min(100, Math.max(0, (timeLeft / 15) * 100))}%` }}
                 />
               </div>
@@ -315,11 +318,11 @@ export function SosClassificationModal({
               <div className="text-center">
                 <h2
                   id="triage-modal-heading"
-                  className="text-xl font-black tracking-tight text-[#173d37] dark:text-white sm:text-2xl"
+                  className="text-xl font-black tracking-tight text-[#0F172A] dark:text-[#F8FAFC] sm:text-2xl"
                 >
                   {t("Tell us what's happening")}
                 </h2>
-                <p className="mt-1 text-xs font-semibold text-[#58746c] dark:text-zinc-400">
+                <p className="mt-1 text-xs font-semibold text-[#334155] dark:text-[#CBD5E1]">
                   {t("Tell us what kind of help you need. You can add details after choosing a category.")}
                 </p>
               </div>
@@ -333,23 +336,23 @@ export function SosClassificationModal({
                   onClick={() => handleCategorySelect("medical")}
                   className={`group relative flex items-center gap-4 rounded-2xl border p-4 text-left transition-all duration-200 active:scale-[0.98] ${
                     selectedCategory === "medical"
-                      ? "border-[#d23f43] bg-[#fff5f4] ring-2 ring-[#d23f43]/40 dark:border-rose-500 dark:bg-rose-950/40"
-                      : "border-[#d6ebe3] bg-[#fbfdfc] hover:border-[#174e46]/40 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-[#1a1c20] dark:hover:border-emerald-500/40"
+                      ? "border-red-500 bg-red-500/10 ring-2 ring-red-500/40 dark:border-red-500 dark:bg-red-500/20"
+                      : "border-[#E2E8F0]/40 bg-white/90 hover:border-red-500/40 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-[#1E293B]/70 dark:hover:border-red-400/40"
                   }`}
                 >
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#fff0ee] text-[#d23f43] transition-transform group-hover:scale-105 dark:bg-rose-900/30 dark:text-rose-400">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-red-500/15 text-red-600 transition-transform group-hover:scale-105 dark:bg-red-500/25 dark:text-red-400">
                     <HeartPulse className="h-7 w-7" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-base font-extrabold text-[#173d37] dark:text-white">
+                      <span className="text-base font-black text-[#0F172A] dark:text-[#F8FAFC]">
                         {t("Medical Help")}
                       </span>
                       {selectedCategory === "medical" && (
-                        <CheckCircle2 className="h-5 w-5 text-[#d23f43] animate-in zoom-in-50 dark:text-rose-400" />
+                        <CheckCircle2 className="h-5 w-5 text-red-600 animate-in zoom-in-50 dark:text-red-400" />
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-[#5f776f] dark:text-zinc-400">
+                    <p className="mt-0.5 text-xs font-medium text-[#334155] dark:text-[#CBD5E1]">
                       {t("Injured, sick, ambulance, or urgent doctor required")}
                     </p>
                   </div>
@@ -362,23 +365,23 @@ export function SosClassificationModal({
                   onClick={() => handleCategorySelect("rescue")}
                   className={`group relative flex items-center gap-4 rounded-2xl border p-4 text-left transition-all duration-200 active:scale-[0.98] ${
                     selectedCategory === "rescue"
-                      ? "border-[#174e46] bg-[#eef7f4] ring-2 ring-[#174e46]/40 dark:border-emerald-400 dark:bg-emerald-950/40"
-                      : "border-[#d6ebe3] bg-[#fbfdfc] hover:border-[#174e46]/40 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-[#1a1c20] dark:hover:border-emerald-500/40"
+                      ? "border-[#1D4ED8] bg-[#1D4ED8]/10 ring-2 ring-[#1D4ED8]/40 dark:border-[#1D4ED8] dark:bg-[#1D4ED8]/20"
+                      : "border-[#E2E8F0]/40 bg-white/90 hover:border-[#1D4ED8]/40 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-[#1E293B]/70 dark:hover:border-[#1D4ED8]/40"
                   }`}
                 >
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#e6f6f0] text-[#174e46] transition-transform group-hover:scale-105 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#1D4ED8]/15 text-[#1D4ED8] transition-transform group-hover:scale-105 dark:bg-[#1D4ED8]/25 dark:text-[#F1F5F9]">
                     <LifeBuoy className="h-7 w-7" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-base font-extrabold text-[#173d37] dark:text-white">
+                      <span className="text-base font-black text-[#0F172A] dark:text-[#F8FAFC]">
                         {t("Rescue / Trapped")}
                       </span>
                       {selectedCategory === "rescue" && (
-                        <CheckCircle2 className="h-5 w-5 text-[#174e46] animate-in zoom-in-50 dark:text-emerald-400" />
+                        <CheckCircle2 className="h-5 w-5 text-[#1D4ED8] animate-in zoom-in-50 dark:text-[#F1F5F9]" />
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-[#5f776f] dark:text-zinc-400">
+                    <p className="mt-0.5 text-xs font-medium text-[#334155] dark:text-[#CBD5E1]">
                       {t("Trapped by floodwaters, roof rescue, boat or evacuation needed")}
                     </p>
                   </div>
@@ -391,23 +394,23 @@ export function SosClassificationModal({
                   onClick={() => handleCategorySelect("emergency")}
                   className={`group relative flex items-center gap-4 rounded-2xl border p-4 text-left transition-all duration-200 active:scale-[0.98] ${
                     selectedCategory === "emergency"
-                      ? "border-amber-500 bg-[#fff9eb] ring-2 ring-amber-500/40 dark:border-amber-400 dark:bg-amber-950/40"
-                      : "border-[#d6ebe3] bg-[#fbfdfc] hover:border-amber-500/40 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-[#1a1c20] dark:hover:border-amber-500/40"
+                      ? "border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/40 dark:border-amber-400 dark:bg-amber-950/40"
+                      : "border-[#E2E8F0]/40 bg-white/90 hover:border-amber-500/40 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-[#1E293B]/70 dark:hover:border-amber-500/40"
                   }`}
                 >
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#fef3c7] text-amber-600 transition-transform group-hover:scale-105 dark:bg-amber-900/30 dark:text-amber-400">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-amber-600 transition-transform group-hover:scale-105 dark:bg-amber-900/30 dark:text-amber-400">
                     <AlertTriangle className="h-7 w-7" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-base font-extrabold text-[#173d37] dark:text-white">
+                      <span className="text-base font-black text-[#0F172A] dark:text-[#F8FAFC]">
                         {t("Emergency / Immediate Danger")}
                       </span>
                       {selectedCategory === "emergency" && (
                         <CheckCircle2 className="h-5 w-5 text-amber-600 animate-in zoom-in-50 dark:text-amber-400" />
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-[#5f776f] dark:text-zinc-400">
+                    <p className="mt-0.5 text-xs font-medium text-[#334155] dark:text-[#CBD5E1]">
                       {t("Immediate life threat, high danger, all-hazard assistance")}
                     </p>
                   </div>
@@ -420,23 +423,23 @@ export function SosClassificationModal({
                   onClick={() => handleCategorySelect("other")}
                   className={`group relative flex items-center gap-4 rounded-2xl border p-4 text-left transition-all duration-200 active:scale-[0.98] ${
                     selectedCategory === "other"
-                      ? "border-slate-500 bg-slate-50 ring-2 ring-slate-500/40 dark:border-zinc-400 dark:bg-zinc-800/50"
-                      : "border-[#d6ebe3] bg-[#fbfdfc] hover:border-slate-400 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-[#1a1c20] dark:hover:border-zinc-500/40"
+                      ? "border-[#1D4ED8] bg-[#1D4ED8]/10 ring-2 ring-[#1D4ED8]/40 dark:border-[#F1F5F9] dark:bg-white/10"
+                      : "border-[#E2E8F0]/40 bg-white/90 hover:border-[#1D4ED8]/40 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-[#1E293B]/70 dark:hover:border-white/20"
                   }`}
                 >
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 transition-transform group-hover:scale-105 dark:bg-zinc-800 dark:text-zinc-300">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#F1F5F9]/50 text-[#1D4ED8] transition-transform group-hover:scale-105 dark:bg-white/10 dark:text-[#F1F5F9]">
                     <HelpCircle className="h-7 w-7" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-base font-extrabold text-[#173d37] dark:text-white">
+                      <span className="text-base font-black text-[#0F172A] dark:text-[#F8FAFC]">
                         {t("Other / Not Listed")}
                       </span>
                       {selectedCategory === "other" && (
-                        <CheckCircle2 className="h-5 w-5 text-slate-600 animate-in zoom-in-50 dark:text-zinc-300" />
+                        <CheckCircle2 className="h-5 w-5 text-[#1D4ED8] animate-in zoom-in-50 dark:text-[#F1F5F9]" />
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-[#5f776f] dark:text-zinc-400">
+                    <p className="mt-0.5 text-xs font-medium text-[#334155] dark:text-[#CBD5E1]">
                       {t("Your situation doesn't match the options above")}
                     </p>
                   </div>
@@ -455,32 +458,17 @@ export function SosClassificationModal({
                   </div>
                 </div>
               )}
-
-              {/* Clear CANCEL SOS Button */}
-              <div className="pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  data-testid="cancel-sos-btn"
-                  disabled={isCancelling}
-                  onClick={handleCancelSos}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-rose-200 bg-rose-50/70 py-3 text-xs font-extrabold text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-900/50"
-                >
-                  <XCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                  <span>{isCancelling ? t("Cancelling SOS…") : t("CANCEL SOS (Accidental)")}</span>
-                </Button>
-              </div>
             </div>
           ) : (
             /* ================= STEP 2: NON-BLOCKING DETAILS SCREEN (NO TIMER!) ================= */
             <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
-              {/* Emergency Status Banner (Clear indication that SOS is active, NO timer countdown) */}
-              <div className="rounded-2xl border border-emerald-500/30 bg-[#eef7f4] p-4 text-xs dark:bg-emerald-950/40">
-                <div className="flex items-center gap-2 font-black text-[#174e46] dark:text-emerald-300">
-                  <Radio className="h-4 w-4 animate-pulse text-emerald-600 dark:text-emerald-400" />
+              {/* Emergency Status Banner */}
+              <div className="rounded-2xl border border-[#1D4ED8]/30 bg-[#1D4ED8]/10 p-4 text-xs dark:bg-[#1D4ED8]/20">
+                <div className="flex items-center gap-2 font-black text-[#1D4ED8] dark:text-[#F1F5F9]">
+                  <Radio className="h-4 w-4 animate-pulse text-[#1D4ED8] dark:text-[#F1F5F9]" />
                   <span>{t("Your SOS is active")}</span>
                 </div>
-                <p className="mt-1 text-[11px] leading-4 text-[#437267] dark:text-zinc-400">
+                <p className="mt-1 text-[11px] leading-4 text-[#0F172A]/75 dark:text-[#F1F5F9]/80">
                   {t("We're finding the right responder now. Add details to help responders prepare. This is optional.")}
                 </p>
               </div>
@@ -493,22 +481,22 @@ export function SosClassificationModal({
                     setCurrentStep("categories");
                     currentStepRef.current = "categories";
                   }}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#174e46] hover:underline dark:text-emerald-300"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1D4ED8] hover:underline dark:text-[#F1F5F9]"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   <span>{t("Back to categories")}</span>
                 </button>
                 <h2
                   id="triage-modal-heading"
-                  className="mt-2 text-xl font-black tracking-tight text-[#173d37] dark:text-white sm:text-2xl"
+                  className="mt-2 text-xl font-black tracking-tight text-[#0F172A] dark:text-[#F8FAFC] sm:text-2xl"
                 >
                   {getContextualDetailsHeading()}
                 </h2>
               </div>
 
               {/* A. People Needing Help Counter */}
-              <div className="rounded-2xl border border-[#b8ded4] bg-[#f8fcfa] p-4 dark:border-white/10 dark:bg-[#16181b]">
-                <p className="text-xs font-bold uppercase tracking-wider text-[#58746c] dark:text-zinc-400">
+              <div className="rounded-2xl border border-[#E2E8F0]/40 bg-white/90 p-4 dark:border-white/10 dark:bg-[#1E293B]/70 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#1E293B] dark:text-[#E2E8F0]">
                   {t("People needing help")}
                 </p>
                 <div className="mt-2.5 flex items-center gap-3">
@@ -516,18 +504,18 @@ export function SosClassificationModal({
                     type="button"
                     variant="outline"
                     onClick={() => setPeopleAffected(v => Math.max(1, v - 1))}
-                    className="h-9 w-9 rounded-xl text-base font-black p-0"
+                    className="h-9 w-9 rounded-xl text-base font-black p-0 border-[#E2E8F0] dark:border-white/10"
                   >
                     −
                   </Button>
-                  <output className="grid h-9 min-w-12 place-items-center rounded-xl bg-white text-lg font-black text-[#174e46] shadow-sm ring-1 ring-black/[0.04] dark:bg-[#202328] dark:text-emerald-400">
+                  <output className="grid h-9 min-w-12 place-items-center rounded-xl bg-white text-lg font-black text-[#1D4ED8] shadow-sm ring-1 ring-black/[0.04] dark:bg-[#0F172A] dark:text-[#F1F5F9]">
                     {peopleAffected}
                   </output>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setPeopleAffected(v => Math.min(500, v + 1))}
-                    className="h-9 w-9 rounded-xl text-base font-black p-0"
+                    className="h-9 w-9 rounded-xl text-base font-black p-0 border-[#E2E8F0] dark:border-white/10"
                   >
                     +
                   </Button>
@@ -535,8 +523,8 @@ export function SosClassificationModal({
               </div>
 
               {/* B. Special Help Needed Quick Selection Tags */}
-              <div className="rounded-2xl border border-[#b8ded4] bg-[#f8fcfa] p-4 dark:border-white/10 dark:bg-[#16181b]">
-                <p className="text-xs font-bold uppercase tracking-wider text-[#58746c] dark:text-zinc-400">
+              <div className="rounded-2xl border border-[#E2E8F0]/40 bg-white/90 p-4 dark:border-white/10 dark:bg-[#1E293B]/70 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#1E293B] dark:text-[#E2E8F0]">
                   {t("Special help needed")}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -547,10 +535,10 @@ export function SosClassificationModal({
                         key={tag}
                         type="button"
                         onClick={() => handleToggleTag(tag)}
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                        className={`rounded-full px-3 py-1 text-[11px] font-bold transition ${
                           isSelected
-                            ? "bg-[#174e46] text-white dark:bg-emerald-600"
-                            : "bg-white text-[#2a5b51] ring-1 ring-[#c5e4db] hover:bg-[#eef7f4] dark:bg-[#202328] dark:text-zinc-300 dark:ring-white/10"
+                            ? "bg-[#1D4ED8] text-white shadow-xs"
+                            : "bg-white text-[#0F172A] ring-1 ring-[#E2E8F0] hover:bg-[#F1F5F9]/60 dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:ring-white/15"
                         }`}
                       >
                         {tag}
@@ -563,13 +551,13 @@ export function SosClassificationModal({
                   onChange={e => setHelpNeeds(e.target.value)}
                   maxLength={1000}
                   placeholder={t("E.g., boat needed, elderly person, urgent medicine, child")}
-                  className="mt-2.5 min-h-[55px] bg-white text-xs dark:bg-[#202328]"
+                  className="mt-2.5 min-h-[55px] bg-white text-[#0F172A] border-[#E2E8F0] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:border-white/15 text-xs rounded-xl"
                 />
               </div>
 
               {/* C. Additional Notes */}
-              <div className="rounded-2xl border border-[#b8ded4] bg-[#f8fcfa] p-4 dark:border-white/10 dark:bg-[#16181b]">
-                <p className="text-xs font-bold uppercase tracking-wider text-[#58746c] dark:text-zinc-400">
+              <div className="rounded-2xl border border-[#E2E8F0]/40 bg-white/90 p-4 dark:border-white/10 dark:bg-[#1E293B]/70 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#1E293B] dark:text-[#E2E8F0]">
                   {t("Additional notes for responders")}
                 </p>
                 <Textarea
@@ -577,7 +565,7 @@ export function SosClassificationModal({
                   onChange={e => setNotes(e.target.value)}
                   maxLength={2000}
                   placeholder={t("Optional landmarks, floor level, or extra directions")}
-                  className="mt-2 min-h-[60px] bg-white text-xs dark:bg-[#202328]"
+                  className="mt-2 min-h-[60px] bg-white text-[#0F172A] border-[#E2E8F0] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:border-white/15 text-xs rounded-xl"
                 />
               </div>
 
@@ -601,7 +589,7 @@ export function SosClassificationModal({
                   type="button"
                   data-testid="continue-to-tracking-btn"
                   onClick={handleContinueToTracking}
-                  className="h-11 rounded-xl bg-[#174e46] text-xs font-extrabold text-white shadow-md hover:bg-[#123e37] dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                  className="h-11 rounded-xl bg-[#1D4ED8] text-xs font-black text-white shadow-md shadow-[#1D4ED8]/25 hover:bg-[#1d47db]"
                 >
                   <span>{t("Continue to Tracking")}</span>
                   <ArrowRight className="ml-1.5 h-4 w-4" />
@@ -611,11 +599,28 @@ export function SosClassificationModal({
           )}
         </div>
 
-        {/* Bottom Feedback Banner (Only on Step 1 when auto-timed out) */}
+        {/* Pinned Sticky Bottom Cancel Bar (The ONLY Cancel Button - 1 single prominent button) */}
+        {currentStep === "categories" && !isExpired && (
+          <div className="border-t border-[#E2E8F0]/30 bg-white/95 px-6 py-4 dark:border-white/10 dark:bg-[#0F172A]/95 backdrop-blur-md">
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="cancel-sos-btn"
+              disabled={isCancelling}
+              onClick={handleCancelSos}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border-red-400 bg-red-50/90 py-3.5 text-xs font-black text-red-700 shadow-sm transition hover:bg-red-100 hover:text-red-800 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/60 cursor-pointer"
+            >
+              <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+              <span>{isCancelling ? t("Cancelling SOS…") : t("Cancel SOS (Accidental / False Alarm)")}</span>
+            </Button>
+          </div>
+        )}
+
+        {/* Bottom Feedback Banner */}
         {currentStep === "categories" && isExpired && !selectedCategory && (
           <div
             role="status"
-            className="border-t border-[#f4d58d] bg-[#fff9eb] p-3 text-center text-xs font-bold text-[#8a5b12] animate-in fade-in dark:border-amber-500/30 dark:bg-amber-950/60 dark:text-amber-300"
+            className="border-t border-amber-500/30 bg-amber-500/10 p-3 text-center text-xs font-bold text-amber-700 animate-in fade-in dark:text-amber-300"
           >
             <Clock className="mr-1.5 inline h-4 w-4 text-amber-600 dark:text-amber-400" />
             {t("Time expired — Emergency response has been activated automatically.")}
