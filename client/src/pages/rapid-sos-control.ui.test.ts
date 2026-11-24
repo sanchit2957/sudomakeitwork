@@ -1,8 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { createAndRedirectAfterRapidSos, redirectAfterRapidSos, rapidSosTrackingPath } from "@/lib/rapidSos";
-import { RapidSosControl } from "./Home";
+import { createAndRedirectAfterRapidSos, redirectAfterRapidSos, rapidSosTrackingPath } from "../lib/rapidSos";
+import { RapidSosControl } from "./user/UserHome";
 
 vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: () => ({ t: (key: string) => key }) }));
 

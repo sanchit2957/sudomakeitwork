@@ -1,8 +1,8 @@
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { ResponderProfileCard } from "./Responder";
-import { AssignedRescuerCard } from "./Track";
+import { ResponderProfileCard } from "./user/UserResponder";
+import { AssignedRescuerCard } from "../components/TrackIncidentComponents";
 
 vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: () => ({ t: (key: string) => key }) }));
 
