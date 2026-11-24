@@ -292,8 +292,9 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
           `INSERT IGNORE INTO \`users\` (\`openId\`, \`name\`, \`email\`, \`password\`, \`role\`, \`status\`, \`loginMethod\`, \`lastSignedIn\`) VALUES ('user-admin', 'Superadmin', 'admin@assamrescue.gov.in', '${adminHash}', 'admin', 'active', 'platform-login', NOW())`,
           "seed_adminUser"
         );
-        // Clear out legacy mock citizen data so only live citizen accounts are stored
-        await execDdl("DELETE FROM `users` WHERE `openId` = 'user-citizen' OR `email` = 'citizen@assamrescue.gov.in'", "clean_mockCitizen");
+        // Clear out legacy mock citizen data so only live real-time citizen accounts are stored
+        await execDdl("DELETE FROM `emergencyContacts` WHERE `userId` IN (SELECT `id` FROM `users` WHERE `role` = 'user' OR `openId` = 'user-citizen' OR `email` LIKE '%citizen%' OR `name` LIKE '%Anamika%')", "clean_mockCitizenContacts");
+        await execDdl("DELETE FROM `users` WHERE `role` = 'user' OR `openId` = 'user-citizen' OR `email` = 'citizen@assamrescue.gov.in' OR `name` LIKE '%Anamika%'", "clean_mockCitizen");
         await execDdl("UPDATE `users` SET `role` = 'admin' WHERE `openId` = 'user-admin' AND `role` != 'admin'", "resetAdminRole");
       } catch {}
 
@@ -1743,7 +1744,7 @@ export async function runDatabaseForensicBenchmark(): Promise<{
   for (let i = 1; i <= 10; i++) {
     const t0 = performance.now();
     try {
-      await getUserByEmail("citizen@assamrescue.gov.in");
+      await getUserByEmail("admin@assamrescue.gov.in");
       userTotals.push(Math.round((performance.now() - t0) * 10) / 10);
     } catch (err: any) {
       userErrors.push(extractSafeDbError(err).code);

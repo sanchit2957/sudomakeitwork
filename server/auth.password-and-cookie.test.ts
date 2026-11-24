@@ -93,10 +93,18 @@ describe("User Sanitization & Authentication Security", () => {
   it("does not return password field on auth.login", async () => {
     const { ctx } = createTestContext();
     const caller = appRouter.createCaller(ctx);
+    const testEmail = `live_citizen_${Date.now()}@example.com`;
+
+    await caller.auth.register({
+      name: "Live Citizen",
+      email: testEmail,
+      password: "securePassword123!",
+      role: "user",
+    });
 
     const loginRes = await caller.auth.login({
-      email: "citizen@assamrescue.gov.in",
-      password: "citizen",
+      email: testEmail,
+      password: "securePassword123!",
     });
 
     expect(loginRes.success).toBe(true);
@@ -107,10 +115,18 @@ describe("User Sanitization & Authentication Security", () => {
   it("rejects login with invalid password", async () => {
     const { ctx } = createTestContext();
     const caller = appRouter.createCaller(ctx);
+    const testEmail = `live_invalid_pass_${Date.now()}@example.com`;
+
+    await caller.auth.register({
+      name: "Live Citizen Pass Check",
+      email: testEmail,
+      password: "correctPassword123!",
+      role: "user",
+    });
 
     await expect(
       caller.auth.login({
-        email: "citizen@assamrescue.gov.in",
+        email: testEmail,
         password: "wrongPassword",
       })
     ).rejects.toMatchObject({
