@@ -32,6 +32,7 @@ export type SosRecord = {
 };
 
 export type SosPayload = {
+  bleBeaconId?: string;
   contactName?: string;
   locationLabel: string;
   latitude: number;

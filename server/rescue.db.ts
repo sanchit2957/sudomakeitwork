@@ -121,6 +121,7 @@ export interface MemoryIncident {
   voiceNoteUrl: string | null;
   voiceNoteDurationSeconds: number | null;
   status: "pending" | "dispatched" | "resolved";
+  bleBeaconId: string | null;
   dispatchStatus: "triage_pending" | "matching" | "offered" | "assigned" | "escalated" | "resolved";
   triageStartedAt: Date | null;
   triageDeadlineAt: Date | null;
@@ -434,6 +435,7 @@ export const _memoryIncidents: Map<number, MemoryIncident> = new Map([
       voiceNoteUrl: null,
       voiceNoteDurationSeconds: null,
       status: "pending",
+      bleBeaconId: null,
       dispatchStatus: "triage_pending",
       triageStartedAt: new Date(Date.now() - 45 * 60 * 1000),
       triageDeadlineAt: new Date(Date.now() - 45 * 60 * 1000 + 10_000),
@@ -648,6 +650,23 @@ export async function getIncidentByCode(publicCode: string) {
     failClosedInProduction(error);
   }
   return Array.from(_memoryIncidents.values()).find(i => i.publicCode === publicCode) || null;
+}
+
+export async function getIncidentByBleBeaconId(bleBeaconId: string) {
+  try {
+    const db = await database();
+    const row = (
+      await withDbTimeout(
+        db.select().from(incidents).where(eq(incidents.bleBeaconId, bleBeaconId)).limit(1),
+        4000,
+        "getIncidentByBleBeaconId"
+      )
+    )[0];
+    if (row) return row;
+  } catch (error) {
+    failClosedInProduction(error);
+  }
+  return Array.from(_memoryIncidents.values()).find(i => i.bleBeaconId === bleBeaconId) || null;
 }
 
 export async function getIncidentTimeline(incidentId: number) {
@@ -1645,8 +1664,8 @@ export async function assignMissionAtomically(data: {
         missionId = Number((missionResult[0] as any).insertId);
       }
 
-      // 3. Update incident status
-      await withDbTimeout(
+      // 3. Update incident status (atomic CAS conditional update)
+      const updateResult: any = await withDbTimeout(
         db
           .update(incidents)
           .set({
@@ -1660,6 +1679,11 @@ export async function assignMissionAtomically(data: {
         4000,
         "assignMissionAtomically_updateIncident"
       );
+
+      const affectedRows = updateResult?.[0]?.affectedRows ?? (updateResult as any)?.rowCount;
+      if (typeof affectedRows === "number" && affectedRows === 0) {
+        throw new Error("This SOS request has already been assigned to another response unit.");
+      }
 
       // 4. Update rescuer availability
       await withDbTimeout(

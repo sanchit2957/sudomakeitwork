@@ -138,4 +138,40 @@ describe("VoiceNoteCard component", () => {
       expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
     });
   });
+
+  it("starts recording when the idle card is clicked anywhere", async () => {
+    render(<VoiceNoteCard />);
+    const cardButton = screen.getByRole("button", { name: "Record voice note" });
+    fireEvent.click(cardButton);
+
+    await waitFor(() => {
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ audio: true });
+      expect(screen.getByText("Stop and save voice note")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Stop recording" })).toBeTruthy();
+    });
+  });
+
+  it("stops recording and saves draft when recording card is clicked", async () => {
+    let now = 1000000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+
+    render(<VoiceNoteCard />);
+    const recordBtn = screen.getByRole("button", { name: "Record voice note" });
+    fireEvent.click(recordBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Stop recording" })).toBeTruthy();
+    });
+
+    // Advance time by 3 seconds so recording duration >= 1 second
+    now += 3000;
+
+    const stopBtn = screen.getByRole("button", { name: "Stop recording" });
+    fireEvent.click(stopBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("Voice note ready")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Play voice note" })).toBeTruthy();
+    });
+  });
 });

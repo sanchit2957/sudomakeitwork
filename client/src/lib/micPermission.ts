@@ -26,6 +26,18 @@ export function subscribeMicPermission(listener: (status: MicPermissionState) =>
   };
 }
 
+/**
+ * Resets the cached permission status in sessionStorage.
+ * Allows fresh user-initiated permission attempts even if a previous attempt failed.
+ */
+export function resetMicPermission(): void {
+  try {
+    sessionStorage.removeItem(MIC_SESSION_PROMPTED_KEY);
+    sessionStorage.removeItem(MIC_STATUS_KEY);
+    notifyMicListeners("prompt");
+  } catch {}
+}
+
 export function isMicSupported(): boolean {
   if (typeof window === "undefined" || typeof navigator === "undefined") return false;
   const hasMediaDevices = Boolean(

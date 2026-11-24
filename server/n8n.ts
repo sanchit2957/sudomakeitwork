@@ -443,6 +443,7 @@ export function registerN8nRoutes(app: Express) {
         voiceNoteUrl: null,
         voiceNoteDurationSeconds: null,
         status: "pending",
+        bleBeaconId: typeof body.bleBeaconId === "string" ? body.bleBeaconId.slice(0, 16) : null,
         requestCategory: emergencyType === "medical" ? "medical" : emergencyType === "trapped" ? "rescue" : "emergency",
         dispatchStatus: "triage_pending",
         triageStartedAt: now,

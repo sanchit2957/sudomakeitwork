@@ -411,6 +411,10 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
       try {
         const [incCols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `incidents`"), 4000, "ensureSchema_showIncCols");
         const incColNames = new Set((incCols || []).map((c: any) => c.Field));
+        if (!incColNames.has("bleBeaconId")) {
+          await execDdl("ALTER TABLE `incidents` ADD COLUMN `bleBeaconId` VARCHAR(16) NULL", "addCol_incidents_bleBeaconId");
+          await execDdl("ALTER TABLE `incidents` ADD INDEX `incidents_bleBeaconId_idx` (`bleBeaconId`)", "addIdx_incidents_bleBeaconId");
+        }
         if (!incColNames.has("requestCategory")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `requestCategory` ENUM('medical', 'rescue', 'emergency') NOT NULL DEFAULT 'emergency'", "addCol_incidents_requestCategory");
         if (!incColNames.has("dispatchStatus")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `dispatchStatus` ENUM('triage_pending', 'matching', 'offered', 'assigned', 'escalated', 'resolved') NOT NULL DEFAULT 'triage_pending'", "addCol_incidents_dispatchStatus");
         if (!incColNames.has("triageStartedAt")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `triageStartedAt` TIMESTAMP NULL", "addCol_incidents_triageStartedAt");

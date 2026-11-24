@@ -3,6 +3,8 @@ import DashboardLayout, { type WorkspaceNavItem } from "@/components/DashboardLa
 import LanguageSelector from "@/components/LanguageSelector";
 import OperationsMap from "@/components/OperationsMap";
 import { BleEmergencyRadar } from "@/components/BleEmergencyRadar";
+import type { BleBeaconPayload } from "@/lib/bleBeacon";
+import { toast } from "sonner";
 import { EmergencyOfferCard } from "@/components/EmergencyOfferCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +42,12 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
+
+import {
+  recordOfflineBleAcceptance,
+  listPendingOfflineBleAcceptances,
+  updateOfflineBleAcceptanceStatus,
+} from "@/lib/offlineBleAcceptanceDb";
 
 type PushState = "not_requested" | "permission_granted" | "subscribed" | "unsupported" | "failed";
 
@@ -135,6 +143,7 @@ function ResponderWorkspace() {
 
   const updateProfile = trpc.rescue.rescuer.updateProfile.useMutation({ onSettled: refreshOperationalState });
   const updateLiveLocation = trpc.rescue.rescuer.updateLiveLocation.useMutation();
+  const submitBleAcceptance = trpc.rescue.rescuer.submitOfflineBleAcceptance.useMutation();
   const markRead = trpc.rescue.rescuer.markNotificationRead.useMutation({
     onSuccess: () => {
       void utils.rescue.rescuer.notifications.invalidate();
@@ -158,6 +167,58 @@ function ResponderWorkspace() {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, [utils]);
+
+  // Periodic and on-reconnect synchronization of offline BLE acceptances
+  useEffect(() => {
+    let active = true;
+    const syncOfflineAcceptances = async () => {
+      if (!navigator.onLine || !user) return;
+      try {
+        const pending = await listPendingOfflineBleAcceptances();
+        for (const item of pending) {
+          if (!active) break;
+          try {
+            const res = await submitBleAcceptance.mutateAsync({
+              bleBeaconId: item.bleBeaconId,
+              acceptedAt: item.acceptedAt,
+              latitude: item.rescuerLatitude,
+              longitude: item.rescuerLongitude,
+            });
+
+            if (res.status === "assigned") {
+              await updateOfflineBleAcceptanceStatus(item.bleBeaconId, {
+                syncStatus: "synced",
+                assignedPublicCode: res.publicCode,
+              });
+              refreshOperationalState();
+              toast.success(`${t("BLE Mission Confirmed")}: ${res.publicCode}`);
+            } else if (res.status === "conflict") {
+              await updateOfflineBleAcceptanceStatus(item.bleBeaconId, {
+                syncStatus: "conflict",
+                syncError: res.message,
+              });
+              toast.warning(`${t("BLE Beacon")} ${item.bleBeaconId}: ${res.message}`);
+            }
+          } catch (err: any) {
+            console.warn("[UserResponder] BLE acceptance sync attempt notice:", err?.message);
+          }
+        }
+      } catch (err) {
+        console.warn("[UserResponder] Failed reading offline acceptances:", err);
+      }
+    };
+
+    void syncOfflineAcceptances();
+    const interval = setInterval(syncOfflineAcceptances, 10_000);
+    const onlineHandler = () => void syncOfflineAcceptances();
+    window.addEventListener("online", onlineHandler);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      window.removeEventListener("online", onlineHandler);
+    };
+  }, [user?.id, t]);
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -492,6 +553,24 @@ function ResponderWorkspace() {
             <BleEmergencyRadar
               rescuerLatitude={profile.data?.lastLatitude || undefined}
               rescuerLongitude={profile.data?.lastLongitude || undefined}
+              rescuerUserId={user?.id}
+              onTargetSelect={(beacon: BleBeaconPayload) => {
+                if (beacon.latitude && beacon.longitude) {
+                  window.open(
+                    `https://www.google.com/maps/dir/?api=1&destination=${beacon.latitude},${beacon.longitude}`,
+                    "_blank",
+                    "noopener,noreferrer"
+                  );
+                } else {
+                  toast.warning(
+                    `${t("BLE Beacon")} ${beacon.id}: ${t("No GPS coordinates")}`,
+                    {
+                      description: t("Offline BLE distress signals do not include GPS to preserve battery and privacy. Follow the RSSI signal strength meter on the radar to navigate closer to the victim."),
+                      duration: 7000,
+                    }
+                  );
+                }
+              }}
             />
             <ResponderProfileCard
               profile={profile.data ? {

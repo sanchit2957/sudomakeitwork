@@ -91,6 +91,7 @@ export const incidents = mysqlTable(
     voiceNoteUrl: varchar("voiceNoteUrl", { length: 1024 }),
     voiceNoteDurationSeconds: int("voiceNoteDurationSeconds"),
     status: mysqlEnum("status", ["pending", "dispatched", "resolved"]).default("pending").notNull(),
+    bleBeaconId: varchar("bleBeaconId", { length: 16 }),
     requestCategory: mysqlEnum("requestCategory", ["medical", "rescue", "emergency"]).default("emergency").notNull(),
     triageStartedAt: timestamp("triageStartedAt"),
     triageDeadlineAt: timestamp("triageDeadlineAt"),
@@ -109,6 +110,7 @@ export const incidents = mysqlTable(
   },
   table => [
     index("incidents_publicCode_idx").on(table.publicCode),
+    index("incidents_bleBeaconId_idx").on(table.bleBeaconId),
     index("incidents_status_createdAt_idx").on(table.status, table.createdAt),
     index("incidents_assignedRescuerId_status_idx").on(table.assignedRescuerId, table.status),
     index("incidents_dispatchStatus_createdAt_idx").on(table.dispatchStatus, table.createdAt),

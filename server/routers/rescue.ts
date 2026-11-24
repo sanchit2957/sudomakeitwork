@@ -51,6 +51,7 @@ import {
   getIncidentMessages,
   getAvailableRescuersNear,
   getIncidentByCode,
+  getIncidentByBleBeaconId,
   getIncidentById,
   getIncidentTimeline,
   getMapLayers,
@@ -577,9 +578,25 @@ export const rescueRouter = router({
           evidenceDataUrl: z.string().max(2_100_000).optional(),
           voiceNoteDataUrl: z.string().max(4_200_000).optional(),
           voiceNoteDurationSeconds: z.number().int().min(1).max(120).optional(),
+          bleBeaconId: z.string().max(16).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
+        // Idempotency check: if an incident with this bleBeaconId was already created (e.g. via offline sync retry), return existing
+        if (input.bleBeaconId) {
+          const existingByBle = await getIncidentByBleBeaconId(input.bleBeaconId);
+          if (existingByBle) {
+            return {
+              incidentId: existingByBle.id,
+              publicCode: existingByBle.publicCode,
+              status: existingByBle.status,
+              triageDeadlineAt: existingByBle.triageDeadlineAt,
+              requestCategory: (existingByBle as any).requestCategory || "emergency",
+              voiceNoteUrl: existingByBle.voiceNoteUrl,
+            };
+          }
+        }
+
         const publicCode = `SOS-${incidentCode()}`;
         const evidence = readEvidence(input.evidenceDataUrl);
         let voiceNote: ReturnType<typeof readVoiceNote> = null;
@@ -634,6 +651,7 @@ export const rescueRouter = router({
               voiceNoteUrl: uploadedVoiceNote?.url ?? null,
               voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
               status: "pending",
+              bleBeaconId: input.bleBeaconId ?? null,
               dispatchStatus: "triage_pending",
               triageStartedAt: now,
               triageDeadlineAt,
@@ -668,6 +686,7 @@ export const rescueRouter = router({
           voiceNoteUrl: uploadedVoiceNote?.url ?? null,
           voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
           status: "pending",
+          bleBeaconId: input.bleBeaconId ?? null,
           dispatchStatus: "triage_pending",
           triageStartedAt: now,
           triageDeadlineAt,
@@ -2921,6 +2940,79 @@ export const rescueRouter = router({
           return { success: true };
         } catch (err: any) {
           throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Failed to decline offer." });
+        }
+      }),
+    submitOfflineBleAcceptance: rescuerProcedure
+      .input(
+        z.object({
+          bleBeaconId: z.string().min(1).max(16),
+          acceptedAt: z.number().int().positive().optional(),
+          latitude: z.number().min(-90).max(90).optional(),
+          longitude: z.number().min(-180).max(180).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { getIncidentByBleBeaconId, assignMissionAtomically } = await import("../rescue.db");
+
+        // 1. Look up incident matching this BLE beacon ID
+        const incident = await getIncidentByBleBeaconId(input.bleBeaconId);
+        if (!incident) {
+          // The victim's phone may still be offline or syncing outbox; client will retry periodically
+          return {
+            status: "pending_victim_sync" as const,
+            message: "Incident not yet received from victim outbox. Will re-sync automatically.",
+          };
+        }
+
+        // 2. Check if already assigned to THIS rescuer
+        if (incident.assignedRescuerId === ctx.user.id) {
+          return {
+            status: "assigned" as const,
+            incidentId: incident.id,
+            publicCode: incident.publicCode,
+            message: "Mission already confirmed and assigned to you.",
+          };
+        }
+
+        // 3. Check if already assigned to another rescuer (conflict)
+        if (incident.assignedRescuerId !== null && incident.assignedRescuerId !== ctx.user.id) {
+          return {
+            status: "conflict" as const,
+            incidentId: incident.id,
+            publicCode: incident.publicCode,
+            message: "This emergency was already assigned to another responder.",
+          };
+        }
+
+        // 4. Incident exists and is unassigned: assign atomically to this rescuer
+        try {
+          const result = await assignMissionAtomically({
+            incidentId: incident.id,
+            rescuerId: ctx.user.id,
+            assignedBy: ctx.user.id,
+            notes: `Offline BLE Acceptance reconciled for Beacon ${input.bleBeaconId}`,
+          });
+
+          // Broadcast status change immediately so any live SSE viewers on Phone A instantly transition to dispatched
+          try {
+            broadcastMissionStatusUpdate(incident.publicCode, "dispatched", "Assigned via offline BLE response reconciliation");
+          } catch { }
+
+          return {
+            status: "assigned" as const,
+            incidentId: incident.id,
+            publicCode: incident.publicCode,
+            missionId: result.missionId,
+            message: "Offline BLE mission successfully reconciled and assigned.",
+          };
+        } catch (assignErr: any) {
+          // If someone else raced and took it
+          return {
+            status: "conflict" as const,
+            incidentId: incident.id,
+            publicCode: incident.publicCode,
+            message: assignErr.message || "Assignment conflict.",
+          };
         }
       }),
     selectHospitalDestination: rescuerProcedure

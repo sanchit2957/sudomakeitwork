@@ -1,4 +1,4 @@
-import UserHome, { RapidSosControl } from "./user/UserHome";
+import UserHome, { RapidSosControl, VictimNavigation } from "./user/UserHome";
 
 export default UserHome;
-export { RapidSosControl };
+export { RapidSosControl, VictimNavigation };

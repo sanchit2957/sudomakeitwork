@@ -14,7 +14,7 @@ import { SosClassificationModal } from "@/components/SosClassificationModal";
 import { flushOfflineSos, queueOfflineSos, pendingSosCount } from "@/lib/offlineSos";
 import { createAndRedirectAfterRapidSos, redirectAfterRapidSos, rememberLatestSos } from "@/lib/rapidSos";
 import { buildEmergencySmsUri } from "@/lib/emergencyDispatch";
-import { startBleSosBeacon } from "@/lib/bleBeacon";
+import { startBleSosBeacon, stopBleSosBeacon, isBleSosBeaconActive, getOrCreateActiveBleBeaconId, clearActiveBleBeaconId, isValidBleCoordinate } from "@/lib/bleBeacon";
 import { getCurrentCoordinates, getLastKnownCoordinates } from "@/lib/nativeLocation";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -46,7 +46,7 @@ export default function UserHome() {
   const [triageData, setTriageData] = useState<{ publicCode: string; incidentId?: number; triageDeadlineAt?: Date | string | null } | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [bleActive, setBleActive] = useState(false);
+  const [bleActive, setBleActive] = useState(() => isBleSosBeaconActive());
 
   // Secondary defense: Route operational users reaching "/" to their canonical workspace
   useEffect(() => {
@@ -207,15 +207,18 @@ export default function UserHome() {
     if (authLoading) return;
     if (!user) { startLogin(); return; }
 
-    const submitSosWithCoords = async (latitude: number, longitude: number, label: string) => {
-      setPosition({ latitude, longitude });
-      setLocationStatus("ready");
+    const submitSosWithCoords = async (latitude: number | undefined, longitude: number | undefined, label: string) => {
+      const hasCoords = latitude != null && longitude != null && isValidBleCoordinate(latitude, longitude);
+      if (hasCoords) {
+        setPosition({ latitude, longitude });
+        setLocationStatus("ready");
+      }
       const voiceNote = readSosVoiceNote();
       const payload = {
         contactName: user.name || undefined,
         locationLabel: label,
-        latitude,
-        longitude,
+        latitude: hasCoords ? latitude : 0,
+        longitude: hasCoords ? longitude : 0,
         emergencyType: "flood" as const,
         severity: "high" as const,
         peopleAffected: 1,
@@ -224,19 +227,28 @@ export default function UserHome() {
       };
 
       // Activate Bluetooth Low Energy Beacon for nearby rescue boats
-      startBleSosBeacon({
-        id: `SOS-BLE-${Date.now().toString(36).toUpperCase()}`,
-        latitude,
-        longitude,
+      const bleBeaconId = getOrCreateActiveBleBeaconId();
+      void startBleSosBeacon({
+        id: bleBeaconId,
+        latitude: hasCoords ? latitude : undefined,
+        longitude: hasCoords ? longitude : undefined,
         emergencyType: "flood",
         peopleAffected: 1,
+      }).then((res) => {
+        if (res.success) {
+          setBleActive(true);
+        }
       });
-      setBleActive(true);
+
+      const sosPayloadWithBle = {
+        ...payload,
+        bleBeaconId,
+      };
 
       if (!navigator.onLine) {
         const guestKey = localStorage.getItem("sudo-makeitwork-guest-key") || crypto.randomUUID().replaceAll("-", "");
         localStorage.setItem("sudo-makeitwork-guest-key", guestKey);
-        await queueOfflineSos({ ...payload, guestKey });
+        await queueOfflineSos({ ...sosPayloadWithBle, guestKey });
         refreshPending();
         setRapidStatus("queued");
         setRapidNotice(t("SOS saved in device database (IndexedDB) & BLE Beacon active. Will auto-dispatch when network returns."));
@@ -245,7 +257,7 @@ export default function UserHome() {
 
       try {
         setRapidStatus("sending");
-        const created = await createSos.mutateAsync(payload);
+        const created = await createSos.mutateAsync(sosPayloadWithBle);
         rememberLatestSos(created.publicCode);
         clearSosVoiceNote();
         setRapidStatus("idle");
@@ -260,7 +272,7 @@ export default function UserHome() {
         if (isNetworkFail) {
           const guestKey = localStorage.getItem("sudo-makeitwork-guest-key") || crypto.randomUUID().replaceAll("-", "");
           localStorage.setItem("sudo-makeitwork-guest-key", guestKey);
-          await queueOfflineSos({ ...payload, guestKey });
+          await queueOfflineSos({ ...sosPayloadWithBle, guestKey });
           refreshPending();
           setRapidStatus("queued");
           setRapidNotice(t("Network dropped. SOS is safely preserved in device database (IndexedDB) and auto-syncing."));
@@ -275,7 +287,9 @@ export default function UserHome() {
     setRapidStatus("locating");
     setRapidNotice(t("Getting location to send SOS immediately…"));
 
-    if (position) {
+    if (manualLocation) {
+      void submitSosWithCoords(manualLocation.lat, manualLocation.lng, manualLocation.name);
+    } else if (position) {
       void submitSosWithCoords(position.latitude, position.longitude, t("GPS location captured from this phone"));
     } else {
       void getCurrentCoordinates({ enableHighAccuracy: true, timeout: 6000 })
@@ -285,18 +299,23 @@ export default function UserHome() {
           submitSosWithCoords(res.latitude, res.longitude, t("GPS location captured from this phone"));
         })
         .catch(() => {
-          submitSosWithCoords(INDIA_CENTER.lat, INDIA_CENTER.lng, t("National emergency coordinates"));
+          const lastKnown = getLastKnownCoordinates();
+          if (lastKnown) {
+            submitSosWithCoords(lastKnown.latitude, lastKnown.longitude, t("Last known device location"));
+          } else {
+            submitSosWithCoords(undefined, undefined, t("Location unavailable (No GPS fix on phone)"));
+          }
         });
     }
   };
 
-  const activePoint = position || { latitude: INDIA_CENTER.lat, longitude: INDIA_CENTER.lng };
+  const activePoint = manualLocation ? { latitude: manualLocation.lat, longitude: manualLocation.lng } : position;
   const emergencySmsUrl = buildEmergencySmsUri({
-    latitude: activePoint.latitude,
-    longitude: activePoint.longitude,
+    latitude: activePoint?.latitude ?? 0,
+    longitude: activePoint?.longitude ?? 0,
     emergencyType: "flood",
     peopleAffected: 1,
-    locationLabel: manualLocation?.name || (position ? t("GPS location captured from this phone") : t("National emergency coordinates")),
+    locationLabel: manualLocation?.name || (position ? t("GPS location captured from this phone") : t("Location unavailable (No GPS fix on phone)")),
   });
 
   return (
@@ -367,7 +386,19 @@ export default function UserHome() {
                 <Bluetooth className="h-3.5 w-3.5" />
                 {t("Bluetooth BLE SOS Beacon: Broadcasting")}
               </span>
-              <span className="text-xs opacity-80">{t("~50-100m range")}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs opacity-80">{t("~50-100m range")}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void stopBleSosBeacon({ clearId: true });
+                    setBleActive(false);
+                  }}
+                  className="rounded-lg bg-cyan-900/20 px-2 py-0.5 text-[10px] font-extrabold text-cyan-800 hover:bg-cyan-900/30 dark:bg-cyan-400/20 dark:text-cyan-200"
+                >
+                  {t("Stop Beacon")}
+                </button>
+              </div>
             </div>
 
             {/* 1-Tap Emergency SMS */}

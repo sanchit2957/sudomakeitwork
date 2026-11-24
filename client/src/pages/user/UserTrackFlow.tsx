@@ -3,6 +3,7 @@ import LanguageSelector from "@/components/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getLatestSos, rememberLatestSos } from "@/lib/rapidSos";
+import { stopBleSosBeacon } from "@/lib/bleBeacon";
 import { trpc } from "@/lib/trpc";
 import { VictimNavigation } from "@/components/VictimNavigation";
 import { AssignedRescuerCard, IncidentChat, PostRescueCheckInCard } from "@/components/TrackIncidentComponents";
@@ -28,13 +29,23 @@ export default function UserTrackFlow() {
     { publicCode },
     {
       enabled: /^SOS-[A-Z0-9]{8}$/.test(publicCode),
-      refetchInterval: liveStream.pollingIntervalMs ?? 20_000,
+      refetchInterval: (query) => {
+        // If unassigned, poll aggressively at 3s so rescuer acceptance reflects immediately
+        const hasRescuer = Boolean(query.state.data?.assignedRescuer);
+        if (!hasRescuer) return 3_000;
+        return liveStream.pollingIntervalMs ?? 10_000;
+      },
       refetchIntervalInBackground: true,
       retry: false,
     }
   );
+  useEffect(() => {
+    if (status.data?.status === "resolved") {
+      void stopBleSosBeacon({ clearId: true });
+    }
+  }, [status.data?.status]);
 
-  const stages = useMemo(
+const stages = useMemo(
     () =>
       [
         { key: "pending", label: t("SOS received"), copy: t("Searching for rescuer..."), icon: Siren },
@@ -201,4 +212,5 @@ export default function UserTrackFlow() {
       <VictimNavigation current="track" />
     </div>
   );
+
 }

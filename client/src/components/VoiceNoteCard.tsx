@@ -154,6 +154,8 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
       setMicState("granted");
+      sessionStorage.setItem("sudo-makeitwork-mic-status", "granted");
+      sessionStorage.setItem("sudo-makeitwork-mic-session-prompted", "true");
 
       const chunks: BlobPart[] = [];
       const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4", "audio/aac"].find(type =>
@@ -225,6 +227,8 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
     } catch (err: any) {
       console.error("[VoiceNote] getUserMedia error:", err?.name, err?.message, err);
       setMicState("denied");
+      sessionStorage.setItem("sudo-makeitwork-mic-status", "denied");
+      sessionStorage.setItem("sudo-makeitwork-mic-session-prompted", "true");
       const errDetail = err?.name ? ` (${err.name}: ${err.message || "Microphone access denied"})` : "";
       setMessage(
         t("Microphone access is off. Enable it in your device settings to use voice notes.") + errDetail
@@ -279,10 +283,11 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
   if (micState === "denied" && !recording && !draft) {
     return (
       <section
-        className={`flex w-full flex-col items-center justify-center p-3.5 text-center ${
+        onClick={handleManualPermissionRetry}
+        className={`group relative flex w-full flex-col items-center justify-center p-3.5 text-center cursor-pointer transition active:scale-[0.98] ${
           embedded
-            ? "rounded-r-[18px]"
-            : "rounded-[20px] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10"
+            ? "rounded-r-[18px] hover:bg-amber-500/5 dark:hover:bg-amber-500/10"
+            : "rounded-[20px] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-amber-500/20 dark:bg-[#1a1a1c] dark:ring-amber-500/30"
         }`}
       >
         <button
@@ -310,17 +315,17 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
     );
   }
 
-  // 2. Main Voice Note Card (Idle / Recording / Recorded Preview)
-  return (
-    <section
-      className={`group relative flex w-full flex-col items-center justify-center p-3.5 text-center ${
-        embedded
-          ? "rounded-r-[18px]"
-          : "rounded-[20px] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10"
-      }`}
-    >
-      {/* Delete Action when recorded draft exists */}
-      {draft && !recording && (
+  // 2. Draft Preview & Playback
+  if (draft && !recording) {
+    return (
+      <section
+        className={`group relative flex w-full flex-col items-center justify-center p-3.5 text-center ${
+          embedded
+            ? "rounded-r-[18px]"
+            : "rounded-[20px] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] dark:bg-[#1a1a1c] dark:ring-white/10"
+        }`}
+      >
+        {/* Delete Action when recorded draft exists */}
         <button
           type="button"
           onClick={handleDelete}
@@ -329,10 +334,8 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
         >
           <Trash2 className="h-3 w-3" />
         </button>
-      )}
 
-      {/* Main Action Button */}
-      {draft && !recording ? (
+        {/* Playback Action Button */}
         <button
           type="button"
           onClick={togglePlayback}
@@ -345,47 +348,96 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
             <Play className="h-5 w-5 fill-current ml-0.5" />
           )}
         </button>
-      ) : (
-        <button
-          type="button"
-          onClick={recording ? stopRecording : startRecording}
-          aria-label={recording ? t("Stop recording") : t("Record voice note")}
-          disabled={micState === "unsupported"}
-          className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white shadow-md transition active:scale-95 disabled:opacity-50 ${
-            recording ? "bg-[#DC2626] animate-pulse shadow-red-500/30" : "bg-[#1D4ED8] shadow-[#1D4ED8]/20 hover:bg-[#1d47db]"
-          }`}
+        {/* Card Title & Progress */}
+        <div
+          onClick={togglePlayback}
+          className="mt-2 flex cursor-pointer items-center justify-center gap-1.5"
         >
-          {recording ? (
-            <Square className="h-4 w-4 fill-current" />
-          ) : (
-            <Mic className="h-5 w-5" />
-          )}
-        </button>
-      )}
+          <p className="text-sm font-extrabold text-[#0F172A] dark:text-[#F8FAFC]">
+            {t("Voice note ready")}
+          </p>
+        </div>
 
-      {/* Card Title */}
-      <div className="mt-2 flex items-center justify-center gap-1.5">
-        {recording && (
-          <span className="inline-block h-2 w-2 rounded-full bg-[#DC2626] animate-ping" />
+        <p
+          onClick={togglePlayback}
+          className="mt-0.5 cursor-pointer text-xs font-semibold text-[#0F172A]/75 dark:text-[#F1F5F9]/80"
+        >
+          {isPlaying
+            ? `${formatSeconds(playProgress)} / ${formatSeconds(draft.durationSeconds)} · ${t("Playing")}`
+            : `${draft.durationSeconds}s · ${t("Attached to your next SOS")}`}
+        </p>
+
+        {message && (
+          <p role="status" className="mt-1 text-[10px] font-semibold text-[#1D4ED8] dark:text-[#F1F5F9]">
+            {message}
+          </p>
         )}
+      </section>
+    );
+  }
+
+  // 3. Recording in Progress (Entire tile is clickable to Stop Recording)
+  if (recording) {
+    return (
+      <button
+        type="button"
+        onClick={stopRecording}
+        aria-label={t("Stop recording")}
+        className={`group relative flex w-full flex-col items-center justify-center p-3.5 text-center cursor-pointer transition active:scale-[0.98] ${
+          embedded
+            ? "rounded-r-[18px] bg-red-500/5 hover:bg-red-500/10 dark:bg-red-950/20"
+            : "rounded-[20px] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-red-500/20 dark:bg-[#1a1a1c] dark:ring-red-500/30"
+        }`}
+      >
+        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#DC2626] text-white shadow-md shadow-red-500/30 transition animate-pulse">
+          <Square className="h-4 w-4 fill-current" />
+        </div>
+
+        <div className="mt-2 flex items-center justify-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-full bg-[#DC2626] animate-ping" />
+          <p className="text-sm font-extrabold text-[#DC2626] dark:text-[#f87171]">
+            {t("Stop and save voice note")}
+          </p>
+        </div>
+
+        <p className="mt-0.5 text-xs font-semibold text-[#0F172A]/75 dark:text-[#F1F5F9]/80">
+          {formatSeconds(recordSeconds)} / 02:00 · {t("Tap to stop")}
+        </p>
+
+        {message && (
+          <p role="status" className="mt-1 text-[10px] font-semibold text-[#1D4ED8] dark:text-[#F1F5F9]">
+            {message}
+          </p>
+        )}
+      </button>
+    );
+  }
+
+  // 4. Idle State (Entire tile is clickable to Start Recording)
+  return (
+    <button
+      type="button"
+      onClick={startRecording}
+      aria-label={t("Record voice note")}
+      disabled={micState === "unsupported"}
+      className={`group relative flex w-full flex-col items-center justify-center p-3.5 text-center cursor-pointer transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
+        embedded
+          ? "rounded-r-[18px] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
+          : "rounded-[20px] bg-white p-4 shadow-[0_12px_28px_rgba(22,60,53,.09)] ring-1 ring-black/[.035] hover:shadow-md dark:bg-[#1a1a1c] dark:ring-white/10"
+      }`}
+    >
+      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#1D4ED8] text-white shadow-md shadow-[#1D4ED8]/20 transition group-hover:bg-[#1d47db] group-active:scale-95">
+        <Mic className="h-5 w-5" />
+      </div>
+
+      <div className="mt-2 flex items-center justify-center gap-1.5">
         <p className="text-sm font-extrabold text-[#0F172A] dark:text-[#F8FAFC]">
-          {recording
-            ? t("Stop and save voice note")
-            : draft
-            ? t("Voice note ready")
-            : t("Record voice note")}
+          {t("Record voice note")}
         </p>
       </div>
 
-      {/* Card Subtitle */}
       <p className="mt-0.5 text-xs font-semibold text-[#0F172A]/75 dark:text-[#F1F5F9]/80">
-        {recording
-          ? `${formatSeconds(recordSeconds)} / 02:00 · ${t("Tap to stop")}`
-          : draft
-          ? isPlaying
-            ? `${formatSeconds(playProgress)} / ${formatSeconds(draft.durationSeconds)} · ${t("Playing")}`
-            : `${draft.durationSeconds}s · ${t("Attached to your next SOS")}`
-          : micState === "unsupported"
+        {micState === "unsupported"
           ? t("Voice recording is not supported in this browser.")
           : t("Speak briefly if typing is difficult")}
       </p>
@@ -395,7 +447,7 @@ export function VoiceNoteCard({ embedded = false }: VoiceNoteCardProps) {
           {message}
         </p>
       )}
-    </section>
+    </button>
   );
 }
 
