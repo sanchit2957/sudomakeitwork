@@ -288,16 +288,12 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
         // Ensure seed demo accounts exist in TiDB production. INSERT IGNORE is safe/idempotent.
         // These are required for platform login (citizen@assamrescue.gov.in / admin@assamrescue.gov.in).
         const adminHash = hashPassword(process.env.ADMIN_INITIAL_PASSWORD || "admin");
-        const citizenHash = hashPassword(process.env.CITIZEN_INITIAL_PASSWORD || "citizen");
         await execDdl(
           `INSERT IGNORE INTO \`users\` (\`openId\`, \`name\`, \`email\`, \`password\`, \`role\`, \`status\`, \`loginMethod\`, \`lastSignedIn\`) VALUES ('user-admin', 'Superadmin', 'admin@assamrescue.gov.in', '${adminHash}', 'admin', 'active', 'platform-login', NOW())`,
           "seed_adminUser"
         );
-        await execDdl(
-          `INSERT IGNORE INTO \`users\` (\`openId\`, \`name\`, \`email\`, \`password\`, \`role\`, \`status\`, \`loginMethod\`, \`lastSignedIn\`) VALUES ('user-citizen', 'Anamika Das', 'citizen@assamrescue.gov.in', '${citizenHash}', 'user', 'active', 'platform-login', NOW())`,
-          "seed_citizenUser"
-        );
-        await execDdl("UPDATE `users` SET `role` = 'user' WHERE `openId` = 'user-citizen' AND `role` != 'user'", "resetCitizenRole");
+        // Clear out legacy mock citizen data so only live citizen accounts are stored
+        await execDdl("DELETE FROM `users` WHERE `openId` = 'user-citizen' OR `email` = 'citizen@assamrescue.gov.in'", "clean_mockCitizen");
         await execDdl("UPDATE `users` SET `role` = 'admin' WHERE `openId` = 'user-admin' AND `role` != 'admin'", "resetAdminRole");
       } catch {}
 
@@ -865,22 +861,6 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "hospital@assamrescue.gov.in",
       password: defaultHospitalHash,
       role: "hospital",
-      status: "active",
-      loginMethod: "platform-login",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    },
-  ],
-  [
-    "user-citizen",
-    {
-      id: 4,
-      openId: "user-citizen",
-      name: "Anamika Das",
-      email: "citizen@assamrescue.gov.in",
-      password: defaultCitizenHash,
-      role: "user",
       status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),

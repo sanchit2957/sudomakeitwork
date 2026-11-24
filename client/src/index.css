@@ -1,11 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Manrope", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "DM Mono", monospace;
+  --font-sans: "Inter", "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -730,31 +729,6 @@ nav[aria-label="Victim App navigation"] {
 :is(button, a, input, select, textarea):focus-visible {
   outline: 2px solid var(--sahay-cobalt) !important;
   outline-offset: 2px !important;
-}
-
-/* Universal High-Contrast Readability & Dark/Light Mode Visibility */
-.text-muted-foreground {
-  color: #334155 !important;
-}
-.dark .text-muted-foreground {
-  color: #CBD5E1 !important;
-}
-
-.dark .text-zinc-400,
-.dark .text-slate-400,
-.dark .text-gray-400 {
-  color: #CBD5E1 !important;
-}
-
-.text-zinc-500,
-.text-slate-500,
-.text-gray-500 {
-  color: #334155 !important;
-}
-
-/* Ensure strong contrast across body text and descriptions */
-p, span, label, div {
-  text-rendering: optimizeLegibility;
 }
 
 /* Dashboard surface */

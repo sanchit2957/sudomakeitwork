@@ -313,7 +313,7 @@ export default function UserHome() {
             clickable
             onClick={() => setLocation(user ? "/profile" : "/login")}
             fallbackName={t("Citizen")}
-            subtext={user ? (user.role ? t(user.role.toUpperCase()) : t("Verified User")) : t("Assam safety companion")}
+            subtext={user ? (user.role ? t(user.role.toUpperCase()) : t("Verified User")) : t("Sign In / Register")}
           />
           <div className="flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-1.5">

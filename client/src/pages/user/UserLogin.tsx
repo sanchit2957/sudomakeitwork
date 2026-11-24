@@ -667,23 +667,6 @@ export default function UserLogin() {
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1">
-                      <p className="text-[11px] text-muted-foreground">
-                        Testing locally?
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEmail("citizen@assamrescue.gov.in");
-                          setPassword("citizen");
-                          setErrorMessage("");
-                        }}
-                        className="font-mono text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400"
-                      >
-                        Fill Demo Citizen
-                      </button>
-                    </div>
-
                     <div className="pt-2">
                       <button
                         type="submit"
