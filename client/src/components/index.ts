@@ -25,4 +25,6 @@ export { AIChatBox } from "./AIChatBox";
 export { SahayakAiModal } from "./SahayakAiModal";
 export { SosClassificationModal } from "./SosClassificationModal";
 export { FloodConditionsPanel } from "./FloodConditionsPanel";
+export { WeatherForecastPanel } from "./WeatherForecastPanel";
 export { EmergencyContactsDisplay } from "./EmergencyContactsDisplay";
+export { ModernAuthForm, ModernInputWrapper, ModernSubmitButton } from "./ModernAuthForm";

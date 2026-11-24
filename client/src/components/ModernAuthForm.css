@@ -1,0 +1,263 @@
+/*
+From Uiverse.io by kyle1dev - https://uiverse.io/kyle1dev/honest-snail-17
+MIT License, Copyright (c) kyle1dev (Kyle)
+*/
+
+.modern-form {
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --primary-light: rgba(59, 130, 246, 0.12);
+  --success: #10b981;
+  --text-main: #1e293b;
+  --text-secondary: #64748b;
+  --bg-input: #f8fafc;
+
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.08),
+    0 2px 4px -2px rgba(0, 0, 0, 0.05),
+    inset 0 0 0 1px rgba(148, 163, 184, 0.15);
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  margin: 0 auto;
+  transition: all 0.25s ease;
+}
+
+/* Dark mode theme variables */
+.dark .modern-form {
+  --text-main: #f8fafc;
+  --text-secondary: #94a3b8;
+  --bg-input: #0f172a;
+  background: #1e293b;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.5),
+    0 8px 10px -6px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.modern-form .form-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0 0 24px;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+.modern-form .form-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.modern-form .input-group {
+  margin-bottom: 16px;
+}
+
+.modern-form .input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.modern-form .form-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 40px;
+  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  transition: all 0.2s ease;
+}
+
+.dark .modern-form .form-input {
+  border-color: #334155;
+}
+
+.modern-form .form-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+.modern-form .input-icon {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.modern-form .password-toggle {
+  position: absolute;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+}
+
+.modern-form .eye-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.modern-form .submit-button {
+  position: relative;
+  width: 100%;
+  height: 44px;
+  margin-top: 10px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.modern-form .submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.modern-form .button-glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.25),
+    transparent
+  );
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
+  pointer-events: none;
+}
+
+.modern-form .form-footer {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.modern-form .login-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+}
+
+.modern-form .login-link span {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.modern-form .form-input:hover {
+  border-color: #cbd5e1;
+}
+
+.dark .modern-form .form-input:hover {
+  border-color: #475569;
+}
+
+.modern-form .form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: white;
+  box-shadow: 0 0 0 4px var(--primary-light);
+}
+
+.dark .modern-form .form-input:focus {
+  background: #0f172a;
+}
+
+.modern-form .password-toggle:hover {
+  color: var(--primary);
+  transform: scale(1.1);
+}
+
+.modern-form .submit-button:hover:not(:disabled) {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 14px rgba(59, 130, 246, 0.35),
+    0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.modern-form .submit-button:hover:not(:disabled) .button-glow {
+  transform: translateX(100%);
+}
+
+.modern-form .login-link:hover {
+  color: var(--text-main);
+}
+
+.modern-form .login-link:hover span {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+.modern-form .submit-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.modern-form .password-toggle:active {
+  transform: scale(0.9);
+}
+
+.modern-form .form-input:not(:placeholder-shown):valid {
+  border-color: var(--success);
+}
+
+.modern-form .form-input:not(:placeholder-shown):valid ~ .input-icon {
+  color: var(--success);
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.modern-form .form-input:not(:placeholder-shown):invalid {
+  border-color: #ef4444;
+  animation: shake 0.2s ease-in-out;
+}
+
+.modern-form .form-input:not(:placeholder-shown):invalid ~ .input-icon {
+  color: #ef4444;
+}
