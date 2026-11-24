@@ -6,13 +6,11 @@ import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   ArrowLeft,
-  CheckCircle2,
   Lock,
   LogOut,
   Shield,
   ShieldAlert,
   ShieldCheck,
-  User,
   Users,
 } from "lucide-react";
 import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
@@ -55,186 +53,186 @@ export default function AdminLogin() {
 
   return (
     <DesktopOnlyGate portalName="State Command Centre" portalType="admin">
-      <div className="min-h-screen bg-[#F8F1E4] text-[#111C44] transition-colors dark:bg-[#111C44] dark:text-[#F8F1E4]">
-      {/* Top Header */}
-      <header className="sticky top-0 z-30 border-b border-black/5 bg-white/85 px-4 py-3 backdrop-blur-md dark:border-white/10 dark:bg-[#111214]/85">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <button
-            onClick={() => setLocation("/")}
-            className="flex items-center gap-2.5 text-left transition hover:opacity-80"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0f766e] text-white shadow-sm">
-              <ArrowLeft className="h-4 w-4" />
-            </span>
-            <span>
-              <span className="block text-base font-black tracking-tight">
-                Sahay Emergency Network
-              </span>
-              <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-[#5d7c74] dark:text-[#94a3b8]">
-                Emergency & Disaster Response Platform
-              </span>
-            </span>
-          </button>
-
-          <div className="flex items-center gap-3">
+      <div className="min-h-screen bg-[#0A0E17] text-slate-100 flex flex-col justify-between selection:bg-sky-500 selection:text-slate-950">
+        {/* Top Header */}
+        <header className="sticky top-0 z-30 border-b border-slate-800 bg-[#0B0F17]/90 px-4 py-3 backdrop-blur-md">
+          <div className="mx-auto flex max-w-5xl items-center justify-between">
             <button
-              onClick={() => setLocation("/login")}
-              className="hidden items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-[#151718] sm:flex"
+              onClick={() => setLocation("/")}
+              className="flex items-center gap-2.5 text-left transition hover:opacity-85 focus:outline-none"
             >
-              <Users className="h-3.5 w-3.5" />
-              Switch to User Portal
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-500 text-slate-950 font-black shadow-xs">
+                <ArrowLeft className="h-4 w-4" />
+              </span>
+              <span>
+                <span className="block text-base font-black tracking-tight text-white">
+                  Sahay Command Architecture
+                </span>
+                <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-sky-400">
+                  State Emergency Operations Centre
+                </span>
+              </span>
             </button>
-            <LanguageSelector compact />
-          </div>
-        </div>
-      </header>
 
-      <main className="mx-auto max-w-md px-4 py-10 md:py-16">
-        {/* State Command Security Banner */}
-        <div className="text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-4 py-1.5 font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0f766e] dark:text-emerald-400">
-            <ShieldCheck className="h-4 w-4" />
-            State Command Centre
-          </div>
-          <h1 className="mt-4 text-3xl font-black tracking-tight md:text-4xl">
-            Admin Portal
-          </h1>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            Restricted access for State Disaster Management Administrators and Coordinators.
-          </p>
-        </div>
-
-        {/* Active Session Notification if logged in */}
-        {user && (
-          <div className="mt-6 overflow-hidden rounded-3xl border border-[#0f766e]/30 bg-white p-5 shadow-sm dark:border-emerald-500/20 dark:bg-[#151718]">
             <div className="flex items-center gap-3">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#0f766e] text-white shadow-md">
-                <Shield className="h-6 w-6" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-extrabold">{user.name || user.email}</span>
-                  <span className="rounded bg-[#0f766e]/15 px-2 py-0.5 font-mono text-[9px] font-bold uppercase text-[#0f766e] dark:text-emerald-400">
-                    {user.role}
-                  </span>
+              <button
+                onClick={() => setLocation("/login")}
+                className="hidden items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white transition sm:flex"
+              >
+                <Users className="h-3.5 w-3.5 text-sky-400" />
+                Citizen Hub
+              </button>
+              <LanguageSelector compact />
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto w-full max-w-md px-4 py-8 md:py-12 my-auto">
+          {/* State Command Security Banner */}
+          <div className="text-center">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-3.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-sky-400">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Restricted Clearance
+            </div>
+            <h1 className="mt-3 text-2xl sm:text-3xl font-black tracking-tight text-white">
+              State Command Centre
+            </h1>
+            <p className="mx-auto mt-2 text-xs leading-relaxed text-slate-400 max-w-sm">
+              Authorized access for State Disaster Management Administrators, Coordinators, and District Dispatchers.
+            </p>
+          </div>
+
+          {/* Active Session Notification if logged in */}
+          {user && (
+            <div className="mt-6 rounded-2xl border border-sky-500/30 bg-slate-900/90 p-5 shadow-lg">
+              <div className="flex items-center gap-3">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                  <Shield className="h-6 w-6" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-bold text-white">{user.name || user.email}</span>
+                    <span className="rounded bg-sky-500/20 px-2 py-0.5 font-mono text-[9px] font-bold uppercase text-sky-300">
+                      {user.role}
+                    </span>
+                  </div>
+                  <p className="truncate text-xs text-slate-400">{user.email || "Active Session"}</p>
                 </div>
-                <p className="truncate text-xs text-muted-foreground">{user.email || "Active Session"}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 flex gap-2">
-              <Button
-                onClick={() => setLocation("/command")}
-                className="flex-1 rounded-xl bg-[#0f766e] font-bold text-white hover:bg-[#0f766e]/90"
-              >
-                Enter Command Centre
-              </Button>
-              <Button
-                onClick={() => logout()}
-                variant="outline"
-                className="rounded-xl font-semibold"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Admin Login Card */}
-        <div className="mt-6 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#141517]">
-          <div className="border-b border-black/5 bg-[#fafcfb] p-4 dark:border-white/5 dark:bg-[#18191c]">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#0f766e]/10 text-[#0f766e] dark:text-emerald-400">
-                <Lock className="h-4 w-4" />
-              </span>
-              <div>
-                <h2 className="text-xs font-black uppercase tracking-wide text-foreground">
-                  Official Command Sign In
-                </h2>
-                <p className="text-[11px] text-muted-foreground">
-                  Enter your administrative credentials below
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6">
-            {errorMessage && (
-              <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-semibold text-destructive">
-                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>{errorMessage}</div>
-              </div>
-            )}
-
-            <form onSubmit={handleAdminSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="admin-email" className="text-xs font-bold">Email or Username</Label>
-                <Input
-                  id="admin-email"
-                  type="text"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1.5 h-11 rounded-xl"
-                  required
-                />
               </div>
 
-              <div>
-                <Label htmlFor="admin-password" className="text-xs font-bold">Password</Label>
-                <Input
-                  id="admin-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1.5 h-11 rounded-xl"
-                  required
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <p className="text-[11px] text-muted-foreground">
-                  Default Demo Credentials
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail("admin@assamrescue.gov.in");
-                    setPassword("admin");
-                    setErrorMessage("");
-                  }}
-                  className="font-mono text-[11px] font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
-                >
-                  Fill Demo Admin
-                </button>
-              </div>
-
-              <div className="pt-2">
+              <div className="mt-4 flex gap-2">
                 <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="h-12 w-full rounded-xl bg-[#0f766e] font-bold text-white shadow-md hover:bg-[#0f766e]/90"
+                  onClick={() => setLocation("/command")}
+                  className="flex-1 h-10 rounded-xl bg-sky-500 font-bold text-slate-950 hover:bg-sky-400"
                 >
-                  <ShieldCheck className="mr-2 h-4 w-4" />
-                  {isSubmitting ? "Verifying Authorization…" : "Sign In to Command"}
+                  Enter Command Centre
+                </Button>
+                <Button
+                  onClick={() => logout()}
+                  variant="outline"
+                  className="h-10 rounded-xl border-slate-700 text-slate-300 hover:bg-slate-800"
+                >
+                  <LogOut className="h-4 w-4" />
                 </Button>
               </div>
-            </form>
+            </div>
+          )}
+
+          {/* Admin Login Card */}
+          <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/90 shadow-xl overflow-hidden">
+            <div className="border-b border-slate-800 bg-slate-950/60 px-5 py-3.5 flex items-center gap-2.5">
+              <span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500/15 text-sky-400">
+                <Lock className="h-3.5 w-3.5" />
+              </span>
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                  Command Identification
+                </h2>
+                <p className="text-[10px] text-slate-400">
+                  Secured Administrator Authentication Gate
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              {errorMessage && (
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-semibold text-rose-400">
+                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>{errorMessage}</div>
+                </div>
+              )}
+
+              <form onSubmit={handleAdminSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="admin-email" className="text-xs font-bold text-slate-300">Email or Username</Label>
+                  <Input
+                    id="admin-email"
+                    type="text"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. admin@assamrescue.gov.in"
+                    className="mt-1.5 h-10 rounded-lg bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-sky-500 text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="admin-password" className="text-xs font-bold text-slate-300">Password</Label>
+                  <Input
+                    id="admin-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Administrator password"
+                    className="mt-1.5 h-10 rounded-lg bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-sky-500 text-sm"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-0.5">
+                  <span className="text-[11px] text-slate-500">Default Credentials</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("admin@assamrescue.gov.in");
+                      setPassword("admin");
+                      setErrorMessage("");
+                    }}
+                    className="font-mono text-[11px] font-bold text-sky-400 hover:underline"
+                  >
+                    Demo Admin
+                  </button>
+                </div>
+
+                <div className="pt-2">
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="h-11 w-full rounded-xl bg-sky-500 font-bold text-slate-950 hover:bg-sky-400 shadow-md shadow-sky-500/20 text-xs"
+                  >
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    {isSubmitting ? "Verifying Authorization…" : "Sign In to Command"}
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
 
-          {/* Quick Prefill Bar */}
-        </div>
+          {/* User Portal Link */}
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => setLocation("/login")}
+              className="text-xs text-slate-400 hover:text-white transition"
+            >
+              Not an administrator? <span className="text-sky-400 underline underline-offset-2">Switch to Citizen & Rescuer Portals</span>
+            </button>
+          </div>
+        </main>
 
-        {/* User Portal Link */}
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => setLocation("/login")}
-            className="text-xs font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
-          >
-            ← Not an administrator? Go to User & Operational Portals (Rescue, Medical & Citizen)
-          </button>
-        </div>
-      </main>
-    </div>
+        <footer className="py-4 text-center text-[10px] font-mono text-slate-600 border-t border-slate-800/80">
+          State Emergency Operations Centre &bull; Protocol SecOps-2026
+        </footer>
+      </div>
     </DesktopOnlyGate>
   );
 }

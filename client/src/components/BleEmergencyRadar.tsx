@@ -38,18 +38,18 @@ export function BleEmergencyRadar({
   }, [rescuerLatitude, rescuerLongitude]);
 
   return (
-    <div className="glass-panel overflow-hidden border border-[#2457FF]/30 bg-[#111C44] p-4.5 text-white shadow-xl dark:bg-[#182353]">
-      <div className="flex items-center justify-between border-b border-white/10 pb-3">
+    <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-4.5 text-white shadow-xs dark:bg-slate-950">
+      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2.5">
-          <div className="relative grid h-8 w-8 place-items-center rounded-xl bg-[#2457FF]/20 text-[#D8E3FF]">
+          <div className="relative grid h-8 w-8 place-items-center rounded-xl bg-sky-500/15 text-sky-400">
             <Radio className={`h-4 w-4 ${scanning ? "animate-spin" : "animate-pulse"}`} />
-            {scanning && <span className="absolute inset-0 rounded-xl bg-[#2457FF]/30 animate-ping" />}
+            {scanning && <span className="absolute inset-0 rounded-xl bg-sky-500/25 animate-ping" />}
           </div>
           <div>
-            <h3 className="text-xs font-black uppercase tracking-wider text-[#D8E3FF]">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
               {t("Offline BLE Distress Radar")}
             </h3>
-            <p className="text-[10px] text-[#D8E3FF]/70">
+            <p className="text-[10px] text-slate-400">
               {t("Peer-to-Peer Bluetooth (~50-100m range)")}
             </p>
           </div>
@@ -59,7 +59,7 @@ export function BleEmergencyRadar({
           variant="outline"
           disabled={scanning}
           onClick={runScan}
-          className="h-7 rounded-xl border-[#2457FF]/40 bg-[#2457FF]/20 px-2.5 text-[11px] font-bold text-[#D8E3FF] hover:bg-[#2457FF]/30"
+          className="h-7 rounded-lg border-slate-700 bg-slate-800 px-2.5 text-[11px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white"
         >
           <RefreshCw className={`mr-1 h-3 w-3 ${scanning ? "animate-spin" : ""}`} />
           {scanning ? t("Scanning…") : t("Scan Radio")}

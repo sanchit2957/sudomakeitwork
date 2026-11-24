@@ -292,16 +292,16 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       data-testid="emergency-offer-card"
       role="region"
       aria-label="New Emergency Request"
-      className="relative overflow-hidden rounded-[1.8rem] border-2 border-red-500 bg-white/95 p-5 text-[#111C44] shadow-2xl backdrop-blur-md dark:bg-[#111C44]/95 dark:text-[#F8F1E4] ring-4 ring-red-500/20"
+      className="relative overflow-hidden rounded-2xl border-2 border-rose-500 bg-slate-900 p-5 text-white shadow-2xl ring-4 ring-rose-500/20"
     >
       {/* Top Banner */}
-      <div className="flex items-center justify-between gap-3 border-b border-red-500/20 pb-3.5">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 border-b border-rose-500/30 pb-3.5">
+        <div className="flex items-center gap-2.5">
           <span className="relative flex h-3 w-3">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-rose-500" />
           </span>
-          <h2 className="text-sm font-black uppercase tracking-wider text-red-600 dark:text-red-400">
+          <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-rose-400">
             {t("NEW EMERGENCY REQUEST")}
           </h2>
         </div>
@@ -310,72 +310,78 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
             type="button"
             onClick={toggleSound}
             aria-label={isMuted ? "Unmute alert chime" : "Mute alert chime"}
-            className="rounded-lg bg-red-500/10 p-1.5 text-muted-foreground hover:bg-red-500/20 hover:text-red-600 transition border border-red-500/20"
+            className="rounded-lg bg-rose-500/10 p-1.5 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 transition border border-rose-500/30"
           >
-            {isMuted ? <VolumeX className="h-3.5 w-3.5 text-red-400" /> : <Volume2 className="h-3.5 w-3.5 text-red-500 animate-pulse" />}
+            {isMuted ? <VolumeX className="h-3.5 w-3.5 text-rose-400" /> : <Volume2 className="h-3.5 w-3.5 text-rose-400 animate-pulse" />}
           </button>
-          <span className="font-mono text-xs font-bold text-[#111C44]/50 dark:text-[#D8E3FF]/50">
+          <span className="font-mono text-xs font-bold text-slate-400">
             {incident.publicCode}
           </span>
         </div>
       </div>
 
       {/* Main Details Grid */}
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {/* Type */}
-        <div className="glass-card border border-red-500/20 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             {t("Type")}
           </p>
-          <div className="mt-1 flex items-center gap-1.5 font-bold text-[#111C44] dark:text-[#F8F1E4] text-xs">
-            <CategoryIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
+          <div className="mt-1 flex items-center gap-1.5 font-bold text-white text-xs">
+            <CategoryIcon className="h-4 w-4 text-rose-400 shrink-0" />
             <span className="truncate">{categoryLabel}</span>
           </div>
         </div>
 
         {/* Priority */}
-        <div className="glass-card border border-red-500/20 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             {t("Priority")}
           </p>
           <span
-            className={`mt-1 inline-block rounded-md border px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${severityTone}`}
+            className={`mt-1 inline-block rounded-md border px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+              incident.severity === "critical"
+                ? "bg-rose-950/80 text-rose-300 border-rose-800"
+                : incident.severity === "high"
+                ? "bg-amber-950/80 text-amber-300 border-amber-800"
+                : "bg-blue-950/80 text-blue-300 border-blue-800"
+            }`}
           >
             {incident.severity}
           </span>
         </div>
 
         {/* Distance */}
-        <div className="glass-card border border-red-500/20 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             {t("Distance")}
           </p>
-          <p className="mt-1 flex items-center gap-1 font-mono text-xs font-black text-red-600 dark:text-red-400">
-            <Navigation className="h-3.5 w-3.5" />
+          <p className="mt-1 flex items-center gap-1 font-mono text-xs font-black text-rose-400">
+            <Navigation className="h-3.5 w-3.5 shrink-0" />
             {offer.distanceKm.toFixed(1)} km
           </p>
         </div>
 
         {/* People */}
-        <div className="glass-card border border-red-500/20 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             {t("People")}
           </p>
-          <p className="mt-1 flex items-center gap-1 font-bold text-[#111C44] dark:text-[#F8F1E4] text-xs">
-            <Users className="h-3.5 w-3.5 text-[#111C44]/50 dark:text-[#D8E3FF]/50" />
+          <p className="mt-1 flex items-center gap-1 font-bold text-white text-xs">
+            <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
             {incident.peopleAffected || 1}
           </p>
         </div>
       </div>
 
       {/* Location */}
-      <div className="mt-3 flex items-start gap-2 rounded-xl glass-card border border-red-500/20 p-3 text-xs">
-        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
-        <span className="font-semibold text-[#111C44] dark:text-[#F8F1E4]">{incident.locationLabel}</span>
+      <div className="mt-3 flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-xs">
+        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+        <span className="font-semibold text-slate-200">{incident.locationLabel}</span>
       </div>
 
       {incident.notes && (
-        <p className="mt-2 text-xs italic text-[#111C44]/70 dark:text-[#D8E3FF]/70 line-clamp-2 px-1">
+        <p className="mt-2 text-xs italic text-slate-400 line-clamp-2 px-1">
           "{incident.notes}"
         </p>
       )}
@@ -386,12 +392,12 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
           className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-300">
-              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="flex items-center gap-1.5 font-bold text-amber-300">
+              <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
               {t("Voice message attached")}
               {incident.voiceNoteDurationSeconds ? ` (${incident.voiceNoteDurationSeconds}s)` : ""}
             </span>
-            <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
               {t("Citizen audio")}
             </span>
           </div>
@@ -407,20 +413,20 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       {/* 30-Second Countdown Timer & Progress Bar */}
       <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-300">
-            <Clock className="h-4 w-4 animate-spin text-amber-600 dark:text-amber-400" />
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+            <Clock className="h-4 w-4 animate-spin text-amber-400" />
             <span>{t("Offer expires in:")}</span>
           </div>
           <span
             data-testid="offer-countdown"
-            className="font-mono text-sm font-black tracking-widest text-amber-800 dark:text-amber-300"
+            className="font-mono text-sm font-black tracking-widest text-amber-300"
           >
             {actionState === "expired" ? "00:00" : formattedCountdown}
           </span>
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-amber-200 dark:bg-amber-950">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 transition-all duration-300 ease-linear"
+            className="h-full rounded-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-400 transition-all duration-300 ease-linear"
             style={{ width: `${Math.min(100, Math.max(0, (secondsRemaining / 30) * 100))}%` }}
           />
         </div>
@@ -430,7 +436,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       {errorMsg && (
         <div
           role="alert"
-          className="mt-3 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-700 dark:text-red-300"
+          className="mt-3 flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/15 p-2.5 text-xs text-rose-300"
         >
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{errorMsg}</span>
@@ -454,7 +460,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
           variant="outline"
           disabled={actionState !== "idle" && actionState !== "error"}
           onClick={handleDecline}
-          className="h-11 rounded-xl border-red-500/30 glass-card font-extrabold text-red-600 hover:bg-red-500/10 hover:text-red-700 active:scale-[0.98] disabled:opacity-50 dark:text-red-400"
+          className="h-11 rounded-xl border-slate-700 bg-slate-800/80 font-extrabold text-slate-300 hover:bg-slate-800 hover:text-white active:scale-[0.98] disabled:opacity-50"
         >
           <X className="mr-1.5 h-5 w-5" />
           {actionState === "declining" ? t("Declining…") : t("DECLINE")}

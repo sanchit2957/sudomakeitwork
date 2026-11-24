@@ -5,7 +5,7 @@ import { HospitalStaffDashboard } from "@/components/HospitalStaffDashboard";
 import DashboardLayout, { type WorkspaceNavItem } from "@/components/DashboardLayout";
 import OperationsMap from "@/components/OperationsMap";
 import { Button } from "@/components/ui/button";
-import { HospitalManager } from "@/pages/Command";
+import { HospitalManager } from "@/pages/admin/AdminCommand";
 import HospitalRegistration from "./HospitalRegistration";
 import { trpc } from "@/lib/trpc";
 import { Building2, CheckCircle2, Hospital, MapPinned, ShieldCheck, UserPlus, XCircle } from "lucide-react";
@@ -49,8 +49,12 @@ function HospitalWorkspace() {
       {location === "/hospital/map" ? (
         <section className="space-y-4">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Shared Operating Picture</p>
-            <h1 className="mt-1 text-2xl font-extrabold">Hospital & Emergency Response Sector Map</h1>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+              Shared Operating Picture
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Hospital & Emergency Response Sector Map
+            </h1>
           </div>
           <div className="mt-4">
             <OperationsMap layers={layers.data} />
@@ -82,42 +86,48 @@ function HospitalApprovals() {
   return (
     <section className="max-w-5xl space-y-6">
       <div>
-        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Verification Queue</p>
-        <h1 className="mt-1 text-2xl font-extrabold">Hospital Registration Approvals</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          Approve a verified hospital facility to establish its live resource record and unlock its dedicated hospital operations command desk.
+        <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+          Verification Queue
+        </p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          Hospital Registration Approvals
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+          Approve verified healthcare facilities to establish live inventory tracking and unlock their specialized clinical desk.
         </p>
       </div>
       <div className="grid gap-4">
         {pending.length ? (
           pending.map(({ request, user }) => (
-            <article key={request.id} className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
+            <article key={request.id} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
               <div className="flex flex-col justify-between gap-5 lg:flex-row">
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
-                    <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#2457FF]/10 text-[#2457FF]">
+                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400">
                       <Building2 className="h-5 w-5" />
                     </span>
                     <div>
-                      <h2 className="text-lg font-black text-foreground">{request.hospitalName}</h2>
-                      <p className="text-xs text-muted-foreground">
+                      <h2 className="text-base font-bold text-slate-900 dark:text-white">{request.hospitalName}</h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         Requested by {user?.name || user?.email || `User #${user?.id ?? "unknown"}`}
                       </p>
                     </div>
                   </div>
-                  <p className="mt-4 text-sm font-semibold text-foreground">{request.address}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-3 text-sm font-semibold text-slate-800 dark:text-slate-200">{request.address}</p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {request.contactPhone} · {request.latitude.toFixed(5)}, {request.longitude.toFixed(5)}
                   </p>
                   {request.note && (
-                    <p className="mt-4 rounded-xl bg-muted/50 p-3 text-sm leading-6 text-muted-foreground">{request.note}</p>
+                    <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                      {request.note}
+                    </p>
                   )}
                 </div>
-                <div className="grid min-w-52 gap-2">
+                <div className="flex flex-col gap-2 min-w-48 justify-center">
                   <Button
                     disabled={review.isPending}
                     onClick={() => review.mutate({ requestId: request.id, decision: "approved" })}
-                    className="rounded-xl font-bold bg-[#2457FF] text-white hover:bg-[#1a44cc] shadow-sm transition"
+                    className="rounded-xl font-semibold bg-teal-600 text-white hover:bg-teal-700 shadow-xs transition"
                   >
                     <CheckCircle2 className="mr-2 h-4 w-4" />
                     Approve Facility
@@ -132,7 +142,7 @@ function HospitalApprovals() {
                         reviewNote: "Please provide official medical facility accreditation.",
                       })
                     }
-                    className="rounded-xl text-destructive border-[#B7AD9E]/30 hover:bg-destructive/10"
+                    className="rounded-xl text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-900 dark:hover:bg-rose-950/40"
                   >
                     <XCircle className="mr-2 h-4 w-4" />
                     Request Review
@@ -142,16 +152,16 @@ function HospitalApprovals() {
             </article>
           ))
         ) : (
-          <div className="rounded-3xl border border-dashed border-[#B7AD9E]/30 bg-card/60 backdrop-blur-md p-10 text-center">
-            <ShieldCheck className="mx-auto h-10 w-10 text-[#2457FF]" />
-            <p className="mt-4 text-base font-extrabold text-foreground">No Hospital Registrations Waiting</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center dark:border-slate-800 dark:bg-slate-900">
+            <ShieldCheck className="mx-auto h-10 w-10 text-teal-600 dark:text-teal-400" />
+            <p className="mt-3 text-base font-bold text-slate-900 dark:text-white">No Hospital Registrations Waiting</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               New medical center registrations will appear here for State Command verification.
             </p>
           </div>
         )}
       </div>
-      {review.error && <p className="text-sm font-semibold text-destructive">{review.error.message}</p>}
+      {review.error && <p className="text-sm font-semibold text-rose-600">{review.error.message}</p>}
     </section>
   );
 }

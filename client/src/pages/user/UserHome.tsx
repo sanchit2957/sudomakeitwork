@@ -20,7 +20,23 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { getWeatherRiskPresentation } from "@/lib/weatherRisk";
 import { INDIA_CENTER } from "@shared/india-locations";
-import { Bluetooth, CloudRain, Database, Hospital, MapPin, MessageSquare, MoreHorizontal, Navigation, PhoneCall, Radio, RefreshCw, ShieldCheck, Siren, TentTree, ThermometerSun, Waves, Wifi, WifiOff } from "lucide-react";
+import {
+  Bluetooth,
+  Database,
+  Hospital,
+  MapPin,
+  MessageSquare,
+  Navigation,
+  PhoneCall,
+  Radio,
+  RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
+  Siren,
+  Waves,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 import { VictimNavigation } from "@/components/VictimNavigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -47,7 +63,7 @@ export default function UserHome() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [bleActive, setBleActive] = useState(false);
 
-  // Secondary defense: Route operational users reaching "/" to their canonical workspace
+  // Route non-citizen roles to their canonical workspace
   useEffect(() => {
     if (!authLoading && user && user.role && user.role !== "user") {
       const canonicalPath =
@@ -176,7 +192,7 @@ export default function UserHome() {
     if (isSyncing) return;
     setIsSyncing(true);
     try {
-      const result = await flushOfflineSos(payload => createSos.mutateAsync(payload));
+      const result = await flushOfflineSos((payload) => createSos.mutateAsync(payload));
       refreshPending();
       if (result.delivered.length > 0) {
         clearSosVoiceNote();
@@ -198,7 +214,10 @@ export default function UserHome() {
 
   const startRapidSos = () => {
     if (authLoading) return;
-    if (!user) { startLogin(); return; }
+    if (!user) {
+      startLogin();
+      return;
+    }
 
     const submitSosWithCoords = async (latitude: number, longitude: number, label: string) => {
       setPosition({ latitude, longitude });
@@ -293,43 +312,38 @@ export default function UserHome() {
   });
 
   return (
-    <div className="victim-page relative min-h-screen bg-[#F8F1E4] text-[#111C44] transition-colors dark:bg-[#111C44] dark:text-[#F8F1E4] overflow-x-hidden">
-      {/* iOS Liquid Glass Ambient Refraction Layer */}
-      <div className="liquid-ambient-bg" />
-
-      <main className="victim-main relative z-10 mx-auto min-h-screen w-full max-w-5xl px-4 sm:px-6 lg:px-8 pb-32 pt-5">
-        {/* Glassmorphic Top Bar */}
-        <header className="glass-card mb-5 flex items-center justify-between gap-3 p-3.5 shadow-sm">
+    <div className="victim-page relative min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden">
+      <main className="mx-auto min-h-screen w-full max-w-5xl px-4 sm:px-6 lg:px-8 pb-28 pt-4">
+        {/* Top Header Card */}
+        <header className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <UserProfileBadge
             user={user}
             size="lg"
             clickable
             onClick={() => setLocation(user ? "/profile" : "/login")}
             fallbackName={t("Citizen")}
-            subtext={user ? (user.role ? t(user.role.toUpperCase()) : t("Verified User")) : t("Assam safety companion")}
+            subtext={user ? (user.role ? t(user.role.toUpperCase()) : t("Verified Citizen")) : t("Emergency Response Active")}
           />
           <div className="flex flex-col items-end gap-1.5">
-            <div className="flex items-center gap-1.5">
-              <LanguageSelector compact />
-            </div>
+            <LanguageSelector compact />
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold shadow-xs ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                 online
-                  ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                  : "bg-amber-500/15 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                  ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                  : "border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"
               }`}
             >
               {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              {online ? t("Connected") : t("Offline")}
+              {online ? t("Connected") : t("Offline Mode")}
             </span>
           </div>
         </header>
 
         {/* Offline SOS & Cellular Radio / BLE Options */}
         {(!online || pendingCount > 0 || bleActive) && (
-          <div className="glass-card mb-5 border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-950 shadow-md dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+          <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-50/70 p-4 text-xs text-amber-950 shadow-xs dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 font-black">
+              <div className="flex items-center gap-2 font-bold">
                 <Database className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                 <span>
                   {pendingCount > 0
@@ -343,7 +357,7 @@ export default function UserHome() {
                   variant="outline"
                   disabled={isSyncing || !online}
                   onClick={triggerFlush}
-                  className="h-7 rounded-xl border-amber-600/40 bg-amber-600 px-2.5 text-[11px] font-bold text-white hover:bg-amber-700 active:scale-95"
+                  className="h-7 rounded-lg border-amber-600/40 bg-amber-600 px-2.5 text-[11px] font-bold text-white hover:bg-amber-700 active:scale-95"
                 >
                   <RefreshCw className={`mr-1 h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />
                   {isSyncing ? t("Syncing…") : t("Sync Now")}
@@ -354,9 +368,9 @@ export default function UserHome() {
             {/* BLE Beacon Pulse Indicator */}
             <div className="mt-2.5 flex items-center justify-between rounded-xl bg-cyan-950/10 px-3 py-2 text-[11px] font-bold text-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-200">
               <span className="flex items-center gap-1.5">
-                <span className="relative flex h-2.5 w-2.5">
+                <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75"></span>
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-cyan-500"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500"></span>
                 </span>
                 <Bluetooth className="h-3.5 w-3.5" />
                 {t("Bluetooth BLE SOS Beacon: Broadcasting")}
@@ -368,35 +382,38 @@ export default function UserHome() {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <a
                 href={emergencySmsUrl}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2.5 text-center text-xs font-black text-white shadow-sm transition hover:bg-amber-700 active:scale-95"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-center text-xs font-bold text-white shadow-xs transition hover:bg-amber-700 active:scale-95"
               >
                 <MessageSquare className="h-3.5 w-3.5" />
                 <span>{t("SMS 112 (No Internet)")}</span>
               </a>
               <a
                 href="tel:112"
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-red-600/30 bg-red-600 px-3 py-2.5 text-center text-xs font-black text-white shadow-sm transition hover:bg-red-700 active:scale-95"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-center text-xs font-bold text-white shadow-xs transition hover:bg-rose-700 active:scale-95"
               >
                 <PhoneCall className="h-3.5 w-3.5" />
                 <span>{t("Call 112 (All Towers)")}</span>
               </a>
             </div>
-
-            <p className="mt-2 text-[10px] leading-4 opacity-85">
-              {t("911/112 cellular frequencies connect across all mobile towers even with zero data. Tap SMS 112 to transmit exact GPS coordinates directly to State Disaster Control.")}
-            </p>
           </div>
         )}
 
         {/* Bento Grid System for Citizen Portal */}
         <div className="bento-container items-start">
-          {/* Bento Cell 1: Central 3D Tactile SOS Action Card */}
+          {/* Bento Cell 1: Central SOS Button (Matching Reference 3) */}
           <div className="bento-cell-12 md:bento-cell-6 lg:bento-cell-5">
-            <section className="glass-panel relative overflow-hidden flex h-full flex-col items-center justify-center p-6 text-center">
-              {/* Radial ambient glow behind button */}
-              <div className="pointer-events-none absolute h-64 w-64 rounded-full bg-red-500/15 blur-3xl" />
+            <section className="rounded-2xl border border-slate-200/80 bg-white p-6 sm:p-7 shadow-xs dark:border-slate-800 dark:bg-slate-900 flex h-full flex-col items-center justify-center text-center">
+              <div className="mb-2">
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                  {t("Are you in emergency?")}
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground max-w-xs">
+                  {t("Press the button below, emergency dispatch and rescue teams will reach you immediately.")}
+                </p>
+              </div>
 
-              <div className="liquid-bezel my-3">
+              {/* Concentric Pulse Ring SOS Container */}
+              <div className="liquid-bezel my-5">
                 <button
                   onClick={startRapidSos}
                   disabled={authLoading || rapidStatus === "locating" || rapidStatus === "sending"}
@@ -405,52 +422,54 @@ export default function UserHome() {
                 >
                   <span className="relative z-10 flex flex-col items-center justify-center">
                     {rapidStatus === "locating" || rapidStatus === "sending" ? (
-                      <Radio className="mb-1.5 h-9 w-9 animate-pulse text-white drop-shadow-md" />
+                      <Radio className="mb-1 h-8 w-8 animate-pulse text-white drop-shadow-sm" />
                     ) : (
-                      <Siren className="mb-1 h-8 w-8 text-white drop-shadow-md" />
+                      <Siren className="mb-1 h-7 w-7 text-white drop-shadow-sm" />
                     )}
-                    <span className="text-5xl sm:text-6xl font-black tracking-tight text-white drop-shadow-lg">SOS</span>
-                    <span className="mt-1 text-[11px] font-extrabold tracking-wider text-white/95 uppercase drop-shadow">
+                    <span className="text-5xl sm:text-6xl font-black tracking-tight text-white drop-shadow-md">
+                      SOS
+                    </span>
+                    <span className="mt-1 font-mono text-[10px] font-bold uppercase tracking-wider text-white/90">
                       {rapidStatus === "locating"
-                        ? t("Getting location")
+                        ? t("Acquiring GPS…")
                         : rapidStatus === "sending"
-                        ? t("Sending SOS")
+                        ? t("Broadcasting…")
                         : user
-                        ? t("Tap for immediate help")
+                        ? t("Tap for Emergency Help")
                         : t("Sign in to activate")}
                     </span>
                   </span>
                 </button>
               </div>
 
-              <p className="mt-4 flex items-center gap-2 rounded-full border border-red-500/25 bg-red-500/10 px-3.5 py-1.5 text-[11px] font-extrabold text-red-700 dark:text-red-300">
-                <Waves className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-                {t("Use this only for an emergency")}
+              <p className="flex items-center gap-1.5 rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1 text-[11px] font-bold text-rose-700 dark:text-rose-400">
+                <Waves className="h-3.5 w-3.5 text-rose-600" />
+                {t("Use this only for genuine emergencies")}
               </p>
 
               {rapidNotice && (
                 <p
                   role="status"
                   className={`mt-3 max-w-xs text-center text-xs font-semibold leading-5 ${
-                    rapidStatus === "error" ? "text-red-600 dark:text-red-400" : "text-[#2457FF] dark:text-[#D8E3FF]"
+                    rapidStatus === "error" ? "text-rose-600 dark:text-rose-400" : "text-sky-600 dark:text-sky-400"
                   }`}
                 >
                   {rapidNotice}
                 </p>
               )}
 
-              {/* Direct Emergency Access Buttons */}
+              {/* Quick direct emergency dispatch call actions */}
               <div className="mt-5 grid w-full grid-cols-2 gap-2.5">
                 <a
                   href={emergencySmsUrl}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-amber-600/30 bg-amber-600 px-3 py-2.5 text-center text-xs font-black text-white shadow-sm transition hover:bg-amber-700 active:scale-95"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-amber-600/30 bg-amber-600 px-3 py-2.5 text-center text-xs font-bold text-white shadow-xs transition hover:bg-amber-700 active:scale-95"
                 >
                   <MessageSquare className="h-3.5 w-3.5" />
                   <span>{t("SMS 112")}</span>
                 </a>
                 <a
                   href="tel:112"
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-red-600/30 bg-red-600 px-3 py-2.5 text-center text-xs font-black text-white shadow-sm transition hover:bg-red-700 active:scale-95"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-600/30 bg-rose-600 px-3 py-2.5 text-center text-xs font-bold text-white shadow-xs transition hover:bg-rose-700 active:scale-95"
                 >
                   <PhoneCall className="h-3.5 w-3.5" />
                   <span>{t("Call 112")}</span>
@@ -478,27 +497,27 @@ export default function UserHome() {
 
           {/* Bento Cell 4: Nearby Emergency Facilities & Hospitals */}
           <div className="bento-cell-12 md:bento-cell-6 lg:bento-cell-7">
-            <section className="glass-panel p-5">
+            <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between">
-                <h3 className="flex items-center gap-2 text-sm font-black text-[#111C44] dark:text-[#F8F1E4]">
-                  <Hospital className="h-4 w-4 text-[#2457FF] dark:text-[#D8E3FF]" />
+                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                  <Hospital className="h-4 w-4 text-teal-600 dark:text-teal-400" />
                   <span>{t("Nearby Emergency Facilities")}</span>
                 </h3>
-                <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
                   {nearbyHospitals.length + nearbyShelters.length} {t("within 50 km")}
                 </span>
               </div>
 
               {nearbyHospitals.length > 0 || nearbyShelters.length > 0 ? (
-                <div className="mt-3.5 space-y-2.5">
+                <div className="mt-3.5 space-y-2">
                   {nearbyHospitals.slice(0, 3).map((h) => (
                     <div
                       key={`hosp-${h.id}`}
-                      className="glass-card flex items-center justify-between p-3 text-xs"
+                      className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs dark:border-slate-800 dark:bg-slate-950/40"
                     >
                       <div>
-                        <div className="font-extrabold text-[#111C44] dark:text-[#F8F1E4]">{h.name}</div>
-                        <div className="text-[10px] text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+                        <div className="font-bold text-slate-900 dark:text-white">{h.name}</div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">
                           {h.distanceKm !== undefined ? `${h.distanceKm.toFixed(1)} km away` : ""} ·{" "}
                           <span className="font-bold text-emerald-700 dark:text-emerald-400">
                             {h.availableEmergencyBeds ?? 0} {t("beds available")}
@@ -508,7 +527,7 @@ export default function UserHome() {
                       {h.contactPhone && (
                         <a
                           href={`tel:${h.contactPhone}`}
-                          className="rounded-lg bg-[#2457FF] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#1d47db] active:scale-95"
+                          className="rounded-lg bg-teal-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-xs transition hover:bg-teal-700 active:scale-95"
                         >
                           {t("Call")}
                         </a>
@@ -518,22 +537,22 @@ export default function UserHome() {
                   {nearbyShelters.slice(0, 2).map((s) => (
                     <div
                       key={`sh-${s.id}`}
-                      className="glass-card flex items-center justify-between p-3 text-xs"
+                      className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs dark:border-slate-800 dark:bg-slate-950/40"
                     >
                       <div>
-                        <div className="font-extrabold text-[#111C44] dark:text-[#F8F1E4]">{s.name}</div>
-                        <div className="text-[10px] text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+                        <div className="font-bold text-slate-900 dark:text-white">{s.name}</div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">
                           {s.distanceKm !== undefined ? `${s.distanceKm.toFixed(1)} km away` : ""} · {t("Capacity")}: {s.capacity ?? "—"}
                         </div>
                       </div>
-                      <span className="rounded-md bg-[#D8E3FF] px-2 py-0.5 text-[10px] font-bold text-[#111C44] dark:bg-[#2457FF]/30 dark:text-[#D8E3FF]">
+                      <span className="rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-400">
                         {t("Relief Camp")}
                       </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="mt-2.5 text-xs text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+                <p className="mt-3 text-xs text-muted-foreground">
                   {position
                     ? t("No verified hospitals or camps registered within 50 km. Call 112 for state emergency coordination.")
                     : t("Acquiring GPS to locate nearest emergency hospitals and relief camps…")}
@@ -623,15 +642,15 @@ export function RapidSosControl({
           </span>
         </span>
       </button>
-      <p className="mt-5 flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-3.5 py-1.5 text-[11px] font-bold text-red-700 dark:text-red-300">
-        <Waves className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+      <p className="mt-4 flex items-center gap-1.5 rounded-full border border-rose-500/20 bg-rose-500/10 px-3.5 py-1 text-[11px] font-bold text-rose-700 dark:text-rose-400">
+        <Waves className="h-3.5 w-3.5 text-rose-600" />
         {t("Use this only for an emergency")}
       </p>
       {notice && (
         <p
           role="status"
-          className={`mt-3 max-w-xs text-center text-xs font-semibold leading-5 ${
-            status === "error" ? "text-red-600 dark:text-red-400" : "text-[#2457FF] dark:text-[#D8E3FF]"
+          className={`mt-2.5 max-w-xs text-center text-xs font-semibold leading-5 ${
+            status === "error" ? "text-rose-600 dark:text-rose-400" : "text-sky-600 dark:text-sky-400"
           }`}
         >
           {notice}
@@ -662,8 +681,8 @@ function LocationPreview({
   const pointKey = point ? `${point.latitude.toFixed(4)}-${point.longitude.toFixed(4)}` : "india-overview";
 
   return (
-    <section className="glass-panel overflow-hidden p-3.5 h-full flex flex-col justify-between">
-      <div className="relative overflow-hidden rounded-2xl">
+    <section className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900 h-full flex flex-col justify-between overflow-hidden">
+      <div className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
         <MapView
           key={pointKey}
           className="h-52 w-full"
@@ -679,7 +698,7 @@ function LocationPreview({
               const L = (await import("leaflet")).default;
               const icon = L.divIcon({
                 className: "loc-pin",
-                html: `<div style="background:#DC2626;color:#fff;border-radius:50%;width:24px;height:24px;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,0.3);font-size:12px;">📍</div>`,
+                html: `<div style="background:#DC2626;color:#fff;border-radius:50%;width:24px;height:24px;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:12px;">📍</div>`,
                 iconSize: [24, 24],
                 iconAnchor: [12, 24],
               });
@@ -687,20 +706,20 @@ function LocationPreview({
             }
           }}
         />
-        <div className="pointer-events-none absolute left-3 top-3 rounded-lg glass-pill px-2.5 py-1 text-xs font-black shadow-sm text-[#111C44] dark:text-[#F8F1E4]">
+        <div className="pointer-events-none absolute left-3 top-3 rounded-lg border border-slate-200/80 bg-white/90 px-2.5 py-1 text-xs font-bold text-slate-800 shadow-xs dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-200 backdrop-blur-xs">
           {t("Map preview")}
         </div>
       </div>
       <div className="flex items-center justify-between px-1 pt-3">
-        <span className="flex items-center gap-2 text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">
-          <MapPin className="h-4 w-4 text-[#DC2626]" />
+        <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
+          <MapPin className="h-4 w-4 text-rose-600" />
           {state === "ready"
             ? t("Your current location")
             : state === "finding"
-            ? t("Finding your location…")
+            ? t("Acquiring GPS location…")
             : t("Location unavailable (Map centered on India)")}
         </span>
-        <span className="font-mono text-[10px] font-bold text-[#2457FF] dark:text-[#D8E3FF]">
+        <span className="font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400">
           {state === "ready" && point
             ? `${point.latitude.toFixed(4)}° N, ${point.longitude.toFixed(4)}° E`
             : "—"}

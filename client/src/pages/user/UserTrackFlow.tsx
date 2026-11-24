@@ -36,9 +36,9 @@ export default function UserTrackFlow() {
   const stages = useMemo(
     () =>
       [
-        { key: "pending", label: t("SOS received"), copy: t("Searching for rescuer..."), icon: Siren },
-        { key: "dispatched", label: t("Rescuer assigned"), copy: t("Your responder’s profile and live updates appear here"), icon: Radio },
-        { key: "resolved", label: t("Rescue completed"), copy: t("This rescue flow is recorded on this device"), icon: CheckCircle2 },
+        { key: "pending", label: t("SOS received"), copy: t("Searching for nearest field responder…"), icon: Siren },
+        { key: "dispatched", label: t("Rescuer assigned"), copy: t("Live responder telemetry & route navigation active"), icon: Radio },
+        { key: "resolved", label: t("Rescue completed"), copy: t("This rescue incident is archived on this device"), icon: CheckCircle2 },
       ] as const,
     [t]
   );
@@ -46,26 +46,23 @@ export default function UserTrackFlow() {
   const activeIndex = status.data ? Math.max(0, stages.findIndex((stage) => stage.key === status.data!.status)) : 0;
 
   return (
-    <div className="victim-page relative min-h-screen bg-[#F8F1E4] text-[#111C44] transition-colors dark:bg-[#111C44] dark:text-[#F8F1E4] overflow-x-hidden">
-      {/* iOS Liquid Glass Ambient Refraction Layer */}
-      <div className="liquid-ambient-bg" />
-
-      <main className="victim-main relative z-10 mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-32 pt-5">
+    <div className="victim-page relative min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden">
+      <main className="mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-28 pt-4">
         {/* Top Header Card */}
-        <header className="glass-card mb-5 flex items-center justify-between p-3.5 shadow-sm">
+        <header className="mb-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <button
             onClick={() => setLocation("/")}
             className="flex items-center gap-3 text-left transition hover:opacity-85 active:scale-95"
           >
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/20">
-              <ArrowLeft className="h-5 w-5" />
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-white shadow-xs dark:bg-sky-500 dark:text-slate-950 font-black">
+              <ArrowLeft className="h-4 w-4" />
             </span>
             <span>
-              <span className="block text-lg font-black tracking-tight text-[#111C44] dark:text-[#F8F1E4]">
+              <span className="block text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
                 {t("Your rescue flow")}
               </span>
-              <span className="block text-[10px] font-bold text-[#111C44]/70 dark:text-[#D8E3FF]/70">
-                {t("Saved on this device")}
+              <span className="block text-[10px] font-bold text-muted-foreground">
+                {t("Saved locally on this device")}
               </span>
             </span>
           </button>
@@ -74,82 +71,82 @@ export default function UserTrackFlow() {
 
         {/* Empty State when no SOS is recorded */}
         {!publicCode && (
-          <section className="glass-panel mt-6 border-dashed border-[#B7AD9E]/40 p-8 text-center dark:border-[#D8E3FF]/20">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#2457FF]/10 text-[#2457FF] dark:bg-[#2457FF]/25 dark:text-[#D8E3FF]">
-              <Siren className="h-8 w-8" />
+          <section className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900 shadow-xs">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
+              <Siren className="h-7 w-7" />
             </div>
-            <h1 className="mt-4 text-xl font-black text-[#111C44] dark:text-[#F8F1E4]">{t("No active SOS yet")}</h1>
-            <p className="mt-2 text-sm leading-6 text-[#111C44]/70 dark:text-[#D8E3FF]/70 max-w-md mx-auto">
-              {t("When you activate SOS, your rescue flow will remain here—even after refresh.")}
+            <h1 className="mt-4 text-xl font-black text-slate-900 dark:text-white">{t("No active SOS yet")}</h1>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground max-w-md mx-auto">
+              {t("When you activate SOS, your rescue flow and live responder position will remain here—even after refresh.")}
             </p>
             <Button
               onClick={() => setLocation("/")}
-              className="mt-6 rounded-xl bg-[#2457FF] px-6 py-2.5 font-bold text-white shadow-md shadow-[#2457FF]/25 hover:bg-[#1d47db]"
+              className="mt-6 rounded-xl bg-rose-600 px-6 py-2.5 font-bold text-white shadow-xs hover:bg-rose-700"
             >
-              {t("Go to SOS")}
+              {t("Go to SOS Hub")}
             </Button>
           </section>
         )}
 
         {status.isFetching && (
-          <p className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-[#111C44]/70 dark:text-[#D8E3FF]/70">
-            <Clock3 className="h-3.5 w-3.5 animate-spin text-[#2457FF]" /> {t("Updating rescue flow")}
+          <p className="mt-3 flex items-center justify-center gap-2 text-xs font-semibold text-muted-foreground">
+            <Clock3 className="h-3.5 w-3.5 animate-spin text-sky-500" /> {t("Updating rescue flow")}
           </p>
         )}
 
         {status.error && (
-          <div role="alert" className="mt-4 flex gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-semibold text-red-700 dark:text-red-300">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div role="alert" className="mt-4 flex gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-xs font-semibold text-rose-700 dark:text-rose-400">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <p>{status.error.message}</p>
           </div>
         )}
 
         {status.data && (
-          <section className="glass-panel mt-6 overflow-hidden">
-            {/* Dark Navy Header Showcase */}
-            <div className="bg-[#111C44] p-5 text-white dark:bg-[#0c1433]">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-[#D8E3FF]">
-                {t("Live rescue flow")}
+          <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
+            {/* Dark Tactical Status Banner (Reference 3 Screen 3) */}
+            <div className="bg-slate-900 p-5 text-white dark:bg-slate-950 border-b border-slate-800">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-400">
+                {t("Live rescue telemetry")}
               </p>
-              <h1 className="mt-2 text-2xl font-black text-[#F8F1E4]">{stages[activeIndex]?.label}</h1>
-              <p className="mt-1 text-sm text-[#D8E3FF]/80">{stages[activeIndex]?.copy}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+              <h1 className="mt-1.5 text-2xl font-black tracking-tight text-white">{stages[activeIndex]?.label}</h1>
+              <p className="mt-1 text-xs text-slate-300">{stages[activeIndex]?.copy}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-2.5">
                 <p
                   aria-label={t("SOS tracking number")}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-1.5 font-mono text-xs font-bold text-[#F8F1E4] backdrop-blur-xs"
+                  className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1 font-mono text-xs font-bold text-white"
                 >
-                  <span className="text-[#D8E3FF]">{t("Tracking no.")}</span>
+                  <span className="text-slate-400">{t("Incident:")}</span>
                   <span>{status.data.publicCode}</span>
                 </p>
-                <div className="flex items-center gap-1.5 text-xs font-bold text-[#D8E3FF]">
-                  <MapPin className="h-3.5 w-3.5 text-[#2457FF]" />
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+                  <MapPin className="h-3.5 w-3.5 text-rose-400" />
                   <span>{status.data.locationLabel}</span>
                 </div>
               </div>
             </div>
 
             {/* Stepper & Details */}
-            <div className="p-5">
-              <ol className="relative ml-3 border-l-2 border-[#D8E3FF]/40 pl-6 dark:border-[#2457FF]/30">
+            <div className="p-5 sm:p-6">
+              <ol className="relative ml-3 border-l-2 border-slate-200 pl-6 dark:border-slate-800">
                 {stages.map((stage, index) => {
                   const Icon = stage.icon;
                   const reached = index <= activeIndex;
                   return (
-                    <li key={stage.key} className="relative pb-7 last:pb-0">
+                    <li key={stage.key} className="relative pb-6 last:pb-0">
                       <span
-                        className={`absolute -left-[2.35rem] grid h-7 w-7 place-items-center rounded-full border-2 transition-all ${
+                        className={`absolute -left-[2.15rem] grid h-6 w-6 place-items-center rounded-full border-2 transition-all ${
                           reached
-                            ? "border-[#2457FF] bg-[#2457FF] text-white shadow-sm"
-                            : "border-[#B7AD9E]/40 bg-white text-[#B7AD9E] dark:bg-[#111C44] dark:border-[#D8E3FF]/20"
+                            ? "border-sky-500 bg-sky-500 text-white"
+                            : "border-slate-300 bg-white text-slate-400 dark:bg-slate-900 dark:border-slate-700"
                         }`}
                       >
-                        <Icon className="h-3.5 w-3.5" />
+                        <Icon className="h-3 w-3" />
                       </span>
-                      <p className={`text-sm font-black ${reached ? "text-[#111C44] dark:text-[#F8F1E4]" : "text-[#B7AD9E] dark:text-[#D8E3FF]/50"}`}>
+                      <p className={`text-sm font-bold ${reached ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-500"}`}>
                         {stage.label}
                       </p>
-                      <p className="mt-1 text-xs leading-5 text-[#111C44]/70 dark:text-[#D8E3FF]/70">
-                        {index === 1 && !status.data.assignedRescuer ? t("Searching for rescuer...") : stage.copy}
+                      <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+                        {index === 1 && !status.data.assignedRescuer ? t("Searching for nearby rescuer…") : stage.copy}
                       </p>
                     </li>
                   );
@@ -157,7 +154,7 @@ export default function UserTrackFlow() {
               </ol>
 
               {(status.data as any).destinationHospitalName && (
-                <div className="mt-5 flex items-center gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-extrabold text-emerald-900 dark:text-emerald-300">
+                <div className="mt-5 flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
                   <span>🏥</span>
                   <span>
                     {t("En route to")} {(status.data as any).destinationHospitalName}
@@ -188,11 +185,13 @@ export default function UserTrackFlow() {
                 <IncidentChat publicCode={status.data.publicCode} active={status.data.status !== "resolved"} />
               </div>
 
-              <div className="mt-5 rounded-xl border border-[#2457FF]/20 bg-[#2457FF]/5 p-3.5 text-xs leading-5 text-[#111C44] dark:text-[#D8E3FF]">
-                <ShieldCheck className="mr-2 inline h-4 w-4 text-[#2457FF]" />
-                {user
-                  ? t("Only your authorized account can add details or message the rescue team.")
-                  : t("Sign in with the reporting account to add details or message the rescue team.")}
+              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-300 flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span>
+                  {user
+                    ? t("Only your authorized account can add details or message the rescue team.")
+                    : t("Sign in with the reporting account to add details or message the rescue team.")}
+                </span>
               </div>
             </div>
           </section>

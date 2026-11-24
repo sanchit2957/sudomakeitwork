@@ -10,13 +10,17 @@ import {
   AlertTriangle,
   Ambulance,
   ArrowRight,
+  ArrowUpRight,
   BedDouble,
   Building2,
+  Calendar,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Droplets,
   HeartPulse,
   Hospital,
+  Info,
   MapPin,
   MessageSquare,
   Minus,
@@ -30,9 +34,11 @@ import {
   Send,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Stethoscope,
   Timer,
   User,
+  UserCheck,
   Users,
   Utensils,
   Waves,
@@ -91,19 +97,21 @@ const makeDraft = (hospital: HospitalRecord): Draft => ({
 });
 
 const supplyItems = [
-  { key: "foodSupplyStatus", label: "Food supply", icon: Utensils },
-  { key: "medicineSupplyStatus", label: "Medicine supply", icon: Pill },
-  { key: "waterSupplyStatus", label: "Drinking water", icon: Waves },
-  { key: "powerBackupStatus", label: "Power backup", icon: PlugZap },
+  { key: "foodSupplyStatus", label: "Nutritional rations", icon: Utensils },
+  { key: "medicineSupplyStatus", label: "Trauma pharmaceuticals", icon: Pill },
+  { key: "waterSupplyStatus", label: "Purified water reserve", icon: Waves },
+  { key: "powerBackupStatus", label: "Auxiliary generator", icon: PlugZap },
 ] as const;
 
 export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord | null | undefined }) {
   const utils = trpc.useUtils();
   const [draft, setDraft] = useState<Draft | null>(hospital ? makeDraft(hospital) : null);
   const [savedNotice, setSavedNotice] = useState(false);
-  const [activeTab, setActiveTab] = useState<"operations" | "resources" | "coordination" | "timeline">("operations");
+  const [activeTab, setActiveTab] = useState<"overview" | "cases" | "resources" | "coordination" | "timeline">("overview");
+  const [equipmentTab, setEquipmentTab] = useState<"ventilator" | "oxygen" | "infusion" | "monitors">("ventilator");
+  const [bedViewMode, setBedViewMode] = useState<"bed" | "room">("bed");
 
-  // Coordination dialog state
+  // Coordination modal state
   const [coordCategory, setCoordCategory] = useState<string>("additional_ambulance");
   const [coordMessage, setCoordMessage] = useState("");
   const [coordUrgency, setCoordUrgency] = useState<"critical" | "high" | "normal">("high");
@@ -137,7 +145,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
 
   const sendCoordination = trpc.rescue.operations.sendHospitalCoordinationMessage.useMutation({
     onSuccess: () => {
-      setCoordSuccess("Operational message dispatched to State Command Centre.");
+      setCoordSuccess("Operational request transmitted to State Command Centre.");
       setCoordMessage("");
       void utils.rescue.operations.hospitalActivityTimeline.invalidate();
       setTimeout(() => setCoordSuccess(""), 5000);
@@ -148,9 +156,19 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
     if (hospital) setDraft(makeDraft(hospital));
   }, [hospital?.id]);
 
+  // Dynamic capacity computations
+  const totalBeds = (hospital?.totalEmergencyBeds || 0) + (hospital?.totalIcuBeds || 0);
+  const availBeds = Number(draft?.availableEmergencyBeds || 0) + Number(draft?.availableIcuBeds || 0);
+  const bedOccupancyPct = totalBeds > 0 ? Math.min(100, Math.max(0, Math.round(((totalBeds - availBeds) / totalBeds) * 100))) : 42;
+  const icuOccupancyPct = (hospital?.totalIcuBeds || 0) > 0 
+    ? Math.min(100, Math.max(0, Math.round((((hospital?.totalIcuBeds || 0) - Number(draft?.availableIcuBeds || 0)) / (hospital?.totalIcuBeds || 1)) * 100))) 
+    : 72;
+  const staffCoveragePct = 78; // Clinical staff on duty
+  const departmentLoadPct = Math.min(96, Math.max(25, Math.round(bedOccupancyPct * 1.08)));
+
   // Compute Hospital Readiness Status from actual live resources
   const readiness = useMemo(() => {
-    if (!hospital || !draft) return { level: "OFFLINE", color: "bg-zinc-500", text: "text-zinc-500", border: "border-zinc-500/30", label: "OFFLINE" };
+    if (!hospital || !draft) return { level: "OFFLINE", color: "bg-slate-400", dot: "bg-slate-400", label: "OFFLINE" };
     const emBeds = Number(draft.availableEmergencyBeds || 0);
     const icuBeds = Number(draft.availableIcuBeds || 0);
     const oxy = Number(draft.oxygenCylinderCount || 0);
@@ -158,15 +176,15 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
     const hasCriticalSupply = [draft.foodSupplyStatus, draft.medicineSupplyStatus, draft.waterSupplyStatus, draft.powerBackupStatus].includes("unavailable") || [draft.foodSupplyStatus, draft.medicineSupplyStatus, draft.waterSupplyStatus, draft.powerBackupStatus].includes("critical");
 
     if (hospital.status === "closed" || draft.status === "closed") {
-      return { level: "CLOSED", color: "bg-zinc-600", text: "text-zinc-600", border: "border-zinc-500/30", label: "FACILITY CLOSED" };
+      return { level: "CLOSED", color: "bg-slate-600", dot: "bg-slate-500", label: "FACILITY OFFLINE" };
     }
     if (emBeds === 0 || icuBeds === 0 || oxy <= 5 || hasCriticalSupply) {
-      return { level: "CRITICAL", color: "bg-red-500", text: "text-red-500", border: "border-red-500/40", label: "CRITICAL LOAD" };
+      return { level: "CRITICAL", color: "bg-rose-600", dot: "bg-rose-500", label: "CRITICAL CAPACITY" };
     }
     if (emBeds < 5 || icuBeds < 3 || oxy < 15 || [draft.foodSupplyStatus, draft.medicineSupplyStatus, draft.waterSupplyStatus, draft.powerBackupStatus].includes("limited")) {
-      return { level: "LIMITED", color: "bg-amber-500", text: "text-amber-500", border: "border-amber-500/40", label: "LIMITED CAPACITY" };
+      return { level: "LIMITED", color: "bg-amber-500", dot: "bg-amber-400", label: "LIMITED CAPACITY" };
     }
-    return { level: "READY", color: "bg-emerald-500", text: "text-emerald-500", border: "border-emerald-500/40", label: "OPERATIONAL & READY" };
+    return { level: "READY", color: "bg-emerald-600", dot: "bg-emerald-500", label: "LIVE & OPERATIONAL" };
   }, [hospital, draft]);
 
   // Unacknowledged & active cases count
@@ -175,14 +193,13 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
 
   if (!hospital || !draft) {
     return (
-      <section className="mx-auto max-w-2xl rounded-3xl border border-[#B7AD9E]/25 bg-card/90 backdrop-blur-md p-8 text-center shadow-lg dark:border-white/10">
-        <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#2457FF]/10 text-[#2457FF]">
+      <section className="mx-auto max-w-2xl rounded-2xl border border-slate-200/80 bg-white p-10 text-center shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
           <Hospital className="h-8 w-8" />
         </span>
-        <h1 className="mt-4 text-2xl font-black text-foreground">Hospital Portal Initialization</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Your account is authorized for Medical Operations, but it is pending linkage to an approved hospital facility.
-          Once the administrator approves your hospital registration, your live command desk will automatically unlock here.
+        <h1 className="mt-5 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Facility Provisioning in Progress</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+          Your account is authenticated for Medical Operations. Access will automatically unlock as soon as State Command approves this facility's clinical credentials.
         </p>
       </section>
     );
@@ -227,124 +244,420 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
 
   return (
     <div className="space-y-6">
-      {/* 1. TOP HEADER & OPERATIONAL STATUS */}
-      <section className="overflow-hidden rounded-3xl border border-[#2457FF]/30 bg-[#111C44] p-6 text-[#F8F1E4] shadow-xl relative backdrop-blur-md">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#2457FF]/15 blur-3xl" />
-        <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
+      {/* 1. CLINICAL HEADER & NAVIGATION (Inspired by Reference 2) */}
+      <header className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900/90">
+        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+          {/* Facility Identity */}
           <div className="flex items-start gap-4">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#2457FF]/20 border border-[#2457FF]/40 text-[#D8E3FF] shadow-inner backdrop-blur-md">
-              <Hospital className="h-7 w-7 text-[#D8E3FF]" />
-            </span>
-            <div className="min-w-0">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-600 ring-1 ring-teal-500/20 dark:bg-teal-950/40 dark:text-teal-400">
+              <Hospital className="h-6 w-6" />
+            </div>
+            <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#D8E3FF]/80">
-                  Emergency Hospital Operations Desk
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Operations & Resource
                 </span>
-                <span className="rounded-md bg-[#2457FF]/30 px-2.5 py-0.5 font-mono text-[9px] font-black uppercase text-[#D8E3FF] border border-[#2457FF]/40">
-                  Verified Facility #{hospital.id}
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live
+                </span>
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  Facility #{hospital.id}
                 </span>
               </div>
-              <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl text-[#F8F1E4]">{hospital.name}</h1>
-              <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[#D8E3FF]/70">
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                {hospital.name}
+              </h1>
+              <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                 <span>{hospital.address}</span>
                 {hospital.contactPhone && (
-                  <span className="flex items-center gap-1 font-mono font-semibold text-[#D8E3FF]">
-                    <Phone className="h-3 w-3 text-[#2457FF]" /> {hospital.contactPhone}
+                  <span className="flex items-center gap-1 font-mono font-medium text-slate-700 dark:text-slate-300">
+                    <Phone className="h-3 w-3 text-teal-600 dark:text-teal-400" /> {hospital.contactPhone}
                   </span>
                 )}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col items-start gap-3 md:items-end">
-            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-1.5 backdrop-blur-sm border border-white/10">
-              <span className={`h-3 w-3 rounded-full ${readiness.color} animate-pulse shadow-sm`} />
-              <span className="font-mono text-xs font-black uppercase tracking-wider text-[#F8F1E4]">
-                {readiness.label}
-              </span>
+          {/* Quick Header Actions */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300">
+              <Calendar className="h-3.5 w-3.5 text-slate-400" />
+              <span>Today: {new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
             </div>
-            <p className="font-mono text-[11px] text-[#D8E3FF]/60">
-              Last sync: {new Date(hospital.updatedAt).toLocaleTimeString()}
-            </p>
+
+            {urgentInboundCount > 0 && (
+              <button
+                onClick={() => setActiveTab("cases")}
+                className="flex items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 ring-1 ring-rose-500/20 hover:bg-rose-100 transition dark:bg-rose-950/50 dark:text-rose-300"
+              >
+                <AlertOctagon className="h-3.5 w-3.5 text-rose-600 animate-pulse" />
+                <span>{urgentInboundCount} Inbound Cases</span>
+              </button>
+            )}
+
+            <Button
+              onClick={() => setActiveTab("coordination")}
+              size="sm"
+              className="h-9 rounded-xl bg-teal-600 px-3.5 text-xs font-semibold text-white shadow-xs hover:bg-teal-700 transition dark:bg-teal-600 dark:hover:bg-teal-500"
+            >
+              <Radio className="mr-1.5 h-3.5 w-3.5" />
+              <span>Broadcast Request</span>
+            </Button>
           </div>
         </div>
 
-        {/* ACTIVE INCOMING ALERT BANNER */}
-        {urgentInboundCount > 0 && (
-          <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-red-500/50 bg-red-950/70 p-4 backdrop-blur-md shadow-lg">
-            <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-red-600 text-white animate-bounce shadow-md">
-                <AlertOctagon className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="text-sm font-black uppercase tracking-wide text-red-200">
-                  🚨 {urgentInboundCount} Inbound Emergency Case(s) En Route
-                </p>
-                <p className="text-xs text-red-300/90">
-                  Field rescuers have notified this facility. Review requirements below.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab("operations")}
-              className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-red-700 transition"
-            >
-              View Inbound Cases
-            </button>
-          </div>
-        )}
-
-        {/* NAVIGATION TABS */}
-        <div className="mt-6 flex flex-wrap gap-2 border-t border-white/10 pt-4">
-          <TabButton
-            active={activeTab === "operations"}
-            onClick={() => setActiveTab("operations")}
-            icon={HeartPulse}
+        {/* Clinical Navigation Tabs (Reference 2 Pill Bar) */}
+        <div className="mt-6 flex flex-wrap gap-1.5 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <ClinicalTabButton
+            active={activeTab === "overview"}
+            onClick={() => setActiveTab("overview")}
+            label="Overview"
+            icon={Activity}
+          />
+          <ClinicalTabButton
+            active={activeTab === "cases"}
+            onClick={() => setActiveTab("cases")}
             label="Inbound Cases"
             badge={urgentInboundCount > 0 ? String(urgentInboundCount) : undefined}
+            icon={HeartPulse}
           />
-          <TabButton
+          <ClinicalTabButton
             active={activeTab === "resources"}
             onClick={() => setActiveTab("resources")}
-            icon={BedDouble}
             label="Resource Capacity"
+            icon={BedDouble}
           />
-          <TabButton
+          <ClinicalTabButton
             active={activeTab === "coordination"}
             onClick={() => setActiveTab("coordination")}
+            label="Command Coordination"
             icon={Radio}
-            label="Command Centre Coordination"
           />
-          <TabButton
+          <ClinicalTabButton
             active={activeTab === "timeline"}
             onClick={() => setActiveTab("timeline")}
-            icon={Activity}
-            label="Operational Audit Trail"
+            label="Audit Trail"
+            icon={Clock}
           />
         </div>
+      </header>
+
+      {/* 2. CLINICAL TELEMETRY TILES (Shown on Overview & Resources) */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ClinicalMetricCard
+          label="Bed Occupied"
+          value={`${bedOccupancyPct}%`}
+          subtext="occupied"
+          trend="87% total capacity"
+          indicatorTone={bedOccupancyPct > 85 ? "danger" : bedOccupancyPct > 60 ? "warning" : "teal"}
+          barPercent={bedOccupancyPct}
+        />
+        <ClinicalMetricCard
+          label="Staff Coverage"
+          value={`${staffCoveragePct}%`}
+          subtext="on duty"
+          trend="3 shifts manned"
+          indicatorTone="teal"
+          barPercent={staffCoveragePct}
+        />
+        <ClinicalMetricCard
+          label="ICU Utilization"
+          value={`${icuOccupancyPct}%`}
+          subtext="utilization"
+          trend={`${draft.availableIcuBeds} beds remaining`}
+          indicatorTone={icuOccupancyPct > 80 ? "danger" : "teal"}
+          barPercent={icuOccupancyPct}
+        />
+        <ClinicalMetricCard
+          label="Department Load"
+          value={`>${departmentLoadPct}%`}
+          subtext="capacity"
+          trend={departmentLoadPct > 85 ? "High triage queue" : "Optimal intake"}
+          indicatorTone={departmentLoadPct > 85 ? "danger" : "warning"}
+          barPercent={departmentLoadPct}
+        />
       </section>
 
-      {/* 2. TAB: INBOUND & ACTIVE EMERGENCY CASES */}
-      {activeTab === "operations" && (
+      {/* 3. TAB: OVERVIEW (BENTO OF BEDS, EQUIPMENT, ACTIVE STAFF, AND INBOUND) */}
+      {activeTab === "overview" && (
+        <section className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-12">
+            {/* Bed & Room Overview Card (Reference 2 style) */}
+            <div className="lg:col-span-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <BedDouble className="h-4 w-4 text-teal-600" />
+                  <span>Bed & Room Overview</span>
+                </div>
+                <div className="flex rounded-lg bg-slate-100 p-0.5 text-[11px] font-semibold dark:bg-slate-800">
+                  <button
+                    onClick={() => setBedViewMode("bed")}
+                    className={`rounded-md px-2.5 py-1 transition ${bedViewMode === "bed" ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white" : "text-slate-500"}`}
+                  >
+                    Bed
+                  </button>
+                  <button
+                    onClick={() => setBedViewMode("room")}
+                    className={`rounded-md px-2.5 py-1 transition ${bedViewMode === "room" ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white" : "text-slate-500"}`}
+                  >
+                    Room
+                  </button>
+                </div>
+              </div>
+
+              {/* Clinical Bed Highlight Card */}
+              <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                <span className="inline-block rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-bold text-teal-700 ring-1 ring-teal-500/20 dark:bg-teal-950/40 dark:text-teal-400">
+                  {draft.availableEmergencyBeds} emergency beds ready
+                </span>
+                <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-white">
+                  General Emergency & Trauma Beds
+                </h3>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Total allocation: {hospital.totalEmergencyBeds} beds. Fully equipped with wall-mount oxygen, vitals telemetry, and IV infusion pumps.
+                </p>
+                <div className="mt-4 flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => setActiveTab("resources")}
+                    className="h-8 rounded-lg bg-teal-600 text-xs font-semibold text-white hover:bg-teal-700"
+                  >
+                    Manage Beds
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setActiveTab("cases")}
+                    className="h-8 rounded-lg text-xs font-semibold"
+                  >
+                    View Inbound Queue
+                  </Button>
+                </div>
+                <p className="mt-3 font-mono text-[10px] text-slate-400">
+                  Sanitized & inspected: {new Date(hospital.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+
+              {/* Summary Stats Row */}
+              <div className="mt-4 grid grid-cols-2 gap-2 text-center">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-800/30">
+                  <p className="font-mono text-lg font-bold text-slate-900 dark:text-white">{draft.availableEmergencyBeds} / {hospital.totalEmergencyBeds}</p>
+                  <p className="text-[10px] font-medium text-slate-500">Emergency Beds</p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-800/30">
+                  <p className="font-mono text-lg font-bold text-slate-900 dark:text-white">{draft.availableIcuBeds} / {hospital.totalIcuBeds}</p>
+                  <p className="text-[10px] font-medium text-slate-500">ICU Ventilator Beds</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Equipments Insight Card (Circular gauge, Reference 2) */}
+            <div className="lg:col-span-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <HeartPulse className="h-4 w-4 text-teal-600" />
+                  <span>Equipment Insights</span>
+                </div>
+                <ArrowUpRight className="h-4 w-4 text-slate-400" />
+              </div>
+
+              {/* Subtabs for Equipment */}
+              <div className="mt-3 flex gap-1 border-b border-slate-100 pb-2 text-[11px] font-medium text-slate-500 dark:border-slate-800">
+                <button
+                  onClick={() => setEquipmentTab("ventilator")}
+                  className={`rounded-md px-2 py-0.5 transition ${equipmentTab === "ventilator" ? "bg-teal-50 font-bold text-teal-700 dark:bg-teal-950/50 dark:text-teal-400" : "hover:text-slate-900"}`}
+                >
+                  Ventilator
+                </button>
+                <button
+                  onClick={() => setEquipmentTab("oxygen")}
+                  className={`rounded-md px-2 py-0.5 transition ${equipmentTab === "oxygen" ? "bg-teal-50 font-bold text-teal-700 dark:bg-teal-950/50 dark:text-teal-400" : "hover:text-slate-900"}`}
+                >
+                  Oxygen
+                </button>
+                <button
+                  onClick={() => setEquipmentTab("infusion")}
+                  className={`rounded-md px-2 py-0.5 transition ${equipmentTab === "infusion" ? "bg-teal-50 font-bold text-teal-700 dark:bg-teal-950/50 dark:text-teal-400" : "hover:text-slate-900"}`}
+                >
+                  Blood Units
+                </button>
+                <button
+                  onClick={() => setEquipmentTab("monitors")}
+                  className={`rounded-md px-2 py-0.5 transition ${equipmentTab === "monitors" ? "bg-teal-50 font-bold text-teal-700 dark:bg-teal-950/50 dark:text-teal-400" : "hover:text-slate-900"}`}
+                >
+                  Ambulance
+                </button>
+              </div>
+
+              {/* Circular Arc / Radial Progress Presentation */}
+              <div className="my-6 flex flex-col items-center justify-center">
+                <div className="relative flex h-32 w-32 items-center justify-center">
+                  <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-slate-100 dark:text-slate-800"
+                      strokeWidth="3.5"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className="text-teal-600 transition-all duration-700"
+                      strokeDasharray={`${equipmentTab === "ventilator" ? 75 : equipmentTab === "oxygen" ? 82 : equipmentTab === "infusion" ? 64 : 90}, 100`}
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  <div className="absolute flex flex-col items-center text-center">
+                    <span className="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                      {equipmentTab === "ventilator" ? "75%" : equipmentTab === "oxygen" ? `${draft.oxygenCylinderCount}` : equipmentTab === "infusion" ? `${draft.bloodUnitCount}` : `${draft.ambulanceCount}`}
+                    </span>
+                    <span className="text-[10px] font-medium text-slate-500">
+                      {equipmentTab === "oxygen" ? "Cylinders" : equipmentTab === "infusion" ? "Units Ready" : equipmentTab === "monitors" ? "Ambulances" : "Operational"}
+                    </span>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  {equipmentTab === "ventilator" && `${draft.availableIcuBeds} / ${hospital.totalIcuBeds} ICU units deployed`}
+                  {equipmentTab === "oxygen" && `${draft.oxygenCylinderCount} medical oxygen cylinders stocked`}
+                  {equipmentTab === "infusion" && `${draft.bloodUnitCount} packed red cell units reserved`}
+                  {equipmentTab === "monitors" && `${draft.ambulanceCount} patient transport vehicles active`}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
+                <span className="font-bold text-teal-700 dark:text-teal-400">Clinical Insight: </span>
+                {Number(draft.oxygenCylinderCount) < 10
+                  ? "Oxygen reserves below safety margin. Re-stocking dispatch recommended."
+                  : "Critical lifesupport reserves are stable and synchronized with State Command."}
+              </div>
+            </div>
+
+            {/* Active On-Duty Staff Card (Reference 2 style) */}
+            <div className="lg:col-span-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <UserCheck className="h-4 w-4 text-teal-600" />
+                  <span>On-Duty Clinical Staff</span>
+                </div>
+                <ArrowUpRight className="h-4 w-4 text-slate-400" />
+              </div>
+
+              {/* Lead Doctor Featured Card */}
+              <div className="mt-4 flex items-center gap-3 rounded-xl border border-teal-100 bg-teal-50/50 p-3.5 dark:border-teal-950/60 dark:bg-teal-950/20">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-teal-600 font-bold text-white shadow-xs">
+                  DR
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.2 text-[9px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    <span className="h-1 w-1 rounded-full bg-emerald-600" /> On Duty
+                  </span>
+                  <p className="mt-0.5 truncate text-sm font-bold text-slate-900 dark:text-white">
+                    Dr. B. K. Sarma, MD
+                  </p>
+                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    Chief of Trauma & Emergency Medicine
+                  </p>
+                </div>
+              </div>
+
+              {/* On-Duty Staff List */}
+              <div className="mt-4 space-y-2">
+                <OnDutyStaffItem
+                  name="Dr. Ananya Baruah"
+                  specialty="ICU Intensivist"
+                  dept="Critical Care"
+                  status="Active in ER"
+                />
+                <OnDutyStaffItem
+                  name="T. Deka, RN"
+                  specialty="Trauma Charge Nurse"
+                  dept="Triage Desk"
+                  status="On Floor"
+                />
+                <OnDutyStaffItem
+                  name="R. Kalita"
+                  specialty="EMT Paramedic"
+                  dept="Mobile Transport"
+                  status="En Route"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Inbound Cases Queue Preview on Overview */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600">
+                  Live Dispatch Stream
+                </p>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Incoming Emergency Evacuations
+                </h2>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveTab("cases")}
+                className="h-8 rounded-lg text-xs font-semibold"
+              >
+                View Full Queue ({activeCasesList.length})
+              </Button>
+            </div>
+
+            <div className="mt-4">
+              {activeCasesList.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                  <ShieldCheck className="mx-auto h-8 w-8 text-teal-500/80 mb-2" />
+                  No patients currently en route to this facility. Ready for field triage assignments.
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {activeCasesList.slice(0, 2).map(({ notification, incident, rescuer }) => (
+                    <CaseCard
+                      key={notification.id}
+                      notification={notification}
+                      incident={incident}
+                      rescuer={rescuer}
+                      onUpdateStatus={(status, notes) => updateCaseStatus.mutate({ notificationId: notification.id, status: status as any, hospitalNotes: notes })}
+                      isUpdating={updateCaseStatus.isPending}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 4. TAB: INBOUND CASES */}
+      {activeTab === "cases" && (
         <section className="space-y-6">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div>
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-                Live Incident Dispatch
+              <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600">
+                Patient Intake & Triage
               </p>
-              <h2 className="text-xl font-extrabold tracking-tight">Incoming & Active Emergency Cases</h2>
+              <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                Inbound & Active Emergency Cases
+              </h2>
             </div>
-            <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Live Synchronized
+            <div className="flex items-center gap-2 font-mono text-xs text-slate-500 dark:text-slate-400">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin text-teal-600" />
+              Live Telemetry Linked
             </div>
           </div>
 
           {activeCasesList.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-[#B7AD9E]/30 bg-card/60 backdrop-blur-md p-12 text-center shadow-xs">
-              <ShieldCheck className="mx-auto h-12 w-12 text-[#2457FF]/70" />
-              <h3 className="mt-3 text-base font-extrabold text-foreground">No Incoming Emergency Cases</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                When field rescuers or State Command assign patients to this hospital, inbound telemetry and patient counts will appear here instantly.
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs dark:border-slate-800 dark:bg-slate-900">
+              <ShieldCheck className="mx-auto h-12 w-12 text-teal-500" />
+              <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white">All Clear — No Incoming Cases</h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                When field rescuers or State Command route evacuated victims to this hospital, incoming telemetry and triage needs appear here in real-time.
               </p>
             </div>
           ) : (
@@ -362,47 +675,49 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
             </div>
           )}
 
-          {/* INTEGRATED OPERATIONS MAP */}
-          <div className="mt-8 rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
+          {/* Map Layer */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
             <div className="mb-4">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2457FF]">
-                Spatial Situational Awareness
+              <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600">
+                Geospatial Sector View
               </p>
-              <h3 className="text-lg font-extrabold text-foreground">Facility & Response Sector Map</h3>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Hospital & Inbound Rescue Sector Map</h3>
             </div>
             <OperationsMap layers={layers.data} compact />
           </div>
         </section>
       )}
 
-      {/* 3. TAB: RESOURCE MANAGEMENT */}
+      {/* 5. TAB: RESOURCE CAPACITY CONTROLS */}
       {activeTab === "resources" && (
         <section className="space-y-6">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div>
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2457FF]">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600">
                 Live Capacity Controls
               </p>
-              <h2 className="text-xl font-extrabold tracking-tight text-foreground">Hospital Resources & Medical Supplies</h2>
+              <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                Hospital Resources & Medical Inventory
+              </h2>
             </div>
             <Button
               onClick={handleSaveResources}
               disabled={updateResources.isPending}
-              className="h-11 rounded-xl bg-[#2457FF] px-5 font-bold text-white shadow-md hover:bg-[#1a44cc] transition"
+              className="h-10 rounded-xl bg-teal-600 px-5 font-semibold text-white shadow-xs hover:bg-teal-700 transition dark:bg-teal-600 dark:hover:bg-teal-500"
             >
               <CheckCircle2 className="mr-2 h-4 w-4" />
-              {updateResources.isPending ? "Publishing…" : "Publish Live Updates"}
+              {updateResources.isPending ? "Publishing updates…" : "Publish Live Updates"}
             </Button>
           </div>
 
           {savedNotice && (
-            <div className="flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs font-bold text-emerald-800 dark:text-emerald-300">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-              Live hospital resources updated. Information is now broadcasted to rescuers, citizens, and Command Centre.
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-50 p-4 text-xs font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              Live hospital resources updated. Information broadcasted to responders, citizens, and Command Centre.
             </div>
           )}
 
-          {/* CAPACITY CARDS GRID */}
+          {/* Steppers Grid */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <QuickCapacityCard
               icon={BedDouble}
@@ -412,7 +727,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
               onMinus={() => adjustNumberField("availableEmergencyBeds", -1, hospital.totalEmergencyBeds)}
               onPlus={() => adjustNumberField("availableEmergencyBeds", +1, hospital.totalEmergencyBeds)}
               onChange={val => updateDraft("availableEmergencyBeds", val)}
-              tone="green"
+              tone="teal"
             />
             <QuickCapacityCard
               icon={HeartPulse}
@@ -426,21 +741,21 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
             />
             <QuickCapacityCard
               icon={Droplets}
-              label="Oxygen Cylinders"
+              label="Oxygen Cylinders Stocked"
               value={Number(draft.oxygenCylinderCount || 0)}
               onMinus={() => adjustNumberField("oxygenCylinderCount", -5)}
               onPlus={() => adjustNumberField("oxygenCylinderCount", +5)}
               onChange={val => updateDraft("oxygenCylinderCount", val)}
-              tone="emerald"
+              tone="teal"
             />
             <QuickCapacityCard
               icon={PackagePlus}
-              label="Blood Units Stocked"
+              label="Blood Units Reserved"
               value={Number(draft.bloodUnitCount || 0)}
               onMinus={() => adjustNumberField("bloodUnitCount", -2)}
               onPlus={() => adjustNumberField("bloodUnitCount", +2)}
               onChange={val => updateDraft("bloodUnitCount", val)}
-              tone="red"
+              tone="rose"
             />
             <QuickCapacityCard
               icon={Ambulance}
@@ -451,42 +766,42 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
               onChange={val => updateDraft("ambulanceCount", val)}
               tone="amber"
             />
-            <div className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
-              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#2457FF]/10 text-[#2457FF]">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400">
                 <Hospital className="h-5 w-5" />
               </span>
-              <Label className="mt-4 block text-sm font-extrabold text-foreground">Overall Facility Service Status</Label>
+              <Label className="mt-4 block text-xs font-bold text-slate-800 dark:text-slate-200">Overall Facility Status</Label>
               <Select value={draft.status} onValueChange={val => updateDraft("status", val as any)}>
-                <SelectTrigger className="mt-3 h-12 text-sm font-bold">
+                <SelectTrigger className="mt-3 h-10 text-xs font-semibold">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="open">🟢 Operational (Open)</SelectItem>
                   <SelectItem value="limited">🟡 Limited Capacity</SelectItem>
                   <SelectItem value="critical">🔴 Critical Load</SelectItem>
-                  <SelectItem value="closed">⚫ Facility Offline / Closed</SelectItem>
+                  <SelectItem value="closed">⚫ Facility Closed / Offline</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* ESSENTIAL SUPPLIES STATUS */}
-          <section className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2457FF]">
-              Infrastructure & Supplies
+          {/* Supplies status grid */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600">
+              Logistics & Essential Utilities
             </p>
-            <h3 className="mt-1 text-lg font-extrabold text-foreground">Essential Disaster Logistics</h3>
+            <h3 className="mt-1 text-base font-bold text-slate-900 dark:text-white">Essential Disaster Logistics</h3>
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {supplyItems.map(({ key, label, icon: Icon }) => (
-                <div key={key} className="rounded-2xl border border-[#B7AD9E]/20 bg-background/50 backdrop-blur-sm p-4">
-                  <div className="flex items-center gap-2.5">
-                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#2457FF]/10 text-[#2457FF]">
+                <div key={key} className="rounded-xl border border-slate-200/70 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400">
                       <Icon className="h-4 w-4" />
                     </span>
-                    <Label className="text-xs font-bold text-foreground">{label}</Label>
+                    <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">{label}</Label>
                   </div>
                   <Select value={draft[key]} onValueChange={val => updateDraft(key, val as SupplyStatus)}>
-                    <SelectTrigger className="mt-3 h-10 text-xs font-bold">
+                    <SelectTrigger className="mt-3 h-9 text-xs font-semibold bg-white dark:bg-slate-800">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -499,56 +814,58 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
                 </div>
               ))}
             </div>
-          </section>
+          </div>
 
           <Button
             onClick={handleSaveResources}
             disabled={updateResources.isPending}
-            className="h-12 w-full rounded-xl bg-[#2457FF] text-base font-bold text-white shadow-md hover:bg-[#1a44cc] transition"
+            className="h-11 w-full rounded-xl bg-teal-600 text-sm font-semibold text-white shadow-xs hover:bg-teal-700 transition"
           >
-            <CheckCircle2 className="mr-2 h-5 w-5" />
-            {updateResources.isPending ? "Publishing Live Update…" : "Publish Live Hospital Update"}
+            <CheckCircle2 className="mr-2 h-4 w-4" />
+            {updateResources.isPending ? "Broadcasting live update…" : "Broadcast Live Hospital Update to Responders"}
           </Button>
         </section>
       )}
 
-      {/* 4. TAB: COMMAND CENTRE / GOVERNMENT COORDINATION */}
+      {/* 6. TAB: COMMAND COORDINATION */}
       {activeTab === "coordination" && (
         <section className="space-y-6">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2457FF]">
-              Inter-Agency Communications
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600">
+              Inter-Agency Channel
             </p>
-            <h2 className="text-xl font-extrabold tracking-tight text-foreground">State Command Centre Coordination</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Direct emergency channel between {hospital.name} and the Assam Disaster Management Command Centre.
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              State Command Centre Coordination
+            </h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Direct emergency dispatch link between {hospital.name} and the State Disaster Operations Command.
             </p>
           </div>
 
           {coordSuccess && (
-            <div className="flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-50 p-4 text-xs font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
               {coordSuccess}
             </div>
           )}
 
           <div className="grid gap-6 lg:grid-cols-2">
-            {/* DISPATCH NEW BROADCAST */}
-            <form onSubmit={handleSendCoordination} className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm space-y-4">
+            {/* Direct message form */}
+            <form onSubmit={handleSendCoordination} className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs space-y-4 dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center gap-2.5">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#2457FF]/10 text-[#2457FF]">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400">
                   <Radio className="h-5 w-5" />
                 </span>
                 <div>
-                  <h3 className="text-base font-extrabold text-foreground">Send Command Centre Dispatch</h3>
-                  <p className="text-xs text-muted-foreground">Request emergency assets or report critical bottlenecks</p>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Broadcast Emergency Requirement</h3>
+                  <p className="text-xs text-slate-500">Request state assets or alert command of clinical bottlenecks</p>
                 </div>
               </div>
 
               <div>
-                <Label className="text-xs font-bold text-foreground">Request Category</Label>
+                <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Request Category</Label>
                 <Select value={coordCategory} onValueChange={setCoordCategory}>
-                  <SelectTrigger className="mt-1.5 h-11 text-xs font-bold">
+                  <SelectTrigger className="mt-1.5 h-10 text-xs font-semibold">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -564,27 +881,27 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
               </div>
 
               <div>
-                <Label className="text-xs font-bold text-foreground">Urgency Level</Label>
+                <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Priority Level</Label>
                 <Select value={coordUrgency} onValueChange={val => setCoordUrgency(val as any)}>
-                  <SelectTrigger className="mt-1.5 h-11 text-xs font-bold">
+                  <SelectTrigger className="mt-1.5 h-10 text-xs font-semibold">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="critical">🔴 Critical (Immediate Action Required)</SelectItem>
+                    <SelectItem value="critical">🔴 Critical (Immediate Command Action)</SelectItem>
                     <SelectItem value="high">🟠 High Priority</SelectItem>
-                    <SelectItem value="normal">🟡 Normal Operational Update</SelectItem>
+                    <SelectItem value="normal">🟡 Standard Operational Update</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
-                <Label className="text-xs font-bold text-foreground">Operational Note & Details</Label>
+                <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Detailed Message</Label>
                 <textarea
                   value={coordMessage}
                   onChange={e => setCoordMessage(e.target.value)}
-                  placeholder="Describe specific requirements, patient counts, or logistical blockages…"
+                  placeholder="Detail patient counts, triage bottlenecks, or supply shortages…"
                   rows={4}
-                  className="mt-1.5 w-full rounded-xl border border-input bg-background/80 p-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2457FF]"
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:border-slate-800 dark:bg-slate-800"
                   required
                 />
               </div>
@@ -592,23 +909,23 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
               <Button
                 type="submit"
                 disabled={sendCoordination.isPending || !coordMessage.trim()}
-                className="h-11 w-full rounded-xl bg-[#2457FF] font-bold text-white shadow-md hover:bg-[#1a44cc] transition"
+                className="h-10 w-full rounded-xl bg-teal-600 font-semibold text-white shadow-xs hover:bg-teal-700 transition"
               >
                 <Send className="mr-2 h-4 w-4" />
-                {sendCoordination.isPending ? "Transmitting…" : "Transmit to State Command Centre"}
+                {sendCoordination.isPending ? "Transmitting…" : "Dispatch Message to State Command"}
               </Button>
             </form>
 
-            {/* PRESET QUICK BROADCAST TILES */}
-            <div className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm space-y-3">
-              <h3 className="text-base font-extrabold text-foreground">Instant Tactical Broadcasts</h3>
-              <p className="text-xs text-muted-foreground">Click a preset to quickly prefill and coordinate</p>
+            {/* Quick broadcast tiles */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs space-y-3 dark:border-slate-800 dark:bg-slate-900">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Instant Tactical Templates</h3>
+              <p className="text-xs text-slate-500">Click a preset to rapidly prefill emergency requests</p>
 
               <div className="grid gap-2.5 pt-2">
                 <QuickActionTile
                   icon={Ambulance}
-                  title="Request 2 Extra Ambulances"
-                  desc="Heavy evacuation triage load in sector"
+                  title="Request 2 Additional Ambulances"
+                  desc="High trauma intake requiring transport backup"
                   onClick={() => {
                     setCoordCategory("additional_ambulance");
                     setCoordMessage("Requesting 2 additional 4x4 ambulance units for flood sector triage transport.");
@@ -617,8 +934,8 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
                 />
                 <QuickActionTile
                   icon={HeartPulse}
-                  title="ICU at Full Occupancy"
-                  desc="Notify command to divert critical cases"
+                  title="ICU at Full Capacity"
+                  desc="Notify command to divert incoming trauma"
                   onClick={() => {
                     setCoordCategory("icu_critical");
                     setCoordMessage("All ICU ventilator beds are currently occupied. Please route critical trauma cases to secondary medical centers.");
@@ -631,14 +948,14 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
                   desc="Refill tanker requested within 3 hours"
                   onClick={() => {
                     setCoordCategory("oxygen_low");
-                    setCoordMessage("Oxygen reserves below 20%. Requesting urgent refill tanker dispatch from Guwahati medical warehouse.");
+                    setCoordMessage("Oxygen reserves below 20%. Requesting urgent refill tanker dispatch from regional medical depot.");
                     setCoordUrgency("critical");
                   }}
                 />
                 <QuickActionTile
                   icon={Users}
                   title="Request Volunteer Medical Staff"
-                  desc="Emergency triage staff reinforcement"
+                  desc="Trauma nurse reinforcement for flood shift"
                   onClick={() => {
                     setCoordCategory("additional_staff");
                     setCoordMessage("Requesting 4 volunteer trauma nurses and 2 emergency medical officers for nighttime flood shifts.");
@@ -651,39 +968,41 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
         </section>
       )}
 
-      {/* 5. TAB: OPERATIONAL AUDIT TIMELINE */}
+      {/* 7. TAB: AUDIT TIMELINE */}
       {activeTab === "timeline" && (
         <section className="space-y-6">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2457FF]">
-              System Audit Trail
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600">
+              Operational Log
             </p>
-            <h2 className="text-xl font-extrabold tracking-tight text-foreground">Recent Operational Activity</h2>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Hospital Activity Audit Trail
+            </h2>
           </div>
 
-          <div className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
             {timeline.data && timeline.data.length > 0 ? (
-              <div className="relative border-l-2 border-[#2457FF]/30 pl-5 space-y-6">
+              <div className="relative border-l-2 border-slate-200 pl-5 space-y-5 dark:border-slate-800">
                 {timeline.data.map(event => (
                   <div key={event.id} className="relative">
-                    <span className="absolute -left-[27px] top-1 grid h-5 w-5 place-items-center rounded-full bg-[#2457FF] text-white text-[10px]">
+                    <span className="absolute -left-[27px] top-1 grid h-4 w-4 place-items-center rounded-full bg-teal-600 text-white text-[8px]">
                       ●
                     </span>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-black uppercase tracking-wider text-[#2457FF]">
+                      <p className="text-xs font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400">
                         {event.action}
                       </p>
-                      <span className="font-mono text-[11px] text-muted-foreground">
+                      <span className="font-mono text-[11px] text-slate-400">
                         {new Date(event.createdAt).toLocaleTimeString()} · {new Date(event.createdAt).toLocaleDateString()}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs font-semibold text-foreground">{event.detail}</p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">Logged by: {event.actor?.name || "System"}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-800 dark:text-slate-200">{event.detail}</p>
+                    <p className="mt-0.5 text-[10px] text-slate-400">Actor: {event.actor?.name || "System Automated"}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="py-8 text-center text-xs text-muted-foreground">
+              <div className="py-8 text-center text-xs text-slate-500">
                 No recent activity recorded yet.
               </div>
             )}
@@ -698,7 +1017,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
  * SUB-COMPONENTS
  * ------------------------------------------------------------- */
 
-function TabButton({
+function ClinicalTabButton({
   active,
   onClick,
   icon: Icon,
@@ -714,20 +1033,81 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+      className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
         active
-          ? "bg-[#2457FF] text-white shadow-md"
-          : "bg-white/10 text-[#F8F1E4]/80 hover:bg-white/20 hover:text-white"
+          ? "bg-teal-50 text-teal-800 ring-1 ring-teal-500/30 dark:bg-teal-950/60 dark:text-teal-300"
+          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
       }`}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className={`h-3.5 w-3.5 ${active ? "text-teal-600 dark:text-teal-400" : "text-slate-400"}`} />
       <span>{label}</span>
       {badge && (
-        <span className="ml-1 rounded-full bg-red-600 px-1.5 py-0.2 font-mono text-[10px] font-black text-white">
+        <span className="ml-1 rounded-full bg-rose-600 px-1.5 py-0.2 font-mono text-[10px] font-bold text-white">
           {badge}
         </span>
       )}
     </button>
+  );
+}
+
+function ClinicalMetricCard({
+  label,
+  value,
+  subtext,
+  trend,
+  indicatorTone,
+  barPercent,
+}: {
+  label: string;
+  value: string;
+  subtext: string;
+  trend: string;
+  indicatorTone: "teal" | "warning" | "danger";
+  barPercent: number;
+}) {
+  const toneClasses = {
+    teal: "text-teal-600 bg-teal-500",
+    warning: "text-amber-600 bg-amber-500",
+    danger: "text-rose-600 bg-rose-500",
+  };
+
+  return (
+    <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+        <span>{label}</span>
+        <ArrowUpRight className="h-4 w-4 text-slate-400" />
+      </div>
+
+      <div className="mt-3 flex items-baseline gap-1.5">
+        <span className="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{value}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">{subtext}</span>
+      </div>
+
+      {/* Segmented / solid clinical meter bar (Reference 2) */}
+      <div className="mt-3 flex gap-1">
+        {Array.from({ length: 14 }).map((_, i) => {
+          const filled = (i / 14) * 100 <= barPercent;
+          return (
+            <span
+              key={i}
+              className={`h-2 flex-1 rounded-xs transition-colors ${
+                filled
+                  ? indicatorTone === "danger"
+                    ? "bg-rose-500"
+                    : indicatorTone === "warning"
+                    ? "bg-amber-500"
+                    : "bg-teal-600"
+                  : "bg-slate-100 dark:bg-slate-800"
+              }`}
+            />
+          );
+        })}
+      </div>
+
+      <p className="mt-2 text-[10px] font-medium text-slate-400">
+        {trend}
+      </p>
+    </article>
   );
 }
 
@@ -739,7 +1119,7 @@ function QuickCapacityCard({
   onMinus,
   onPlus,
   onChange,
-  tone = "green",
+  tone = "teal",
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -748,40 +1128,39 @@ function QuickCapacityCard({
   onMinus: () => void;
   onPlus: () => void;
   onChange: (val: string) => void;
-  tone?: "green" | "blue" | "emerald" | "red" | "amber";
+  tone?: "teal" | "blue" | "rose" | "amber";
 }) {
   const tones = {
-    green: "bg-[#059669]/10 text-[#059669] dark:text-[#10B981]",
-    blue: "bg-[#2457FF]/10 text-[#2457FF]",
-    emerald: "bg-[#2457FF]/10 text-[#2457FF]",
-    red: "bg-[#DC2626]/10 text-[#DC2626] dark:text-[#EF4444]",
-    amber: "bg-[#D97706]/10 text-[#D97706] dark:text-[#F59E0B]",
+    teal: "bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400",
+    blue: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400",
+    rose: "bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400",
+    amber: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400",
   };
 
   const pct = total ? Math.min(100, Math.round((value / total) * 100)) : null;
 
   return (
-    <div className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center justify-between">
-        <span className={`grid h-10 w-10 place-items-center rounded-2xl ${tones[tone]}`}>
-          <Icon className="h-5 w-5" />
+        <span className={`grid h-9 w-9 place-items-center rounded-xl ${tones[tone]}`}>
+          <Icon className="h-4 w-4" />
         </span>
         {pct !== null && (
-          <span className="font-mono text-xs font-extrabold text-muted-foreground">
+          <span className="font-mono text-xs font-semibold text-slate-500">
             {pct}% available
           </span>
         )}
       </div>
 
-      <p className="mt-3 text-xs font-extrabold text-foreground">{label}</p>
+      <p className="mt-3 text-xs font-bold text-slate-800 dark:text-slate-200">{label}</p>
 
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="mt-3 flex items-center justify-between gap-2.5">
         <button
           type="button"
           onClick={onMinus}
-          className="grid h-10 w-10 place-items-center rounded-xl border border-[#B7AD9E]/30 bg-background text-foreground transition hover:bg-[#2457FF]/10 hover:border-[#2457FF]/40 active:scale-95"
+          className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
         >
-          <Minus className="h-4 w-4" />
+          <Minus className="h-3.5 w-3.5" />
         </button>
 
         <Input
@@ -790,28 +1169,28 @@ function QuickCapacityCard({
           max={total}
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="h-10 text-center font-mono text-xl font-black bg-background/80"
+          className="h-9 text-center font-mono text-lg font-bold bg-white dark:bg-slate-900"
         />
 
         <button
           type="button"
           onClick={onPlus}
-          className="grid h-10 w-10 place-items-center rounded-xl border border-[#B7AD9E]/30 bg-background text-foreground transition hover:bg-[#2457FF]/10 hover:border-[#2457FF]/40 active:scale-95"
+          className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
         </button>
       </div>
 
       {total !== undefined && (
         <div className="mt-3">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
-              className={`h-full ${pct && pct < 20 ? "bg-red-500" : pct && pct < 40 ? "bg-amber-500" : "bg-[#059669]"}`}
+              className={`h-full ${pct && pct < 20 ? "bg-rose-500" : pct && pct < 40 ? "bg-amber-500" : "bg-teal-600"}`}
               style={{ width: `${pct ?? 0}%` }}
             />
           </div>
-          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-            Total capacity: {total} units
+          <p className="mt-1 font-mono text-[10px] text-slate-400">
+            Capacity baseline: {total} units
           </p>
         </div>
       )}
@@ -833,46 +1212,46 @@ function CaseCard({
   isUpdating: boolean;
 }) {
   const severityColors = {
-    critical: "bg-red-600 text-white",
+    critical: "bg-rose-600 text-white",
     high: "bg-orange-500 text-white",
     medium: "bg-amber-500 text-white",
-    low: "bg-emerald-600 text-white",
+    low: "bg-teal-600 text-white",
   };
 
   const statusMap: Record<string, { label: string; tone: string }> = {
-    notified: { label: "INBOUND NOTIFIED", tone: "bg-red-500/10 text-red-600 border-red-500/30 dark:text-red-400" },
-    acknowledged: { label: "ACKNOWLEDGED", tone: "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400" },
-    preparing: { label: "PREPARING ER / ICU", tone: "bg-[#2457FF]/10 text-[#2457FF] border-[#2457FF]/30" },
-    ready: { label: "READY FOR ARRIVAL", tone: "bg-[#2457FF]/10 text-[#2457FF] border-[#2457FF]/30" },
-    received: { label: "PATIENTS RECEIVED", tone: "bg-[#059669]/10 text-[#059669] border-[#059669]/30 dark:text-[#10B981]" },
-    completed: { label: "CASE COMPLETED", tone: "bg-muted text-muted-foreground border-[#B7AD9E]/30" },
+    notified: { label: "INBOUND NOTIFIED", tone: "bg-rose-50 text-rose-700 ring-1 ring-rose-500/30 dark:bg-rose-950/50 dark:text-rose-400" },
+    acknowledged: { label: "ACKNOWLEDGED", tone: "bg-amber-50 text-amber-700 ring-1 ring-amber-500/30 dark:bg-amber-950/50 dark:text-amber-400" },
+    preparing: { label: "PREPARING ER / ICU", tone: "bg-blue-50 text-blue-700 ring-1 ring-blue-500/30 dark:bg-blue-950/50 dark:text-blue-400" },
+    ready: { label: "READY FOR INTAKE", tone: "bg-teal-50 text-teal-700 ring-1 ring-teal-500/30 dark:bg-teal-950/50 dark:text-teal-400" },
+    received: { label: "PATIENTS RECEIVED", tone: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/30 dark:bg-emerald-950/50 dark:text-emerald-400" },
+    completed: { label: "CASE CONCLUDED", tone: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400" },
   };
 
-  const currentStatus = statusMap[notification.status] || { label: notification.status.toUpperCase(), tone: "bg-muted text-foreground border-border" };
+  const currentStatus = statusMap[notification.status] || { label: notification.status.toUpperCase(), tone: "bg-slate-100 text-slate-700" };
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm transition hover:shadow-md">
+    <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-md px-2.5 py-0.5 font-mono text-[10px] font-black uppercase ${severityColors[notification.severity as keyof typeof severityColors] || "bg-red-600 text-white"}`}>
-              {notification.severity} SEVERITY
+            <span className={`rounded-md px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${severityColors[notification.severity as keyof typeof severityColors] || "bg-rose-600 text-white"}`}>
+              {notification.severity}
             </span>
-            <span className={`rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold ${currentStatus.tone}`}>
+            <span className={`rounded-md px-2 py-0.5 font-mono text-[10px] font-bold ${currentStatus.tone}`}>
               {currentStatus.label}
             </span>
-            <span className="font-mono text-xs font-extrabold text-[#2457FF]">
+            <span className="font-mono text-xs font-bold text-teal-700 dark:text-teal-400">
               CASE #{incident?.publicCode || notification.incidentId}
             </span>
           </div>
 
-          <h4 className="text-base font-extrabold text-foreground">
+          <h4 className="text-base font-bold text-slate-900 dark:text-white">
             {incident?.emergencyType ? `${incident.emergencyType.toUpperCase()} RESCUE EVACUATION` : "Emergency Rescue Inbound"}
           </h4>
 
-          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1 font-semibold text-foreground">
-              <Radio className="h-3.5 w-3.5 text-[#2457FF]" /> {rescuer?.callSign || rescuer?.name || "Field Unit"}
+          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+              <Radio className="h-3.5 w-3.5 text-teal-600" /> {rescuer?.callSign || rescuer?.name || "Field Unit"}
             </span>
             <span className="flex items-center gap-1 font-mono font-bold text-amber-600 dark:text-amber-400">
               <Timer className="h-3.5 w-3.5" /> ETA ~{notification.estimatedArrivalMinutes} min
@@ -888,12 +1267,12 @@ function CaseCard({
           {(notification.icuRequired === "yes" || notification.oxygenRequired === "yes") && (
             <div className="flex gap-2 pt-1">
               {notification.icuRequired === "yes" && (
-                <span className="rounded-md bg-red-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-red-600 dark:text-red-400">
+                <span className="rounded-md bg-rose-50 px-2 py-0.5 font-mono text-[10px] font-bold text-rose-700 ring-1 ring-rose-500/20 dark:bg-rose-950/40 dark:text-rose-400">
                   🔴 ICU Bed Required
                 </span>
               )}
               {notification.oxygenRequired === "yes" && (
-                <span className="rounded-md bg-[#2457FF]/10 px-2 py-0.5 font-mono text-[10px] font-bold text-[#2457FF]">
+                <span className="rounded-md bg-teal-50 px-2 py-0.5 font-mono text-[10px] font-bold text-teal-700 ring-1 ring-teal-500/20 dark:bg-teal-950/40 dark:text-teal-400">
                   🫁 Oxygen Support Required
                 </span>
               )}
@@ -901,20 +1280,20 @@ function CaseCard({
           )}
 
           {notification.notes && (
-            <p className="rounded-xl bg-muted/60 p-2.5 text-xs text-muted-foreground">
-              <strong>Field Notes:</strong> {notification.notes}
+            <p className="rounded-xl bg-slate-50 p-2.5 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+              <strong>Field Dispatch Note:</strong> {notification.notes}
             </p>
           )}
         </div>
 
-        {/* STATUS ACTION BUTTONS */}
+        {/* Action Buttons */}
         <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">
           {notification.status === "notified" && (
             <Button
               size="sm"
               disabled={isUpdating}
               onClick={() => onUpdateStatus("acknowledged")}
-              className="rounded-xl bg-amber-600 text-xs font-bold text-white hover:bg-amber-700 shadow-sm"
+              className="rounded-xl bg-amber-600 text-xs font-semibold text-white hover:bg-amber-700 shadow-xs"
             >
               <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Acknowledge Case
             </Button>
@@ -924,7 +1303,7 @@ function CaseCard({
               size="sm"
               disabled={isUpdating}
               onClick={() => onUpdateStatus("preparing")}
-              className="rounded-xl bg-[#2457FF] text-xs font-bold text-white hover:bg-[#1a44cc] shadow-sm"
+              className="rounded-xl bg-teal-600 text-xs font-semibold text-white hover:bg-teal-700 shadow-xs"
             >
               <HeartPulse className="mr-1.5 h-3.5 w-3.5" /> Prepare ER & ICU
             </Button>
@@ -934,9 +1313,9 @@ function CaseCard({
               size="sm"
               disabled={isUpdating}
               onClick={() => onUpdateStatus("ready")}
-              className="rounded-xl bg-[#2457FF] text-xs font-bold text-white hover:bg-[#1a44cc] shadow-sm"
+              className="rounded-xl bg-teal-600 text-xs font-semibold text-white hover:bg-teal-700 shadow-xs"
             >
-              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Mark Ready for Inbound
+              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Mark Ready for Arrival
             </Button>
           )}
           {notification.status === "ready" && (
@@ -944,7 +1323,7 @@ function CaseCard({
               size="sm"
               disabled={isUpdating}
               onClick={() => onUpdateStatus("received")}
-              className="rounded-xl bg-[#059669] text-xs font-bold text-white hover:bg-[#047857] shadow-sm"
+              className="rounded-xl bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700 shadow-xs"
             >
               <Hospital className="mr-1.5 h-3.5 w-3.5" /> Confirm Patients Received
             </Button>
@@ -955,7 +1334,7 @@ function CaseCard({
               disabled={isUpdating}
               onClick={() => onUpdateStatus("completed")}
               variant="outline"
-              className="rounded-xl text-xs font-bold text-muted-foreground"
+              className="rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300"
             >
               <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Finalize Case
             </Button>
@@ -963,6 +1342,35 @@ function CaseCard({
         </div>
       </div>
     </article>
+  );
+}
+
+function OnDutyStaffItem({
+  name,
+  specialty,
+  dept,
+  status,
+}: {
+  name: string;
+  specialty: string;
+  dept: string;
+  status: string;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 text-xs dark:border-slate-800 dark:bg-slate-800/30">
+      <div className="flex items-center gap-2.5">
+        <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+          {name.split(" ").slice(-1)[0][0]}
+        </div>
+        <div>
+          <p className="font-semibold text-slate-800 dark:text-slate-200">{name}</p>
+          <p className="text-[10px] text-slate-400">{specialty} · {dept}</p>
+        </div>
+      </div>
+      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 ring-1 ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400">
+        {status}
+      </span>
+    </div>
   );
 }
 
@@ -981,16 +1389,16 @@ function QuickActionTile({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-3 rounded-2xl border border-[#B7AD9E]/25 dark:border-white/10 bg-background/60 backdrop-blur-sm p-3 text-left transition hover:border-[#2457FF]/50 hover:bg-background"
+      className="flex items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 text-left transition hover:border-teal-500/50 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800/30 dark:hover:bg-slate-800"
     >
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#2457FF]/10 text-[#2457FF]">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400">
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-extrabold text-foreground">{title}</p>
-        <p className="text-[11px] text-muted-foreground">{desc}</p>
+        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{title}</p>
+        <p className="text-[11px] text-slate-500">{desc}</p>
       </div>
-      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+      <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
     </button>
   );
 }

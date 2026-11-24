@@ -242,23 +242,23 @@ export default function UserProfile() {
   const savedContacts = contactsQuery.data || [];
 
   return (
-    <div className="victim-page min-h-screen bg-[#F8F1E4] text-[#111C44] transition-colors dark:bg-[#111C44] dark:text-[#F8F1E4]">
-      <main className="victim-main relative mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-32 pt-5">
+    <div className="victim-page min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100">
+      <main className="mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-28 pt-4">
         {/* Top Header */}
-        <header className="glass-card mb-5 flex items-center justify-between p-3.5 shadow-sm">
+        <header className="mb-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setLocation("/more")}
-              className="grid h-10 w-10 place-items-center rounded-2xl bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/20 transition active:scale-95 hover:bg-[#1d47db]"
+              className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-white shadow-xs transition active:scale-95 hover:bg-slate-800 dark:bg-sky-500 dark:text-slate-950 font-black"
               aria-label={t("Back to More")}
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4" />
             </button>
             <div>
-              <h1 className="text-lg font-black tracking-tight text-[#111C44] dark:text-[#F8F1E4]">
+              <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
                 {t("Profile Customization")}
               </h1>
-              <p className="text-[10px] font-bold text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+              <p className="text-[10px] font-bold text-muted-foreground">
                 {t("Personal & emergency rescue details")}
               </p>
             </div>
@@ -267,7 +267,7 @@ export default function UserProfile() {
         </header>
 
         {/* User Hero Banner */}
-        <section className="glass-panel overflow-hidden bg-[#111C44] p-5 text-white dark:bg-[#0c1433]">
+        <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-5 text-white shadow-xs dark:bg-slate-950">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4">
               <ProfileAvatar
@@ -279,15 +279,15 @@ export default function UserProfile() {
                   role: user?.role,
                 }}
                 size="xl"
-                className="ring-2 ring-white/30"
+                className="ring-2 ring-white/20"
               />
               <div>
-                <p className="text-lg font-black leading-tight text-[#F8F1E4]">
+                <p className="text-lg font-black leading-tight text-white">
                   {getFirstName(name || user?.name, user?.email, t("Citizen"))}
                 </p>
-                <p className="mt-0.5 text-xs text-[#D8E3FF]/80">{user?.email || t("Account verified")}</p>
-                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#F8F1E4]">
-                  <ShieldCheck className="h-3 w-3 text-[#D8E3FF]" />
+                <p className="mt-0.5 text-xs text-slate-400">{user?.email || t("Account verified")}</p>
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-200">
+                  <ShieldCheck className="h-3 w-3 text-sky-400" />
                   {roleLabel}
                 </div>
               </div>

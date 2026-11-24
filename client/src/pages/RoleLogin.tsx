@@ -27,23 +27,25 @@ type PortalRole = "rescuer" | "hospital";
 const portalConfig = {
   rescuer: {
     title: "Rescuer Portal",
-    heading: "Rescuer Access",
-    description: "Restricted access for authorized field rescue personnel & SDRF teams.",
+    heading: "Field Rescuer Access",
+    description: "Restricted gateway for authorized field rescue personnel, NDRF, and SDRF task forces.",
     prompt: "Enter your rescuer credentials and the active Government Access Code.",
     destination: "/responder",
     icon: Radio,
     callSignPlaceholder: "e.g. NDRF-Boat-01",
     callSignLabel: "Field Call Sign",
+    toneColor: "amber",
   },
   hospital: {
     title: "Hospital Portal",
-    heading: "Hospital Access",
-    description: "Restricted access for authorized hospital operations staff & triage centers.",
+    heading: "Hospital Operations Desk",
+    description: "Clinical gateway for authorized hospital operations staff, ICU coordinators, and triage centers.",
     prompt: "Enter your hospital staff credentials and the active Government Access Code.",
     destination: "/hospital",
     icon: Hospital,
     callSignPlaceholder: "e.g. Guwahati Triage Desk",
     callSignLabel: "Facility / Ward Label",
+    toneColor: "teal",
   },
 } as const;
 
@@ -166,26 +168,34 @@ export function RoleLogin({ role }: { role: PortalRole }) {
     }
   };
 
+  const isRescuer = role === "rescuer";
+
   return (
-    <div className="min-h-screen bg-[#f4f7f6] text-[#122824] transition-colors dark:bg-[#090a0a] dark:text-[#f3f4f6]">
-      <header className="sticky top-0 z-30 border-b border-black/5 bg-white/85 px-4 py-3 backdrop-blur-md dark:border-white/10 dark:bg-[#111214]/85">
+    <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 flex flex-col justify-between">
+      {/* Top Header */}
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-md dark:border-slate-800 dark:bg-[#0B0F17]/90">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <button
             onClick={() => setLocation("/login")}
-            className="flex items-center gap-2.5 text-left transition hover:opacity-80 focus:outline-none"
+            className="flex items-center gap-2.5 text-left transition hover:opacity-85 focus:outline-none"
           >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0f766e] text-white shadow-sm">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-white shadow-xs dark:bg-slate-800 font-black">
               <ArrowLeft className="h-4 w-4" />
             </span>
             <span>
-              <span className="block text-base font-black tracking-tight leading-tight">Sahay Emergency Network</span>
-              <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-[#5d7c74] dark:text-[#94a3b8]">
-                Emergency & Disaster Response Platform
+              <span className="block text-base font-black tracking-tight leading-tight">Sahay Network</span>
+              <span className="block font-mono text-[9px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Disaster Response Platform
               </span>
             </span>
           </button>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => setLocation("/login")} className="text-xs">
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setLocation("/login")}
+              className="text-xs h-8 rounded-lg border-slate-300 dark:border-slate-700"
+            >
               Citizen Portal
             </Button>
             <LanguageSelector compact />
@@ -193,18 +203,23 @@ export function RoleLogin({ role }: { role: PortalRole }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-md px-4 py-8 md:py-12">
+      <main className="mx-auto w-full max-w-md px-4 py-8 md:py-12 my-auto">
         {/* Title Header */}
         <div className="text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-4 py-1.5 font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0f766e] dark:text-emerald-400">
-            <Icon className="h-4 w-4" /> {config.title}
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300">
+            <Icon className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+            {config.title}
           </div>
-          <h1 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">{config.heading}</h1>
-          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{config.description}</p>
+          <h1 className="mt-3 text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+            {config.heading}
+          </h1>
+          <p className="mx-auto mt-2 text-xs leading-relaxed text-muted-foreground max-w-sm">
+            {config.description}
+          </p>
         </div>
 
         {/* Mode Switcher */}
-        <div className="mt-6 grid grid-cols-2 rounded-2xl bg-black/5 p-1.5 dark:bg-white/5">
+        <div className="mt-6 grid grid-cols-2 rounded-xl bg-slate-200/80 p-1 dark:bg-slate-800 text-xs font-bold">
           <button
             type="button"
             onClick={() => {
@@ -212,10 +227,10 @@ export function RoleLogin({ role }: { role: PortalRole }) {
               setErrorMessage("");
               setSuccessMessage("");
             }}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 transition-all ${
               authMode === "signin"
-                ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-white text-slate-900 shadow-xs dark:bg-slate-900 dark:text-white font-extrabold"
+                : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
             }`}
           >
             <Lock className="h-3.5 w-3.5" />
@@ -228,10 +243,10 @@ export function RoleLogin({ role }: { role: PortalRole }) {
               setErrorMessage("");
               setSuccessMessage("");
             }}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 transition-all ${
               authMode === "register"
-                ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-white text-slate-900 shadow-xs dark:bg-slate-900 dark:text-white font-extrabold"
+                : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
             }`}
           >
             <UserPlus className="h-3.5 w-3.5" />
@@ -240,20 +255,18 @@ export function RoleLogin({ role }: { role: PortalRole }) {
         </div>
 
         {/* Form Card */}
-        <div className="mt-4 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#141517]">
-          <div className="border-b border-black/5 bg-[#fafcfb] p-4 dark:border-white/5 dark:bg-[#18191c]">
+        <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+          <div className="border-b border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/40">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#0f766e]/10 text-[#0f766e] dark:text-emerald-400">
-                <KeyRound className="h-4 w-4" />
+              <span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                <KeyRound className="h-3.5 w-3.5" />
               </span>
               <div>
-                <h2 className="text-xs font-black uppercase tracking-wide">
-                  {authMode === "signin" ? `Authorized ${config.title} Login` : `Register ${config.title} Account`}
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                  {authMode === "signin" ? `Authorized ${config.title}` : `Register ${config.title} Account`}
                 </h2>
-                <p className="text-[11px] text-muted-foreground">
-                  {authMode === "signin"
-                    ? "Email/Password for identity + active Government Code."
-                    : "Create role account gated by active Government Code."}
+                <p className="text-[10px] text-muted-foreground">
+                  Gated on active Government Authorization Code.
                 </p>
               </div>
             </div>
@@ -263,7 +276,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
             {errorMessage && (
               <div
                 role="alert"
-                className="mb-5 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-semibold text-destructive"
+                className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs font-semibold text-rose-600 dark:text-rose-400"
               >
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
                 <div className="leading-snug">{errorMessage}</div>
@@ -271,7 +284,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
             )}
 
             {successMessage && (
-              <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                 <div className="leading-snug">{successMessage}</div>
               </div>
@@ -279,7 +292,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
 
             {authMode === "signin" ? (
               /* SIGN IN FORM */
-              <form onSubmit={handleSignIn} className="space-y-4">
+              <form onSubmit={handleSignIn} className="space-y-3.5">
                 <div>
                   <Label htmlFor={`${role}-email`} className="text-xs font-bold">
                     Email or Username
@@ -290,7 +303,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="e.g. officer@assamrescue.gov.in"
-                    className="mt-1.5 h-11 rounded-xl text-sm"
+                    className="mt-1 h-10 rounded-lg text-sm border-slate-200 dark:border-slate-800"
                     autoComplete="username"
                     required
                   />
@@ -300,14 +313,14 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                   <Label htmlFor={`${role}-password`} className="text-xs font-bold">
                     Password
                   </Label>
-                  <div className="relative mt-1.5">
+                  <div className="relative mt-1">
                     <Input
                       id={`${role}-password`}
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter account password"
-                      className="h-11 rounded-xl pr-11 text-sm"
+                      className="h-10 rounded-lg pr-10 text-sm border-slate-200 dark:border-slate-800"
                       autoComplete="current-password"
                       required
                     />
@@ -315,7 +328,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                       type="button"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground hover:text-foreground"
+                      className="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground hover:text-foreground"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -325,58 +338,51 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                 <div>
                   <div className="flex items-center justify-between">
                     <Label htmlFor={`${role}-gov-code`} className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                      Government Code <span className="text-destructive">*</span>
+                      Government Access Code <span className="text-rose-500">*</span>
                     </Label>
-                    <span className="font-mono text-[10px] uppercase font-bold text-amber-600 dark:text-amber-500">
-                      Required
+                    <span className="font-mono text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400">
+                      Gated
                     </span>
                   </div>
-                  <div className="relative mt-1.5">
-                    <Input
-                      id={`${role}-gov-code`}
-                      type="text"
-                      value={governmentCode}
-                      onChange={(e) => setGovernmentCode(e.target.value)}
-                      placeholder="Enter active Government Access Code"
-                      className="h-11 rounded-xl border-amber-500/40 bg-amber-50/40 font-mono text-sm font-bold tracking-wider text-amber-950 focus:border-amber-600 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200"
-                      autoComplete="off"
-                      required
-                    />
-                  </div>
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    Access is gated on the active code set by the system administrator.
-                  </p>
+                  <Input
+                    id={`${role}-gov-code`}
+                    type="text"
+                    value={governmentCode}
+                    onChange={(e) => setGovernmentCode(e.target.value)}
+                    placeholder="Enter active Government Access Code"
+                    className="mt-1 h-10 rounded-lg border-amber-500/40 bg-amber-50/40 font-mono text-sm font-bold tracking-wider text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200"
+                    autoComplete="off"
+                    required
+                  />
                 </div>
 
-                  <div className="flex items-center justify-between pt-1">
-                    <p className="text-[11px] text-muted-foreground">
-                      Default Demo Credentials
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (role === "rescuer") {
-                          setEmail("rescuer@assamrescue.gov.in");
-                          setPassword("rescuer");
-                          setGovernmentCode("RESCUER-2026");
-                        } else {
-                          setEmail("hospital@assamrescue.gov.in");
-                          setPassword("hospital");
-                          setGovernmentCode("HOSPITAL-2026");
-                        }
-                        setErrorMessage("");
-                      }}
-                      className="font-mono text-[11px] font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
-                    >
-                      Fill Demo {role === "rescuer" ? "Rescuer" : "Hospital"}
-                    </button>
-                  </div>
+                <div className="flex items-center justify-between pt-0.5">
+                  <span className="text-[11px] text-muted-foreground">Demo Credentials</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (role === "rescuer") {
+                        setEmail("rescuer@assamrescue.gov.in");
+                        setPassword("rescuer");
+                        setGovernmentCode("RESCUER-2026");
+                      } else {
+                        setEmail("hospital@assamrescue.gov.in");
+                        setPassword("hospital");
+                        setGovernmentCode("HOSPITAL-2026");
+                      }
+                      setErrorMessage("");
+                    }}
+                    className="font-mono text-[11px] font-bold text-sky-600 hover:underline dark:text-sky-400"
+                  >
+                    Fill Demo {role === "rescuer" ? "Rescuer" : "Hospital"}
+                  </button>
+                </div>
 
                 <div className="pt-2">
                   <Button
                     type="submit"
                     disabled={isSubmitting || !email.trim() || !password || !governmentCode.trim()}
-                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                    className="h-11 w-full rounded-xl bg-slate-900 text-xs font-bold text-white shadow-xs hover:bg-slate-800 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400"
                   >
                     <Icon className="mr-2 h-4 w-4" />
                     {isSubmitting ? "Authenticating…" : `Sign In as ${role === "rescuer" ? "Rescuer" : "Hospital Staff"}`}
@@ -385,7 +391,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
               </form>
             ) : (
               /* SIGN UP / REGISTRATION FORM */
-              <form onSubmit={handleRegister} className="space-y-3.5">
+              <form onSubmit={handleRegister} className="space-y-3">
                 <div>
                   <Label htmlFor={`${role}-reg-name`} className="text-xs font-bold">
                     Full Name / Designation
@@ -396,7 +402,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
                     placeholder="e.g. Commander Barua"
-                    className="mt-1 h-10 rounded-xl text-sm"
+                    className="mt-1 h-10 rounded-lg text-sm border-slate-200 dark:border-slate-800"
                     autoComplete="name"
                     required
                   />
@@ -412,7 +418,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
                     placeholder="officer@assamrescue.gov.in"
-                    className="mt-1 h-10 rounded-xl text-sm"
+                    className="mt-1 h-10 rounded-lg text-sm border-slate-200 dark:border-slate-800"
                     autoComplete="email"
                     required
                   />
@@ -428,8 +434,8 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                       type={showRegPassword ? "text" : "password"}
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Create a secure password (min. 4 chars)"
-                      className="h-10 rounded-xl pr-10 text-sm"
+                      placeholder="At least 4 characters"
+                      className="h-10 rounded-lg pr-10 text-sm border-slate-200 dark:border-slate-800"
                       autoComplete="new-password"
                       required
                     />
@@ -447,9 +453,9 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                 <div>
                   <div className="flex items-center justify-between">
                     <Label htmlFor={`${role}-reg-gov-code`} className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                      Government Code <span className="text-destructive">*</span>
+                      Government Access Code <span className="text-rose-500">*</span>
                     </Label>
-                    <span className="font-mono text-[10px] uppercase font-bold text-amber-600 dark:text-amber-500">
+                    <span className="font-mono text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400">
                       Required
                     </span>
                   </div>
@@ -459,13 +465,10 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                     value={regGovernmentCode}
                     onChange={(e) => setRegGovernmentCode(e.target.value)}
                     placeholder="Enter active Government Access Code"
-                    className="mt-1 h-10 rounded-xl border-amber-500/40 bg-amber-50/40 font-mono text-sm font-bold tracking-wider text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200"
+                    className="mt-1 h-10 rounded-lg border-amber-500/40 bg-amber-50/40 font-mono text-sm font-bold tracking-wider text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200"
                     autoComplete="off"
                     required
                   />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Required to authorize your account for operational response access.
-                  </p>
                 </div>
 
                 <div>
@@ -478,7 +481,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                     value={regCallSign}
                     onChange={(e) => setRegCallSign(e.target.value)}
                     placeholder={config.callSignPlaceholder}
-                    className="mt-1 h-10 rounded-xl text-sm"
+                    className="mt-1 h-10 rounded-lg text-sm border-slate-200 dark:border-slate-800"
                   />
                 </div>
 
@@ -492,7 +495,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                       !regPassword ||
                       !regGovernmentCode.trim()
                     }
-                    className="h-12 w-full rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md transition hover:bg-[#0f766e]/90"
+                    className="h-11 w-full rounded-xl bg-slate-900 text-xs font-bold text-white shadow-xs hover:bg-slate-800 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400"
                   >
                     <UserPlus className="mr-2 h-4 w-4" />
                     {isSubmitting ? "Registering…" : `Sign Up as ${role === "rescuer" ? "Rescuer" : "Hospital Staff"}`}
@@ -506,12 +509,16 @@ export function RoleLogin({ role }: { role: PortalRole }) {
         <div className="mt-6 text-center">
           <button
             onClick={() => setLocation("/login")}
-            className="text-xs font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
+            className="text-xs text-muted-foreground hover:text-foreground transition font-medium"
           >
             ← Back to Citizen / All Portals
           </button>
         </div>
       </main>
+
+      <footer className="py-4 text-center text-[10px] font-mono text-muted-foreground border-t border-slate-200/60 dark:border-slate-800">
+        Sahay Emergency Network &bull; Authorized Personnel Gateway
+      </footer>
     </div>
   );
 }

@@ -62,12 +62,12 @@ function kilometresBetween(position: Position, latitude: number, longitude: numb
 
 function supplyTone(status: SupplyStatus) {
   return status === "available"
-    ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-300"
     : status === "limited"
-    ? "bg-amber-500/15 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+    ? "bg-amber-50 text-amber-700 ring-1 ring-amber-500/20 dark:bg-amber-950/40 dark:text-amber-300"
     : status === "critical"
-    ? "bg-red-500/15 text-red-700 dark:bg-red-950/60 dark:text-red-300"
-    : "bg-slate-500/15 text-slate-700 dark:bg-slate-900/60 dark:text-slate-300";
+    ? "bg-rose-50 text-rose-700 ring-1 ring-rose-500/20 dark:bg-rose-950/40 dark:text-rose-300"
+    : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
 }
 
 function humanStatus(status: string) {
@@ -126,41 +126,38 @@ export default function UserSafety() {
       : t("Use location to sort hospitals by distance");
 
   return (
-    <div className="victim-page relative min-h-screen bg-[#F8F1E4] text-[#111C44] transition-colors dark:bg-[#111C44] dark:text-[#F8F1E4] overflow-x-hidden">
-      {/* iOS Liquid Glass Ambient Refraction Layer */}
-      <div className="liquid-ambient-bg" />
-
+    <div className="victim-page relative min-h-screen bg-[#F8FAFC] text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden">
       <main className="victim-main relative z-10 mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-32 pt-5">
         {/* Header */}
-        <header className="glass-card mb-5 flex items-center justify-between p-3.5 shadow-sm">
+        <header className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 mb-5 flex items-center justify-between">
           <button
             onClick={() => setLocation("/")}
             className="flex items-center gap-3 text-left transition hover:opacity-85 active:scale-95"
           >
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/20">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-teal-600 ring-1 ring-teal-500/20 dark:bg-teal-950/40 dark:text-teal-400">
               <ShieldCheck className="h-5 w-5" />
             </span>
-            <span>
-              <span className="block text-lg font-black tracking-tight text-[#111C44] dark:text-[#F8F1E4]">
+            <div>
+              <span className="block text-base font-bold text-slate-900 dark:text-white">
                 {t("Safety")}
               </span>
-              <span className="block text-[10px] font-bold text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+              <span className="block text-xs text-slate-500 dark:text-slate-400">
                 {t("Nearby hospital information")}
               </span>
-            </span>
+            </div>
           </button>
           <LanguageSelector compact />
         </header>
 
         {/* Hero Notice Banner */}
-        <section className="glass-panel overflow-hidden bg-[#111C44] p-5 text-white dark:bg-[#0c1433]">
+        <section className="rounded-2xl border border-slate-800 bg-[#0F172A] p-6 text-white shadow-sm">
           <div className="flex gap-4 items-start">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 text-[#D8E3FF]">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/10 text-teal-400">
               <ShieldCheck className="h-6 w-6" />
             </span>
             <div>
-              <h1 className="text-xl font-black tracking-tight text-[#F8F1E4]">{t("Stay safe, stay informed")}</h1>
-              <p className="mt-1 text-sm leading-6 text-[#D8E3FF]/80">
+              <h1 className="text-xl font-bold tracking-tight text-white">{t("Stay safe, stay informed")}</h1>
+              <p className="mt-1 text-xs leading-relaxed text-slate-300">
                 {t("Find verified nearby medical care. For immediate danger, send an SOS now.")}
               </p>
             </div>
@@ -168,16 +165,16 @@ export default function UserSafety() {
           <div className="mt-5 grid grid-cols-2 gap-3">
             <a
               href="tel:112"
-              className="inline-flex items-center justify-center rounded-xl border border-red-500/30 bg-red-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-red-700 active:scale-95"
+              className="inline-flex items-center justify-center rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-rose-700 active:scale-95"
             >
               <PhoneCall className="mr-2 h-4 w-4" />
               {t("Call 112")}
             </a>
             <button
               onClick={() => setLocation("/")}
-              className="inline-flex items-center justify-center rounded-xl border border-[#2457FF]/40 bg-[#2457FF] px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-[#1d47db] active:scale-95"
+              className="inline-flex items-center justify-center rounded-xl bg-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-teal-700 active:scale-95"
             >
-              <AlertTriangle className="mr-2 h-4 w-4 text-amber-300" />
+              <AlertTriangle className="mr-2 h-4 w-4" />
               {t("Rapid SOS")}
             </button>
           </div>
@@ -218,17 +215,17 @@ function VerifiedMedicalCare({
     <section className="mt-6">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#2457FF] dark:text-[#D8E3FF]">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
             {t("Verified medical care")}
           </p>
-          <h2 className="mt-1 text-xl font-black text-[#111C44] dark:text-[#F8F1E4]">{t("Nearby hospitals")}</h2>
-          <p className="mt-1 text-xs font-semibold text-[#111C44]/70 dark:text-[#D8E3FF]/70">{locationCopy}</p>
+          <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-white">{t("Nearby hospitals")}</h2>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{locationCopy}</p>
         </div>
         <button
           type="button"
           aria-label={t("Refresh nearby hospitals")}
           onClick={refresh}
-          className="grid h-10 w-10 place-items-center rounded-2xl glass-card text-[#2457FF] dark:text-[#D8E3FF] transition hover:scale-105 active:scale-95"
+          className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-xs hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
         >
           <RefreshCw className="h-4 w-4" />
         </button>
@@ -259,19 +256,21 @@ function HospitalCard({
   const { t } = useLanguage();
   return (
     <article
-      className={`glass-panel overflow-hidden transition-all ${
-        primary ? "ring-2 ring-[#2457FF]/40 shadow-md" : ""
+      className={`rounded-2xl border bg-white shadow-xs transition-all dark:bg-slate-900 ${
+        primary
+          ? "border-teal-500/40 ring-1 ring-teal-500/30"
+          : "border-slate-200/80 dark:border-slate-800"
       }`}
     >
-      <div className={`p-4 border-b border-[#B7AD9E]/20 dark:border-[#D8E3FF]/10 ${primary ? "bg-[#2457FF]/5 dark:bg-[#2457FF]/10" : ""}`}>
+      <div className={`p-4 border-b border-slate-100 dark:border-slate-800 ${primary ? "bg-teal-50/30 dark:bg-teal-950/20" : ""}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 gap-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/20">
-              <Hospital className="h-6 w-6" />
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-600 ring-1 ring-teal-500/20 dark:bg-teal-950/40 dark:text-teal-400">
+              <Hospital className="h-5 w-5" />
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="min-w-0 flex-1 text-base font-black leading-5 text-[#111C44] dark:text-[#F8F1E4]">
+                <p className="min-w-0 flex-1 text-sm font-bold text-slate-900 dark:text-white">
                   {hospital.name}
                 </p>
                 <a
@@ -280,18 +279,18 @@ function HospitalCard({
                   rel="noopener noreferrer"
                   aria-label={t("Get directions")}
                   title={t("Get directions")}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg glass-card text-[#2457FF] dark:text-[#D8E3FF] transition active:scale-95 hover:bg-[#2457FF]/10"
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 text-teal-600 hover:bg-teal-50 dark:border-slate-700 dark:hover:bg-slate-800"
                 >
-                  <Navigation className="h-4 w-4" />
+                  <Navigation className="h-3.5 w-3.5" />
                 </a>
               </div>
-              <p className="mt-1 text-xs leading-5 text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                 {hospital.distance !== null ? `${hospital.distance.toFixed(1)} km away · ` : ""}
                 {hospital.address}
               </p>
             </div>
           </div>
-          <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[9px] font-black uppercase text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 ring-1 ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400">
             {t("Open")}
           </span>
         </div>
@@ -304,7 +303,7 @@ function HospitalCard({
             label={t("Beds ready")}
             value={hospital.availableEmergencyBeds}
             total={hospital.totalEmergencyBeds}
-            tone="green"
+            tone="teal"
           />
           <MetricTile
             icon={HeartPulse}
@@ -324,28 +323,28 @@ function HospitalCard({
               { label: t("Power"), value: hospital.powerBackupStatus, icon: PlugZap },
             ] as const
           ).map(({ label, value, icon: Icon }) => (
-            <span key={label} className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[10px] font-black ${supplyTone(value)}`}>
-              <Icon className="h-3.5 w-3.5 shrink-0" />
+            <span key={label} className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-semibold ${supplyTone(value)}`}>
+              <Icon className="h-3 w-3 shrink-0" />
               <span className="truncate">{label}: {t(humanStatus(value))}</span>
             </span>
           ))}
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#B7AD9E]/20 dark:border-[#D8E3FF]/10 pt-3">
-          <span className="flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-[#111C44]/60 dark:text-[#D8E3FF]/60">
-            <Clock3 className="h-3.5 w-3.5 shrink-0" />
-            {t("Updated")} {new Date(hospital.updatedAt).toLocaleTimeString()}
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-3">
+          <span className="flex min-w-0 items-center gap-1 text-[10px] text-slate-400">
+            <Clock3 className="h-3 w-3 shrink-0" />
+            {t("Updated")} {new Date(hospital.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
           {hospital.contactPhone ? (
             <a
               href={`tel:${hospital.contactPhone}`}
-              className="inline-flex shrink-0 items-center rounded-xl bg-[#2457FF] px-3 py-1.5 text-xs font-black text-white shadow-sm transition hover:bg-[#1d47db] active:scale-95"
+              className="inline-flex shrink-0 items-center rounded-xl bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 transition"
             >
               <PhoneCall className="mr-1.5 h-3.5 w-3.5" />
               {t("Call")}
             </a>
           ) : (
-            <span className="inline-flex shrink-0 items-center rounded-xl bg-[#B7AD9E]/20 px-3 py-1.5 text-xs font-bold text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+            <span className="inline-flex shrink-0 items-center rounded-xl bg-slate-100 px-2.5 py-1 text-xs text-slate-500 dark:bg-slate-800">
               {t("No call number")}
             </span>
           )}
@@ -366,19 +365,19 @@ function MetricTile({
   label: string;
   value: number;
   total: number;
-  tone: "green" | "blue";
+  tone: "teal" | "blue";
 }) {
   const { t } = useLanguage();
   const styles =
-    tone === "green"
-      ? "bg-emerald-500/10 text-emerald-900 dark:text-emerald-300"
-      : "bg-[#2457FF]/10 text-[#111C44] dark:text-[#D8E3FF]";
+    tone === "teal"
+      ? "bg-teal-50/70 text-teal-900 dark:bg-teal-950/40 dark:text-teal-300"
+      : "bg-blue-50/70 text-blue-900 dark:bg-blue-950/40 dark:text-blue-300";
   return (
-    <div className={`rounded-2xl p-3 ${styles}`}>
-      <Icon className="h-5 w-5" />
-      <p className="mt-2 text-2xl font-black tracking-tight">{value}</p>
-      <p className="text-[10px] font-black uppercase tracking-wide">{label}</p>
-      <p className="mt-0.5 text-[10px] font-semibold opacity-75">
+    <div className={`rounded-xl p-3 border border-transparent ${styles}`}>
+      <Icon className="h-4 w-4" />
+      <p className="mt-2 text-xl font-bold tracking-tight">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">{label}</p>
+      <p className="mt-0.5 text-[10px] opacity-70">
         {t("of")} {total} {t("total")}
       </p>
     </div>
@@ -388,9 +387,9 @@ function MetricTile({
 function HospitalLoading() {
   const { t } = useLanguage();
   return (
-    <div className="glass-panel mt-4 p-8 text-center border-dashed border-[#B7AD9E]/40">
-      <Hospital className="mx-auto h-8 w-8 animate-pulse text-[#2457FF]" />
-      <p className="mt-3 text-sm font-bold text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900 mt-4">
+      <Hospital className="mx-auto h-7 w-7 animate-pulse text-teal-600" />
+      <p className="mt-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
         {t("Loading verified hospitals…")}
       </p>
     </div>
@@ -400,12 +399,12 @@ function HospitalLoading() {
 function NoHospitalCard() {
   const { t } = useLanguage();
   return (
-    <div className="glass-panel mt-4 p-7 text-center border-dashed border-[#B7AD9E]/40">
-      <Building2 className="mx-auto h-9 w-9 text-[#B7AD9E]" />
-      <p className="mt-3 text-base font-black text-[#111C44] dark:text-[#F8F1E4]">
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900 mt-4">
+      <Building2 className="mx-auto h-8 w-8 text-slate-400" />
+      <p className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
         {t("No verified hospital listed nearby")}
       </p>
-      <p className="mt-2 text-xs leading-5 text-[#111C44]/70 dark:text-[#D8E3FF]/70 max-w-sm mx-auto">
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
         {t("Hospital information appears here after a hospital is verified and staff publish its current capacity.")}
       </p>
     </div>
@@ -415,11 +414,11 @@ function NoHospitalCard() {
 function FloodSafety() {
   const { t } = useLanguage();
   return (
-    <section className="glass-panel mt-5 border border-amber-500/30 bg-amber-500/10 p-4.5 text-amber-950 dark:text-amber-200">
+    <section className="mt-5 rounded-2xl border border-amber-200/80 bg-amber-50/60 p-5 dark:border-amber-900/40 dark:bg-amber-950/20">
       <div className="flex gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
         <div>
-          <p className="text-sm font-black text-amber-900 dark:text-amber-300">{t("Flood safety now")}</p>
+          <p className="text-sm font-bold text-amber-900 dark:text-amber-300">{t("Flood safety now")}</p>
           <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
             <SafetyTip
               icon={TentTree}
@@ -445,10 +444,10 @@ function FloodSafety() {
 
 function SafetyTip({ icon: Icon, title, copy }: { icon: typeof TentTree; title: string; copy: string }) {
   return (
-    <div className="glass-card p-3">
-      <Icon className="h-4 w-4 text-[#2457FF] dark:text-[#D8E3FF]" />
-      <p className="mt-2 text-xs font-black text-[#111C44] dark:text-[#F8F1E4]">{title}</p>
-      <p className="mt-1 text-[10px] leading-4 text-[#111C44]/70 dark:text-[#D8E3FF]/70">{copy}</p>
+    <div className="rounded-xl border border-amber-200/60 bg-white/80 p-3 dark:border-amber-900/30 dark:bg-slate-900/80">
+      <Icon className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+      <p className="mt-2 text-xs font-bold text-slate-900 dark:text-white">{title}</p>
+      <p className="mt-1 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">{copy}</p>
     </div>
   );
 }
@@ -498,27 +497,27 @@ export function SafetyConditionsCard({ conditions, loading }: { conditions?: Saf
       : t("Official river-gauge data is temporarily unavailable.");
 
   return (
-    <section className="glass-panel mt-5 p-4.5">
+    <section className="mt-5 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#2457FF] dark:text-[#D8E3FF]">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
             {t("Local alert")}
           </p>
-          <h2 className="mt-1 text-base font-black text-[#111C44] dark:text-[#F8F1E4]">{title}</h2>
+          <h2 className="mt-0.5 text-base font-bold text-slate-900 dark:text-white">{title}</h2>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${tone}`}>
+        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${tone}`}>
           {conditions?.risk ? t(riskInfo.badgeLabelKey) : t("loading")}
         </span>
       </div>
-      <p className="mt-2 text-xs leading-5 text-[#111C44]/70 dark:text-[#D8E3FF]/70">{detail}</p>
-      <div className="glass-card mt-3 p-3 text-[10px] leading-4 text-[#111C44]/80 dark:text-[#D8E3FF]/80">
+      <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{detail}</p>
+      <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-[11px] leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
         <span>{riverCopy}</span>
         {river?.sourceUrl && river?.sourceName ? (
           <a
             href={river.sourceUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-1 block font-bold text-[#2457FF] dark:text-[#D8E3FF] underline underline-offset-2"
+            className="mt-1 block font-semibold text-teal-600 dark:text-teal-400 hover:underline"
           >
             {river.sourceName}
             {river.updatedAt ? ` · ${t("observed")} ${new Date(river.updatedAt).toLocaleString()}` : ""}

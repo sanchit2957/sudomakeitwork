@@ -431,8 +431,8 @@ function ResponderWorkspace() {
         ) : (
           <>
             <section className={`grid gap-5 ${pushState === "subscribed" || Capacitor.isNativePlatform() ? "" : "lg:grid-cols-[1.25fr_0.75fr]"}`}>
-              <div className="glass-panel overflow-hidden rounded-3xl bg-[#111C44] p-6 text-white shadow-xl dark:bg-[#182353]">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#D8E3FF]">
+              <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 text-white shadow-sm dark:bg-slate-950">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-sky-400">
                   {t("responder.readiness")}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -448,12 +448,12 @@ function ResponderWorkspace() {
                     textClassName="text-2xl font-extrabold tracking-tight text-white"
                   />
                   {profile.data?.callSign && (
-                    <span className="rounded-lg bg-white/15 px-2.5 py-1 font-mono text-xs font-bold text-[#D8E3FF]">
+                    <span className="rounded-lg bg-white/10 px-2.5 py-1 font-mono text-xs font-bold text-sky-300">
                       {profile.data.callSign}
                     </span>
                   )}
                 </div>
-                <p className="mt-2 max-w-lg text-sm leading-6 text-[#D8E3FF]/80">
+                <p className="mt-2 max-w-lg text-xs leading-relaxed text-slate-400">
                   {t("responder.readinessCopy")}
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -468,10 +468,14 @@ function ResponderWorkspace() {
                       key={value}
                       onClick={() => withCurrentLocation(value)}
                       disabled={setAvailability.isPending || !profile.data}
-                      className={`rounded-xl px-4 py-2.5 text-sm font-extrabold transition active:scale-95 ${
+                      className={`rounded-xl px-4 py-2 text-xs font-bold transition active:scale-95 ${
                         profile.data?.availability === value
-                          ? "bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/30"
-                          : "bg-white/10 text-[#D8E3FF] hover:bg-white/20"
+                          ? value === "available"
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : value === "on_mission"
+                            ? "bg-sky-600 text-white shadow-xs"
+                            : "bg-slate-700 text-white shadow-xs"
+                          : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                       }`}
                     >
                       {setAvailability.isPending ? t("responder.updating") : label}
@@ -1778,41 +1782,41 @@ function UserRescuerMissionCard({
   const currentHospital = hospitals.find(h => h.id === Number(selectedHospitalId)) || hospitals[0];
 
   return (
-    <article className="glass-panel grid gap-4 p-5 shadow-sm md:grid-cols-[1fr_auto]">
+    <article className="rounded-2xl border border-slate-800 bg-slate-900 grid gap-4 p-5 shadow-xs md:grid-cols-[1fr_auto]">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-xs font-bold text-[#2457FF] dark:text-[#D8E3FF]">{incident.publicCode}</span>
+          <span className="font-mono text-xs font-bold text-sky-400">{incident.publicCode}</span>
           <StatusBadge status={mission.status} />
           {incident.destinationHospitalName && (
-            <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 ring-1 ring-emerald-500/30 dark:bg-emerald-950/50 dark:text-emerald-300">
+            <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-400 ring-1 ring-emerald-500/30">
               🏥 En route: {incident.destinationHospitalName}
             </span>
           )}
         </div>
-        <h2 className="mt-2 text-lg font-extrabold text-[#111C44] dark:text-[#F8F1E4]">{incident.locationLabel}</h2>
-        <p className="mt-1 text-sm text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+        <h2 className="mt-2 text-lg font-bold text-white">{incident.locationLabel}</h2>
+        <p className="mt-1 text-xs text-slate-400">
           {incident.peopleAffected} {t("responder.people")} · {incident.emergencyType} ·{" "}
-          <strong className={incident.severity === "critical" ? "text-destructive" : ""}>
+          <strong className={incident.severity === "critical" ? "text-rose-400" : ""}>
             {incident.severity}
           </strong>{" "}
           {t("responder.priority")}
         </p>
         {mission.notes && (
-          <p className="mt-3 rounded-lg glass-card px-3 py-2 text-xs leading-5 text-[#111C44]/80 dark:text-[#D8E3FF]/80">
+          <p className="mt-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs leading-5 text-slate-300">
             {mission.notes}
           </p>
         )}
         {incident.voiceNoteUrl && (
           <div
             data-testid="mission-voice-note"
-            className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 dark:border-amber-500/20"
+            className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5"
           >
-            <p className="mb-2 flex items-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-400">
-              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <p className="mb-2 flex items-center gap-2 text-xs font-bold text-amber-300">
+              <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
               Attached Emergency Voice Note
               {incident.voiceNoteDurationSeconds ? ` (${incident.voiceNoteDurationSeconds}s)` : ""}
             </p>
-            <audio controls preload="metadata" src={getApiUrl(incident.voiceNoteUrl)} className="h-10 w-full" />
+            <audio controls preload="metadata" src={getApiUrl(incident.voiceNoteUrl)} className="h-10 w-full rounded-lg" />
           </div>
         )}
       </div>
@@ -1825,7 +1829,7 @@ function UserRescuerMissionCard({
               variant="outline"
               size="sm"
               onClick={() => setShowHospitalDialog(true)}
-              className="rounded-xl border-[#2457FF]/40 bg-[#2457FF]/10 text-xs font-bold text-[#2457FF] hover:bg-[#2457FF]/20 dark:text-[#D8E3FF]"
+              className="rounded-xl border-sky-500/30 bg-sky-500/10 text-xs font-bold text-sky-400 hover:bg-sky-500/20"
             >
               <Hospital className="mr-1.5 h-3.5 w-3.5" />
               {incident.destinationHospitalName ? "Change Hospital" : "Route to Hospital"}
@@ -1833,24 +1837,24 @@ function UserRescuerMissionCard({
           )}
 
           {mission.status === "resolved" ? (
-            <span className="flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-400">
-              <CheckCircle2 className="h-5 w-5" /> {t("responder.completed")}
+            <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" /> {t("responder.completed")}
             </span>
           ) : (
             <Button
               disabled={isUpdating}
               onClick={() => onUpdateStatus(mission.status === "pending" ? "dispatched" : "resolved")}
-              className="rounded-xl bg-[#2457FF] text-white hover:bg-[#1d47db] shadow-md shadow-[#2457FF]/20"
+              className="rounded-xl bg-sky-500 text-slate-950 hover:bg-sky-400 font-bold shadow-xs"
             >
               {isUpdating ? (
                 t("responder.updating")
               ) : mission.status === "pending" ? (
                 <>
-                  <Navigation className="mr-2 h-4 w-4" /> {t("responder.dispatched")}
+                  <Navigation className="mr-1.5 h-4 w-4" /> {t("responder.dispatched")}
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="mr-2 h-4 w-4" /> {t("responder.resolved")}
+                  <CheckCircle2 className="mr-1.5 h-4 w-4" /> {t("responder.resolved")}
                 </>
               )}
             </Button>

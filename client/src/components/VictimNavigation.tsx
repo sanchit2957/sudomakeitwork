@@ -10,10 +10,9 @@ export interface VictimNavigationProps {
 /**
  * VictimNavigation — Citizen Emergency Navigation Bar.
  *
- * Responsive behavior:
- * - Mobile (<md): Anchored bottom bar with vertical touch layout and safe-area insets.
- * - Desktop / Large Screens (>=md): Compact Apple visionOS floating capsule island
- *   centered at the bottom with horizontal icon+label pills, preventing awkward stretching.
+ * Matching Reference 3:
+ * - Mobile (<md): Anchored clean bottom bar with high-contrast icons, tactile feedback, safe-area inset.
+ * - Desktop (>=md): Refined centered capsule dock with subtle elevation and clear active indicator.
  */
 export function VictimNavigation({ current }: VictimNavigationProps) {
   const [, setLocation] = useLocation();
@@ -29,9 +28,9 @@ export function VictimNavigation({ current }: VictimNavigationProps) {
   return (
     <nav
       aria-label="Victim App navigation"
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full glass-panel border-t border-[#B7AD9E]/30 dark:border-[#D8E3FF]/15 px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 shadow-lg liquid-glass transition-all duration-200 md:bottom-6 md:left-1/2 md:-translate-x-1/2 md:inset-x-auto md:w-auto md:max-w-none md:flex md:items-center md:gap-1.5 md:p-1.5 md:rounded-full md:border md:border-white/60 dark:md:border-white/15 md:shadow-2xl md:shadow-[#111C44]/20 dark:md:shadow-black/60"
+      className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full border-t border-slate-200/90 bg-white/95 px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 shadow-lg backdrop-blur-md transition-all duration-200 dark:border-slate-800 dark:bg-slate-900/95 md:bottom-5 md:left-1/2 md:-translate-x-1/2 md:inset-x-auto md:w-auto md:flex md:items-center md:gap-1 md:p-1.5 md:rounded-full md:border md:shadow-xl md:shadow-slate-950/10"
     >
-      {/* Mobile flex container (<md) */}
+      {/* Mobile touch layout (<md) */}
       <div className="flex w-full items-center justify-around md:hidden">
         {items.map(({ id, icon: Icon, label, path }) => {
           const isActive = current === id;
@@ -42,20 +41,20 @@ export function VictimNavigation({ current }: VictimNavigationProps) {
               type="button"
               onClick={() => setLocation(path)}
               aria-current={isActive ? "page" : undefined}
-              className={`grid min-w-16 place-items-center gap-1 rounded-xl px-2.5 py-1.5 text-[10px] font-extrabold transition-all active:scale-95 ${
+              className={`grid min-w-16 place-items-center gap-1 rounded-xl px-2.5 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
                 isActive
                   ? isHome
-                    ? "text-[#DC2626]"
-                    : "text-[#2457FF] dark:text-[#D8E3FF]"
-                  : "text-[#111C44]/60 dark:text-[#D8E3FF]/50 hover:text-[#111C44] dark:hover:text-[#F8F1E4]"
+                    ? "text-rose-600 dark:text-rose-400"
+                    : "text-slate-900 dark:text-white"
+                  : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300"
               }`}
             >
               <span
                 className={`grid h-8 w-8 place-items-center rounded-xl transition-colors ${
                   isActive
                     ? isHome
-                      ? "bg-red-500/15 text-[#DC2626]"
-                      : "bg-[#2457FF]/15 text-[#2457FF] dark:bg-[#2457FF]/30 dark:text-[#D8E3FF]"
+                      ? "bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400"
+                      : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
                     : ""
                 }`}
               >
@@ -67,7 +66,7 @@ export function VictimNavigation({ current }: VictimNavigationProps) {
         })}
       </div>
 
-      {/* Desktop / Big Screen horizontal island (>=md) */}
+      {/* Desktop / Tablet centered capsule (>=md) */}
       <div className="hidden md:flex md:items-center md:gap-1">
         {items.map(({ id, icon: Icon, label, path }) => {
           const isActive = current === id;
@@ -78,25 +77,15 @@ export function VictimNavigation({ current }: VictimNavigationProps) {
               type="button"
               onClick={() => setLocation(path)}
               aria-current={isActive ? "page" : undefined}
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold transition-all duration-150 active:scale-95 ${
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition-all duration-150 active:scale-95 ${
                 isActive
                   ? isHome
-                    ? "bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/25 shadow-xs"
-                    : "bg-[#2457FF]/15 text-[#2457FF] dark:bg-[#2457FF]/30 dark:text-[#D8E3FF] border border-[#2457FF]/25 shadow-xs"
-                  : "text-[#111C44]/65 dark:text-[#D8E3FF]/60 hover:text-[#111C44] dark:hover:text-[#F8F1E4] hover:bg-black/5 dark:hover:bg-white/10"
+                    ? "bg-rose-500 text-white shadow-xs"
+                    : "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
               }`}
             >
-              <span
-                className={`grid h-6 w-6 place-items-center rounded-lg transition-colors ${
-                  isActive
-                    ? isHome
-                      ? "text-red-600 dark:text-red-400"
-                      : "text-[#2457FF] dark:text-[#D8E3FF]"
-                    : "opacity-75"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-              </span>
+              <Icon className="h-4 w-4" />
               <span>{label}</span>
             </button>
           );

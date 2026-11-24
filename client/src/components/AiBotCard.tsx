@@ -17,21 +17,21 @@ export function AiBotCard({ onOpen, onOpenModal, embedded = false }: AiBotCardPr
       type="button"
       onClick={handleAction}
       aria-label={t("Open AI Bot")}
-      className={`group flex w-full flex-col items-center justify-center p-3.5 text-center transition active:scale-[0.98] ${
+      className={`group flex w-full flex-col items-center justify-center p-4 text-center transition active:scale-[0.98] ${
         embedded
-          ? "rounded-l-[18px] hover:bg-[#2457FF]/[0.05] dark:hover:bg-white/[0.05]"
-          : "glass-card p-4 hover:shadow-md"
+          ? "hover:bg-slate-50 dark:hover:bg-slate-800/60"
+          : "rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs hover:shadow-sm dark:border-slate-800 dark:bg-slate-900"
       }`}
     >
-      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/20 transition group-hover:scale-105 group-hover:bg-[#1d47db]">
+      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sky-500/10 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400 transition group-hover:scale-105">
         <Bot className="h-5 w-5" />
       </div>
 
-      <p className="mt-2 text-sm font-extrabold text-[#111C44] dark:text-[#F8F1E4]">
+      <p className="mt-2 text-xs font-bold text-slate-900 dark:text-white">
         {t("AI Bot")}
       </p>
 
-      <p className="mt-0.5 text-xs text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+      <p className="mt-0.5 text-[11px] text-muted-foreground">
         {t("Get Help")}
       </p>
     </button>
