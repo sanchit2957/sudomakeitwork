@@ -292,7 +292,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       data-testid="emergency-offer-card"
       role="region"
       aria-label="New Emergency Request"
-      className="relative overflow-hidden rounded-[1.8rem] border-2 border-red-500 bg-white/95 p-5 text-[#111C44] shadow-2xl backdrop-blur-md dark:bg-[#111C44]/95 dark:text-[#F8F1E4] ring-4 ring-red-500/20"
+      className="relative overflow-hidden rounded-[1.8rem] border-2 border-red-500 bg-white/95 p-5 text-[#0F172A] shadow-2xl backdrop-blur-md dark:bg-[#0F172A]/95 dark:text-[#F8FAFC] ring-4 ring-red-500/20"
     >
       {/* Top Banner */}
       <div className="flex items-center justify-between gap-3 border-b border-red-500/20 pb-3.5">
@@ -314,7 +314,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
           >
             {isMuted ? <VolumeX className="h-3.5 w-3.5 text-red-400" /> : <Volume2 className="h-3.5 w-3.5 text-red-500 animate-pulse" />}
           </button>
-          <span className="font-mono text-xs font-bold text-[#111C44]/50 dark:text-[#D8E3FF]/50">
+          <span className="font-mono text-xs font-bold text-[#0F172A]/50 dark:text-[#F1F5F9]/50">
             {incident.publicCode}
           </span>
         </div>
@@ -324,10 +324,10 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {/* Type */}
         <div className="glass-card border border-red-500/20 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#0F172A]/60 dark:text-[#F1F5F9]/60">
             {t("Type")}
           </p>
-          <div className="mt-1 flex items-center gap-1.5 font-bold text-[#111C44] dark:text-[#F8F1E4] text-xs">
+          <div className="mt-1 flex items-center gap-1.5 font-bold text-[#0F172A] dark:text-[#F8FAFC] text-xs">
             <CategoryIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
             <span className="truncate">{categoryLabel}</span>
           </div>
@@ -335,7 +335,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
 
         {/* Priority */}
         <div className="glass-card border border-red-500/20 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#0F172A]/60 dark:text-[#F1F5F9]/60">
             {t("Priority")}
           </p>
           <span
@@ -347,7 +347,7 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
 
         {/* Distance */}
         <div className="glass-card border border-red-500/20 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#0F172A]/60 dark:text-[#F1F5F9]/60">
             {t("Distance")}
           </p>
           <p className="mt-1 flex items-center gap-1 font-mono text-xs font-black text-red-600 dark:text-red-400">
@@ -358,11 +358,11 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
 
         {/* People */}
         <div className="glass-card border border-red-500/20 p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#0F172A]/60 dark:text-[#F1F5F9]/60">
             {t("People")}
           </p>
-          <p className="mt-1 flex items-center gap-1 font-bold text-[#111C44] dark:text-[#F8F1E4] text-xs">
-            <Users className="h-3.5 w-3.5 text-[#111C44]/50 dark:text-[#D8E3FF]/50" />
+          <p className="mt-1 flex items-center gap-1 font-bold text-[#0F172A] dark:text-[#F8FAFC] text-xs">
+            <Users className="h-3.5 w-3.5 text-[#0F172A]/50 dark:text-[#F1F5F9]/50" />
             {incident.peopleAffected || 1}
           </p>
         </div>
@@ -371,11 +371,11 @@ export function EmergencyOfferCard({ data, onAccepted, onDeclined }: EmergencyOf
       {/* Location */}
       <div className="mt-3 flex items-start gap-2 rounded-xl glass-card border border-red-500/20 p-3 text-xs">
         <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
-        <span className="font-semibold text-[#111C44] dark:text-[#F8F1E4]">{incident.locationLabel}</span>
+        <span className="font-semibold text-[#0F172A] dark:text-[#F8FAFC]">{incident.locationLabel}</span>
       </div>
 
       {incident.notes && (
-        <p className="mt-2 text-xs italic text-[#111C44]/70 dark:text-[#D8E3FF]/70 line-clamp-2 px-1">
+        <p className="mt-2 text-xs italic text-[#0F172A]/70 dark:text-[#F1F5F9]/70 line-clamp-2 px-1">
           "{incident.notes}"
         </p>
       )}

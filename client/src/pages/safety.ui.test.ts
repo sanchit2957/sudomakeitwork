@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { SafetyConditionsCard } from "./Safety";
+import { SafetyConditionsCard } from "./user/UserSafety";
 
 describe("Safety local alert UI", () => {
   it("renders a high-risk weather alert with an explicit early-movement instruction", () => {
@@ -27,7 +27,7 @@ describe("Safety local alert UI", () => {
   });
 
   it("prioritizes senior-friendly nearby hospitals above local alerts without restoring the removed checklist", () => {
-    const source = readFileSync(new URL("./Safety.tsx", import.meta.url), "utf8");
+    const source = readFileSync(new URL("./user/UserSafety.tsx", import.meta.url), "utf8");
     expect(source).toContain("Nearby hospitals");
     expect(source).toContain("Nearest verified hospital shown first");
     expect(source).toContain("foodSupplyStatus");

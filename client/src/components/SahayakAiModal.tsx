@@ -209,32 +209,32 @@ export function SahayakAiModal({ isOpen, onClose }: SahayakAiModalProps) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="sahayak-ai-title"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs transition-opacity duration-200"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-[#0F172A]/60 backdrop-blur-md transition-opacity duration-200 p-0 sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-t-[2rem] bg-[#fcfdfd] shadow-2xl ring-1 ring-black/10 dark:bg-[#121214] dark:ring-white/10 sm:max-h-[80vh] animate-in slide-in-from-bottom duration-300"
+        className="flex max-h-[88vh] sm:max-h-[82vh] w-full max-w-lg flex-col rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-white/80 dark:border-white/15 bg-white/95 dark:bg-[#0F172A]/95 shadow-2xl backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 animate-in slide-in-from-bottom duration-300 overflow-hidden"
       >
         {/* Top Drag Pill */}
         <div className="flex justify-center pt-2.5 pb-1">
-          <div className="h-1.5 w-12 rounded-full bg-neutral-300 dark:bg-neutral-700" />
+          <div className="h-1.5 w-12 rounded-full bg-neutral-300 dark:bg-white/20" />
         </div>
 
         {/* Modal Header */}
-        <header className="flex items-center justify-between border-b border-neutral-100 px-5 py-3 dark:border-neutral-800">
+        <header className="flex items-center justify-between border-b border-[#E2E8F0]/25 px-5 py-3.5 dark:border-white/10">
           <div className="flex items-center gap-2.5">
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[#174e46] text-white shadow-sm">
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[#1D4ED8] text-white shadow-md shadow-[#1D4ED8]/25">
               <Bot className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-base" role="img" aria-label="robot">🤖</span>
-                <h2 id="sahayak-ai-title" className="text-base font-extrabold tracking-tight text-[#142c2b] dark:text-[#f4f4f5]">
+                <h2 id="sahayak-ai-title" className="text-base font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
                   {t("Sahayak AI")}
                 </h2>
               </div>
-              <p className="text-[11px] font-bold text-[#63817b] dark:text-[#a1a1aa]">
+              <p className="text-[11px] font-bold text-[#0F172A]/70 dark:text-[#F1F5F9]/75">
                 {t("Sahay Emergency Assistant")}
               </p>
             </div>
@@ -247,7 +247,7 @@ export function SahayakAiModal({ isOpen, onClose }: SahayakAiModalProps) {
                 onClick={handleClearConversation}
                 title={t("Clear conversation")}
                 aria-label={t("Clear conversation")}
-                className="grid h-8 w-8 place-items-center rounded-xl text-neutral-500 transition hover:bg-neutral-100 active:scale-95 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                className="grid h-8 w-8 place-items-center rounded-xl text-[#0F172A]/60 transition hover:bg-black/5 active:scale-95 dark:text-[#F1F5F9]/60 dark:hover:bg-white/10"
               >
                 <RotateCcw className="h-4 w-4" />
               </button>
@@ -256,7 +256,7 @@ export function SahayakAiModal({ isOpen, onClose }: SahayakAiModalProps) {
               type="button"
               onClick={onClose}
               aria-label={t("Close")}
-              className="grid h-8 w-8 place-items-center rounded-xl text-neutral-500 transition hover:bg-neutral-100 active:scale-95 dark:text-neutral-400 dark:hover:bg-neutral-800"
+              className="grid h-8 w-8 place-items-center rounded-xl text-[#0F172A]/60 transition hover:bg-black/5 active:scale-95 dark:text-[#F1F5F9]/60 dark:hover:bg-white/10"
             >
               <X className="h-4 w-4" />
             </button>
@@ -353,8 +353,8 @@ export function SahayakAiModal({ isOpen, onClose }: SahayakAiModalProps) {
         </div>
 
         {/* Input Bar */}
-        <footer className="border-t border-neutral-100 bg-white p-3.5 dark:border-neutral-800 dark:bg-[#121214]">
-          <div className="flex items-center gap-2 rounded-2xl border border-[#d6e7e2] bg-[#fcfdfd] px-3 py-1.5 shadow-2xs focus-within:border-[#174e46] focus-within:ring-2 focus-within:ring-[#174e46]/10 dark:border-neutral-700 dark:bg-[#1a1a1c] dark:focus-within:border-[#2dd4bf]">
+        <footer className="border-t border-[#E2E8F0]/25 bg-white/95 p-3.5 pb-6 sm:pb-3.5 dark:border-white/10 dark:bg-[#0F172A]/95 backdrop-blur-md">
+          <div className="flex items-center gap-2 rounded-2xl border border-[#E2E8F0]/30 bg-white/80 px-3 py-1.5 shadow-2xs focus-within:border-[#1D4ED8] focus-within:ring-2 focus-within:ring-[#1D4ED8]/15 dark:border-white/15 dark:bg-[#182353]/60 dark:focus-within:border-[#1D4ED8]">
             <button
               type="button"
               onClick={toggleListening}
@@ -362,7 +362,7 @@ export function SahayakAiModal({ isOpen, onClose }: SahayakAiModalProps) {
               className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition ${
                 isListening 
                   ? "bg-rose-500 text-white animate-pulse" 
-                  : "bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                  : "bg-black/5 text-[#0F172A]/70 hover:bg-black/10 dark:bg-white/10 dark:text-[#F1F5F9]/75 dark:hover:bg-white/15"
               }`}
             >
               {isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
@@ -375,14 +375,14 @@ export function SahayakAiModal({ isOpen, onClose }: SahayakAiModalProps) {
               onKeyDown={handleKeyDown}
               disabled={chatMutation.isPending}
               placeholder={t("Ask about flood safety, weather, or hospitals…")}
-              className="flex-1 bg-transparent py-1.5 text-xs text-[#142c2b] placeholder:text-neutral-400 focus:outline-hidden dark:text-[#f4f4f5] dark:placeholder:text-neutral-500"
+              className="flex-1 bg-transparent py-1.5 text-xs text-[#0F172A] placeholder:text-[#0F172A]/45 focus:outline-hidden dark:text-[#F8FAFC] dark:placeholder:text-[#F1F5F9]/45"
             />
             <button
               type="button"
               onClick={() => handleSendMessage()}
               disabled={!input.trim() || chatMutation.isPending}
               aria-label={t("Send message")}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#174e46] text-white transition active:scale-95 hover:bg-[#1f6359] disabled:cursor-not-allowed disabled:opacity-40"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#1D4ED8] text-white shadow-md shadow-[#1D4ED8]/25 transition active:scale-95 hover:bg-[#1a44d6] disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send className="h-3.5 w-3.5" />
             </button>

@@ -1,6 +1,6 @@
 import React from "react";
 import LanguageSelector from "@/components/LanguageSelector";
-import { VictimNavigation } from "@/pages/Home";
+import { VictimNavigation } from "@/components/VictimNavigation";
 import { ProfileAvatar, UserProfileBadge, getFirstName } from "@/components/ProfileAvatar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -24,24 +24,24 @@ export default function UserMore() {
     user?.role === "admin"
       ? "Superadmin"
       : user?.role === "rescuer"
-      ? "Rescuer"
-      : user?.role === "medical" || user?.role === "hospital"
-      ? "Hospital Staff"
-      : "Citizen";
+        ? "Rescuer"
+        : user?.role === "medical" || user?.role === "hospital"
+          ? "Hospital Staff"
+          : "Citizen";
 
   const userDistrict = (user as any)?.homeDistrict;
   const bloodGroup = (user as any)?.bloodGroup;
 
   return (
-    <div className="victim-page relative min-h-screen bg-[#F8F1E4] text-[#111C44] transition-colors dark:bg-[#111C44] dark:text-[#F8F1E4] overflow-x-hidden">
+    <div className="victim-page relative min-h-screen bg-[#F8FAFC] text-[#0F172A] transition-colors dark:bg-[#0F172A] dark:text-[#F8FAFC] overflow-x-hidden">
       {/* iOS Liquid Glass Ambient Refraction Layer */}
       <div className="liquid-ambient-bg" />
 
-      <main className="victim-main relative z-10 mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-32 pt-5">
+      <main className="victim-main relative z-10 mx-auto min-h-screen w-full max-w-[1520px] px-4 sm:px-6 lg:px-10 pb-36 pt-6">
         <header className="glass-card mb-5 flex items-center justify-between p-3.5 shadow-sm">
           <div>
-            <p className="text-xl font-black tracking-tight text-[#111C44] dark:text-[#F8F1E4]">{t("More")}</p>
-            <p className="text-[10px] font-bold text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+            <p className="text-xl font-black tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">{t("More")}</p>
+            <p className="text-xs font-semibold text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
               {t("Profile & Community Support")}
             </p>
           </div>
@@ -51,31 +51,31 @@ export default function UserMore() {
         {/* Top Profile Card - Clickable to Open Customization Page */}
         <section
           onClick={() => setLocation("/profile")}
-          className="group cursor-pointer overflow-hidden rounded-2xl bg-[#111C44] p-5 text-white shadow-md transition hover:shadow-lg active:scale-[.99] dark:bg-[#182353]"
+          className="group cursor-pointer overflow-hidden rounded-2xl bg-[#0F172A] p-5 text-white shadow-md transition hover:shadow-lg active:scale-[.99] dark:bg-[#182353]"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-4">
               <ProfileAvatar user={user} size="xl" className="ring-2 ring-white/30" />
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-lg font-black leading-tight text-[#F8F1E4]">
+                  <p className="text-lg font-black leading-tight text-[#F8FAFC]">
                     {getFirstName(user?.name, user?.email, t("Citizen"))}
                   </p>
                 </div>
-                <p className="mt-0.5 text-xs text-[#D8E3FF]/80">{user?.email || t("Citizen Account")}</p>
+                <p className="mt-0.5 text-xs text-[#F1F5F9]/80">{user?.email || t("Citizen Account")}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#F8F1E4]">
-                    <ShieldCheck className="h-3 w-3 text-[#D8E3FF]" />
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-[#F8FAFC]">
+                    <ShieldCheck className="h-3 w-3 text-[#F1F5F9]" />
                     {t(roleLabel)}
                   </span>
                   {userDistrict && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-semibold text-[#D8E3FF]">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2 py-0.5 text-xs font-semibold text-[#F1F5F9]">
                       <MapPin className="h-2.5 w-2.5" />
                       {t(userDistrict)}
                     </span>
                   )}
                   {bloodGroup && (
-                    <span className="inline-flex items-center rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-200">
+                    <span className="inline-flex items-center rounded-full bg-red-500/20 px-2 py-0.5 text-xs font-bold text-red-200">
                       {bloodGroup === "Not specified" ? t("Not specified") : bloodGroup}
                     </span>
                   )}
@@ -88,9 +88,9 @@ export default function UserMore() {
             </span>
           </div>
 
-          <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-xs font-semibold text-[#D8E3FF]">
+          <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-xs font-semibold text-[#F1F5F9]">
             <span className="flex items-center gap-1.5">
-              <Edit3 className="h-3.5 w-3.5 text-[#D8E3FF]" />
+              <Edit3 className="h-3.5 w-3.5 text-[#F1F5F9]" />
               {t("Tap to customize safety profile & emergency contacts")}
             </span>
             <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
@@ -101,25 +101,25 @@ export default function UserMore() {
         <section className="glass-panel mt-5 p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#2457FF] text-white">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#1D4ED8] text-white">
                 <HeartHandshake className="h-4 w-4" />
               </span>
               <div>
-                <p className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[#2457FF] dark:text-[#D8E3FF]">
+                <p className="font-mono text-xs font-bold uppercase tracking-[.14em] text-[#1D4ED8] dark:text-[#F1F5F9]">
                   {t("Community Relief")}
                 </p>
-                <p className="text-base font-black tracking-tight text-[#111C44] dark:text-[#F8F1E4]">
+                <p className="text-base font-black tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
                   {t("Disaster Donations")}
                 </p>
               </div>
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#2457FF]/10 px-2.5 py-1 text-[10px] font-extrabold text-[#2457FF] dark:bg-[#2457FF]/20 dark:text-[#D8E3FF]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#1D4ED8]/10 px-2.5 py-1 text-xs font-bold text-[#1D4ED8] dark:bg-[#1D4ED8]/20 dark:text-[#F1F5F9]">
               <Sparkles className="h-3 w-3" />
               {t("Direct Aid")}
             </span>
           </div>
 
-          <p className="mt-2 text-xs leading-5 text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+          <p className="mt-2 text-xs leading-relaxed text-[#0F172A]/70 dark:text-[#F1F5F9]/70 text-prose-justified">
             {t("Connect with verified relief NGOs and community disaster foundations operating in Assam.")}
           </p>
 
@@ -127,25 +127,25 @@ export default function UserMore() {
             {/* Donate to NGO Card */}
             <button
               onClick={() => setLocation("/donations")}
-              className="group glass-card flex w-full items-center justify-between p-4 text-left transition hover:border-[#2457FF]/40 hover:shadow-md active:scale-[.99]"
+              className="group glass-card flex w-full items-center justify-between p-4 text-left transition hover:border-[#1D4ED8]/40 hover:shadow-md active:scale-[.99]"
             >
               <div className="flex items-center gap-3.5">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#D8E3FF] text-[#2457FF] transition group-hover:scale-105 dark:bg-[#2457FF]/30 dark:text-[#D8E3FF]">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#F1F5F9] text-[#1D4ED8] transition group-hover:scale-105 dark:bg-[#1D4ED8]/30 dark:text-[#F1F5F9]">
                   <Building2 className="h-5 w-5" />
                 </span>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-black text-[#111C44] dark:text-[#F8F1E4]">{t("Donate to NGO")}</span>
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold uppercase text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    <span className="text-sm font-black text-[#0F172A] dark:text-[#F8FAFC]">{t("Donate to NGO")}</span>
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-bold uppercase text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                       {t("Verified NGOs")}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+                  <p className="mt-0.5 text-xs text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
                     {t("Find nearby grassroots flood relief teams and contact numbers")}
                   </p>
                 </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-[#B7AD9E] transition group-hover:translate-x-1 group-hover:text-[#2457FF] dark:group-hover:text-[#D8E3FF]" />
+              <ChevronRight className="h-4 w-4 text-[#E2E8F0] transition group-hover:translate-x-1 group-hover:text-[#1D4ED8] dark:group-hover:text-[#F1F5F9]" />
             </button>
           </div>
         </section>

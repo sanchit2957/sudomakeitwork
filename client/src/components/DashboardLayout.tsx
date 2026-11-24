@@ -82,35 +82,35 @@ export default function DashboardLayout({
     <SidebarProvider>
       <Sidebar
         collapsible={desktopSidebar === "fixed" ? "none" : "icon"}
-        className="border-r border-[#B7AD9E]/30 bg-[#F8F1E4]/90 backdrop-blur-md dark:border-[#D8E3FF]/15 dark:bg-[#111C44]/95"
+        className="sticky top-0 h-screen shrink-0 z-20 border-r border-[#E2E8F0]/30 bg-[#F8FAFC]/90 backdrop-blur-md dark:border-[#F1F5F9]/15 dark:bg-[#0F172A]/95"
       >
         <SidebarHeader className="p-4">
           <div className="flex items-center gap-1">
             <div
               className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 text-left select-none group-data-[collapsible=icon]:justify-center"
             >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/25">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#1D4ED8] text-white shadow-md shadow-[#1D4ED8]/25">
                 <ShieldCheck className="h-5 w-5" />
               </span>
               <span className="group-data-[collapsible=icon]:hidden">
-                <span className="block text-sm font-extrabold tracking-tight text-[#111C44] dark:text-[#F8F1E4]">
+                <span className="block text-sm font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
                   {workspace}
                 </span>
-                <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#2457FF] dark:text-[#D8E3FF]">
+                <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#1D4ED8] dark:text-[#F1F5F9]">
                   {t("brand.network")}
                 </span>
               </span>
             </div>
             <SidebarTrigger
               className={cn(
-                "hidden h-9 w-9 shrink-0 md:inline-flex group-data-[collapsible=icon]:hidden text-[#111C44] dark:text-[#F8F1E4]",
+                "hidden h-9 w-9 shrink-0 md:inline-flex group-data-[collapsible=icon]:hidden text-[#0F172A] dark:text-[#F8FAFC]",
                 desktopSidebar === "fixed" && "md:hidden"
               )}
             />
           </div>
         </SidebarHeader>
         <SidebarContent className="px-3">
-          <div className="px-3 pb-2 pt-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[#111C44]/60 dark:text-[#D8E3FF]/60 group-data-[collapsible=icon]:hidden">
+          <div className="px-3 pb-2 pt-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[#0F172A]/60 dark:text-[#F1F5F9]/60 group-data-[collapsible=icon]:hidden">
             {roleLabel}
           </div>
           <SidebarMenu>
@@ -125,8 +125,8 @@ export default function DashboardLayout({
                     className={cn(
                       "h-11 rounded-xl transition-all font-semibold",
                       active
-                        ? "bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/20 font-bold hover:bg-[#1d47db] hover:text-white"
-                        : "text-[#111C44]/75 dark:text-[#D8E3FF]/75 hover:bg-[#2457FF]/10 hover:text-[#2457FF] dark:hover:text-[#D8E3FF]"
+                        ? "bg-[#1D4ED8] text-white shadow-md shadow-[#1D4ED8]/20 font-bold hover:bg-[#1d47db] hover:text-white"
+                        : "text-[#0F172A]/75 dark:text-[#F1F5F9]/75 hover:bg-[#1D4ED8]/10 hover:text-[#1D4ED8] dark:hover:text-[#F1F5F9]"
                     )}
                   >
                     <item.icon className="h-4 w-4" />
@@ -142,13 +142,13 @@ export default function DashboardLayout({
             <div className="flex items-center gap-2.5">
               <ProfileAvatar user={user} size="sm" />
               <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                <p className="truncate text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">{user.name || "Authorized user"}</p>
-                <p className="font-mono text-[9px] uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+                <p className="truncate text-xs font-bold text-[#0F172A] dark:text-[#F8FAFC]">{user.name || "Authorized user"}</p>
+                <p className="font-mono text-[9px] uppercase tracking-wider text-[#0F172A]/60 dark:text-[#F1F5F9]/60">
                   {roleLabel}
                 </p>
               </div>
             </div>
-            <div className="mt-2.5 flex flex-col gap-1 border-t border-[#B7AD9E]/20 dark:border-[#D8E3FF]/10 pt-2 group-data-[collapsible=icon]:hidden">
+            <div className="mt-2.5 flex flex-col gap-1 border-t border-[#E2E8F0]/20 dark:border-[#F1F5F9]/10 pt-2 group-data-[collapsible=icon]:hidden">
               <button
                 onClick={() => void logout().then(() => setLocation("/login"))}
                 className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-500/10 dark:text-rose-400 transition"
@@ -159,13 +159,13 @@ export default function DashboardLayout({
           </div>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="relative min-h-screen bg-[#F8F1E4] text-[#111C44] dark:bg-[#111C44] dark:text-[#F8F1E4] transition-colors overflow-x-hidden">
+      <SidebarInset className="relative min-h-screen bg-[#F8FAFC] text-[#0F172A] dark:bg-[#0F172A] dark:text-[#F8FAFC] transition-colors overflow-x-hidden">
         {/* iOS Liquid Glass Ambient Refraction Layer */}
         <div className="liquid-ambient-bg" />
 
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#B7AD9E]/30 bg-[#F8F1E4]/85 px-4 backdrop-blur-md dark:border-[#D8E3FF]/15 dark:bg-[#111C44]/85 md:px-7">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#E2E8F0]/30 bg-[#F8FAFC]/85 px-4 backdrop-blur-md dark:border-[#F1F5F9]/15 dark:bg-[#0F172A]/85 md:px-7">
           <div className="flex items-center gap-3">
-            <SidebarTrigger className="md:hidden text-[#111C44] dark:text-[#F8F1E4]">
+            <SidebarTrigger className="md:hidden text-[#0F172A] dark:text-[#F8FAFC]">
               <Menu className="h-4 w-4" />
             </SidebarTrigger>
             {/* Unified Reusable Profile Component next to workspace title */}
@@ -175,10 +175,10 @@ export default function DashboardLayout({
               clickable={user?.role === "user"}
               onClick={user?.role === "user" ? () => setLocation("/profile") : undefined}
             />
-            <div className="hidden sm:block h-5 w-px bg-[#B7AD9E]/40 dark:bg-[#D8E3FF]/20" />
+            <div className="hidden sm:block h-5 w-px bg-[#E2E8F0]/40 dark:bg-[#F1F5F9]/20" />
             <div className="hidden sm:block">
-              <p className="text-xs font-bold tracking-tight text-[#111C44] dark:text-[#F8F1E4]">{workspace}</p>
-              <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-[#2457FF] dark:text-[#D8E3FF]">
+              <p className="text-xs font-bold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">{workspace}</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-[#1D4ED8] dark:text-[#F1F5F9]">
                 {roleLabel || t("dashboard.liveWorkspace")}
               </p>
             </div>

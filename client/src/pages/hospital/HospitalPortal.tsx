@@ -5,7 +5,7 @@ import { HospitalStaffDashboard } from "@/components/HospitalStaffDashboard";
 import DashboardLayout, { type WorkspaceNavItem } from "@/components/DashboardLayout";
 import OperationsMap from "@/components/OperationsMap";
 import { Button } from "@/components/ui/button";
-import { HospitalManager } from "@/pages/Command";
+import { HospitalManager } from "@/pages/admin/AdminCommand";
 import HospitalRegistration from "./HospitalRegistration";
 import { trpc } from "@/lib/trpc";
 import { Building2, CheckCircle2, Hospital, MapPinned, ShieldCheck, UserPlus, XCircle } from "lucide-react";
@@ -91,11 +91,11 @@ function HospitalApprovals() {
       <div className="grid gap-4">
         {pending.length ? (
           pending.map(({ request, user }) => (
-            <article key={request.id} className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
+            <article key={request.id} className="rounded-3xl border border-[#E2E8F0]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
               <div className="flex flex-col justify-between gap-5 lg:flex-row">
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
-                    <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#2457FF]/10 text-[#2457FF]">
+                    <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#1D4ED8]/10 text-[#1D4ED8]">
                       <Building2 className="h-5 w-5" />
                     </span>
                     <div>
@@ -117,7 +117,7 @@ function HospitalApprovals() {
                   <Button
                     disabled={review.isPending}
                     onClick={() => review.mutate({ requestId: request.id, decision: "approved" })}
-                    className="rounded-xl font-bold bg-[#2457FF] text-white hover:bg-[#1a44cc] shadow-sm transition"
+                    className="rounded-xl font-bold bg-[#1D4ED8] text-white hover:bg-[#1a44cc] shadow-sm transition"
                   >
                     <CheckCircle2 className="mr-2 h-4 w-4" />
                     Approve Facility
@@ -132,7 +132,7 @@ function HospitalApprovals() {
                         reviewNote: "Please provide official medical facility accreditation.",
                       })
                     }
-                    className="rounded-xl text-destructive border-[#B7AD9E]/30 hover:bg-destructive/10"
+                    className="rounded-xl text-destructive border-[#E2E8F0]/30 hover:bg-destructive/10"
                   >
                     <XCircle className="mr-2 h-4 w-4" />
                     Request Review
@@ -142,8 +142,8 @@ function HospitalApprovals() {
             </article>
           ))
         ) : (
-          <div className="rounded-3xl border border-dashed border-[#B7AD9E]/30 bg-card/60 backdrop-blur-md p-10 text-center">
-            <ShieldCheck className="mx-auto h-10 w-10 text-[#2457FF]" />
+          <div className="rounded-3xl border border-dashed border-[#E2E8F0]/30 bg-card/60 backdrop-blur-md p-10 text-center">
+            <ShieldCheck className="mx-auto h-10 w-10 text-[#1D4ED8]" />
             <p className="mt-4 text-base font-extrabold text-foreground">No Hospital Registrations Waiting</p>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               New medical center registrations will appear here for State Command verification.

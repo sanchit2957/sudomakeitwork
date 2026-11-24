@@ -175,8 +175,8 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
 
   if (!hospital || !draft) {
     return (
-      <section className="mx-auto max-w-2xl rounded-3xl border border-[#B7AD9E]/25 bg-card/90 backdrop-blur-md p-8 text-center shadow-lg dark:border-white/10">
-        <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#2457FF]/10 text-[#2457FF]">
+      <section className="mx-auto max-w-2xl rounded-3xl border border-[#E2E8F0]/25 bg-card/90 backdrop-blur-md p-8 text-center shadow-lg dark:border-white/10">
+        <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#1D4ED8]/10 text-[#1D4ED8]">
           <Hospital className="h-8 w-8" />
         </span>
         <h1 className="mt-4 text-2xl font-black text-foreground">Hospital Portal Initialization</h1>
@@ -228,28 +228,28 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
   return (
     <div className="space-y-6">
       {/* 1. TOP HEADER & OPERATIONAL STATUS */}
-      <section className="overflow-hidden rounded-3xl border border-[#2457FF]/30 bg-[#111C44] p-6 text-[#F8F1E4] shadow-xl relative backdrop-blur-md">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#2457FF]/15 blur-3xl" />
+      <section className="overflow-hidden rounded-3xl border border-[#1D4ED8]/30 bg-[#0F172A] p-6 text-[#F8FAFC] shadow-xl relative backdrop-blur-md">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#1D4ED8]/15 blur-3xl" />
         <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
           <div className="flex items-start gap-4">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#2457FF]/20 border border-[#2457FF]/40 text-[#D8E3FF] shadow-inner backdrop-blur-md">
-              <Hospital className="h-7 w-7 text-[#D8E3FF]" />
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#1D4ED8]/20 border border-[#1D4ED8]/40 text-[#F1F5F9] shadow-inner backdrop-blur-md">
+              <Hospital className="h-7 w-7 text-[#F1F5F9]" />
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#D8E3FF]/80">
+                <span className="font-mono text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#F1F5F9]/80">
                   Emergency Hospital Operations Desk
                 </span>
-                <span className="rounded-md bg-[#2457FF]/30 px-2.5 py-0.5 font-mono text-[9px] font-black uppercase text-[#D8E3FF] border border-[#2457FF]/40">
+                <span className="rounded-md bg-[#1D4ED8]/30 px-2.5 py-0.5 font-mono text-[9px] font-black uppercase text-[#F1F5F9] border border-[#1D4ED8]/40">
                   Verified Facility #{hospital.id}
                 </span>
               </div>
-              <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl text-[#F8F1E4]">{hospital.name}</h1>
-              <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[#D8E3FF]/70">
+              <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl text-[#F8FAFC]">{hospital.name}</h1>
+              <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[#F1F5F9]/70">
                 <span>{hospital.address}</span>
                 {hospital.contactPhone && (
-                  <span className="flex items-center gap-1 font-mono font-semibold text-[#D8E3FF]">
-                    <Phone className="h-3 w-3 text-[#2457FF]" /> {hospital.contactPhone}
+                  <span className="flex items-center gap-1 font-mono font-semibold text-[#F1F5F9]">
+                    <Phone className="h-3 w-3 text-[#1D4ED8]" /> {hospital.contactPhone}
                   </span>
                 )}
               </p>
@@ -259,11 +259,11 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
           <div className="flex flex-col items-start gap-3 md:items-end">
             <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-1.5 backdrop-blur-sm border border-white/10">
               <span className={`h-3 w-3 rounded-full ${readiness.color} animate-pulse shadow-sm`} />
-              <span className="font-mono text-xs font-black uppercase tracking-wider text-[#F8F1E4]">
+              <span className="font-mono text-xs font-black uppercase tracking-wider text-[#F8FAFC]">
                 {readiness.label}
               </span>
             </div>
-            <p className="font-mono text-[11px] text-[#D8E3FF]/60">
+            <p className="font-mono text-[11px] text-[#F1F5F9]/60">
               Last sync: {new Date(hospital.updatedAt).toLocaleTimeString()}
             </p>
           </div>
@@ -340,8 +340,8 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
           </div>
 
           {activeCasesList.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-[#B7AD9E]/30 bg-card/60 backdrop-blur-md p-12 text-center shadow-xs">
-              <ShieldCheck className="mx-auto h-12 w-12 text-[#2457FF]/70" />
+            <div className="rounded-3xl border border-dashed border-[#E2E8F0]/30 bg-card/60 backdrop-blur-md p-12 text-center shadow-xs">
+              <ShieldCheck className="mx-auto h-12 w-12 text-[#1D4ED8]/70" />
               <h3 className="mt-3 text-base font-extrabold text-foreground">No Incoming Emergency Cases</h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 When field rescuers or State Command assign patients to this hospital, inbound telemetry and patient counts will appear here instantly.
@@ -363,9 +363,9 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
           )}
 
           {/* INTEGRATED OPERATIONS MAP */}
-          <div className="mt-8 rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
+          <div className="mt-8 rounded-3xl border border-[#E2E8F0]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
             <div className="mb-4">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2457FF]">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#1D4ED8]">
                 Spatial Situational Awareness
               </p>
               <h3 className="text-lg font-extrabold text-foreground">Facility & Response Sector Map</h3>
@@ -380,7 +380,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
         <section className="space-y-6">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div>
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2457FF]">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#1D4ED8]">
                 Live Capacity Controls
               </p>
               <h2 className="text-xl font-extrabold tracking-tight text-foreground">Hospital Resources & Medical Supplies</h2>
@@ -388,7 +388,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
             <Button
               onClick={handleSaveResources}
               disabled={updateResources.isPending}
-              className="h-11 rounded-xl bg-[#2457FF] px-5 font-bold text-white shadow-md hover:bg-[#1a44cc] transition"
+              className="h-11 rounded-xl bg-[#1D4ED8] px-5 font-bold text-white shadow-md hover:bg-[#1a44cc] transition"
             >
               <CheckCircle2 className="mr-2 h-4 w-4" />
               {updateResources.isPending ? "Publishing…" : "Publish Live Updates"}
@@ -451,8 +451,8 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
               onChange={val => updateDraft("ambulanceCount", val)}
               tone="amber"
             />
-            <div className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
-              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#2457FF]/10 text-[#2457FF]">
+            <div className="rounded-3xl border border-[#E2E8F0]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#1D4ED8]/10 text-[#1D4ED8]">
                 <Hospital className="h-5 w-5" />
               </span>
               <Label className="mt-4 block text-sm font-extrabold text-foreground">Overall Facility Service Status</Label>
@@ -471,16 +471,16 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
           </div>
 
           {/* ESSENTIAL SUPPLIES STATUS */}
-          <section className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2457FF]">
+          <section className="rounded-3xl border border-[#E2E8F0]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#1D4ED8]">
               Infrastructure & Supplies
             </p>
             <h3 className="mt-1 text-lg font-extrabold text-foreground">Essential Disaster Logistics</h3>
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {supplyItems.map(({ key, label, icon: Icon }) => (
-                <div key={key} className="rounded-2xl border border-[#B7AD9E]/20 bg-background/50 backdrop-blur-sm p-4">
+                <div key={key} className="rounded-2xl border border-[#E2E8F0]/20 bg-background/50 backdrop-blur-sm p-4">
                   <div className="flex items-center gap-2.5">
-                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#2457FF]/10 text-[#2457FF]">
+                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#1D4ED8]/10 text-[#1D4ED8]">
                       <Icon className="h-4 w-4" />
                     </span>
                     <Label className="text-xs font-bold text-foreground">{label}</Label>
@@ -504,7 +504,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
           <Button
             onClick={handleSaveResources}
             disabled={updateResources.isPending}
-            className="h-12 w-full rounded-xl bg-[#2457FF] text-base font-bold text-white shadow-md hover:bg-[#1a44cc] transition"
+            className="h-12 w-full rounded-xl bg-[#1D4ED8] text-base font-bold text-white shadow-md hover:bg-[#1a44cc] transition"
           >
             <CheckCircle2 className="mr-2 h-5 w-5" />
             {updateResources.isPending ? "Publishing Live Update…" : "Publish Live Hospital Update"}
@@ -516,7 +516,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
       {activeTab === "coordination" && (
         <section className="space-y-6">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2457FF]">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#1D4ED8]">
               Inter-Agency Communications
             </p>
             <h2 className="text-xl font-extrabold tracking-tight text-foreground">State Command Centre Coordination</h2>
@@ -534,9 +534,9 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
 
           <div className="grid gap-6 lg:grid-cols-2">
             {/* DISPATCH NEW BROADCAST */}
-            <form onSubmit={handleSendCoordination} className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm space-y-4">
+            <form onSubmit={handleSendCoordination} className="rounded-3xl border border-[#E2E8F0]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2.5">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#2457FF]/10 text-[#2457FF]">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#1D4ED8]/10 text-[#1D4ED8]">
                   <Radio className="h-5 w-5" />
                 </span>
                 <div>
@@ -584,7 +584,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
                   onChange={e => setCoordMessage(e.target.value)}
                   placeholder="Describe specific requirements, patient counts, or logistical blockages…"
                   rows={4}
-                  className="mt-1.5 w-full rounded-xl border border-input bg-background/80 p-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2457FF]"
+                  className="mt-1.5 w-full rounded-xl border border-input bg-background/80 p-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
                   required
                 />
               </div>
@@ -592,7 +592,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
               <Button
                 type="submit"
                 disabled={sendCoordination.isPending || !coordMessage.trim()}
-                className="h-11 w-full rounded-xl bg-[#2457FF] font-bold text-white shadow-md hover:bg-[#1a44cc] transition"
+                className="h-11 w-full rounded-xl bg-[#1D4ED8] font-bold text-white shadow-md hover:bg-[#1a44cc] transition"
               >
                 <Send className="mr-2 h-4 w-4" />
                 {sendCoordination.isPending ? "Transmitting…" : "Transmit to State Command Centre"}
@@ -600,7 +600,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
             </form>
 
             {/* PRESET QUICK BROADCAST TILES */}
-            <div className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm space-y-3">
+            <div className="rounded-3xl border border-[#E2E8F0]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm space-y-3">
               <h3 className="text-base font-extrabold text-foreground">Instant Tactical Broadcasts</h3>
               <p className="text-xs text-muted-foreground">Click a preset to quickly prefill and coordinate</p>
 
@@ -655,22 +655,22 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
       {activeTab === "timeline" && (
         <section className="space-y-6">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2457FF]">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#1D4ED8]">
               System Audit Trail
             </p>
             <h2 className="text-xl font-extrabold tracking-tight text-foreground">Recent Operational Activity</h2>
           </div>
 
-          <div className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm">
+          <div className="rounded-3xl border border-[#E2E8F0]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-6 shadow-sm">
             {timeline.data && timeline.data.length > 0 ? (
-              <div className="relative border-l-2 border-[#2457FF]/30 pl-5 space-y-6">
+              <div className="relative border-l-2 border-[#1D4ED8]/30 pl-5 space-y-6">
                 {timeline.data.map(event => (
                   <div key={event.id} className="relative">
-                    <span className="absolute -left-[27px] top-1 grid h-5 w-5 place-items-center rounded-full bg-[#2457FF] text-white text-[10px]">
+                    <span className="absolute -left-[27px] top-1 grid h-5 w-5 place-items-center rounded-full bg-[#1D4ED8] text-white text-[10px]">
                       ●
                     </span>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-black uppercase tracking-wider text-[#2457FF]">
+                      <p className="text-xs font-black uppercase tracking-wider text-[#1D4ED8]">
                         {event.action}
                       </p>
                       <span className="font-mono text-[11px] text-muted-foreground">
@@ -716,8 +716,8 @@ function TabButton({
       onClick={onClick}
       className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
         active
-          ? "bg-[#2457FF] text-white shadow-md"
-          : "bg-white/10 text-[#F8F1E4]/80 hover:bg-white/20 hover:text-white"
+          ? "bg-[#1D4ED8] text-white shadow-md"
+          : "bg-white/10 text-[#F8FAFC]/80 hover:bg-white/20 hover:text-white"
       }`}
     >
       <Icon className="h-4 w-4" />
@@ -752,8 +752,8 @@ function QuickCapacityCard({
 }) {
   const tones = {
     green: "bg-[#059669]/10 text-[#059669] dark:text-[#10B981]",
-    blue: "bg-[#2457FF]/10 text-[#2457FF]",
-    emerald: "bg-[#2457FF]/10 text-[#2457FF]",
+    blue: "bg-[#1D4ED8]/10 text-[#1D4ED8]",
+    emerald: "bg-[#1D4ED8]/10 text-[#1D4ED8]",
     red: "bg-[#DC2626]/10 text-[#DC2626] dark:text-[#EF4444]",
     amber: "bg-[#D97706]/10 text-[#D97706] dark:text-[#F59E0B]",
   };
@@ -761,7 +761,7 @@ function QuickCapacityCard({
   const pct = total ? Math.min(100, Math.round((value / total) * 100)) : null;
 
   return (
-    <div className="rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
+    <div className="rounded-3xl border border-[#E2E8F0]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <span className={`grid h-10 w-10 place-items-center rounded-2xl ${tones[tone]}`}>
           <Icon className="h-5 w-5" />
@@ -779,7 +779,7 @@ function QuickCapacityCard({
         <button
           type="button"
           onClick={onMinus}
-          className="grid h-10 w-10 place-items-center rounded-xl border border-[#B7AD9E]/30 bg-background text-foreground transition hover:bg-[#2457FF]/10 hover:border-[#2457FF]/40 active:scale-95"
+          className="grid h-10 w-10 place-items-center rounded-xl border border-[#E2E8F0]/30 bg-background text-foreground transition hover:bg-[#1D4ED8]/10 hover:border-[#1D4ED8]/40 active:scale-95"
         >
           <Minus className="h-4 w-4" />
         </button>
@@ -796,7 +796,7 @@ function QuickCapacityCard({
         <button
           type="button"
           onClick={onPlus}
-          className="grid h-10 w-10 place-items-center rounded-xl border border-[#B7AD9E]/30 bg-background text-foreground transition hover:bg-[#2457FF]/10 hover:border-[#2457FF]/40 active:scale-95"
+          className="grid h-10 w-10 place-items-center rounded-xl border border-[#E2E8F0]/30 bg-background text-foreground transition hover:bg-[#1D4ED8]/10 hover:border-[#1D4ED8]/40 active:scale-95"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -842,16 +842,16 @@ function CaseCard({
   const statusMap: Record<string, { label: string; tone: string }> = {
     notified: { label: "INBOUND NOTIFIED", tone: "bg-red-500/10 text-red-600 border-red-500/30 dark:text-red-400" },
     acknowledged: { label: "ACKNOWLEDGED", tone: "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400" },
-    preparing: { label: "PREPARING ER / ICU", tone: "bg-[#2457FF]/10 text-[#2457FF] border-[#2457FF]/30" },
-    ready: { label: "READY FOR ARRIVAL", tone: "bg-[#2457FF]/10 text-[#2457FF] border-[#2457FF]/30" },
+    preparing: { label: "PREPARING ER / ICU", tone: "bg-[#1D4ED8]/10 text-[#1D4ED8] border-[#1D4ED8]/30" },
+    ready: { label: "READY FOR ARRIVAL", tone: "bg-[#1D4ED8]/10 text-[#1D4ED8] border-[#1D4ED8]/30" },
     received: { label: "PATIENTS RECEIVED", tone: "bg-[#059669]/10 text-[#059669] border-[#059669]/30 dark:text-[#10B981]" },
-    completed: { label: "CASE COMPLETED", tone: "bg-muted text-muted-foreground border-[#B7AD9E]/30" },
+    completed: { label: "CASE COMPLETED", tone: "bg-muted text-muted-foreground border-[#E2E8F0]/30" },
   };
 
   const currentStatus = statusMap[notification.status] || { label: notification.status.toUpperCase(), tone: "bg-muted text-foreground border-border" };
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-[#B7AD9E]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm transition hover:shadow-md">
+    <article className="overflow-hidden rounded-3xl border border-[#E2E8F0]/25 dark:border-white/10 bg-card/90 backdrop-blur-md p-5 shadow-sm transition hover:shadow-md">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -861,7 +861,7 @@ function CaseCard({
             <span className={`rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold ${currentStatus.tone}`}>
               {currentStatus.label}
             </span>
-            <span className="font-mono text-xs font-extrabold text-[#2457FF]">
+            <span className="font-mono text-xs font-extrabold text-[#1D4ED8]">
               CASE #{incident?.publicCode || notification.incidentId}
             </span>
           </div>
@@ -872,7 +872,7 @@ function CaseCard({
 
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1 font-semibold text-foreground">
-              <Radio className="h-3.5 w-3.5 text-[#2457FF]" /> {rescuer?.callSign || rescuer?.name || "Field Unit"}
+              <Radio className="h-3.5 w-3.5 text-[#1D4ED8]" /> {rescuer?.callSign || rescuer?.name || "Field Unit"}
             </span>
             <span className="flex items-center gap-1 font-mono font-bold text-amber-600 dark:text-amber-400">
               <Timer className="h-3.5 w-3.5" /> ETA ~{notification.estimatedArrivalMinutes} min
@@ -893,7 +893,7 @@ function CaseCard({
                 </span>
               )}
               {notification.oxygenRequired === "yes" && (
-                <span className="rounded-md bg-[#2457FF]/10 px-2 py-0.5 font-mono text-[10px] font-bold text-[#2457FF]">
+                <span className="rounded-md bg-[#1D4ED8]/10 px-2 py-0.5 font-mono text-[10px] font-bold text-[#1D4ED8]">
                   🫁 Oxygen Support Required
                 </span>
               )}
@@ -924,7 +924,7 @@ function CaseCard({
               size="sm"
               disabled={isUpdating}
               onClick={() => onUpdateStatus("preparing")}
-              className="rounded-xl bg-[#2457FF] text-xs font-bold text-white hover:bg-[#1a44cc] shadow-sm"
+              className="rounded-xl bg-[#1D4ED8] text-xs font-bold text-white hover:bg-[#1a44cc] shadow-sm"
             >
               <HeartPulse className="mr-1.5 h-3.5 w-3.5" /> Prepare ER & ICU
             </Button>
@@ -934,7 +934,7 @@ function CaseCard({
               size="sm"
               disabled={isUpdating}
               onClick={() => onUpdateStatus("ready")}
-              className="rounded-xl bg-[#2457FF] text-xs font-bold text-white hover:bg-[#1a44cc] shadow-sm"
+              className="rounded-xl bg-[#1D4ED8] text-xs font-bold text-white hover:bg-[#1a44cc] shadow-sm"
             >
               <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Mark Ready for Inbound
             </Button>
@@ -981,9 +981,9 @@ function QuickActionTile({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-3 rounded-2xl border border-[#B7AD9E]/25 dark:border-white/10 bg-background/60 backdrop-blur-sm p-3 text-left transition hover:border-[#2457FF]/50 hover:bg-background"
+      className="flex items-center gap-3 rounded-2xl border border-[#E2E8F0]/25 dark:border-white/10 bg-background/60 backdrop-blur-sm p-3 text-left transition hover:border-[#1D4ED8]/50 hover:bg-background"
     >
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#2457FF]/10 text-[#2457FF]">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#1D4ED8]/10 text-[#1D4ED8]">
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">

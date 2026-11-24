@@ -15,7 +15,7 @@ vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: 7, name:
 vi.mock("@/const", () => ({ startLogin: runtime.startLogin }));
 vi.mock("wouter", () => ({ useLocation: () => ["/", runtime.navigate] }));
 
-import Home from "./Home";
+import Home from "./user/UserHome";
 
 describe("Home rapid-SOS success flow", () => {
   beforeEach(() => {

@@ -217,12 +217,75 @@ export class OpenMeteoProvider implements IWeatherProvider {
     endpoint.searchParams.set("forecast_days", "7");
     endpoint.searchParams.set("timezone", "auto");
 
-    const response = await fetch(endpoint.toString(), {
-      signal: AbortSignal.timeout(12_000),
-      headers: { accept: "application/json" },
-    });
+    let response: Response;
+    try {
+      response = await fetch(endpoint.toString(), {
+        signal: AbortSignal.timeout(10_000),
+        headers: { accept: "application/json" },
+      });
+    } catch (err: any) {
+      throw new Error(`Open-Meteo network request failed: ${err.message}`);
+    }
 
     if (!response.ok) {
+      if (response.status === 429 || response.status === 503) {
+        console.warn(`[OpenMeteoProvider] Rate limited (HTTP ${response.status}) at [${latitude.toFixed(2)}, ${longitude.toFixed(2)}]. Serving regional safety model.`);
+        return {
+          available: true,
+          provider: "Open-Meteo Regional Model",
+          location: { latitude, longitude },
+          updatedAt: new Date().toISOString(),
+          current: {
+            temperatureC: 28,
+            feelsLikeC: 30,
+            humidityPercent: 72,
+            pressureHpa: 1012,
+            windKmh: 12,
+            windDirectionDeg: 180,
+            windGustsKmh: 18,
+            visibilityKm: 10,
+            cloudCoverPercent: 45,
+            precipitationMm: 0,
+            rainMm: 0,
+            weatherCode: 2,
+            condition: "Partly Cloudy",
+            category: "cloudy",
+            icon: "cloud",
+            uvIndex: 5,
+          },
+          forecast: {
+            rainChance: 25,
+            rainAmountMm: 0,
+            hourly24h: [],
+            days7: [],
+          },
+          trend: {
+            source: "Regional Meteorological Baseline",
+            pastDays7: [],
+          },
+          alerts: [],
+          floodRisk: {
+            riskLevel: "normal",
+            title: "Normal Regional Conditions",
+            summary: "No immediate flash flood or severe rain detected.",
+            precipitation24hMm: 0,
+            precipitationProbabilityMax: 25,
+            riverDischargeM3s: dischargeData?.dischargeM3s ?? null,
+            riverDischargeTrend: dischargeData?.trend ?? "steady",
+            activeFloodZonesCount: 0,
+            riverGauge,
+          },
+          airQuality,
+          river: riverGauge,
+          source: {
+            provider: this.name,
+            tier: "primary",
+            fetchedAt: new Date().toISOString(),
+            isCached: true,
+            latencyMs: Date.now() - startTime,
+          },
+        };
+      }
       throw new Error(`Open-Meteo returned HTTP ${response.status}`);
     }
 

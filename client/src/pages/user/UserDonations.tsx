@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSelector from "@/components/LanguageSelector";
-import { VictimNavigation } from "@/pages/Home";
+import { VictimNavigation } from "@/components/VictimNavigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -112,7 +112,7 @@ export default function UserDonations() {
   }, [position]);
 
   return (
-    <div className="victim-page min-h-screen bg-[#F8F1E4] text-[#111C44] transition-colors dark:bg-[#111C44] dark:text-[#F8F1E4]">
+    <div className="victim-page min-h-screen bg-[#F8FAFC] text-[#0F172A] transition-colors dark:bg-[#0F172A] dark:text-[#F8FAFC]">
       <main className="victim-main relative mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-32 pt-5">
         {/* Header */}
         <header className="glass-card mb-5 flex items-center justify-between p-3.5 shadow-sm">
@@ -120,14 +120,14 @@ export default function UserDonations() {
             onClick={() => setLocation("/more")}
             className="flex items-center gap-3 text-left transition hover:opacity-80 active:scale-95"
           >
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/20">
+            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#1D4ED8] text-white shadow-md shadow-[#1D4ED8]/20">
               <ArrowLeft className="h-5 w-5" />
             </span>
             <div>
-              <span className="block text-lg font-black tracking-tight text-[#111C44] dark:text-[#F8F1E4]">
+              <span className="block text-lg font-black tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
                 {t("Donate to NGO")}
               </span>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+              <span className="block text-xs font-bold uppercase tracking-wider text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
                 {t("Nearby Relief Organizations")}
               </span>
             </div>
@@ -136,30 +136,30 @@ export default function UserDonations() {
         </header>
 
         {/* Hero Section */}
-        <section className="glass-panel overflow-hidden bg-[#111C44] p-5 text-white dark:bg-[#0c1433]">
+        <section className="glass-panel overflow-hidden bg-[#0F172A] p-5 text-white dark:bg-[#0c1433]">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15 backdrop-blur-sm text-[#D8E3FF]">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15 backdrop-blur-sm text-[#F1F5F9]">
                 <HeartHandshake className="h-6 w-6" />
               </span>
               <div>
-                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#D8E3FF]">
+                <p className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-[#F1F5F9]">
                   {t("Verified Relief Directory")}
                 </p>
-                <h1 className="mt-0.5 text-xl font-black tracking-tight text-[#F8F1E4]">
+                <h1 className="mt-0.5 text-xl font-black tracking-tight text-[#F8FAFC]">
                   {t("Community Relief NGOs")}
                 </h1>
               </div>
             </div>
           </div>
 
-          <p className="mt-3 text-xs leading-relaxed text-[#D8E3FF]/80">
+          <p className="mt-3 text-xs leading-relaxed text-[#F1F5F9]/85 text-prose-justified">
             {t("Connect directly with grassroots flood relief and disaster rehabilitation teams across Assam.")}
           </p>
 
           <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/10 pt-3">
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#D8E3FF]">
-              <MapPin className="h-4 w-4 shrink-0 text-[#2457FF]" />
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#F1F5F9]">
+              <MapPin className="h-4 w-4 shrink-0 text-[#1D4ED8]" />
               <span className="truncate">
                 {locationStatus === "locating"
                   ? t("Locating nearby NGOs…")
@@ -182,21 +182,21 @@ export default function UserDonations() {
         {/* NGO List Section */}
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between px-1">
-            <h2 className="text-sm font-extrabold tracking-tight text-[#111C44] dark:text-[#F8F1E4]">
+            <h2 className="text-sm font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
               {t("Nearby Relief Teams")} {ngos.length > 0 && `(${ngos.length})`}
             </h2>
-            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
               {t("Sorted by distance")}
             </span>
           </div>
 
           {loading ? (
             <div className="glass-panel flex flex-col items-center justify-center p-12 text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[#2457FF]" />
-              <p className="mt-3 text-sm font-bold text-[#111C44] dark:text-[#F8F1E4]">
+              <Loader2 className="h-8 w-8 animate-spin text-[#1D4ED8]" />
+              <p className="mt-3 text-sm font-bold text-[#0F172A] dark:text-[#F8FAFC]">
                 {t("Finding nearby NGOs…")}
               </p>
-              <p className="mt-1 text-xs text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+              <p className="mt-1 text-xs text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
                 {t("Calculating distances from your location")}
               </p>
             </div>
@@ -212,12 +212,12 @@ export default function UserDonations() {
               </Button>
             </div>
           ) : ngos.length === 0 ? (
-            <div className="glass-panel p-8 text-center border-dashed border-[#B7AD9E]/40">
-              <Building2 className="mx-auto h-10 w-10 text-[#B7AD9E]" />
-              <p className="mt-3 text-sm font-bold text-[#111C44] dark:text-[#F8F1E4]">
+            <div className="glass-panel p-8 text-center border-dashed border-[#E2E8F0]/40">
+              <Building2 className="mx-auto h-10 w-10 text-[#E2E8F0]" />
+              <p className="mt-3 text-sm font-bold text-[#0F172A] dark:text-[#F8FAFC]">
                 {t("No NGOs found nearby")}
               </p>
-              <p className="mt-1 text-xs text-[#111C44]/70 dark:text-[#D8E3FF]/70 max-w-sm mx-auto">
+              <p className="mt-1 text-xs text-[#0F172A]/70 dark:text-[#F1F5F9]/70 max-w-sm mx-auto">
                 {t("Check your device location permissions or refresh to load all Assam relief organizations.")}
               </p>
             </div>
@@ -239,27 +239,27 @@ export default function UserDonations() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#D8E3FF] text-[#2457FF] dark:bg-[#2457FF]/30 dark:text-[#D8E3FF]">
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#F1F5F9] text-[#1D4ED8] dark:bg-[#1D4ED8]/30 dark:text-[#F1F5F9]">
                             <Building2 className="h-4 w-4" />
                           </span>
-                          <h3 className="truncate text-sm font-black tracking-tight text-[#111C44] dark:text-[#F8F1E4]">
+                          <h3 className="truncate text-sm font-black tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
                             {ngo.name}
                           </h3>
                         </div>
 
                         {/* Address */}
-                        <div className="mt-2.5 flex items-start gap-2 text-xs leading-5 text-[#111C44]/70 dark:text-[#D8E3FF]/70">
-                          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#2457FF] dark:text-[#D8E3FF]" />
+                        <div className="mt-2.5 flex items-start gap-2 text-xs leading-5 text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
+                          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1D4ED8] dark:text-[#F1F5F9]" />
                           <span>{ngo.address}</span>
                         </div>
 
                         {/* Phone Number */}
                         <div className="mt-2 flex items-start gap-2 text-xs font-semibold">
-                          <Phone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#2457FF] dark:text-[#D8E3FF]" />
+                          <Phone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1D4ED8] dark:text-[#F1F5F9]" />
                           {hasValidPhone ? (
                             <a
                               href={`tel:${ngo.phone.replace(/[^0-9+]/g, "")}`}
-                              className="text-[#2457FF] hover:underline dark:text-[#D8E3FF]"
+                              className="text-[#1D4ED8] hover:underline dark:text-[#F1F5F9]"
                             >
                               {ngo.phone}
                             </a>
@@ -274,10 +274,10 @@ export default function UserDonations() {
                       {/* Distance Badge */}
                       {ngo.distance && (
                         <div className="shrink-0 rounded-xl glass-card px-2.5 py-1 text-right">
-                          <span className="block font-mono text-[11px] font-black text-[#2457FF] dark:text-[#D8E3FF]">
+                          <span className="block font-mono text-[11px] font-black text-[#1D4ED8] dark:text-[#F1F5F9]">
                             {ngo.distance}
                           </span>
-                          <span className="block text-[9px] font-bold uppercase tracking-wider text-[#111C44]/60 dark:text-[#D8E3FF]/60">
+                          <span className="block text-[9px] font-bold uppercase tracking-wider text-[#0F172A]/60 dark:text-[#F1F5F9]/60">
                             {t("Distance")}
                           </span>
                         </div>
@@ -285,11 +285,11 @@ export default function UserDonations() {
                     </div>
 
                     {/* Action Bar */}
-                    <div className="mt-3.5 flex items-center gap-2 border-t border-[#B7AD9E]/20 dark:border-[#D8E3FF]/10 pt-3">
+                    <div className="mt-3.5 flex items-center gap-2 border-t border-[#E2E8F0]/20 dark:border-[#F1F5F9]/10 pt-3">
                       {hasValidPhone ? (
                         <a
                           href={`tel:${ngo.phone.replace(/[^0-9+]/g, "")}`}
-                          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#2457FF] px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#1d47db] active:scale-95"
+                          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#1d47db] active:scale-95"
                         >
                           <PhoneCall className="h-3.5 w-3.5" />
                           <span>{t("Call NGO")}</span>
@@ -302,11 +302,11 @@ export default function UserDonations() {
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`flex items-center justify-center gap-1.5 rounded-xl glass-card border border-[#B7AD9E]/30 px-3 py-2 text-xs font-bold text-[#111C44] transition hover:bg-neutral-50 active:scale-95 dark:text-[#F8F1E4] dark:hover:bg-neutral-800 ${
+                        className={`flex items-center justify-center gap-1.5 rounded-xl glass-card border border-[#E2E8F0]/30 px-3 py-2 text-xs font-bold text-[#0F172A] transition hover:bg-neutral-50 active:scale-95 dark:text-[#F8FAFC] dark:hover:bg-neutral-800 ${
                           hasValidPhone ? "flex-1" : "w-full"
                         }`}
                       >
-                        <ExternalLink className="h-3.5 w-3.5 text-[#2457FF] dark:text-[#D8E3FF]" />
+                        <ExternalLink className="h-3.5 w-3.5 text-[#1D4ED8] dark:text-[#F1F5F9]" />
                         <span>{t("View on Map")}</span>
                       </a>
                     </div>

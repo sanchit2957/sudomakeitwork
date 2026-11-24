@@ -431,8 +431,8 @@ function ResponderWorkspace() {
         ) : (
           <>
             <section className={`grid gap-5 ${pushState === "subscribed" || Capacitor.isNativePlatform() ? "" : "lg:grid-cols-[1.25fr_0.75fr]"}`}>
-              <div className="glass-panel overflow-hidden rounded-3xl bg-[#111C44] p-6 text-white shadow-xl dark:bg-[#182353]">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#D8E3FF]">
+              <div className="glass-panel overflow-hidden rounded-3xl bg-[#0F172A] p-6 text-white shadow-xl dark:bg-[#182353]">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F1F5F9]">
                   {t("responder.readiness")}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -448,12 +448,12 @@ function ResponderWorkspace() {
                     textClassName="text-2xl font-extrabold tracking-tight text-white"
                   />
                   {profile.data?.callSign && (
-                    <span className="rounded-lg bg-white/15 px-2.5 py-1 font-mono text-xs font-bold text-[#D8E3FF]">
+                    <span className="rounded-lg bg-white/15 px-2.5 py-1 font-mono text-xs font-bold text-[#F1F5F9]">
                       {profile.data.callSign}
                     </span>
                   )}
                 </div>
-                <p className="mt-2 max-w-lg text-sm leading-6 text-[#D8E3FF]/80">
+                <p className="mt-2 max-w-lg text-sm leading-6 text-[#F1F5F9]/80">
                   {t("responder.readinessCopy")}
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -470,8 +470,8 @@ function ResponderWorkspace() {
                       disabled={setAvailability.isPending || !profile.data}
                       className={`rounded-xl px-4 py-2.5 text-sm font-extrabold transition active:scale-95 ${
                         profile.data?.availability === value
-                          ? "bg-[#2457FF] text-white shadow-md shadow-[#2457FF]/30"
-                          : "bg-white/10 text-[#D8E3FF] hover:bg-white/20"
+                          ? "bg-[#1D4ED8] text-white shadow-md shadow-[#1D4ED8]/30"
+                          : "bg-white/10 text-[#F1F5F9] hover:bg-white/20"
                       }`}
                     >
                       {setAvailability.isPending ? t("responder.updating") : label}
@@ -1781,7 +1781,7 @@ function UserRescuerMissionCard({
     <article className="glass-panel grid gap-4 p-5 shadow-sm md:grid-cols-[1fr_auto]">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-xs font-bold text-[#2457FF] dark:text-[#D8E3FF]">{incident.publicCode}</span>
+          <span className="font-mono text-xs font-bold text-[#1D4ED8] dark:text-[#F1F5F9]">{incident.publicCode}</span>
           <StatusBadge status={mission.status} />
           {incident.destinationHospitalName && (
             <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 ring-1 ring-emerald-500/30 dark:bg-emerald-950/50 dark:text-emerald-300">
@@ -1789,8 +1789,8 @@ function UserRescuerMissionCard({
             </span>
           )}
         </div>
-        <h2 className="mt-2 text-lg font-extrabold text-[#111C44] dark:text-[#F8F1E4]">{incident.locationLabel}</h2>
-        <p className="mt-1 text-sm text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+        <h2 className="mt-2 text-lg font-extrabold text-[#0F172A] dark:text-[#F8FAFC]">{incident.locationLabel}</h2>
+        <p className="mt-1 text-sm text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
           {incident.peopleAffected} {t("responder.people")} · {incident.emergencyType} ·{" "}
           <strong className={incident.severity === "critical" ? "text-destructive" : ""}>
             {incident.severity}
@@ -1798,7 +1798,7 @@ function UserRescuerMissionCard({
           {t("responder.priority")}
         </p>
         {mission.notes && (
-          <p className="mt-3 rounded-lg glass-card px-3 py-2 text-xs leading-5 text-[#111C44]/80 dark:text-[#D8E3FF]/80">
+          <p className="mt-3 rounded-lg glass-card px-3 py-2 text-xs leading-5 text-[#0F172A]/80 dark:text-[#F1F5F9]/80">
             {mission.notes}
           </p>
         )}
@@ -1825,7 +1825,7 @@ function UserRescuerMissionCard({
               variant="outline"
               size="sm"
               onClick={() => setShowHospitalDialog(true)}
-              className="rounded-xl border-[#2457FF]/40 bg-[#2457FF]/10 text-xs font-bold text-[#2457FF] hover:bg-[#2457FF]/20 dark:text-[#D8E3FF]"
+              className="rounded-xl border-[#1D4ED8]/40 bg-[#1D4ED8]/10 text-xs font-bold text-[#1D4ED8] hover:bg-[#1D4ED8]/20 dark:text-[#F1F5F9]"
             >
               <Hospital className="mr-1.5 h-3.5 w-3.5" />
               {incident.destinationHospitalName ? "Change Hospital" : "Route to Hospital"}
@@ -1840,7 +1840,7 @@ function UserRescuerMissionCard({
             <Button
               disabled={isUpdating}
               onClick={() => onUpdateStatus(mission.status === "pending" ? "dispatched" : "resolved")}
-              className="rounded-xl bg-[#2457FF] text-white hover:bg-[#1d47db] shadow-md shadow-[#2457FF]/20"
+              className="rounded-xl bg-[#1D4ED8] text-white hover:bg-[#1d47db] shadow-md shadow-[#1D4ED8]/20"
             >
               {isUpdating ? (
                 t("responder.updating")

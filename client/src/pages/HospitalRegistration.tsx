@@ -1,2 +1,3 @@
-export { default } from "./hospital/HospitalRegistration";
-export * from "./hospital/HospitalRegistration";
+import HospitalRegistration from "./hospital/HospitalRegistration";
+
+export default HospitalRegistration;

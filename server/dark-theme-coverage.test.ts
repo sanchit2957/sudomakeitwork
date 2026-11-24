@@ -5,7 +5,12 @@ const source = (path: string) => readFileSync(new URL(path, import.meta.url), "u
 
 describe("dark theme coverage", () => {
   it("applies the shared Victim dark surface wrapper to every public subpage", () => {
-    for (const path of ["../client/src/pages/Home.tsx", "../client/src/pages/Safety.tsx", "../client/src/pages/More.tsx", "../client/src/pages/TrackFlow.tsx"]) {
+    for (const path of [
+      "../client/src/pages/user/UserHome.tsx",
+      "../client/src/pages/user/UserSafety.tsx",
+      "../client/src/pages/user/UserMore.tsx",
+      "../client/src/pages/user/UserTrackFlow.tsx",
+    ]) {
       const page = source(path);
       expect(page).toContain("victim-page");
       expect(page).toContain("victim-main");

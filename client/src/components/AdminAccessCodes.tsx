@@ -110,13 +110,13 @@ export function AdminAccessCodes() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#2457FF] dark:text-[#D8E3FF]">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#1D4ED8] dark:text-[#F1F5F9]">
           Security & Access Gating
         </p>
-        <h1 className="mt-1 text-2xl font-black tracking-tight text-[#111C44] dark:text-[#F8F1E4] sm:text-3xl">
+        <h1 className="mt-1 text-2xl font-black tracking-tight text-[#0F172A] dark:text-[#F8FAFC] sm:text-3xl">
           Role Access Codes
         </h1>
-        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-[#111C44]/70 dark:text-[#D8E3FF]/70 sm:text-sm">
+        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-[#0F172A]/70 dark:text-[#F1F5F9]/70 sm:text-sm">
           Rescuer and Hospital roles require an active Government Access Code to sign up and authenticate.
           When an access code is updated or regenerated, its version increments, immediately invalidating all
           active sessions for that role across web and mobile clients.
@@ -142,10 +142,10 @@ export function AdminAccessCodes() {
                   <Radio className="h-6 w-6" />
                 </span>
                 <div>
-                  <h2 className="text-base font-extrabold text-[#111C44] dark:text-[#F8F1E4] sm:text-lg">
+                  <h2 className="text-base font-extrabold text-[#0F172A] dark:text-[#F8FAFC] sm:text-lg">
                     Rescuer Access Code
                   </h2>
-                  <p className="text-xs text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+                  <p className="text-xs text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
                     Required for field rescue teams, SDRF & NDRF units
                   </p>
                 </div>
@@ -156,7 +156,7 @@ export function AdminAccessCodes() {
             </div>
 
             {/* Version Metadata */}
-            <div className="mt-4 flex items-center justify-between rounded-2xl glass-card p-3 font-mono text-[11px] text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+            <div className="mt-4 flex items-center justify-between rounded-2xl glass-card p-3 font-mono text-[11px] text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
               <span>Code Version: <strong>v{rescuerRecord?.codeVersion ?? 1}</strong></span>
               <span>
                 Updated:{" "}
@@ -231,7 +231,7 @@ export function AdminAccessCodes() {
                   <Button
                     type="submit"
                     disabled={updateCodeMutation.isPending || !rescuerCustomCode.trim()}
-                    className="h-10 shrink-0 rounded-xl bg-[#2457FF] text-xs font-bold text-white shadow-sm hover:bg-[#1d47db]"
+                    className="h-10 shrink-0 rounded-xl bg-[#1D4ED8] text-xs font-bold text-white shadow-sm hover:bg-[#1d47db]"
                   >
                     Set Code
                   </Button>
@@ -241,13 +241,13 @@ export function AdminAccessCodes() {
           </div>
 
           {/* Regenerate Action */}
-          <div className="mt-6 border-t border-[#B7AD9E]/20 dark:border-[#D8E3FF]/10 pt-4">
+          <div className="mt-6 border-t border-[#E2E8F0]/20 dark:border-[#F1F5F9]/10 pt-4">
             <Button
               type="button"
               variant="outline"
               disabled={regenerateCodeMutation.isPending}
               onClick={() => handleRegenerate("rescuer")}
-              className="h-11 w-full rounded-xl border-dashed border-[#B7AD9E]/40 text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/20"
+              className="h-11 w-full rounded-xl border-dashed border-[#E2E8F0]/40 text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/20"
             >
               <Sparkles className="mr-2 h-4 w-4 text-amber-600 dark:text-amber-400" />
               {regenerateCodeMutation.isPending ? "Generating…" : "Generate New Random Rescuer Code"}
@@ -260,25 +260,25 @@ export function AdminAccessCodes() {
           <div>
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#2457FF]/15 text-[#2457FF] dark:bg-[#2457FF]/25 dark:text-[#D8E3FF]">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#1D4ED8]/15 text-[#1D4ED8] dark:bg-[#1D4ED8]/25 dark:text-[#F1F5F9]">
                   <Building2 className="h-6 w-6" />
                 </span>
                 <div>
-                  <h2 className="text-base font-extrabold text-[#111C44] dark:text-[#F8F1E4] sm:text-lg">
+                  <h2 className="text-base font-extrabold text-[#0F172A] dark:text-[#F8FAFC] sm:text-lg">
                     Hospital Access Code
                   </h2>
-                  <p className="text-xs text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+                  <p className="text-xs text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
                     Required for hospital staff, doctors & triage desks
                   </p>
                 </div>
               </div>
-              <span className="rounded-full bg-[#2457FF]/15 px-3 py-1 font-mono text-[11px] font-bold text-[#2457FF] dark:text-[#D8E3FF]">
+              <span className="rounded-full bg-[#1D4ED8]/15 px-3 py-1 font-mono text-[11px] font-bold text-[#1D4ED8] dark:text-[#F1F5F9]">
                 v{hospitalRecord?.codeVersion ?? 1}
               </span>
             </div>
 
             {/* Version Metadata */}
-            <div className="mt-4 flex items-center justify-between rounded-2xl glass-card p-3 font-mono text-[11px] text-[#111C44]/70 dark:text-[#D8E3FF]/70">
+            <div className="mt-4 flex items-center justify-between rounded-2xl glass-card p-3 font-mono text-[11px] text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
               <span>Code Version: <strong>v{hospitalRecord?.codeVersion ?? 1}</strong></span>
               <span>
                 Updated:{" "}
@@ -292,15 +292,15 @@ export function AdminAccessCodes() {
 
             {/* Newly Generated / Saved Code Preview */}
             {activeRevealedCodes.hospital && (
-              <div className="mt-4 rounded-2xl border border-[#2457FF]/30 bg-[#2457FF]/10 p-4">
+              <div className="mt-4 rounded-2xl border border-[#1D4ED8]/30 bg-[#1D4ED8]/10 p-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#2457FF] dark:text-[#D8E3FF]">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#1D4ED8] dark:text-[#F1F5F9]">
                     Active Code (Share with Hospital Staff)
                   </span>
                   <button
                     type="button"
                     onClick={() => handleCopy("hospital", activeRevealedCodes.hospital!)}
-                    className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-bold text-[#2457FF] shadow-sm hover:bg-neutral-50 dark:bg-[#111C44] dark:text-[#D8E3FF]"
+                    className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-bold text-[#1D4ED8] shadow-sm hover:bg-neutral-50 dark:bg-[#0F172A] dark:text-[#F1F5F9]"
                   >
                     {copiedRole === "hospital" ? (
                       <>
@@ -313,7 +313,7 @@ export function AdminAccessCodes() {
                     )}
                   </button>
                 </div>
-                <div className="mt-2 font-mono text-base font-black tracking-widest text-[#111C44] dark:text-[#F8F1E4]">
+                <div className="mt-2 font-mono text-base font-black tracking-widest text-[#0F172A] dark:text-[#F8FAFC]">
                   {activeRevealedCodes.hospital}
                 </div>
               </div>
@@ -325,7 +325,7 @@ export function AdminAccessCodes() {
                 className={`mt-4 rounded-2xl p-3 text-xs font-semibold ${
                   statusMessage.isError
                     ? "border border-destructive/30 bg-destructive/10 text-destructive"
-                    : "border border-[#2457FF]/30 bg-[#2457FF]/10 text-[#2457FF] dark:text-[#D8E3FF]"
+                    : "border border-[#1D4ED8]/30 bg-[#1D4ED8]/10 text-[#1D4ED8] dark:text-[#F1F5F9]"
                 }`}
               >
                 {statusMessage.text}
@@ -338,7 +338,7 @@ export function AdminAccessCodes() {
               className="mt-5 space-y-3"
             >
               <div>
-                <Label htmlFor="hospital-custom-code" className="text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">
+                <Label htmlFor="hospital-custom-code" className="text-xs font-bold text-[#0F172A] dark:text-[#F8FAFC]">
                   Set Custom Hospital Code
                 </Label>
                 <div className="mt-1.5 flex gap-2">
@@ -348,12 +348,12 @@ export function AdminAccessCodes() {
                     value={hospitalCustomCode}
                     onChange={(e) => setHospitalCustomCode(e.target.value)}
                     placeholder="e.g. ASSAM-MED-2026"
-                    className="h-10 rounded-xl font-mono text-xs font-bold glass-card border-[#B7AD9E]/30"
+                    className="h-10 rounded-xl font-mono text-xs font-bold glass-card border-[#E2E8F0]/30"
                   />
                   <Button
                     type="submit"
                     disabled={updateCodeMutation.isPending || !hospitalCustomCode.trim()}
-                    className="h-10 shrink-0 rounded-xl bg-[#2457FF] text-xs font-bold text-white shadow-sm hover:bg-[#1d47db]"
+                    className="h-10 shrink-0 rounded-xl bg-[#1D4ED8] text-xs font-bold text-white shadow-sm hover:bg-[#1d47db]"
                   >
                     Set Code
                   </Button>
@@ -363,15 +363,15 @@ export function AdminAccessCodes() {
           </div>
 
           {/* Regenerate Action */}
-          <div className="mt-6 border-t border-[#B7AD9E]/20 dark:border-[#D8E3FF]/10 pt-4">
+          <div className="mt-6 border-t border-[#E2E8F0]/20 dark:border-[#F1F5F9]/10 pt-4">
             <Button
               type="button"
               variant="outline"
               disabled={regenerateCodeMutation.isPending}
               onClick={() => handleRegenerate("hospital")}
-              className="h-11 w-full rounded-xl border-dashed border-[#B7AD9E]/40 text-xs font-bold hover:bg-[#2457FF]/10"
+              className="h-11 w-full rounded-xl border-dashed border-[#E2E8F0]/40 text-xs font-bold hover:bg-[#1D4ED8]/10"
             >
-              <Sparkles className="mr-2 h-4 w-4 text-[#2457FF] dark:text-[#D8E3FF]" />
+              <Sparkles className="mr-2 h-4 w-4 text-[#1D4ED8] dark:text-[#F1F5F9]" />
               {regenerateCodeMutation.isPending ? "Generating…" : "Generate New Random Hospital Code"}
             </Button>
           </div>

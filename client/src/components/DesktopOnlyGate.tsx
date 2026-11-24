@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Monitor, ShieldAlert, ArrowLeft, HeartPulse, Shield, Radio, Sparkles } from "lucide-react";
+import { Monitor, ShieldAlert, ArrowLeft, HeartPulse, Shield, Radio, Sparkles, LogOut } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { isNativeApp } from "@/lib/apiConfig";
 
 // Desktop threshold: 1024px (standard desktop/laptop viewport)
@@ -57,6 +58,34 @@ export function DesktopOnlyGate({
 }: DesktopOnlyGateProps) {
   const isDesktop = useIsDesktop();
   const [, setLocation] = useLocation();
+  const { logout } = useAuth();
+
+  const handleGoToCitizen = () => {
+    try {
+      sessionStorage.setItem("sahay_allow_citizen_home", "true");
+    } catch { }
+    setLocation("/");
+  };
+
+  const handleGoBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      handleGoToCitizen();
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+    } catch (e) {
+      console.warn("Logout error:", e);
+    }
+    try {
+      sessionStorage.removeItem("sahay_allow_citizen_home");
+    } catch { }
+    setLocation("/login");
+  };
 
   if (isDesktop && children) {
     return <>{children}</>;
@@ -152,30 +181,34 @@ export function DesktopOnlyGate({
         </div>
 
         {/* Navigation Action Buttons */}
-        <div className="mt-6 flex flex-col sm:flex-row gap-3">
+        <div className="mt-6 flex flex-col gap-2.5">
           <button
             type="button"
-            onClick={() => setLocation("/")}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#2457FF] px-4 py-3 text-xs font-bold text-white shadow-lg shadow-[#2457FF]/25 transition hover:bg-[#1d47db] active:scale-[0.98]"
+            onClick={handleGoToCitizen}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#2457FF] px-4 py-3.5 text-xs font-black text-white shadow-lg shadow-[#2457FF]/25 transition hover:bg-[#1d47db] active:scale-[0.98] cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
             Citizen SOS Hub
           </button>
-          <button
-            type="button"
-            onClick={() => setLocation("/responder")}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-xs font-bold text-[#F8F1E4] transition hover:bg-white/10 active:scale-[0.98]"
-          >
-            <Shield className="h-4 w-4 text-[#D8E3FF]" />
-            Field Rescuer
-          </button>
-          <button
-            type="button"
-            onClick={() => setLocation("/login")}
-            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-xs font-semibold text-[#D8E3FF]/80 transition hover:bg-white/5 active:scale-[0.98]"
-          >
-            Role Selector
-          </button>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={handleGoBack}
+              className="flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 py-3 text-xs font-bold text-[#F8F1E4] transition hover:bg-white/15 active:scale-[0.98] cursor-pointer"
+            >
+              <ArrowLeft className="h-4 w-4 text-[#D8E3FF]" />
+              Go Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="flex items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/15 px-3 py-3 text-xs font-bold text-red-200 transition hover:bg-red-500/25 active:scale-[0.98] cursor-pointer"
+            >
+              <LogOut className="h-4 w-4 text-red-300" />
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
     </div>
