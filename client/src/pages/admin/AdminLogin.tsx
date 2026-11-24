@@ -12,8 +12,11 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import {
   ArrowLeft,
   CheckCircle2,
+  Eye,
+  EyeOff,
   Lock,
   LogOut,
+  Mail,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -31,6 +34,7 @@ export default function AdminLogin() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -145,18 +149,18 @@ export default function AdminLogin() {
           </div>
         )}
 
-        {/* Admin Login Card - Modern Form */}
-        <div className="modern-form mt-6 !max-w-xl !p-6 sm:!p-8 shadow-xl">
-          <div className="border-b border-black/5 bg-[#fafcfb] p-4 rounded-2xl mb-5 dark:border-white/5 dark:bg-[#18191c]">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                <Lock className="h-4 w-4" />
+        {/* Admin Login Card - Modern Form with generous breathing room */}
+        <div className="modern-form mt-8 sm:mt-10 !max-w-xl !p-6 sm:!p-8 shadow-xl">
+          <div className="border-b border-black/5 bg-[#fafcfb] p-4.5 rounded-2xl mb-6 dark:border-white/5 dark:bg-[#18191c]">
+            <div className="flex items-center gap-3">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <Lock className="h-4.5 w-4.5" />
               </span>
               <div>
                 <h2 className="text-xs font-black uppercase tracking-wide text-foreground">
                   Official Command Sign In
                 </h2>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Enter your administrative credentials below
                 </p>
               </div>
@@ -171,39 +175,61 @@ export default function AdminLogin() {
               </div>
             )}
 
-            <form onSubmit={handleAdminSubmit} className="space-y-4">
+            <form onSubmit={handleAdminSubmit} className="space-y-5">
               <div className="input-group">
-                <Label htmlFor="admin-email" className="text-xs font-bold mb-1 block">Email or Username</Label>
+                <Label htmlFor="admin-email" className="text-xs font-bold mb-1.5 block text-foreground/90">
+                  Email or Username
+                </Label>
                 <div className="input-wrapper">
+                  <User className="input-icon" />
                   <Input
                     id="admin-email"
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="form-input !h-11 text-sm"
+                    placeholder="e.g. admin@assamrescue.gov.in"
+                    className="form-input !h-12 text-sm"
+                    autoComplete="username"
                     required
                   />
                 </div>
               </div>
 
               <div className="input-group">
-                <Label htmlFor="admin-password" className="text-xs font-bold mb-1 block">Password</Label>
+                <Label htmlFor="admin-password" className="text-xs font-bold mb-1.5 block text-foreground/90">
+                  Password
+                </Label>
                 <div className="input-wrapper">
+                  <Lock className="input-icon" />
                   <Input
                     id="admin-password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="form-input !h-11 text-sm"
+                    placeholder="Enter command password"
+                    className="form-input !h-12 !pr-11 text-sm"
+                    autoComplete="current-password"
                     required
                   />
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="password-toggle"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <p className="text-[11px] text-muted-foreground">
-                  Default Demo Credentials
-                </p>
+              {/* Styled Demo Credentials Strip */}
+              <div className="my-2 flex items-center justify-between rounded-xl border border-blue-500/20 bg-blue-500/5 px-3.5 py-2.5 dark:border-blue-500/20 dark:bg-blue-950/25">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                  <p className="text-[11px] font-semibold text-muted-foreground">
+                    Default Demo Credentials
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -211,7 +237,7 @@ export default function AdminLogin() {
                     setPassword("admin");
                     setErrorMessage("");
                   }}
-                  className="font-mono text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400"
+                  className="font-mono text-xs font-bold text-blue-600 hover:underline dark:text-blue-400"
                 >
                   Fill Demo Admin
                 </button>
@@ -221,10 +247,10 @@ export default function AdminLogin() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="submit-button !h-12 w-full text-sm font-bold"
+                  className="submit-button !h-12 w-full text-sm font-bold shadow-md shadow-blue-600/30 transition active:scale-[0.98]"
                 >
-                  <span className="button-text flex items-center justify-center gap-2">
-                    <ShieldCheck className="h-4 w-4" />
+                  <span className="button-text flex items-center justify-center gap-2.5">
+                    <ShieldCheck className="h-4.5 w-4.5" />
                     {isSubmitting ? "Verifying Authorization…" : "Sign In to Command"}
                   </span>
                   <div className="button-glow"></div>
@@ -235,7 +261,7 @@ export default function AdminLogin() {
         </div>
 
         {/* User Portal Link */}
-        <div className="mt-6 text-center">
+        <div className="mt-8 text-center">
           <button
             onClick={() => setLocation("/login")}
             className="text-xs font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
