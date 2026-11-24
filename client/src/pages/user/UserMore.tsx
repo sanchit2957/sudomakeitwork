@@ -51,7 +51,7 @@ export default function UserMore() {
         {/* Top Profile Card - Clickable to Open Customization Page */}
         <section
           onClick={() => setLocation("/profile")}
-          className="group cursor-pointer overflow-hidden rounded-2xl bg-[#0F172A] p-5 text-white shadow-md transition hover:shadow-lg active:scale-[.99] dark:bg-[#182353]"
+          className="glass-panel glass-panel-dark group cursor-pointer overflow-hidden rounded-2xl bg-[#0F172A] p-5 text-white shadow-md transition hover:shadow-lg active:scale-[.99] dark:bg-[#182353]"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-4">

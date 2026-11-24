@@ -108,7 +108,7 @@ export default function UserTrackFlow() {
         {status.data && (
           <section className="glass-panel mt-6 overflow-hidden">
             {/* Dark Navy Header Showcase */}
-            <div className="bg-[#0F172A] p-5 text-white dark:bg-[#0c1433]">
+            <div className="glass-panel-dark bg-[#0F172A] p-5 text-white dark:bg-[#0c1433]">
               <p className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-[#F1F5F9]">
                 {t("Live rescue flow")}
               </p>
