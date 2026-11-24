@@ -375,7 +375,7 @@ export default function UserLogin() {
             </div>
 
             {/* Top Sign In / Register Switcher */}
-            <div className="mt-6 grid grid-cols-2 rounded-2xl bg-black/5 p-1.5 dark:bg-white/5">
+            <div className="my-7 sm:my-8 grid grid-cols-2 gap-2.5 rounded-2xl bg-black/5 p-2 dark:bg-white/5">
               <button
                 type="button"
                 onClick={() => {
@@ -411,7 +411,7 @@ export default function UserLogin() {
             </div>
 
         {/* Main Auth Container - Modern Form Adapted from Uiverse.io honest-snail-17 */}
-        <div className="modern-form mt-5 !max-w-xl !p-6 sm:!p-8 shadow-xl">
+        <div className="modern-form mt-6 sm:mt-8 !max-w-xl !p-6 sm:!p-8 shadow-xl">
           <div>
             {errorMessage && (
               <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-semibold text-destructive">
