@@ -171,6 +171,8 @@ function Router() {
   );
 }
 
+import { FloatingSahayak } from "./components/FloatingSahayak";
+
 function App() {
   return (
     <ErrorBoundary>
@@ -182,6 +184,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <Router />
+            <FloatingSahayak />
           </TooltipProvider>
         </LanguageProvider>
       </ThemeProvider>

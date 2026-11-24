@@ -389,19 +389,19 @@ export default function UserHome() {
         )}
 
         {/* Primary Human-Centric Crisis Section (Middle Screen of Reference Image 3) */}
-        <div className="my-auto flex flex-col items-center justify-center py-4">
+        <div className="my-auto flex flex-col items-center justify-center py-1 sm:py-3">
           {/* Headline & Calm Prompt */}
-          <div className="text-center mb-6">
+          <div className="text-center mb-2.5 sm:mb-4">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
               {t("Are you in emergency?")}
             </h1>
-            <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
               {t("Press the button below, help will reach you soon.")}
             </p>
           </div>
 
           {/* Balanced Circular SOS Button & Concentric Pedestal Frame */}
-          <div className="sahay-sos-pedestal my-3">
+          <div className="sahay-sos-pedestal my-1.5 sm:my-3">
             <div className="sahay-sos-pedestal-inner">
               <button
                 type="button"
@@ -437,7 +437,7 @@ export default function UserHome() {
           {rapidNotice && (
             <div
               role="status"
-              className={`mt-3 max-w-xs text-center text-xs font-semibold leading-relaxed px-4 py-1.5 rounded-full ${
+              className={`mt-2 max-w-xs text-center text-xs font-semibold leading-relaxed px-4 py-1.5 rounded-full ${
                 rapidStatus === "error"
                   ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
                   : "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
@@ -447,18 +447,23 @@ export default function UserHome() {
             </div>
           )}
 
+          {/* Accessible 1-Tap Emergency Voice Note Bar (Critical Life-Saving Feature) */}
+          <div className="mt-3 w-full flex justify-center">
+            <VoiceNoteCard variant="emergency-bar" />
+          </div>
+
           {/* Direct 1-Tap Emergency Dispatch Actions: Call 112 & SMS 112 */}
-          <div className="mt-6 flex items-center justify-center gap-3 w-full max-w-xs">
+          <div className="mt-3 flex items-center justify-center gap-3 w-full max-w-sm">
             <a
               href="tel:112"
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-center text-xs font-bold text-white shadow-sm hover:bg-rose-700 active:scale-95 transition"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-center text-xs font-bold text-white shadow-sm hover:bg-rose-700 active:scale-95 transition"
             >
               <PhoneCall className="h-4 w-4" />
               <span>{t("Call 112")}</span>
             </a>
             <a
               href={emergencySmsUrl}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-4 py-3 text-center text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-center text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition"
             >
               <MessageSquare className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               <span>{t("SMS 112")}</span>

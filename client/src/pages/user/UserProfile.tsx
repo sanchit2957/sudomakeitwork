@@ -238,25 +238,25 @@ export default function UserProfile() {
   const savedContacts = contactsQuery.data || [];
 
   return (
-    <div className="victim-page min-h-screen bg-background text-foreground transition-colors overflow-x-hidden">
-      <main className="mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-28 pt-4">
-        {/* Top Header */}
-        <header className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-xs">
-          <div className="flex items-center gap-3">
+    <div className="victim-page min-h-screen bg-white text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden">
+      <main className="mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-28 pt-3">
+        {/* Seamless Header matching Citizen Home */}
+        <header className="flex items-center justify-between gap-3 pt-2 pb-4">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={() => setLocation("/more")}
-              className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-muted/60 text-foreground transition active:scale-95 hover:bg-muted"
+              className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs transition active:scale-95 hover:bg-slate-200 dark:hover:bg-slate-700"
               aria-label={t("Back to More")}
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div>
-              <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground">
+              <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                {t("Medical Evacuation Credentials")}
+              </p>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
                 {t("Citizen Safety Profile")}
               </h1>
-              <p className="text-xs text-muted-foreground">
-                {t("Emergency Dispatch & Medical Evacuation Credentials")}
-              </p>
             </div>
           </div>
           <LanguageSelector compact />

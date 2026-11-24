@@ -33,14 +33,17 @@ export default function UserMore() {
   const bloodGroup = (user as any)?.bloodGroup;
 
   return (
-    <div className="victim-page relative min-h-screen bg-background text-foreground transition-colors overflow-x-hidden">
-      <main className="mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-28 pt-4">
-        <header className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div className="victim-page relative min-h-screen bg-white text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden">
+      <main className="mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-28 pt-3">
+        {/* Seamless Header matching Citizen Home */}
+        <header className="flex items-center justify-between gap-3 pt-2 pb-4">
           <div>
-            <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground">{t("Account & Community")}</h1>
-            <p className="text-xs text-muted-foreground">
-              {t("Citizen Safety Identity & Relief Services")}
+            <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              {t("Citizen Safety Identity & Relief")}
             </p>
+            <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+              {t("Account & Community")}
+            </h1>
           </div>
           <LanguageSelector compact />
         </header>

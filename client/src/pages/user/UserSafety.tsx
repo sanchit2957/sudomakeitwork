@@ -6,6 +6,7 @@ import { getCurrentCoordinates, getLastKnownCoordinates } from "@/lib/nativeLoca
 import { getWeatherRiskPresentation } from "@/lib/weatherRisk";
 import {
   AlertTriangle,
+  ArrowLeft,
   BedDouble,
   Building2,
   Clock3,
@@ -126,24 +127,24 @@ export default function UserSafety() {
       : t("Use location to sort hospitals by distance");
 
   return (
-    <div className="victim-page relative min-h-screen bg-background text-foreground transition-colors overflow-x-hidden">
-      <main className="victim-main relative z-10 mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-32 pt-4">
-        {/* Institutional Header */}
-        <header className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div className="victim-page relative min-h-screen bg-white text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden">
+      <main className="victim-main relative z-10 mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-32 pt-3">
+        {/* Seamless Header matching Citizen Home */}
+        <header className="flex items-center justify-between gap-3 pt-2 pb-4">
           <button
             onClick={() => setLocation("/")}
-            className="flex items-center gap-3 text-left transition hover:opacity-85 active:scale-95"
+            className="flex items-center gap-2.5 text-left transition hover:opacity-85 active:scale-95"
           >
-            <span className="grid h-10 w-10 place-items-center rounded-lg border border-border bg-muted/60 text-foreground">
-              <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs">
+              <ArrowLeft className="h-4 w-4" />
             </span>
             <div>
-              <span className="block text-base font-bold text-foreground">
+              <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                {t("Clinical Care Directory")}
+              </p>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
                 {t("Safety & Hospital Resources")}
-              </span>
-              <span className="block text-xs text-muted-foreground">
-                {t("National Emergency Dispatch & Clinical Care Directory")}
-              </span>
+              </h1>
             </div>
           </button>
           <LanguageSelector compact />

@@ -46,25 +46,25 @@ export default function UserTrackFlow() {
   const activeIndex = status.data ? Math.max(0, stages.findIndex((stage) => stage.key === status.data!.status)) : 0;
 
   return (
-    <div className="victim-page relative min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden">
-      <main className="mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-28 pt-4">
-        {/* Top Header Card */}
-        <header className="mb-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+    <div className="victim-page relative min-h-screen bg-white text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden">
+      <main className="mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-28 pt-3">
+        {/* Top Seamless Header matching Citizen Home */}
+        <header className="flex items-center justify-between gap-3 pt-2 pb-4">
           <button
             onClick={() => setLocation("/")}
-            className="flex items-center gap-3 text-left transition hover:opacity-85 active:scale-95"
+            className="flex items-center gap-2.5 text-left transition hover:opacity-85 active:scale-95"
           >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-white shadow-xs dark:bg-sky-500 dark:text-slate-950 font-black">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs">
               <ArrowLeft className="h-4 w-4" />
             </span>
-            <span>
-              <span className="block text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                {t("Your rescue flow")}
-              </span>
-              <span className="block text-[10px] font-bold text-muted-foreground">
+            <div>
+              <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                 {t("Saved locally on this device")}
-              </span>
-            </span>
+              </p>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+                {t("Your rescue flow")}
+              </h1>
+            </div>
           </button>
           <LanguageSelector compact />
         </header>
