@@ -38,7 +38,7 @@ export function BleEmergencyRadar({
   }, [rescuerLatitude, rescuerLongitude]);
 
   return (
-    <div className="glass-panel overflow-hidden border border-[#1D4ED8]/30 bg-[#0F172A] p-4.5 text-white shadow-xl dark:bg-[#182353]">
+    <div className="glass-panel glass-panel-dark overflow-hidden border border-[#1D4ED8]/30 bg-[#0F172A] p-4.5 text-white shadow-xl dark:bg-[#182353]">
       <div className="flex items-center justify-between border-b border-white/10 pb-3">
         <div className="flex items-center gap-2.5">
           <div className="relative grid h-8 w-8 place-items-center rounded-xl bg-[#1D4ED8]/20 text-[#F1F5F9]">

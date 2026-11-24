@@ -431,7 +431,7 @@ function ResponderWorkspace() {
         ) : (
           <>
             <section className={`grid gap-5 ${pushState === "subscribed" || Capacitor.isNativePlatform() ? "" : "lg:grid-cols-[1.25fr_0.75fr]"}`}>
-              <div className="glass-panel overflow-hidden rounded-3xl bg-[#0F172A] p-6 text-white shadow-xl dark:bg-[#182353]">
+              <div className="glass-panel glass-panel-dark overflow-hidden rounded-3xl bg-[#0F172A] p-6 text-white shadow-xl dark:bg-[#182353]">
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F1F5F9]">
                   {t("responder.readiness")}
                 </p>
