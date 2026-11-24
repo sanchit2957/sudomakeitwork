@@ -431,57 +431,62 @@ function ResponderWorkspace() {
         ) : (
           <>
             <section className={`grid gap-5 ${pushState === "subscribed" || Capacitor.isNativePlatform() ? "" : "lg:grid-cols-[1.25fr_0.75fr]"}`}>
-              <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 text-white shadow-sm dark:bg-slate-950">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-sky-400">
-                  {t("responder.readiness")}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <UserProfileBadge
-                    user={{
-                      name: user?.name,
-                      email: user?.email,
-                      photoUrl: profile.data?.photoUrl || (user as any)?.photoUrl,
-                      avatarUrl: (user as any)?.avatarUrl,
-                      role: user?.role,
-                    }}
-                    size="xl"
-                    textClassName="text-2xl font-extrabold tracking-tight text-white"
-                  />
-                  {profile.data?.callSign && (
-                    <span className="rounded-lg bg-white/10 px-2.5 py-1 font-mono text-xs font-bold text-sky-300">
-                      {profile.data.callSign}
+              <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
+                  <div>
+                    <span className="font-mono text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                      {t("responder.readiness")} · CAD Dispatch Console
                     </span>
-                  )}
+                    <div className="mt-1 flex flex-wrap items-center gap-2.5">
+                      <UserProfileBadge
+                        user={{
+                          name: user?.name,
+                          email: user?.email,
+                          photoUrl: profile.data?.photoUrl || (user as any)?.photoUrl,
+                          avatarUrl: (user as any)?.avatarUrl,
+                          role: user?.role,
+                        }}
+                        size="lg"
+                        textClassName="text-xl font-bold tracking-tight text-foreground"
+                      />
+                      {profile.data?.callSign && (
+                        <span className="rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs font-bold text-foreground">
+                          {profile.data.callSign}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3-State CAD Readiness Segmented Control */}
+                  <div className="flex items-center rounded-lg border border-border bg-muted/40 p-1 gap-1">
+                    {(
+                      [
+                        ["available", t("responder.available"), "bg-emerald-600 text-white"],
+                        ["on_mission", t("responder.onMission"), "bg-sky-600 text-white"],
+                        ["off_duty", t("responder.offDuty"), "bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900"],
+                      ] as const
+                    ).map(([value, label, activeClass]) => {
+                      const isActive = profile.data?.availability === value;
+                      return (
+                        <button
+                          key={value}
+                          onClick={() => withCurrentLocation(value)}
+                          disabled={setAvailability.isPending || !profile.data}
+                          className={`rounded-md px-3 py-1.5 font-mono text-xs font-bold transition active:scale-95 ${
+                            isActive
+                              ? `${activeClass} shadow-xs`
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                          }`}
+                        >
+                          {setAvailability.isPending && isActive ? t("responder.updating") : label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <p className="mt-2 max-w-lg text-xs leading-relaxed text-slate-400">
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
                   {t("responder.readinessCopy")}
                 </p>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {(
-                    [
-                      ["available", t("responder.available")],
-                      ["on_mission", t("responder.onMission")],
-                      ["off_duty", t("responder.offDuty")],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      onClick={() => withCurrentLocation(value)}
-                      disabled={setAvailability.isPending || !profile.data}
-                      className={`rounded-xl px-4 py-2 text-xs font-bold transition active:scale-95 ${
-                        profile.data?.availability === value
-                          ? value === "available"
-                            ? "bg-emerald-600 text-white shadow-xs"
-                            : value === "on_mission"
-                            ? "bg-sky-600 text-white shadow-xs"
-                            : "bg-slate-700 text-white shadow-xs"
-                          : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                      }`}
-                    >
-                      {setAvailability.isPending ? t("responder.updating") : label}
-                    </button>
-                  ))}
-                </div>
               </div>
               {pushState !== "subscribed" && !Capacitor.isNativePlatform() && typeof Notification !== "undefined" && Notification.permission === "default" && (
                 <AlertSetup
@@ -1322,60 +1327,66 @@ export function ResponderProfileCard({
 
   const preview = photoDataUrl || profile?.photoUrl;
   return (
-    <section className="rounded-3xl border bg-white p-5 shadow-sm md:p-6">
-      <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#e7f7ee] text-primary">
-            {preview ? <img src={preview} alt="" className="h-full w-full object-cover" /> : <Camera className="h-7 w-7" />}
+    <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pb-4 border-b border-border">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-muted/60 text-foreground">
+            {preview ? <img src={preview} alt="" className="h-full w-full object-cover" /> : <Camera className="h-6 w-6 text-muted-foreground" />}
           </div>
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{t("Your field profile")}</p>
-            <h2 className="mt-1 text-xl font-extrabold">{profile?.callSign || t("responder.profilePending")}</h2>
-            <p className="mt-1 text-sm leading-5 text-muted-foreground">
+            <span className="font-mono text-[10px] uppercase font-bold tracking-wider text-muted-foreground">{t("Your field profile")}</span>
+            <h2 className="text-base font-bold text-foreground">{profile?.callSign || t("responder.profilePending")}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {t("Your contact details are shown only to the person linked to an active mission when you choose to share them.")}
             </p>
           </div>
         </div>
-        <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#91cbbb] px-4 py-2.5 text-sm font-bold text-primary hover:bg-[#effaf6]">
-          <Camera className="h-4 w-4" /> {t("Add or change photo")}
+        <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted">
+          <Camera className="h-3.5 w-3.5" /> {t("Add or change photo")}
           <input type="file" accept="image/png,image/jpeg,image/webp" onChange={choosePhoto} className="sr-only" />
         </label>
       </div>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]">
-        <div className="grid gap-2">
-          <Label htmlFor="rescuer-phone">{t("Assignment contact number")}</Label>
-          <div className="flex gap-2">
-            <Phone className="mt-3 h-4 w-4 shrink-0 text-primary" />
+      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+        <div className="grid gap-1.5">
+          <Label htmlFor="rescuer-phone" className="text-xs font-medium text-foreground">{t("Assignment contact number")}</Label>
+          <div className="relative">
+            <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               id="rescuer-phone"
               inputMode="tel"
               value={phone}
               onChange={event => setPhone(event.target.value)}
               placeholder={t("Phone number for active assignments")}
+              className="pl-9 text-xs"
             />
           </div>
         </div>
-        <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-[#f0faf6] px-4 py-3 text-sm font-semibold text-[#285f55]">
+        <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3.5 py-2.5 text-xs font-medium text-foreground self-end">
           <input
             type="checkbox"
             checked={contactSharing === "yes"}
             onChange={event => setContactSharing(event.target.checked ? "yes" : "no")}
-            className="h-4 w-4 accent-primary"
+            className="h-4 w-4 rounded border-gray-300 text-neutral-900 focus:ring-neutral-900"
           />
           {t("Show my phone number to my active assignment")}
         </label>
       </div>
 
-      {photoError && <p className="mt-3 text-xs font-semibold text-destructive">{photoError}</p>}
+      {photoError && <p className="mt-2 text-xs font-semibold text-destructive">{photoError}</p>}
       {savedNotice && (
-        <p className="mt-3 rounded-xl bg-[#e7f7ee] p-2.5 text-xs font-bold text-[#19755f]">
+        <p className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
           ✓ Details and contact preferences saved successfully!
         </p>
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" onClick={handleSave} disabled={saving} className="rounded-xl">
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-lg bg-neutral-900 dark:bg-white dark:text-neutral-900 text-xs font-bold text-white hover:opacity-90"
+        >
           {saving ? t("responder.updating") : t("Save profile and contact settings")}
         </Button>
         {preview && (
@@ -1387,6 +1398,7 @@ export function ResponderProfileCard({
               onSave({ clearPhoto: true });
             }}
             disabled={saving}
+            className="rounded-lg text-xs"
           >
             {t("Remove photo")}
           </Button>
@@ -1394,28 +1406,28 @@ export function ResponderProfileCard({
       </div>
 
       <div
-        className={`mt-6 rounded-2xl border p-4 ${
-          hasActiveMission ? "border-[#b8ded4] bg-[#f8fcfa]" : "border-border bg-muted/40"
+        className={`mt-4 rounded-lg border p-3.5 text-xs ${
+          hasActiveMission ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-muted/30"
         }`}
       >
         <div className="flex gap-3">
           <span
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-              hasActiveMission ? "bg-primary text-white" : "bg-secondary text-primary"
+            className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border ${
+              hasActiveMission ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-border bg-card text-muted-foreground"
             }`}
           >
-            <LocateFixed className="h-5 w-5" />
+            <LocateFixed className="h-4 w-4" />
           </span>
           <div>
-            <h3 className="font-extrabold">Automatic mission location</h3>
-            <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">
+            <h3 className="font-bold text-foreground">Automatic mission location telemetry</h3>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
               {hasActiveMission
                 ? "Your location is shared automatically with the person linked to your active SOS and refreshes every 5 seconds. It stops and clears automatically when the mission is resolved."
                 : "Location sharing starts automatically when Command assigns you an active SOS mission."}
             </p>
             {hasActiveMission && (
-              <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#e7f6ef] px-3 py-1.5 text-xs font-bold text-[#19755f]">
-                <Radio className="h-3.5 w-3.5 animate-pulse" />
+              <span className="mt-2 inline-flex items-center gap-1.5 font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                <Radio className="h-3 w-3 animate-pulse" />
                 Sharing automatically every 5 seconds
               </span>
             )}
@@ -1781,70 +1793,136 @@ function UserRescuerMissionCard({
 
   const currentHospital = hospitals.find(h => h.id === Number(selectedHospitalId)) || hospitals[0];
 
+  const progressPercent = mission.status === "resolved" ? 100 : mission.status === "dispatched" ? 65 : 25;
+
   return (
-    <article className="rounded-2xl border border-slate-800 bg-slate-900 grid gap-4 p-5 shadow-xs md:grid-cols-[1fr_auto]">
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-xs font-bold text-sky-400">{incident.publicCode}</span>
+    <article className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-xs transition hover:border-border/80">
+      {/* Top Header: Code, Assigned Unit, Status */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs font-bold text-foreground bg-muted/60 px-2 py-0.5 rounded border border-border">
+            {incident.publicCode}
+          </span>
           <StatusBadge status={mission.status} />
           {incident.destinationHospitalName && (
-            <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-400 ring-1 ring-emerald-500/30">
+            <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
               🏥 En route: {incident.destinationHospitalName}
             </span>
           )}
         </div>
-        <h2 className="mt-2 text-lg font-bold text-white">{incident.locationLabel}</h2>
-        <p className="mt-1 text-xs text-slate-400">
-          {incident.peopleAffected} {t("responder.people")} · {incident.emergencyType} ·{" "}
-          <strong className={incident.severity === "critical" ? "text-rose-400" : ""}>
-            {incident.severity}
-          </strong>{" "}
-          {t("responder.priority")}
-        </p>
+        <span className="font-mono text-[10px] font-semibold text-muted-foreground uppercase">
+          {incident.emergencyType || "Emergency Rescue"}
+        </span>
+      </div>
+
+      {/* Main Content & Mission Title */}
+      <div className="mt-3.5">
+        <h2 className="text-base sm:text-lg font-bold text-foreground">{incident.locationLabel}</h2>
+
+        {/* Progress Bar (Direction 2: Mission Operational Grid) */}
+        <div className="mt-3 space-y-1.5">
+          <div className="flex items-center justify-between font-mono text-[11px]">
+            <span className="text-muted-foreground">{t("Mission Progress")}</span>
+            <span className="font-bold text-foreground">{progressPercent}%</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={`h-full transition-all duration-500 ${
+                mission.status === "resolved"
+                  ? "bg-emerald-600"
+                  : mission.status === "dispatched"
+                  ? "bg-sky-600"
+                  : "bg-amber-500"
+              }`}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Structured Metadata Grid */}
+        <div className="mt-3.5 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div className="rounded-lg border border-border bg-muted/30 p-2">
+            <span className="font-mono text-[10px] text-muted-foreground uppercase block">{t("People")}</span>
+            <span className="font-mono font-bold text-foreground">{incident.peopleAffected || 1} {t("responder.people")}</span>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/30 p-2">
+            <span className="font-mono text-[10px] text-muted-foreground uppercase block">{t("Priority")}</span>
+            <span className={`font-mono font-bold uppercase ${
+              incident.severity === "critical"
+                ? "text-red-600 dark:text-red-400"
+                : incident.severity === "high"
+                ? "text-amber-600 dark:text-amber-400"
+                : "text-foreground"
+            }`}>
+              {incident.severity}
+            </span>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/30 p-2">
+            <span className="font-mono text-[10px] text-muted-foreground uppercase block">{t("Assigned Unit")}</span>
+            <span className="font-mono font-bold text-foreground truncate block">
+              {incident.assignedUnit || "Rescue Unit #1"}
+            </span>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/30 p-2">
+            <span className="font-mono text-[10px] text-muted-foreground uppercase block">{t("Coordinates")}</span>
+            <span className="font-mono font-bold text-muted-foreground truncate block">
+              {Number(incident.latitude).toFixed(3)}°, {Number(incident.longitude).toFixed(3)}°
+            </span>
+          </div>
+        </div>
+
         {mission.notes && (
-          <p className="mt-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs leading-5 text-slate-300">
+          <p className="mt-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs leading-relaxed text-foreground">
             {mission.notes}
           </p>
         )}
+
         {incident.voiceNoteUrl && (
           <div
             data-testid="mission-voice-note"
-            className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5"
+            className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3"
           >
-            <p className="mb-2 flex items-center gap-2 text-xs font-bold text-amber-300">
-              <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+            <p className="mb-2 flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-300">
+              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
               Attached Emergency Voice Note
               {incident.voiceNoteDurationSeconds ? ` (${incident.voiceNoteDurationSeconds}s)` : ""}
             </p>
-            <audio controls preload="metadata" src={getApiUrl(incident.voiceNoteUrl)} className="h-10 w-full rounded-lg" />
+            <audio controls preload="metadata" src={getApiUrl(incident.voiceNoteUrl)} className="h-9 w-full rounded" />
           </div>
         )}
       </div>
 
-      <div className="flex flex-col items-start gap-2 md:items-end md:justify-center">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* CAD Action Bar */}
+      <div className="mt-4 pt-3 border-t border-border flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
           {mission.status !== "resolved" && (
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => setShowHospitalDialog(true)}
-              className="rounded-xl border-sky-500/30 bg-sky-500/10 text-xs font-bold text-sky-400 hover:bg-sky-500/20"
+              className="rounded-lg border-border text-xs font-semibold text-foreground hover:bg-muted"
             >
-              <Hospital className="mr-1.5 h-3.5 w-3.5" />
+              <Hospital className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
               {incident.destinationHospitalName ? "Change Hospital" : "Route to Hospital"}
             </Button>
           )}
+        </div>
 
+        <div className="flex items-center gap-2">
           {mission.status === "resolved" ? (
-            <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+            <span className="flex items-center gap-1.5 font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
               <CheckCircle2 className="h-4 w-4" /> {t("responder.completed")}
             </span>
           ) : (
             <Button
               disabled={isUpdating}
               onClick={() => onUpdateStatus(mission.status === "pending" ? "dispatched" : "resolved")}
-              className="rounded-xl bg-sky-500 text-slate-950 hover:bg-sky-400 font-bold shadow-xs"
+              className={`rounded-lg text-xs font-bold shadow-xs transition active:scale-95 ${
+                mission.status === "pending"
+                  ? "bg-neutral-900 text-white hover:opacity-90 dark:bg-white dark:text-neutral-900"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700"
+              }`}
             >
               {isUpdating ? (
                 t("responder.updating")

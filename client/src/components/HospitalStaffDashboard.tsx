@@ -1033,16 +1033,16 @@ function ClinicalTabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
+      className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
         active
-          ? "bg-teal-50 text-teal-800 ring-1 ring-teal-500/30 dark:bg-teal-950/60 dark:text-teal-300"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+          ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs font-bold"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
       }`}
     >
-      <Icon className={`h-3.5 w-3.5 ${active ? "text-teal-600 dark:text-teal-400" : "text-slate-400"}`} />
+      <Icon className="h-3.5 w-3.5" />
       <span>{label}</span>
       {badge && (
-        <span className="ml-1 rounded-full bg-rose-600 px-1.5 py-0.2 font-mono text-[10px] font-bold text-white">
+        <span className="ml-1 rounded-full bg-red-600 px-1.5 py-0.2 font-mono text-[10px] font-bold text-white">
           {badge}
         </span>
       )}
@@ -1065,25 +1065,19 @@ function ClinicalMetricCard({
   indicatorTone: "teal" | "warning" | "danger";
   barPercent: number;
 }) {
-  const toneClasses = {
-    teal: "text-teal-600 bg-teal-500",
-    warning: "text-amber-600 bg-amber-500",
-    danger: "text-rose-600 bg-rose-500",
-  };
-
   return (
-    <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+    <article className="rounded-xl border border-border bg-card p-5 shadow-xs transition hover:border-border/80">
+      <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
         <span>{label}</span>
-        <ArrowUpRight className="h-4 w-4 text-slate-400" />
+        <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
       </div>
 
-      <div className="mt-3 flex items-baseline gap-1.5">
-        <span className="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{value}</span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">{subtext}</span>
+      <div className="mt-2.5 flex items-baseline gap-1.5">
+        <span className="font-mono text-2xl font-bold tracking-tight text-foreground">{value}</span>
+        <span className="text-xs text-muted-foreground">{subtext}</span>
       </div>
 
-      {/* Segmented / solid clinical meter bar (Reference 2) */}
+      {/* Segmented clinical meter bar (Reference 2) */}
       <div className="mt-3 flex gap-1">
         {Array.from({ length: 14 }).map((_, i) => {
           const filled = (i / 14) * 100 <= barPercent;
@@ -1093,18 +1087,18 @@ function ClinicalMetricCard({
               className={`h-2 flex-1 rounded-xs transition-colors ${
                 filled
                   ? indicatorTone === "danger"
-                    ? "bg-rose-500"
+                    ? "bg-red-500"
                     : indicatorTone === "warning"
                     ? "bg-amber-500"
-                    : "bg-teal-600"
-                  : "bg-slate-100 dark:bg-slate-800"
+                    : "bg-emerald-600"
+                  : "bg-muted"
               }`}
             />
           );
         })}
       </div>
 
-      <p className="mt-2 text-[10px] font-medium text-slate-400">
+      <p className="mt-2 font-mono text-[10px] text-muted-foreground">
         {trend}
       </p>
     </article>
@@ -1131,34 +1125,34 @@ function QuickCapacityCard({
   tone?: "teal" | "blue" | "rose" | "amber";
 }) {
   const tones = {
-    teal: "bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400",
-    blue: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400",
-    rose: "bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400",
-    amber: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400",
+    teal: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20",
+    blue: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20",
+    rose: "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20",
+    amber: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20",
   };
 
   const pct = total ? Math.min(100, Math.round((value / total) * 100)) : null;
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-xs">
       <div className="flex items-center justify-between">
-        <span className={`grid h-9 w-9 place-items-center rounded-xl ${tones[tone]}`}>
+        <span className={`grid h-8 w-8 place-items-center rounded-lg ${tones[tone]}`}>
           <Icon className="h-4 w-4" />
         </span>
         {pct !== null && (
-          <span className="font-mono text-xs font-semibold text-slate-500">
+          <span className="font-mono text-xs font-semibold text-muted-foreground">
             {pct}% available
           </span>
         )}
       </div>
 
-      <p className="mt-3 text-xs font-bold text-slate-800 dark:text-slate-200">{label}</p>
+      <p className="mt-3 text-xs font-bold text-foreground">{label}</p>
 
       <div className="mt-3 flex items-center justify-between gap-2.5">
         <button
           type="button"
           onClick={onMinus}
-          className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          className="grid h-8 w-8 place-items-center rounded-lg border border-border bg-muted/40 text-foreground transition hover:bg-muted active:scale-95"
         >
           <Minus className="h-3.5 w-3.5" />
         </button>
@@ -1169,13 +1163,13 @@ function QuickCapacityCard({
           max={total}
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="h-9 text-center font-mono text-lg font-bold bg-white dark:bg-slate-900"
+          className="h-8 text-center font-mono text-base font-bold bg-background"
         />
 
         <button
           type="button"
           onClick={onPlus}
-          className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          className="grid h-8 w-8 place-items-center rounded-lg border border-border bg-muted/40 text-foreground transition hover:bg-muted active:scale-95"
         >
           <Plus className="h-3.5 w-3.5" />
         </button>
@@ -1183,13 +1177,13 @@ function QuickCapacityCard({
 
       {total !== undefined && (
         <div className="mt-3">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className={`h-full ${pct && pct < 20 ? "bg-rose-500" : pct && pct < 40 ? "bg-amber-500" : "bg-teal-600"}`}
+              className={`h-full ${pct && pct < 20 ? "bg-red-500" : pct && pct < 40 ? "bg-amber-500" : "bg-emerald-600"}`}
               style={{ width: `${pct ?? 0}%` }}
             />
           </div>
-          <p className="mt-1 font-mono text-[10px] text-slate-400">
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
             Capacity baseline: {total} units
           </p>
         </div>

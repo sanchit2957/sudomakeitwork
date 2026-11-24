@@ -224,38 +224,38 @@ function CommandWorkspace() {
       ) : (
         <div className="space-y-6">
           {/* 1. TOP COMMAND BAR (Reference 1: MAP INBOX Header) */}
-          <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900/90">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
             <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-                    DISPATCH COMMAND INBOX
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    National Emergency Dispatch · CAD Incident Inbox
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Live Reconciling
+                    Live CAD Feed
                   </span>
                 </div>
-                <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                <h1 className="mt-1 text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                   Operational Incidents & Tactical Dispatch
                 </h1>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  Real-time multi-agency coordination desk. Assign responders, monitor field units, and follow every mission to verified resolution.
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  National multi-agency coordination desk. Assign responders, monitor field units, and follow every mission to verified resolution.
                 </p>
               </div>
 
               {/* Status and Active Filters Pill */}
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 font-mono text-xs font-bold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/50 dark:text-blue-300">
-                  INCIDENTS ACTIVE: {visibleIncidents.length} of {incidents.data?.length || 0}
+                <span className="rounded-lg border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs font-bold text-foreground">
+                  INCIDENTS SHOWN: {visibleIncidents.length} of {incidents.data?.length || 0}
                 </span>
 
                 {hasActiveFilters && (
                   <button
                     onClick={clearAllFilters}
-                    className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
                   >
-                    <RotateCcw className="h-3.5 w-3.5" />
+                    <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
                     Clear Filters
                   </button>
                 )}
@@ -1062,8 +1062,8 @@ function TeamRoster({
 function Heading({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <div>
-      <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">{eyebrow}</p>
-      <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
+      <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{eyebrow}</span>
+      <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-foreground">{title}</h1>
     </div>
   );
 }
@@ -1082,24 +1082,24 @@ function Metric({
   footer?: string;
 }) {
   const tones = {
-    teal: "text-teal-600 bg-teal-50 dark:bg-teal-950/40 dark:text-teal-400",
-    amber: "text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-400",
-    green: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400",
-    blue: "text-blue-600 bg-blue-50 dark:bg-blue-950/40 dark:text-blue-400",
+    teal: "text-emerald-700 bg-emerald-500/10 border-emerald-500/20 dark:text-emerald-400",
+    amber: "text-amber-700 bg-amber-500/10 border-amber-500/20 dark:text-amber-400",
+    green: "text-emerald-700 bg-emerald-500/10 border-emerald-500/20 dark:text-emerald-400",
+    blue: "text-sky-700 bg-sky-500/10 border-sky-500/20 dark:text-sky-400",
   };
 
   return (
-    <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+    <article className="rounded-xl border border-border bg-card p-5 shadow-xs transition hover:border-border/80">
       <div className="flex items-center justify-between">
-        <span className={`grid h-9 w-9 place-items-center rounded-xl ${tones[tone]}`}>
+        <span className={`grid h-8 w-8 place-items-center rounded-lg border ${tones[tone]}`}>
           <Icon className="h-4 w-4" />
         </span>
-        <ArrowUpRight className="h-4 w-4 text-slate-400" />
+        <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
       </div>
-      <p className="mt-3 font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{value ?? "—"}</p>
-      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-3 font-mono text-2xl font-bold tracking-tight text-foreground">{value ?? "—"}</p>
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
       {footer && (
-        <p className="mt-2 border-t border-slate-100 pt-2 text-[10px] text-slate-400 dark:border-slate-800">
+        <p className="mt-2 border-t border-border pt-2 font-mono text-[10px] text-muted-foreground">
           {footer}
         </p>
       )}
@@ -1109,13 +1109,13 @@ function Metric({
 
 function SeverityBadge({ severity }: { severity: string }) {
   const modes = {
-    critical: "bg-rose-50 text-rose-700 ring-1 ring-rose-500/30 dark:bg-rose-950/40 dark:text-rose-400",
-    high: "bg-amber-50 text-amber-700 ring-1 ring-amber-500/30 dark:bg-amber-950/40 dark:text-amber-400",
-    medium: "bg-yellow-50 text-yellow-800 ring-1 ring-yellow-500/30 dark:bg-yellow-950/40 dark:text-yellow-400",
-    low: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-400",
+    critical: "bg-red-50 text-red-700 border border-red-500/30 dark:bg-red-950/40 dark:text-red-400",
+    high: "bg-amber-50 text-amber-700 border border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-400",
+    medium: "bg-yellow-50 text-yellow-800 border border-yellow-500/30 dark:bg-yellow-950/40 dark:text-yellow-400",
+    low: "bg-emerald-50 text-emerald-700 border border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-400",
   };
   return (
-    <span className={`inline-block rounded-md px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${modes[severity as keyof typeof modes] || "bg-slate-100 text-slate-700"}`}>
+    <span className={`inline-block rounded-md px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${modes[severity as keyof typeof modes] || "bg-muted text-muted-foreground"}`}>
       {severity}
     </span>
   );

@@ -22,14 +22,10 @@ import {
   PhoneCall,
   Plus,
   Save,
-  Shield,
-  ShieldAlert,
   ShieldCheck,
   Star,
   Trash2,
   User,
-  UserCheck,
-  UserPlus,
   Users,
 } from "lucide-react";
 import React, { FormEvent, useEffect, useState } from "react";
@@ -242,32 +238,32 @@ export default function UserProfile() {
   const savedContacts = contactsQuery.data || [];
 
   return (
-    <div className="victim-page min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100">
+    <div className="victim-page min-h-screen bg-background text-foreground transition-colors overflow-x-hidden">
       <main className="mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-28 pt-4">
         {/* Top Header */}
-        <header className="mb-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <header className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-xs">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setLocation("/more")}
-              className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-white shadow-xs transition active:scale-95 hover:bg-slate-800 dark:bg-sky-500 dark:text-slate-950 font-black"
+              className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-muted/60 text-foreground transition active:scale-95 hover:bg-muted"
               aria-label={t("Back to More")}
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div>
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                {t("Profile Customization")}
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground">
+                {t("Citizen Safety Profile")}
               </h1>
-              <p className="text-[10px] font-bold text-muted-foreground">
-                {t("Personal & emergency rescue details")}
+              <p className="text-xs text-muted-foreground">
+                {t("Emergency Dispatch & Medical Evacuation Credentials")}
               </p>
             </div>
           </div>
           <LanguageSelector compact />
         </header>
 
-        {/* User Hero Banner */}
-        <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-5 text-white shadow-xs dark:bg-slate-950">
+        {/* User Institutional Profile Card */}
+        <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4">
               <ProfileAvatar
@@ -279,15 +275,14 @@ export default function UserProfile() {
                   role: user?.role,
                 }}
                 size="xl"
-                className="ring-2 ring-white/20"
               />
               <div>
-                <p className="text-lg font-black leading-tight text-white">
+                <p className="text-lg font-bold leading-tight text-foreground">
                   {getFirstName(name || user?.name, user?.email, t("Citizen"))}
                 </p>
-                <p className="mt-0.5 text-xs text-slate-400">{user?.email || t("Account verified")}</p>
-                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-200">
-                  <ShieldCheck className="h-3 w-3 text-sky-400" />
+                <p className="mt-0.5 text-xs text-muted-foreground">{user?.email || t("Account verified")}</p>
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-foreground">
+                  <ShieldCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                   {roleLabel}
                 </div>
               </div>
@@ -297,7 +292,7 @@ export default function UserProfile() {
 
         {/* Feedback Alerts */}
         {saveSuccess && (
-          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-900 dark:text-emerald-200">
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-900 dark:text-emerald-200">
             <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
             <div className="text-xs font-semibold">
               <p className="font-bold">{t("Profile updated successfully!")}</p>
@@ -307,64 +302,66 @@ export default function UserProfile() {
         )}
 
         {errorMessage && (
-          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-900 dark:text-red-200">
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-900 dark:text-red-200">
             <AlertCircle className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
             <p className="text-xs font-semibold">{errorMessage}</p>
           </div>
         )}
 
         {/* Section 1: Emergency Contacts Shared with Admin, Rescuer & Hospital */}
-        <section className="glass-panel mt-5 p-4.5 border border-amber-500/30 bg-amber-500/5">
-          <div className="flex items-center justify-between border-b border-[#B7AD9E]/20 pb-3 dark:border-[#D8E3FF]/15">
-            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-300">
-              <Users className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <span>{t("Emergency Contacts (Rescue & Hospital Sync)")}</span>
+        <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
+                {t("Emergency Contacts & Next-of-Kin")}
+              </span>
             </div>
             <button
               type="button"
               onClick={() => setShowAddContact(!showAddContact)}
-              className="inline-flex items-center gap-1 rounded-xl bg-amber-600 px-3 py-1.5 text-[11px] font-bold text-white shadow transition hover:bg-amber-700 active:scale-95"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 dark:bg-white dark:text-neutral-900 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:opacity-90 active:scale-95"
             >
               <Plus className="h-3.5 w-3.5" />
               {showAddContact ? t("Close") : t("Add Contact")}
             </button>
           </div>
 
-          <div className="mt-2.5 text-[11px] font-medium text-amber-900/80 dark:text-amber-200/80">
-            {t("Contacts saved here are automatically made available to State Command Admins, SDRF/NDRF Boat Rescuers, and Hospital Emergency Staff during active incidents.")}
-          </div>
+          <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+            {t("Contacts saved here are automatically provided to Command Center dispatchers, field rescue teams, and emergency clinical staff during an active SOS.")}
+          </p>
 
           {/* Add Contact Form Accordion */}
           {showAddContact && (
-            <form onSubmit={handleAddEmergencyContact} className="glass-card mt-4 p-4 shadow-sm">
-              <p className="text-xs font-black uppercase tracking-wider text-[#111C44] dark:text-[#F8F1E4]">
+            <form onSubmit={handleAddEmergencyContact} className="mt-4 rounded-lg border border-border bg-muted/20 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-foreground">
                 {t("New Emergency Contact")}
               </p>
 
               {contactError && (
-                <div className="mt-2 rounded-xl bg-red-500/10 p-2 text-xs font-semibold text-red-700 dark:text-red-300">
+                <div className="mt-2 rounded-lg bg-red-500/10 p-2 text-xs font-semibold text-red-700 dark:text-red-300 border border-red-500/20">
                   {contactError}
                 </div>
               )}
 
               <div className="mt-3 space-y-3">
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-[11px] font-bold">{t("Contact Name *")}</Label>
+                    <Label className="text-xs font-medium text-foreground">{t("Contact Name *")}</Label>
                     <Input
                       value={cName}
                       onChange={(e) => setCName(e.target.value)}
-                      placeholder={t("e.g. Rahul Sharma")}
+                      placeholder={t("Full name")}
                       required
-                      className="mt-1 rounded-xl text-xs glass-card border-[#B7AD9E]/30"
+                      className="mt-1 text-xs"
                     />
                   </div>
                   <div>
-                    <Label className="text-[11px] font-bold">{t("Relationship *")}</Label>
+                    <Label className="text-xs font-medium text-foreground">{t("Relationship *")}</Label>
                     <select
                       value={cRelation}
                       onChange={(e) => setCRelation(e.target.value)}
-                      className="mt-1 block w-full rounded-xl border border-[#B7AD9E]/30 bg-background px-3 py-2 text-xs font-semibold"
+                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground"
                     >
                       {RELATION_OPTIONS.map((r) => (
                         <option key={r} value={r}>
@@ -375,35 +372,35 @@ export default function UserProfile() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-[11px] font-bold">{t("Primary Phone *")}</Label>
+                    <Label className="text-xs font-medium text-foreground">{t("Primary Phone *")}</Label>
                     <Input
                       value={cPhone}
                       onChange={(e) => setCPhone(e.target.value)}
                       placeholder={t("+91 94350 12345")}
                       required
-                      className="mt-1 rounded-xl text-xs glass-card border-[#B7AD9E]/30"
+                      className="mt-1 text-xs"
                     />
                   </div>
                   <div>
-                    <Label className="text-[11px] font-bold">{t("Alternate Phone")}</Label>
+                    <Label className="text-xs font-medium text-foreground">{t("Alternate Phone")}</Label>
                     <Input
                       value={cAltPhone}
                       onChange={(e) => setCAltPhone(e.target.value)}
                       placeholder={t("Optional phone")}
-                      className="mt-1 rounded-xl text-xs glass-card border-[#B7AD9E]/30"
+                      className="mt-1 text-xs"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-[11px] font-bold">{t("Notes / Location Details")}</Label>
+                  <Label className="text-xs font-medium text-foreground">{t("Notes / Location Details")}</Label>
                   <Input
                     value={cNotes}
                     onChange={(e) => setCNotes(e.target.value)}
                     placeholder={t("e.g. Has 2nd floor shelter and boat access")}
-                    className="mt-1 rounded-xl text-xs glass-card border-[#B7AD9E]/30"
+                    className="mt-1 text-xs"
                   />
                 </div>
 
@@ -413,9 +410,9 @@ export default function UserProfile() {
                     id="isPrimaryContact"
                     checked={cIsPrimary}
                     onChange={(e) => setCIsPrimary(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                    className="h-4 w-4 rounded border-gray-300 text-neutral-900 focus:ring-neutral-900"
                   />
-                  <Label htmlFor="isPrimaryContact" className="cursor-pointer text-xs font-semibold">
+                  <Label htmlFor="isPrimaryContact" className="cursor-pointer text-xs font-medium text-foreground">
                     {t("Set as Primary Next-of-Kin")}
                   </Label>
                 </div>
@@ -423,7 +420,7 @@ export default function UserProfile() {
                 <Button
                   type="submit"
                   disabled={isSavingContact}
-                  className="w-full gap-2 rounded-xl bg-amber-600 py-2 text-xs font-bold text-white hover:bg-amber-700"
+                  className="w-full gap-2 rounded-lg bg-neutral-900 dark:bg-white dark:text-neutral-900 py-2 text-xs font-bold text-white hover:opacity-90"
                 >
                   {isSavingContact ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {t("Save Emergency Contact")}
@@ -433,37 +430,37 @@ export default function UserProfile() {
           )}
 
           {/* Existing Contacts List */}
-          <div className="mt-3.5 space-y-2.5">
+          <div className="mt-4 space-y-2.5">
             {contactsQuery.isLoading ? (
               <div className="flex items-center justify-center p-4">
-                <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : savedContacts.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-amber-300 p-4 text-center text-xs text-amber-900/70 dark:border-amber-800 dark:text-amber-300/70">
-                {t("No emergency contacts added yet. Tap Add Contact above to register family or next-of-kin.")}
+              <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                {t("No emergency contacts registered yet. Tap Add Contact above to configure next-of-kin.")}
               </div>
             ) : (
               savedContacts.map((contact) => (
                 <div
                   key={contact.id}
-                  className="glass-card flex items-start justify-between p-3.5 shadow-xs"
+                  className="flex items-start justify-between rounded-lg border border-border bg-muted/20 p-3"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-[#111C44] dark:text-[#F8F1E4]">{contact.name}</span>
-                      <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:text-amber-300">
+                      <span className="text-xs font-bold text-foreground">{contact.name}</span>
+                      <span className="rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
                         {t(contact.relation)}
                       </span>
                       {contact.isPrimary === "yes" && (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-300">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
                           <Star className="h-2.5 w-2.5 fill-emerald-600 text-emerald-600" />
                           {t("Primary")}
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-[#2457FF] dark:text-[#D8E3FF]">
+                    <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-foreground">
                       <a href={`tel:${contact.phone}`} className="flex items-center gap-1 hover:underline">
-                        <Phone className="h-3 w-3" />
+                        <Phone className="h-3 w-3 text-muted-foreground" />
                         {contact.phone}
                       </a>
                       {contact.alternatePhone && (
@@ -479,7 +476,7 @@ export default function UserProfile() {
                   <button
                     type="button"
                     onClick={() => handleDeleteContact(contact.id)}
-                    className="rounded-xl p-1.5 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 active:scale-95 dark:hover:bg-rose-950/40"
+                    className="rounded-md p-1.5 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 active:scale-95 dark:hover:bg-rose-950/40"
                     title={t("Delete contact")}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -491,56 +488,58 @@ export default function UserProfile() {
         </section>
 
         {/* Profile Customization Form */}
-        <form onSubmit={handleSave} className="mt-5 space-y-5">
+        <form onSubmit={handleSave} className="space-y-4">
           {/* Section 2: Identity & Contact */}
-          <div className="glass-panel p-4.5">
-            <div className="flex items-center gap-2 border-b border-[#B7AD9E]/20 pb-3 text-xs font-black uppercase tracking-wider text-[#2457FF] dark:border-[#D8E3FF]/15 dark:text-[#D8E3FF]">
-              <User className="h-4 w-4" />
-              <span>{t("Personal Identity & Phone")}</span>
+          <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
+                {t("Personal Identity & Contact Information")}
+              </span>
             </div>
 
             <div className="mt-4 space-y-3.5">
               <div>
-                <Label htmlFor="prof-name" className="text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">
+                <Label htmlFor="prof-name" className="text-xs font-medium text-foreground">
                   {t("Full Name / Display Name")}
                 </Label>
                 <Input
                   id="prof-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={t("e.g. Anupam Deka")}
+                  placeholder={t("e.g. Rahul Sharma")}
                   required
-                  className="mt-1 rounded-xl glass-card border-[#B7AD9E]/30 text-xs font-semibold"
+                  className="mt-1 text-xs"
                 />
               </div>
 
               <div>
-                <Label htmlFor="prof-email" className="text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">
+                <Label htmlFor="prof-email" className="text-xs font-medium text-foreground">
                   {t("Email Address")}
                 </Label>
                 <Input
                   id="prof-email"
                   value={user?.email || ""}
                   disabled
-                  className="mt-1 cursor-not-allowed rounded-xl glass-card border-[#B7AD9E]/30 text-xs font-semibold opacity-70"
+                  className="mt-1 cursor-not-allowed text-xs opacity-70"
                 />
                 <p className="mt-1 text-[10px] text-muted-foreground">{t("Primary login address (locked).")}</p>
               </div>
 
               <div>
-                <Label htmlFor="prof-phone" className="text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">
+                <Label htmlFor="prof-phone" className="text-xs font-medium text-foreground">
                   {t("Primary Citizen Phone Number")}
                 </Label>
                 <div className="relative mt-1">
                   <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
-                    <Phone className="h-4 w-4 text-[#2457FF] dark:text-[#D8E3FF]" />
+                    <Phone className="h-4 w-4" />
                   </span>
                   <Input
                     id="prof-phone"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder={t("+91 98640 12345")}
-                    className="rounded-xl glass-card border-[#B7AD9E]/30 pl-9 text-xs font-semibold"
+                    className="pl-9 text-xs"
                   />
                 </div>
                 <p className="mt-1 text-[10px] text-muted-foreground">{t("Direct citizen contact number for rescue operations.")}</p>
@@ -549,22 +548,24 @@ export default function UserProfile() {
           </div>
 
           {/* Section 3: Health & Emergency Profile */}
-          <div className="glass-panel p-4.5">
-            <div className="flex items-center gap-2 border-b border-[#B7AD9E]/20 pb-3 text-xs font-black uppercase tracking-wider text-rose-600 dark:border-[#D8E3FF]/15 dark:text-rose-400">
-              <HeartPulse className="h-4 w-4" />
-              <span>{t("Medical & Disaster Assistance")}</span>
+          <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <HeartPulse className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
+                {t("Medical Notes & Special Evacuation Needs")}
+              </span>
             </div>
 
             <div className="mt-4 space-y-3.5">
               <div>
-                <Label htmlFor="prof-blood" className="text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">
+                <Label htmlFor="prof-blood" className="text-xs font-medium text-foreground">
                   {t("Blood Group")}
                 </Label>
                 <select
                   id="prof-blood"
                   value={bloodGroup}
                   onChange={(e) => setBloodGroup(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-[#B7AD9E]/30 glass-card px-3 py-2 text-xs font-semibold text-[#111C44] dark:text-[#F8F1E4]"
+                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground"
                 >
                   {BLOOD_GROUPS.map((bg) => (
                     <option key={bg} value={bg}>
@@ -575,16 +576,16 @@ export default function UserProfile() {
               </div>
 
               <div>
-                <Label htmlFor="prof-med" className="text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">
-                  {t("Medical Notes & Special Evacuation Needs")}
+                <Label htmlFor="prof-med" className="text-xs font-medium text-foreground">
+                  {t("Medical Conditions & Evacuation Logistics")}
                 </Label>
                 <Textarea
                   id="prof-med"
                   value={medicalNotes}
                   onChange={(e) => setMedicalNotes(e.target.value)}
-                  placeholder={t("e.g. Diabetic requiring insulin refrigeration, wheelchair user, 1 elder person (age 78) requiring boat evacuation...")}
+                  placeholder={t("e.g. Diabetic requiring insulin refrigeration, wheelchair user, elderly family members requiring boat assistance...")}
                   rows={3}
-                  className="mt-1 rounded-xl glass-card border-[#B7AD9E]/30 text-xs font-medium"
+                  className="mt-1 text-xs"
                 />
                 <p className="mt-1 text-[10px] text-muted-foreground">
                   {t("Shared confidentially with hospital medical responders and boat dispatch units.")}
@@ -594,22 +595,24 @@ export default function UserProfile() {
           </div>
 
           {/* Section 4: Location & Region */}
-          <div className="glass-panel p-4.5">
-            <div className="flex items-center gap-2 border-b border-[#B7AD9E]/20 pb-3 text-xs font-black uppercase tracking-wider text-[#2457FF] dark:border-[#D8E3FF]/15 dark:text-[#D8E3FF]">
-              <MapPin className="h-4 w-4" />
-              <span>{t("State, District & Locality")}</span>
+          <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
+                {t("Jurisdiction, District & Locality")}
+              </span>
             </div>
 
             <div className="mt-4 space-y-3.5">
               <div>
-                <Label htmlFor="prof-district" className="text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">
+                <Label htmlFor="prof-district" className="text-xs font-medium text-foreground">
                   {t("State & District")}
                 </Label>
                 <select
                   id="prof-district"
                   value={homeDistrict}
                   onChange={(e) => setHomeDistrict(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-[#B7AD9E]/30 glass-card px-3 py-2 text-xs font-semibold text-[#111C44] dark:text-[#F8F1E4]"
+                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground"
                 >
                   {ASSAM_DISTRICTS.map((dist) => (
                     <option key={dist} value={dist}>
@@ -623,30 +626,32 @@ export default function UserProfile() {
               </div>
 
               <div>
-                <Label htmlFor="prof-address" className="text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">
-                  {t("Home Address / Village / Ward")}
+                <Label htmlFor="prof-address" className="text-xs font-medium text-foreground">
+                  {t("Home Address / Locality / Ward")}
                 </Label>
                 <Input
                   id="prof-address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder={t("e.g. House 42, Ward 12, Lachit Nagar, Guwahati")}
-                  className="mt-1 rounded-xl glass-card border-[#B7AD9E]/30 text-xs font-semibold"
+                  placeholder={t("e.g. Sector 4, Civil Lines")}
+                  className="mt-1 text-xs"
                 />
               </div>
             </div>
           </div>
 
           {/* Section 5: Preferences & Notifications */}
-          <div className="glass-panel p-4.5">
-            <div className="flex items-center gap-2 border-b border-[#B7AD9E]/20 pb-3 text-xs font-black uppercase tracking-wider text-[#2457FF] dark:border-[#D8E3FF]/15 dark:text-[#D8E3FF]">
-              <Languages className="h-4 w-4" />
-              <span>{t("Language & Broadcasts")}</span>
+          <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <Languages className="h-4 w-4 text-muted-foreground" />
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
+                {t("Language & Emergency Notifications")}
+              </span>
             </div>
 
             <div className="mt-4 space-y-3.5">
               <div>
-                <Label htmlFor="prof-lang" className="text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">
+                <Label htmlFor="prof-lang" className="text-xs font-medium text-foreground">
                   {t("Preferred Language")}
                 </Label>
                 <select
@@ -654,7 +659,7 @@ export default function UserProfile() {
                   data-no-operational-translation="true"
                   value={preferredLanguage}
                   onChange={(e) => setPreferredLanguage(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-[#B7AD9E]/30 glass-card px-3 py-2 text-xs font-semibold text-[#111C44] dark:text-[#F8F1E4]"
+                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground"
                 >
                   {localeOptions.map((l) => (
                     <option key={l.code} value={l.code} data-no-operational-translation="true">
@@ -664,13 +669,13 @@ export default function UserProfile() {
                 </select>
               </div>
 
-              <div className="flex items-center justify-between gap-4 rounded-xl glass-card p-3">
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/20 p-3">
                 <div className="flex items-center gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#2457FF]/15 text-[#2457FF] dark:bg-[#2457FF]/30 dark:text-[#D8E3FF]">
+                  <span className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-muted/60 text-foreground">
                     <Bell className="h-4 w-4" />
                   </span>
                   <div>
-                    <p className="text-xs font-bold text-[#111C44] dark:text-[#F8F1E4]">{t("Emergency Broadcasts")}</p>
+                    <p className="text-xs font-bold text-foreground">{t("Emergency Broadcasts")}</p>
                     <p className="text-[10px] text-muted-foreground">{t("Receive red alert warnings & flood advisories")}</p>
                   </div>
                 </div>
@@ -678,27 +683,27 @@ export default function UserProfile() {
                   type="checkbox"
                   checked={safetyNotifications}
                   onChange={(e) => setSafetyNotifications(e.target.checked)}
-                  className="h-5 w-5 rounded border-gray-300 text-[#2457FF] focus:ring-[#2457FF]"
+                  className="h-4 w-4 rounded border-gray-300 text-neutral-900 focus:ring-neutral-900"
                 />
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-2 space-y-3">
+          <div className="pt-2 space-y-2.5">
             <Button
               type="submit"
               disabled={isSaving}
-              className="w-full gap-2 rounded-2xl bg-[#2457FF] py-6 text-sm font-black text-white shadow-lg shadow-[#2457FF]/25 transition hover:bg-[#1d47db] active:scale-[.99]"
+              className="w-full gap-2 rounded-lg bg-neutral-900 dark:bg-white dark:text-neutral-900 py-3 text-sm font-bold text-white transition hover:opacity-90 active:scale-[0.99]"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   {t("Saving Changes…")}
                 </>
               ) : (
                 <>
-                  <Save className="h-5 w-5" />
+                  <Save className="h-4 w-4" />
                   {t("Save Profile Changes")}
                 </>
               )}
@@ -707,9 +712,9 @@ export default function UserProfile() {
             <button
               type="button"
               onClick={handleLogout}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 py-3.5 text-xs font-black text-rose-700 transition hover:bg-rose-500/20 active:scale-[.99] dark:text-rose-300"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card py-2.5 text-xs font-semibold text-foreground transition hover:bg-muted active:scale-[0.99]"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4 w-4 text-muted-foreground" />
               {t("Sign Out of Account")}
             </button>
           </div>

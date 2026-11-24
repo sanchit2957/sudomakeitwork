@@ -4,8 +4,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "DM Mono", ui-monospace, monospace;
+  --font-sans: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -24,90 +24,80 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
 }
 
 /* ==========================================================================
-   SAHAY OFFICIAL 5-COLOR PALETTE & DESIGN SYSTEM
-   - Cobalt Blue: #2457FF
-   - Deep Navy:   #111C44
-   - Cream White: #F8F1E4
-   - Pale Sky:    #D8E3FF
-   - Sand Gray:   #B7AD9E
+   SAHAY NATIONAL EMERGENCY INFRASTRUCTURE DESIGN SYSTEM (DIRECTION 1)
+   - Utilitarian, austere, high-legibility public safety foundation.
+   - Clean white / slate canvas, hairline 1px dividers, zero decorative gloss.
+   - Signal Red (#DC2626) reserved strictly for emergency actions.
    ========================================================================== */
 
 :root {
-  --sahay-cobalt: #2457FF;
-  --sahay-navy: #111C44;
-  --sahay-cream: #F8F1E4;
-  --sahay-sky: #D8E3FF;
-  --sahay-sand: #B7AD9E;
-
-  /* Theme mappings for Light Mode */
-  --background: #F8F1E4;
-  --foreground: #111C44;
+  --background: #FFFFFF;
+  --foreground: #0F172A;
   
-  --card: rgba(255, 255, 255, 0.88);
-  --card-foreground: #111C44;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
   
-  --popover: rgba(255, 255, 255, 0.96);
-  --popover-foreground: #111C44;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
   
-  --primary: #2457FF;
+  --primary: #0F172A;
   --primary-foreground: #FFFFFF;
   
-  --secondary: #D8E3FF;
-  --secondary-foreground: #111C44;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
   
-  --muted: rgba(216, 227, 255, 0.4);
-  --muted-foreground: #5A6987;
+  --muted: #F8FAFC;
+  --muted-foreground: #475569;
   
-  --accent: #D8E3FF;
-  --accent-foreground: #2457FF;
+  --accent: #F1F5F9;
+  --accent-foreground: #0F172A;
   
   --destructive: #DC2626;
   --destructive-foreground: #FFFFFF;
   
-  --border: rgba(183, 173, 158, 0.35);
-  --input: rgba(183, 173, 158, 0.45);
-  --ring: #2457FF;
-  --radius: 1rem;
+  --border: #E2E8F0;
+  --input: #CBD5E1;
+  --ring: #0F172A;
+  --radius: 0.5rem;
 
   color-scheme: light;
 }
 
 .dark {
-  /* Theme mappings for Dark Mode */
-  --background: #111C44;
-  --foreground: #F8F1E4;
+  --background: #0B0F17;
+  --foreground: #F8FAFC;
   
-  --card: rgba(24, 35, 83, 0.75);
-  --card-foreground: #F8F1E4;
+  --card: #0F172A;
+  --card-foreground: #F8FAFC;
   
-  --popover: rgba(24, 35, 83, 0.96);
-  --popover-foreground: #F8F1E4;
+  --popover: #0F172A;
+  --popover-foreground: #F8FAFC;
   
-  --primary: #2457FF;
-  --primary-foreground: #FFFFFF;
+  --primary: #F8FAFC;
+  --primary-foreground: #0B0F17;
   
-  --secondary: rgba(216, 227, 255, 0.14);
-  --secondary-foreground: #D8E3FF;
+  --secondary: #1E293B;
+  --secondary-foreground: #F8FAFC;
   
-  --muted: rgba(216, 227, 255, 0.1);
+  --muted: #1E293B;
   --muted-foreground: #94A3B8;
   
-  --accent: rgba(36, 87, 255, 0.25);
-  --accent-foreground: #D8E3FF;
+  --accent: #1E293B;
+  --accent-foreground: #F8FAFC;
   
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   
-  --border: rgba(216, 227, 255, 0.14);
-  --input: rgba(216, 227, 255, 0.2);
-  --ring: #2457FF;
+  --border: #1E293B;
+  --input: #334155;
+  --ring: #F8FAFC;
 
   color-scheme: dark;
 }
@@ -129,489 +119,90 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   overflow-x: hidden;
-  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* ==========================================================================
-   HEAVY GLASSMORPHISM & BENTO SYSTEM UTILITIES (iOS / visionOS LIQUID GLASS)
+   FUNCTIONAL CRISIS TRIGGER (FLAT, HIGH-CONTRAST, ACCESSIBLE)
+   Direction 3: Clean, trauma-informed emergency trigger with zero 3D shine.
    ========================================================================== */
-
-.liquid-glass,
-.glass-panel {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(32px) saturate(200%) contrast(102%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%) contrast(102%);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px 0 rgba(183, 173, 158, 0.15),
-    0 20px 45px -15px rgba(17, 28, 68, 0.08),
-    0 4px 16px -2px rgba(17, 28, 68, 0.03);
-  border-radius: var(--radius);
-  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s ease;
-}
-
-.dark .liquid-glass,
-.dark .glass-panel {
-  background: rgba(17, 28, 68, 0.58);
-  backdrop-filter: blur(32px) saturate(200%) contrast(105%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%) contrast(105%);
-  border: 1px solid rgba(216, 227, 255, 0.18);
-  box-shadow: 
-    inset 0 1.5px 1.5px 0 rgba(216, 227, 255, 0.35),
-    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.4),
-    0 25px 55px -12px rgba(0, 0, 0, 0.65),
-    0 6px 20px -4px rgba(0, 0, 0, 0.4);
-}
-
-.glass-card {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(24px) saturate(190%) contrast(102%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(102%);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 
-    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -1px 1px 0 rgba(183, 173, 158, 0.1),
-    0 12px 32px -8px rgba(17, 28, 68, 0.06),
-    0 2px 8px -2px rgba(17, 28, 68, 0.02);
-  border-radius: 1.5rem;
-  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.dark .glass-card {
-  background: rgba(24, 35, 83, 0.52);
-  backdrop-filter: blur(24px) saturate(190%) contrast(105%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(105%);
-  border: 1px solid rgba(216, 227, 255, 0.15);
-  box-shadow: 
-    inset 0 1px 1.5px 0 rgba(216, 227, 255, 0.25),
-    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35),
-    0 16px 36px -8px rgba(0, 0, 0, 0.5),
-    0 4px 12px -2px rgba(0, 0, 0, 0.3);
-}
-
-.glass-pill {
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.9),
-    0 4px 16px -2px rgba(17, 28, 68, 0.06);
-  border-radius: 9999px;
-}
-
-.dark .glass-pill {
-  background: rgba(24, 35, 83, 0.5);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(216, 227, 255, 0.16);
-  box-shadow: 
-    inset 0 1px 1px 0 rgba(216, 227, 255, 0.2),
-    0 6px 20px -2px rgba(0, 0, 0, 0.4);
-}
-
-/* Glassmorphism browser fallback */
-@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .liquid-glass,
-  .glass-panel,
-  .glass-card,
-  .glass-pill {
-    background: #FFFFFF;
-  }
-  .dark .liquid-glass,
-  .dark .glass-panel,
-  .dark .glass-card,
-  .dark .glass-pill {
-    background: #182353;
-  }
-}
-
-/* Bento Grid Container & Cell Helpers */
-.bento-container {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 1.25rem;
-  width: 100%;
-}
-
-@media (max-width: 640px) {
-  .bento-container {
-    gap: 0.85rem;
-  }
-}
-
-.bento-cell-12 { grid-column: span 12 / span 12; }
-.bento-cell-8  { grid-column: span 12 / span 12; }
-.bento-cell-6  { grid-column: span 12 / span 12; }
-.bento-cell-4  { grid-column: span 12 / span 12; }
-.bento-cell-3  { grid-column: span 12 / span 12; }
-
-@media (min-width: 768px) {
-  .bento-cell-8 { grid-column: span 8 / span 12; }
-  .bento-cell-6 { grid-column: span 6 / span 12; }
-  .bento-cell-4 { grid-column: span 4 / span 12; }
-  .bento-cell-3 { grid-column: span 3 / span 12; }
-}
-
-@media (min-width: 1024px) {
-  .bento-cell-lg-8 { grid-column: span 8 / span 12; }
-  .bento-cell-lg-6 { grid-column: span 6 / span 12; }
-  .bento-cell-lg-4 { grid-column: span 4 / span 12; }
-  .bento-cell-lg-3 { grid-column: span 3 / span 12; }
-}
-
-/* ==========================================================================
-   APPLE iOS / visionOS 3D LIQUID TACTILE SOS BUTTON
-   ========================================================================== */
-
-@keyframes sos-liquid-ripple {
-  0% {
-    transform: scale(0.96);
-    opacity: 0.75;
-    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.65), 0 0 30px rgba(220, 38, 38, 0.4);
-  }
-  50% {
-    opacity: 0.45;
-  }
-  100% {
-    transform: scale(1.36);
-    opacity: 0;
-    box-shadow: 0 0 0 38px rgba(220, 38, 38, 0), 0 0 60px rgba(220, 38, 38, 0);
-  }
-}
-
-@keyframes sos-liquid-sheen {
-  0%, 100% {
-    opacity: 0.45;
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: translateY(-2px) scale(1.02);
-  }
-}
-
-.liquid-bezel {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(14px, 2.5vw, 20px);
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1.5px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 
-    inset 0 2px 4px rgba(255, 255, 255, 0.95),
-    inset 0 -2px 6px rgba(17, 28, 68, 0.08),
-    0 24px 50px -12px rgba(220, 38, 38, 0.25),
-    0 4px 16px rgba(17, 28, 68, 0.05);
-}
-
-.dark .liquid-bezel {
-  background: rgba(24, 35, 83, 0.45);
-  border: 1.5px solid rgba(216, 227, 255, 0.22);
-  box-shadow: 
-    inset 0 2px 4px rgba(216, 227, 255, 0.35),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.5),
-    0 30px 60px -12px rgba(220, 38, 38, 0.45),
-    0 8px 24px rgba(0, 0, 0, 0.5);
-}
-
-.liquid-bezel::before {
-  content: "";
-  position: absolute;
-  inset: -12px;
-  border-radius: 9999px;
-  border: 2px solid rgba(220, 38, 38, 0.3);
-  animation: sos-liquid-ripple 3s infinite cubic-bezier(0.1, 0.7, 0.3, 1);
-  pointer-events: none;
-}
-
-.liquid-bezel::after {
-  content: "";
-  position: absolute;
-  inset: -24px;
-  border-radius: 9999px;
-  border: 1.5px solid rgba(220, 38, 38, 0.2);
-  animation: sos-liquid-ripple 3s infinite 1.2s cubic-bezier(0.1, 0.7, 0.3, 1);
-  pointer-events: none;
-}
 
 .sahay-sos-btn {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: clamp(160px, 36vw, 205px);
-  height: clamp(160px, 36vw, 205px);
-  border-radius: 9999px;
-  background: radial-gradient(circle at 38% 28%, #ff6470 0%, #ef4444 32%, #dc2626 62%, #991b1b 92%, #7f1d1d 100%);
+  width: 100%;
+  max-width: 340px;
+  min-height: 120px;
+  padding: 1.5rem 1rem;
+  border-radius: var(--radius);
+  background-color: #DC2626;
   color: #FFFFFF;
-  border: 3.5px solid rgba(255, 255, 255, 0.75);
+  border: 2px solid #B91C1C;
   cursor: pointer;
   outline: none;
   touch-action: manipulation;
   user-select: none;
-  box-shadow: 
-    inset 0 3px 6px 0 rgba(255, 255, 255, 0.8),
-    inset 0 14px 26px -6px rgba(255, 255, 255, 0.4),
-    inset 0 -8px 18px rgba(0, 0, 0, 0.45),
-    0 24px 50px -8px rgba(220, 38, 38, 0.65),
-    0 8px 18px rgba(0, 0, 0, 0.2);
-  transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.16s ease;
-  overflow: hidden;
-  isolation: isolate;
-}
-
-/* Glass lens highlight sweep */
-.sahay-sos-btn::before {
-  content: "";
-  position: absolute;
-  top: 8px;
-  left: 14%;
-  right: 14%;
-  height: 48%;
-  border-radius: 9999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.15) 60%, transparent 100%);
-  filter: blur(0.5px);
-  pointer-events: none;
-  animation: sos-liquid-sheen 4s ease-in-out infinite;
+  font-weight: 700;
+  transition: background-color 0.15s ease, transform 0.1s ease;
 }
 
 .sahay-sos-btn:hover:not(:disabled) {
-  transform: translateY(-3px) scale(1.025);
-  box-shadow: 
-    inset 0 4px 8px 0 rgba(255, 255, 255, 0.9),
-    inset 0 16px 28px -6px rgba(255, 255, 255, 0.5),
-    inset 0 -8px 18px rgba(0, 0, 0, 0.45),
-    0 30px 60px -8px rgba(220, 38, 38, 0.75),
-    0 10px 22px rgba(0, 0, 0, 0.22);
-  filter: brightness(1.04);
+  background-color: #B91C1C;
 }
 
 .sahay-sos-btn:active:not(:disabled) {
-  transform: translateY(4px) scale(0.96);
-  box-shadow: 
-    inset 0 6px 14px rgba(0, 0, 0, 0.65),
-    inset 0 -2px 5px rgba(255, 255, 255, 0.25),
-    0 10px 22px -2px rgba(220, 38, 38, 0.45),
-    0 4px 10px rgba(0, 0, 0, 0.2);
-  filter: brightness(0.96);
+  background-color: #991B1B;
+  transform: scale(0.99);
 }
 
 .sahay-sos-btn:focus-visible {
-  outline: 4px solid #2457FF;
-  outline-offset: 8px;
+  outline: 3px solid #0F172A;
+  outline-offset: 4px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .liquid-bezel::before,
-  .liquid-bezel::after,
-  .sahay-sos-btn::before {
-    animation: none !important;
-  }
-}
-
-/* ==========================================================================
-   THEME ADAPTATION OVERRIDES FOR EXISTING PAGES & CLASSES
-   ========================================================================== */
-
-/* Page background containers */
-.victim-page {
-  background-color: var(--background) !important;
-  color: var(--foreground) !important;
-}
-
-.victim-main {
-  background: var(--card) !important;
-  color: var(--foreground) !important;
-  border-color: var(--border) !important;
-  box-shadow: 0 16px 48px -12px rgba(17, 28, 68, 0.1) !important;
-}
-
-.dark .victim-main {
-  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.55) !important;
-}
-
-.dark .victim-page :is([class~="bg-white"], [class~="bg-card"]) {
-  background-color: var(--card) !important;
-  color: var(--foreground) !important;
-}
-
-.dark .workspace-surface :is([class~="bg-white"], [class~="bg-card"]) {
-  background-color: var(--card) !important;
-  color: var(--foreground) !important;
-}
-
-.dark .victim-page [class*="text-[#"] {
-  color: inherit !important;
-}
-
-.dark .workspace-surface [class*="border-[#"] {
-  border-color: var(--border) !important;
-}
-
-/* Replace legacy teal #174e46, #0f766e, #163d36 with Deep Navy / Cobalt Blue */
-[class*="bg-[#174e46]"],
-[class*="bg-[#0f766e]"],
-[class*="bg-[#122824]"] {
-  background-color: var(--sahay-navy) !important;
-  color: var(--sahay-cream) !important;
-}
-
-button[class*="bg-[#174e46]"],
-button[class*="bg-[#0f766e]"],
-.btn-cobalt {
-  background-color: var(--sahay-cobalt) !important;
-  color: #FFFFFF !important;
-  transition: all 0.2s ease !important;
-}
-
-button[class*="bg-[#174e46]"]:hover,
-button[class*="bg-[#0f766e]"]:hover,
-.btn-cobalt:hover {
-  background-color: #1a46d6 !important;
-  box-shadow: 0 4px 14px rgba(36, 87, 255, 0.35) !important;
-}
-
-[class*="text-[#174e46]"],
-[class*="text-[#0f766e]"] {
-  color: var(--sahay-cobalt) !important;
-}
-
-.dark [class*="text-[#174e46]"],
-.dark [class*="text-[#0f766e]"] {
-  color: var(--sahay-sky) !important;
-}
-
-/* Subtle backgrounds */
-[class*="bg-[#f0faf6]"],
-[class*="bg-[#f4faf7]"],
-[class*="bg-[#eaf7f2]"],
-[class*="bg-[#f2faf7]"] {
-  background-color: rgba(216, 227, 255, 0.3) !important;
-}
-
-.dark [class*="bg-[#f0faf6]"],
-.dark [class*="bg-[#f4faf7]"],
-.dark [class*="bg-[#eaf7f2]"],
-.dark [class*="bg-[#f2faf7]"] {
-  background-color: rgba(24, 35, 83, 0.6) !important;
+.dark .sahay-sos-btn:focus-visible {
+  outline: 3px solid #FFFFFF;
+  outline-offset: 4px;
 }
 
 /* Navigation bar */
 nav[aria-label="Victim App navigation"] {
   border-color: var(--border) !important;
-  background: rgba(255, 255, 255, 0.88) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  box-shadow: 0 -4px 20px -2px rgba(17, 28, 68, 0.08) !important;
+  background-color: var(--background) !important;
+  box-shadow: 0 -1px 0 0 var(--border) !important;
 }
 
-.dark nav[aria-label="Victim App navigation"] {
-  background: rgba(24, 35, 83, 0.88) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  box-shadow: 0 -6px 24px -2px rgba(0, 0, 0, 0.45) !important;
-}
-
-/* Inputs and interactive focus */
+/* Accessible focus ring */
 :is(button, a, input, select, textarea):focus-visible {
-  outline: 2px solid var(--sahay-cobalt) !important;
-  outline-offset: 2px !important;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
-/* Dashboard surface */
+/* ==========================================================================
+   BACKWARD-COMPATIBILITY SELECTORS FOR VITEST SUITE
+   ========================================================================== */
+.victim-page {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+}
+
 .workspace-surface {
   background-color: transparent !important;
 }
 
-/* Ambient Liquid Lighting Orbs for authentic iOS/visionOS Glass Depth */
-.liquid-ambient-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-
-.liquid-ambient-bg::before {
-  content: "";
-  position: absolute;
-  top: -10%;
-  left: -10%;
-  width: 55vw;
-  height: 55vw;
-  max-width: 650px;
-  max-height: 650px;
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgba(36, 87, 255, 0.16) 0%, rgba(36, 87, 255, 0) 70%);
-  filter: blur(80px);
-}
-
-.liquid-ambient-bg::after {
-  content: "";
-  position: absolute;
-  top: 35%;
-  right: -10%;
-  width: 50vw;
-  height: 50vw;
-  max-width: 600px;
-  max-height: 600px;
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgba(216, 227, 255, 0.35) 0%, rgba(36, 87, 255, 0.08) 50%, transparent 70%);
-  filter: blur(90px);
-}
-
-.dark .liquid-ambient-bg::before {
-  background: radial-gradient(circle, rgba(36, 87, 255, 0.22) 0%, rgba(17, 28, 68, 0) 70%);
-}
-
-.dark .liquid-ambient-bg::after {
-  background: radial-gradient(circle, rgba(36, 87, 255, 0.15) 0%, rgba(216, 227, 255, 0.05) 50%, transparent 70%);
-}
-
-/* Grid overlay */
-.app-grid {
-  background-image: 
-    linear-gradient(to right, rgba(36, 87, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(36, 87, 255, 0.05) 1px, transparent 1px);
-  background-size: 28px 28px;
-}
-
-.dark .app-grid {
-  background-image: 
-    linear-gradient(to right, rgba(216, 227, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(216, 227, 255, 0.04) 1px, transparent 1px);
-  background-size: 28px 28px;
-}
-.river-line { position: absolute; border-radius: 999px; background: linear-gradient(90deg, transparent, rgb(72 171 177 / 0.62), transparent); filter: blur(1px); transform: rotate(-12deg); }
-.map-shell .gm-style { border-radius: 1rem; }
-.map-shell .gm-style-mtc button { font-family: "Manrope", sans-serif !important; }
-
-@media (prefers-reduced-motion: no-preference) {
-  .rise-in { animation: rise-in 500ms cubic-bezier(0.23, 1, 0.32, 1) both; }
-  @keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-}
-
-/* Backward-compatibility theme coverage selectors for automated test assertions */
 .dark .victim-page :is([class~="bg-white"], [class~="bg-card"]) {
   background-color: var(--card);
 }
+
 .dark .workspace-surface :is([class~="bg-white"], [class~="bg-card"]) {
   background-color: var(--card);
 }
+
 .dark .victim-page [class*="text-[#"] {
   color: inherit;
 }
+
 .dark .workspace-surface [class*="border-[#"] {
   border-color: var(--border);
-}
-:is(button, a, input, select, textarea):focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
 }

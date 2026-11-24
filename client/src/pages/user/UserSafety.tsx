@@ -62,12 +62,12 @@ function kilometresBetween(position: Position, latitude: number, longitude: numb
 
 function supplyTone(status: SupplyStatus) {
   return status === "available"
-    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-300"
+    ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
     : status === "limited"
-    ? "bg-amber-50 text-amber-700 ring-1 ring-amber-500/20 dark:bg-amber-950/40 dark:text-amber-300"
+    ? "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
     : status === "critical"
-    ? "bg-rose-50 text-rose-700 ring-1 ring-rose-500/20 dark:bg-rose-950/40 dark:text-rose-300"
-    : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
+    ? "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+    : "bg-muted text-muted-foreground border-border";
 }
 
 function humanStatus(status: string) {
@@ -126,57 +126,62 @@ export default function UserSafety() {
       : t("Use location to sort hospitals by distance");
 
   return (
-    <div className="victim-page relative min-h-screen bg-[#F8FAFC] text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden">
-      <main className="victim-main relative z-10 mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-32 pt-5">
-        {/* Header */}
-        <header className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 mb-5 flex items-center justify-between">
+    <div className="victim-page relative min-h-screen bg-background text-foreground transition-colors overflow-x-hidden">
+      <main className="victim-main relative z-10 mx-auto min-h-screen w-full max-w-4xl px-4 sm:px-6 pb-32 pt-4">
+        {/* Institutional Header */}
+        <header className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-xs">
           <button
             onClick={() => setLocation("/")}
             className="flex items-center gap-3 text-left transition hover:opacity-85 active:scale-95"
           >
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-teal-600 ring-1 ring-teal-500/20 dark:bg-teal-950/40 dark:text-teal-400">
-              <ShieldCheck className="h-5 w-5" />
+            <span className="grid h-10 w-10 place-items-center rounded-lg border border-border bg-muted/60 text-foreground">
+              <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </span>
             <div>
-              <span className="block text-base font-bold text-slate-900 dark:text-white">
-                {t("Safety")}
+              <span className="block text-base font-bold text-foreground">
+                {t("Safety & Hospital Resources")}
               </span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400">
-                {t("Nearby hospital information")}
+              <span className="block text-xs text-muted-foreground">
+                {t("National Emergency Dispatch & Clinical Care Directory")}
               </span>
             </div>
           </button>
           <LanguageSelector compact />
         </header>
 
-        {/* Hero Notice Banner */}
-        <section className="rounded-2xl border border-slate-800 bg-[#0F172A] p-6 text-white shadow-sm">
-          <div className="flex gap-4 items-start">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/10 text-teal-400">
-              <ShieldCheck className="h-6 w-6" />
-            </span>
+        {/* Institutional Emergency Action Banner */}
+        <section className="mb-5 rounded-xl border border-border bg-card p-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-white">{t("Stay safe, stay informed")}</h1>
-              <p className="mt-1 text-xs leading-relaxed text-slate-300">
-                {t("Find verified nearby medical care. For immediate danger, send an SOS now.")}
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {t("Emergency Healthcare Hotline")}
+                </span>
+              </div>
+              <h1 className="mt-1 text-lg sm:text-xl font-bold tracking-tight text-foreground">
+                {t("In Need of Immediate Medical Care?")}
+              </h1>
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed max-w-xl">
+                {t("Review verified hospital capacity below or dial national emergency dispatch immediately.")}
               </p>
             </div>
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <a
-              href="tel:112"
-              className="inline-flex items-center justify-center rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-rose-700 active:scale-95"
-            >
-              <PhoneCall className="mr-2 h-4 w-4" />
-              {t("Call 112")}
-            </a>
-            <button
-              onClick={() => setLocation("/")}
-              className="inline-flex items-center justify-center rounded-xl bg-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-teal-700 active:scale-95"
-            >
-              <AlertTriangle className="mr-2 h-4 w-4" />
-              {t("Rapid SOS")}
-            </button>
+            <div className="flex w-full sm:w-auto items-center gap-2.5">
+              <a
+                href="tel:112"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-lg bg-neutral-900 dark:bg-white dark:text-neutral-900 px-4 py-2.5 text-xs font-bold text-white transition hover:opacity-90 active:scale-95"
+              >
+                <PhoneCall className="mr-2 h-4 w-4" />
+                {t("Call 112")}
+              </a>
+              <button
+                onClick={() => setLocation("/")}
+                className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-red-700 active:scale-95"
+              >
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                {t("Emergency SOS")}
+              </button>
+            </div>
           </div>
         </section>
 
@@ -213,19 +218,21 @@ function VerifiedMedicalCare({
   const { t } = useLanguage();
   return (
     <section className="mt-6">
-      <div className="flex items-end justify-between gap-3">
+      <div className="flex items-end justify-between gap-3 pb-3 border-b border-border">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-            {t("Verified medical care")}
-          </p>
-          <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-white">{t("Nearby hospitals")}</h2>
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{locationCopy}</p>
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            {t("Verified Medical Directory")}
+          </span>
+          <h2 className="mt-0.5 text-base sm:text-lg font-bold text-foreground">
+            {t("Nearby Hospitals & Trauma Centers")}
+          </h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{locationCopy}</p>
         </div>
         <button
           type="button"
           aria-label={t("Refresh nearby hospitals")}
           onClick={refresh}
-          className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-xs hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+          className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-card text-foreground shadow-xs hover:bg-muted active:scale-95"
         >
           <RefreshCw className="h-4 w-4" />
         </button>
@@ -233,7 +240,7 @@ function VerifiedMedicalCare({
       {loading ? (
         <HospitalLoading />
       ) : hospitals.length ? (
-        <div className="mt-4 grid gap-4">
+        <div className="mt-4 grid gap-3.5">
           <HospitalCard hospital={hospitals[0]} primary />
           {hospitals.slice(1, 4).map((hospital) => (
             <HospitalCard hospital={hospital} key={hospital.id} />
@@ -256,21 +263,21 @@ function HospitalCard({
   const { t } = useLanguage();
   return (
     <article
-      className={`rounded-2xl border bg-white shadow-xs transition-all dark:bg-slate-900 ${
+      className={`rounded-xl border bg-card shadow-xs transition-all ${
         primary
-          ? "border-teal-500/40 ring-1 ring-teal-500/30"
-          : "border-slate-200/80 dark:border-slate-800"
+          ? "border-emerald-500/50 ring-1 ring-emerald-500/30"
+          : "border-border"
       }`}
     >
-      <div className={`p-4 border-b border-slate-100 dark:border-slate-800 ${primary ? "bg-teal-50/30 dark:bg-teal-950/20" : ""}`}>
+      <div className="p-4 border-b border-border">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-600 ring-1 ring-teal-500/20 dark:bg-teal-950/40 dark:text-teal-400">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-muted/60 text-foreground">
               <Hospital className="h-5 w-5" />
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="min-w-0 flex-1 text-sm font-bold text-slate-900 dark:text-white">
+                <p className="min-w-0 flex-1 text-sm font-bold text-foreground">
                   {hospital.name}
                 </p>
                 <a
@@ -279,19 +286,19 @@ function HospitalCard({
                   rel="noopener noreferrer"
                   aria-label={t("Get directions")}
                   title={t("Get directions")}
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 text-teal-600 hover:bg-teal-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border text-foreground hover:bg-muted"
                 >
                   <Navigation className="h-3.5 w-3.5" />
                 </a>
               </div>
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {hospital.distance !== null ? `${hospital.distance.toFixed(1)} km away · ` : ""}
                 {hospital.address}
               </p>
             </div>
           </div>
-          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 ring-1 ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400">
-            {t("Open")}
+          <span className="rounded-md bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+            {t("Operational")}
           </span>
         </div>
       </div>
@@ -300,17 +307,15 @@ function HospitalCard({
         <div className="grid grid-cols-2 gap-3">
           <MetricTile
             icon={BedDouble}
-            label={t("Beds ready")}
+            label={t("Emergency Beds")}
             value={hospital.availableEmergencyBeds}
             total={hospital.totalEmergencyBeds}
-            tone="teal"
           />
           <MetricTile
             icon={HeartPulse}
-            label={t("ICU ready")}
+            label={t("ICU Ventilators")}
             value={hospital.availableIcuBeds}
             total={hospital.totalIcuBeds}
-            tone="blue"
           />
         </div>
 
@@ -323,29 +328,29 @@ function HospitalCard({
               { label: t("Power"), value: hospital.powerBackupStatus, icon: PlugZap },
             ] as const
           ).map(({ label, value, icon: Icon }) => (
-            <span key={label} className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-semibold ${supplyTone(value)}`}>
+            <span key={label} className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-semibold ${supplyTone(value)}`}>
               <Icon className="h-3 w-3 shrink-0" />
               <span className="truncate">{label}: {t(humanStatus(value))}</span>
             </span>
           ))}
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-3">
-          <span className="flex min-w-0 items-center gap-1 text-[10px] text-slate-400">
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+          <span className="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground">
             <Clock3 className="h-3 w-3 shrink-0" />
             {t("Updated")} {new Date(hospital.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
           {hospital.contactPhone ? (
             <a
               href={`tel:${hospital.contactPhone}`}
-              className="inline-flex shrink-0 items-center rounded-xl bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 transition"
+              className="inline-flex shrink-0 items-center rounded-lg bg-neutral-900 dark:bg-white dark:text-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition"
             >
               <PhoneCall className="mr-1.5 h-3.5 w-3.5" />
-              {t("Call")}
+              {t("Call Hospital")}
             </a>
           ) : (
-            <span className="inline-flex shrink-0 items-center rounded-xl bg-slate-100 px-2.5 py-1 text-xs text-slate-500 dark:bg-slate-800">
-              {t("No call number")}
+            <span className="inline-flex shrink-0 items-center rounded-lg bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+              {t("No phone listed")}
             </span>
           )}
         </div>
@@ -359,26 +364,22 @@ function MetricTile({
   label,
   value,
   total,
-  tone,
 }: {
   icon: typeof BedDouble;
   label: string;
   value: number;
   total: number;
-  tone: "teal" | "blue";
 }) {
   const { t } = useLanguage();
-  const styles =
-    tone === "teal"
-      ? "bg-teal-50/70 text-teal-900 dark:bg-teal-950/40 dark:text-teal-300"
-      : "bg-blue-50/70 text-blue-900 dark:bg-blue-950/40 dark:text-blue-300";
   return (
-    <div className={`rounded-xl p-3 border border-transparent ${styles}`}>
-      <Icon className="h-4 w-4" />
-      <p className="mt-2 text-xl font-bold tracking-tight">{value}</p>
-      <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">{label}</p>
-      <p className="mt-0.5 text-[10px] opacity-70">
-        {t("of")} {total} {t("total")}
+    <div className="rounded-lg border border-border bg-muted/40 p-3">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+      </div>
+      <p className="mt-1.5 font-mono text-xl sm:text-2xl font-bold tracking-tight text-foreground">{value}</p>
+      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+        {t("of")} {total} {t("total capacity")}
       </p>
     </div>
   );
@@ -387,9 +388,9 @@ function MetricTile({
 function HospitalLoading() {
   const { t } = useLanguage();
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900 mt-4">
-      <Hospital className="mx-auto h-7 w-7 animate-pulse text-teal-600" />
-      <p className="mt-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
+    <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center mt-4">
+      <Hospital className="mx-auto h-7 w-7 animate-pulse text-muted-foreground" />
+      <p className="mt-3 text-xs font-semibold text-muted-foreground">
         {t("Loading verified hospitals…")}
       </p>
     </div>
@@ -399,12 +400,12 @@ function HospitalLoading() {
 function NoHospitalCard() {
   const { t } = useLanguage();
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900 mt-4">
-      <Building2 className="mx-auto h-8 w-8 text-slate-400" />
-      <p className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
+    <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center mt-4">
+      <Building2 className="mx-auto h-8 w-8 text-muted-foreground" />
+      <p className="mt-3 text-sm font-bold text-foreground">
         {t("No verified hospital listed nearby")}
       </p>
-      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+      <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
         {t("Hospital information appears here after a hospital is verified and staff publish its current capacity.")}
       </p>
     </div>
@@ -414,26 +415,26 @@ function NoHospitalCard() {
 function FloodSafety() {
   const { t } = useLanguage();
   return (
-    <section className="mt-5 rounded-2xl border border-amber-200/80 bg-amber-50/60 p-5 dark:border-amber-900/40 dark:bg-amber-950/20">
+    <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs">
       <div className="flex gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-        <div>
-          <p className="text-sm font-bold text-amber-900 dark:text-amber-300">{t("Flood safety now")}</p>
+        <div className="w-full">
+          <p className="text-sm font-bold text-foreground">{t("Flood & Disaster Safety Protocols")}</p>
           <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
             <SafetyTip
               icon={TentTree}
-              title={t("Move higher")}
-              copy={t("Leave low ground before water rises.")}
+              title={t("Move to Higher Ground")}
+              copy={t("Evacuate low-lying areas before floodwaters peak.")}
             />
             <SafetyTip
               icon={Waves}
-              title={t("Avoid water")}
-              copy={t("Never walk or drive through moving water.")}
+              title={t("Avoid Moving Water")}
+              copy={t("Never drive, walk, or wade across flood pathways.")}
             />
             <SafetyTip
               icon={Smartphone}
-              title={t("Keep contact")}
-              copy={t("Charge your phone and keep emergency numbers ready.")}
+              title={t("Maintain Emergency Contact")}
+              copy={t("Keep communications active and monitor official disaster broadcasts.")}
             />
           </div>
         </div>
@@ -444,10 +445,10 @@ function FloodSafety() {
 
 function SafetyTip({ icon: Icon, title, copy }: { icon: typeof TentTree; title: string; copy: string }) {
   return (
-    <div className="rounded-xl border border-amber-200/60 bg-white/80 p-3 dark:border-amber-900/30 dark:bg-slate-900/80">
-      <Icon className="h-4 w-4 text-teal-600 dark:text-teal-400" />
-      <p className="mt-2 text-xs font-bold text-slate-900 dark:text-white">{title}</p>
-      <p className="mt-1 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">{copy}</p>
+    <div className="rounded-lg border border-border bg-muted/30 p-3">
+      <Icon className="h-4 w-4 text-foreground" />
+      <p className="mt-2 text-xs font-bold text-foreground">{title}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{copy}</p>
     </div>
   );
 }
@@ -497,27 +498,27 @@ export function SafetyConditionsCard({ conditions, loading }: { conditions?: Saf
       : t("Official river-gauge data is temporarily unavailable.");
 
   return (
-    <section className="mt-5 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-start justify-between gap-3">
+    <section className="mt-5 rounded-xl border border-border bg-card p-5 shadow-xs">
+      <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-            {t("Local alert")}
-          </p>
-          <h2 className="mt-0.5 text-base font-bold text-slate-900 dark:text-white">{title}</h2>
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            {t("Environmental Advisory")}
+          </span>
+          <h2 className="mt-0.5 text-base font-bold text-foreground">{title}</h2>
         </div>
-        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${tone}`}>
+        <span className={`rounded-md px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase border ${tone}`}>
           {conditions?.risk ? t(riskInfo.badgeLabelKey) : t("loading")}
         </span>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{detail}</p>
-      <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-[11px] leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{detail}</p>
+      <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-relaxed text-foreground">
         <span>{riverCopy}</span>
         {river?.sourceUrl && river?.sourceName ? (
           <a
             href={river.sourceUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-1 block font-semibold text-teal-600 dark:text-teal-400 hover:underline"
+            className="mt-1 block font-semibold text-foreground underline underline-offset-2"
           >
             {river.sourceName}
             {river.updatedAt ? ` · ${t("observed")} ${new Date(river.updatedAt).toLocaleString()}` : ""}

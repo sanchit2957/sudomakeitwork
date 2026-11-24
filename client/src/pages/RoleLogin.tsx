@@ -43,7 +43,7 @@ const portalConfig = {
     prompt: "Enter your hospital staff credentials and the active Government Access Code.",
     destination: "/hospital",
     icon: Hospital,
-    callSignPlaceholder: "e.g. Guwahati Triage Desk",
+    callSignPlaceholder: "e.g. Trauma Triage Desk 1",
     callSignLabel: "Facility / Ward Label",
     toneColor: "teal",
   },
@@ -302,7 +302,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. officer@assamrescue.gov.in"
+                    placeholder="e.g. officer@dispatch.gov.in"
                     className="mt-1 h-10 rounded-lg text-sm border-slate-200 dark:border-slate-800"
                     autoComplete="username"
                     required
@@ -401,7 +401,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                     type="text"
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    placeholder="e.g. Commander Barua"
+                    placeholder="e.g. Duty Commander"
                     className="mt-1 h-10 rounded-lg text-sm border-slate-200 dark:border-slate-800"
                     autoComplete="name"
                     required
@@ -417,7 +417,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                     type="email"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="officer@assamrescue.gov.in"
+                    placeholder="officer@dispatch.gov.in"
                     className="mt-1 h-10 rounded-lg text-sm border-slate-200 dark:border-slate-800"
                     autoComplete="email"
                     required

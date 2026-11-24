@@ -102,32 +102,36 @@ export default function UserTrackFlow() {
         )}
 
         {status.data && (
-          <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-            {/* Dark Tactical Status Banner (Reference 3 Screen 3) */}
-            <div className="bg-slate-900 p-5 text-white dark:bg-slate-950 border-b border-slate-800">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-400">
-                {t("Live rescue telemetry")}
+          <section className="mt-4 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+            {/* Reassuring Crisis Status Header (Direction 3: Calm & Humane) */}
+            <div className="border-b border-border bg-muted/40 p-5">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                {t("Live Rescue Status")}
+              </span>
+              <h1 className="mt-1 text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+                {stages[activeIndex]?.label}
+              </h1>
+              <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+                {stages[activeIndex]?.copy}
               </p>
-              <h1 className="mt-1.5 text-2xl font-black tracking-tight text-white">{stages[activeIndex]?.label}</h1>
-              <p className="mt-1 text-xs text-slate-300">{stages[activeIndex]?.copy}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-2.5">
-                <p
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span
                   aria-label={t("SOS tracking number")}
-                  className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1 font-mono text-xs font-bold text-white"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 font-mono text-xs font-bold text-foreground"
                 >
-                  <span className="text-slate-400">{t("Incident:")}</span>
+                  <span className="text-muted-foreground">{t("Incident:")}</span>
                   <span>{status.data.publicCode}</span>
-                </p>
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
-                  <MapPin className="h-3.5 w-3.5 text-rose-400" />
-                  <span>{status.data.locationLabel}</span>
+                </span>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                  <span className="font-medium text-foreground">{status.data.locationLabel}</span>
                 </div>
               </div>
             </div>
 
             {/* Stepper & Details */}
             <div className="p-5 sm:p-6">
-              <ol className="relative ml-3 border-l-2 border-slate-200 pl-6 dark:border-slate-800">
+              <ol className="relative ml-3 border-l-2 border-border pl-6">
                 {stages.map((stage, index) => {
                   const Icon = stage.icon;
                   const reached = index <= activeIndex;
@@ -136,13 +140,13 @@ export default function UserTrackFlow() {
                       <span
                         className={`absolute -left-[2.15rem] grid h-6 w-6 place-items-center rounded-full border-2 transition-all ${
                           reached
-                            ? "border-sky-500 bg-sky-500 text-white"
-                            : "border-slate-300 bg-white text-slate-400 dark:bg-slate-900 dark:border-slate-700"
+                            ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
+                            : "border-border bg-background text-muted-foreground"
                         }`}
                       >
                         <Icon className="h-3 w-3" />
                       </span>
-                      <p className={`text-sm font-bold ${reached ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-500"}`}>
+                      <p className={`text-sm font-semibold ${reached ? "text-foreground" : "text-muted-foreground"}`}>
                         {stage.label}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
@@ -154,7 +158,7 @@ export default function UserTrackFlow() {
               </ol>
 
               {(status.data as any).destinationHospitalName && (
-                <div className="mt-5 flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                <div className="mt-5 flex items-center gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                   <span>🏥</span>
                   <span>
                     {t("En route to")} {(status.data as any).destinationHospitalName}
@@ -185,7 +189,7 @@ export default function UserTrackFlow() {
                 <IncidentChat publicCode={status.data.publicCode} active={status.data.status !== "resolved"} />
               </div>
 
-              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-300 flex items-center gap-2">
+              <div className="mt-5 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <span>
                   {user
