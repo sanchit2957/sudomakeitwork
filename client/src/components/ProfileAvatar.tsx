@@ -208,7 +208,7 @@ export function UserProfileBadge({
       <div className="flex flex-col min-w-0 leading-tight">
         <span
           className={cn(
-            "truncate tracking-tight font-extrabold text-[#142c2b] dark:text-[#f4f4f5]",
+            "truncate tracking-tight font-extrabold text-[#0F172A] dark:text-[#F8FAFC]",
             BADGE_TEXT_SIZES[size] || BADGE_TEXT_SIZES.md,
             isInteractive && "group-hover:text-primary transition-colors",
             textClassName
@@ -219,7 +219,7 @@ export function UserProfileBadge({
         {subtext && (
           <span
             className={cn(
-              "truncate font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground",
+              "truncate font-mono text-[10px] font-bold uppercase tracking-wider text-[#334155] dark:text-[#CBD5E1]",
               subtextClassName
             )}
           >

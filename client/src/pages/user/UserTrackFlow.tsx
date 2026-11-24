@@ -116,7 +116,7 @@ export default function UserTrackFlow() {
               <p className="mt-1 text-sm text-[#F1F5F9]/80">{stages[activeIndex]?.copy}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <p
-                  aria-label={t("SOS tracking number")}
+                  aria-label="SOS tracking number"
                   className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-1.5 font-mono text-xs font-bold text-[#F8FAFC] backdrop-blur-xs"
                 >
                   <span className="text-[#F1F5F9]">{t("Tracking no.")}</span>
@@ -140,12 +140,12 @@ export default function UserTrackFlow() {
                       <span
                         className={`absolute -left-[2.35rem] grid h-7 w-7 place-items-center rounded-full border-2 transition-all ${reached
                             ? "border-[#1D4ED8] bg-[#1D4ED8] text-white shadow-sm"
-                            : "border-[#E2E8F0]/40 bg-white text-[#E2E8F0] dark:bg-[#0F172A] dark:border-[#F1F5F9]/20"
+                            : "border-[#94A3B8]/40 bg-slate-100 text-[#475569] dark:bg-[#0F172A] dark:border-[#64748B]/50 dark:text-[#94A3B8]"
                           }`}
                       >
                         <Icon className="h-3.5 w-3.5" />
                       </span>
-                      <p className={`text-sm font-black ${reached ? "text-[#0F172A] dark:text-[#F8FAFC]" : "text-[#E2E8F0] dark:text-[#F1F5F9]/50"}`}>
+                      <p className={`text-sm font-black ${reached ? "text-[#0F172A] dark:text-[#F8FAFC]" : "text-[#475569] dark:text-[#94A3B8]"}`}>
                         {stage.label}
                       </p>
                       <p className="mt-1 text-xs leading-5 text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
