@@ -133,24 +133,28 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
   overflow-x: hidden;
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* ==========================================================================
    HEAVY GLASSMORPHISM & BENTO SYSTEM UTILITIES (iOS / visionOS LIQUID GLASS)
+   - isolation: isolate prevents Chromium hardware compositor from dropping text
+   - Stable opacity prevents text disappearance during rendering
    ========================================================================== */
 
 .liquid-glass,
 .glass-panel {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.78) 100%);
-  backdrop-filter: blur(32px) saturate(200%) contrast(102%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%) contrast(102%);
-  border: 1px solid rgba(255, 255, 255, 0.95);
+  isolation: isolate;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(226, 232, 240, 0.85);
   box-shadow: 
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 1),
-    inset 0 -1px 1px 0 rgba(226, 232, 240, 0.4),
-    0 16px 36px -10px rgba(15, 23, 42, 0.05),
+    0 10px 25px -5px rgba(15, 23, 42, 0.05),
     0 2px 8px -2px rgba(15, 23, 42, 0.02);
   border-radius: var(--radius);
   transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s ease;
@@ -158,59 +162,108 @@ body {
 
 .dark .liquid-glass,
 .dark .glass-panel {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.82) 0%, rgba(15, 23, 42, 0.92) 100%);
-  backdrop-filter: blur(32px) saturate(200%) contrast(105%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%) contrast(105%);
+  isolation: isolate;
+  background-color: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
   border: 1px solid rgba(51, 65, 85, 0.65);
   box-shadow: 
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -1.5px 2px 0 rgba(0, 0, 0, 0.5),
-    0 24px 56px -10px rgba(0, 0, 0, 0.7),
-    0 6px 18px -4px rgba(0, 0, 0, 0.45);
+    0 16px 36px -10px rgba(0, 0, 0, 0.6),
+    0 4px 12px -2px rgba(0, 0, 0, 0.35);
 }
 
 .glass-card {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.84) 100%);
-  backdrop-filter: blur(28px) saturate(200%) contrast(102%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%) contrast(102%);
+  isolation: isolate;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
   border: 1px solid rgba(226, 232, 240, 0.85);
   box-shadow: 
-    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.98),
-    0 12px 28px -6px rgba(15, 23, 42, 0.04),
+    0 8px 20px -4px rgba(15, 23, 42, 0.04),
     0 2px 6px -1px rgba(15, 23, 42, 0.02);
   border-radius: 1.5rem;
   transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .dark .glass-card {
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%);
-  backdrop-filter: blur(28px) saturate(200%) contrast(105%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%) contrast(105%);
+  isolation: isolate;
+  background-color: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
   border: 1px solid rgba(51, 65, 85, 0.6);
   box-shadow: 
-    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.1),
-    0 16px 36px -6px rgba(0, 0, 0, 0.6),
-    0 4px 12px -2px rgba(0, 0, 0, 0.35);
+    0 12px 28px -6px rgba(0, 0, 0, 0.55),
+    0 3px 8px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Explicit Dark Hero Glass Panels — guarantees high-contrast dark surface in both light and dark mode */
+.glass-panel-dark,
+.glass-card-dark,
+.glass-panel.bg-\[\#0F172A\],
+.glass-panel.bg-\[\#182353\],
+.glass-panel.bg-\[\#111C44\],
+.glass-panel.bg-\[\#0c1433\],
+.glass-card.bg-\[\#0F172A\],
+.glass-card.bg-\[\#182353\],
+.glass-card.bg-\[\#111C44\],
+.glass-card.bg-\[\#0c1433\] {
+  isolation: isolate;
+  background-color: #0F172A !important;
+  background-image: none !important;
+  color: #F8FAFC !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 2px 8px -2px rgba(0, 0, 0, 0.2) !important;
+}
+
+.dark .glass-panel-dark,
+.dark .glass-card-dark,
+.dark .glass-panel.bg-\[\#0F172A\],
+.dark .glass-panel.bg-\[\#182353\],
+.dark .glass-panel.bg-\[\#111C44\],
+.dark .glass-panel.bg-\[\#0c1433\],
+.dark .glass-card.bg-\[\#0F172A\],
+.dark .glass-card.bg-\[\#182353\],
+.dark .glass-card.bg-\[\#111C44\],
+.dark .glass-card.bg-\[\#0c1433\] {
+  isolation: isolate;
+  background-color: #0B1120 !important;
+  background-image: none !important;
+  color: #F8FAFC !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Text inside dark glass containers must always be bright, clear, and visible */
+.glass-panel-dark :is(h1, h2, h3, h4, h5, h6),
+.glass-card-dark :is(h1, h2, h3, h4, h5, h6) {
+  color: #F8FAFC !important;
+}
+
+.glass-panel-dark :is(p, span, label, div):not([class*="bg-"]):not([class*="text-amber"]):not([class*="text-red"]):not([class*="text-emerald"]):not([class*="text-cyan"]):not([class*="text-rose"]):not(button):not(a) {
+  color: #F8FAFC !important;
+}
+
+.glass-panel-dark :is([class*="text-[#F1F5F9]/"], [class*="text-[#0F172A]/"], [class*="text-[#D8E3FF]/"], [class*="text-white/"]) {
+  color: #CBD5E1 !important;
 }
 
 .glass-pill {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.8) 100%);
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  isolation: isolate;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(226, 232, 240, 0.85);
   box-shadow: 
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.98),
     0 4px 14px -2px rgba(15, 23, 42, 0.05);
   border-radius: 9999px;
 }
 
 .dark .glass-pill {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.85) 100%);
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  isolation: isolate;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(51, 65, 85, 0.6);
   box-shadow: 
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.1),
     0 6px 18px -2px rgba(0, 0, 0, 0.45);
   border-radius: 9999px;
 }
@@ -504,6 +557,38 @@ body {
   color: var(--foreground) !important;
 }
 
+/* Universal high-contrast light mode text visibility guarantees */
+:root:not(.dark) :is(
+  [class~="text-[#F1F5F9]"],
+  [class~="text-[#F8FAFC]"],
+  [class~="text-[#F8F1E4]"],
+  [class~="text-[#D8E3FF]"],
+  [class~="text-[#E2E8F0]"]
+):not([class*="dark:text-"]):not([class*="bg-"]):not(button):not(a[class*="bg-"]):not(.btn) {
+  color: #0F172A !important;
+}
+
+/* Guard against white text on white/light cards in Light Mode */
+:root:not(.dark) :is(.glass-panel:not(.glass-panel-dark), .glass-card:not(.glass-card-dark), .bg-white, .bg-card) :is(
+  h1, h2, h3, h4, h5, h6,
+  [class~="text-[#F1F5F9]"],
+  [class~="text-[#F8FAFC]"],
+  [class~="text-[#F8F1E4]"],
+  [class~="text-[#D8E3FF]"],
+  [class~="text-[#E2E8F0]"],
+  .text-white
+):not(button):not(a[class*="bg-"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([class*="bg-[#1D4ED8]"]):not([class*="bg-[#DC2626]"]):not([class*="bg-emerald"]):not([class*="bg-amber"]):not(.btn) {
+  color: #0F172A !important;
+}
+
+:root:not(.dark) :is(
+  .text-muted-foreground,
+  [class~="text-[#475569]"],
+  [class~="text-[#64748B]"]
+) {
+  color: #334155 !important;
+}
+
 /* Universal dark text conversion in Dark Mode */
 .dark :is(
   [class*="text-[#0F172A]"],
@@ -538,19 +623,11 @@ body {
 
 /* Subtitle & muted text high contrast in Dark Mode */
 .dark :is(
-  [class*="text-[#0F172A]/70"],
-  [class*="text-[#0F172A]/60"],
-  [class*="text-[#0F172A]/75"],
-  [class*="text-[#0F172A]/65"],
-  [class*="text-[#0F172A]/80"],
-  [class*="text-black/70"],
-  [class*="text-black/60"],
-  [class*="text-black/80"],
-  [class*="text-[#708981]"],
-  [class*="text-[#748a83]"],
-  [class*="text-[#4a7b72]"]
+  .text-muted-foreground,
+  [class~="text-[#475569]"],
+  [class~="text-[#64748B]"]
 ):not([class*="dark:text-"]) {
-  color: rgba(226, 232, 240, 0.88) !important;
+  color: #CBD5E1 !important;
 }
 
 /* Form inputs & textareas text contrast in Dark Mode */
@@ -592,12 +669,11 @@ textarea::placeholder {
   scrollbar-width: none;
 }
 
-/* Replace legacy teal #174e46, #0f766e, #163d36 with Executive Slate / Royal Blue */
-[class*="bg-[#174e46]"],
-[class*="bg-[#0f766e]"],
-[class*="bg-[#122824]"] {
+/* Replace legacy teal #174e46, #0f766e, #163d36 without overriding text color globally */
+[class~="bg-[#174e46]"],
+[class~="bg-[#0f766e]"],
+[class~="bg-[#122824]"] {
   background-color: var(--sahay-navy) !important;
-  color: var(--sahay-cream) !important;
 }
 
 button[class*="bg-[#174e46]"],
@@ -736,7 +812,7 @@ nav[aria-label="Victim App navigation"] {
   background-color: transparent !important;
 }
 
-/* Ambient Liquid Lighting Orbs for authentic iOS/visionOS Glass Depth */
+/* Ambient Liquid Lighting Orbs — Pure GPU-Safe Radial Gradients (zero blur filter dropouts) */
 .liquid-ambient-bg {
   position: fixed;
   inset: 0;
@@ -755,8 +831,7 @@ nav[aria-label="Victim App navigation"] {
   max-width: 650px;
   max-height: 650px;
   border-radius: 9999px;
-  background: radial-gradient(circle, rgba(36, 87, 255, 0.16) 0%, rgba(36, 87, 255, 0) 70%);
-  filter: blur(80px);
+  background: radial-gradient(circle, rgba(29, 78, 216, 0.07) 0%, rgba(29, 78, 216, 0.02) 40%, transparent 70%);
 }
 
 .liquid-ambient-bg::after {
@@ -769,16 +844,15 @@ nav[aria-label="Victim App navigation"] {
   max-width: 600px;
   max-height: 600px;
   border-radius: 9999px;
-  background: radial-gradient(circle, rgba(216, 227, 255, 0.35) 0%, rgba(36, 87, 255, 0.08) 50%, transparent 70%);
-  filter: blur(90px);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.06) 0%, rgba(59, 130, 246, 0.01) 45%, transparent 70%);
 }
 
 .dark .liquid-ambient-bg::before {
-  background: radial-gradient(circle, rgba(36, 87, 255, 0.22) 0%, rgba(17, 28, 68, 0) 70%);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.03) 45%, transparent 70%);
 }
 
 .dark .liquid-ambient-bg::after {
-  background: radial-gradient(circle, rgba(36, 87, 255, 0.15) 0%, rgba(216, 227, 255, 0.05) 50%, transparent 70%);
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.09) 0%, rgba(37, 99, 235, 0.02) 45%, transparent 70%);
 }
 
 /* Grid overlay */
