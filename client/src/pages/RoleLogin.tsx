@@ -18,6 +18,7 @@ import {
   Hospital,
   KeyRound,
   Lock,
+  Mail,
   Radio,
   ShieldAlert,
   ShieldCheck,
@@ -209,7 +210,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
         </div>
 
         {/* Mode Switcher */}
-        <div className="mt-6 grid grid-cols-2 rounded-2xl bg-black/5 p-1.5 dark:bg-white/5">
+        <div className="my-7 sm:my-8 grid grid-cols-2 gap-2.5 rounded-2xl bg-black/5 p-2 dark:bg-white/5">
           <button
             type="button"
             onClick={() => {
@@ -245,7 +246,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
         </div>
 
         {/* Form Card - Modern Form */}
-        <div className="modern-form mt-4 !max-w-xl !p-6 sm:!p-8 shadow-xl">
+        <div className="modern-form mt-6 sm:mt-8 !max-w-xl !p-6 sm:!p-8 shadow-xl">
           <div className="border-b border-black/5 bg-[#fafcfb] p-4 rounded-2xl mb-5 dark:border-white/5 dark:bg-[#18191c]">
             <div className="flex items-center gap-2.5">
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -284,19 +285,20 @@ export function RoleLogin({ role }: { role: PortalRole }) {
 
             {authMode === "signin" ? (
               /* SIGN IN FORM */
-              <form onSubmit={handleSignIn} className="space-y-4">
+              <form onSubmit={handleSignIn} className="space-y-5">
                 <div className="input-group">
-                  <Label htmlFor={`${role}-email`} className="text-xs font-bold mb-1 block">
+                  <Label htmlFor={`${role}-email`} className="text-xs font-bold mb-1.5 block text-foreground/90">
                     Email or Username
                   </Label>
                   <div className="input-wrapper">
+                    <Mail className="input-icon" />
                     <Input
                       id={`${role}-email`}
                       type="text"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="e.g. officer@assamrescue.gov.in"
-                      className="form-input !h-11 text-sm"
+                      className="form-input !h-12 text-sm"
                       autoComplete="username"
                       required
                     />
@@ -304,17 +306,18 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                 </div>
 
                 <div className="input-group">
-                  <Label htmlFor={`${role}-password`} className="text-xs font-bold mb-1 block">
+                  <Label htmlFor={`${role}-password`} className="text-xs font-bold mb-1.5 block text-foreground/90">
                     Password
                   </Label>
                   <div className="input-wrapper">
+                    <Lock className="input-icon" />
                     <Input
                       id={`${role}-password`}
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter account password"
-                      className="form-input !h-11 !pr-11 text-sm"
+                      className="form-input !h-12 !pr-11 text-sm"
                       autoComplete="current-password"
                       required
                     />
@@ -330,7 +333,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                 </div>
 
                 <div className="input-group">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor={`${role}-gov-code`} className="text-xs font-bold text-amber-700 dark:text-amber-400">
                       Government Code <span className="text-destructive">*</span>
                     </Label>
@@ -339,13 +342,14 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                     </span>
                   </div>
                   <div className="input-wrapper">
+                    <KeyRound className="input-icon text-amber-600 dark:text-amber-400" />
                     <Input
                       id={`${role}-gov-code`}
                       type="text"
                       value={governmentCode}
                       onChange={(e) => setGovernmentCode(e.target.value)}
                       placeholder="Enter active Government Access Code"
-                      className="form-input !h-11 border-amber-500/40 bg-amber-50/40 font-mono text-sm font-bold tracking-wider text-amber-950 focus:border-amber-600 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200"
+                      className="form-input !h-12 border-amber-500/40 bg-amber-50/40 font-mono text-sm font-bold tracking-wider text-amber-950 focus:border-amber-600 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200"
                       autoComplete="off"
                       required
                     />
@@ -355,10 +359,14 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between pt-1">
-                  <p className="text-[11px] text-muted-foreground">
-                    Default Demo Credentials
-                  </p>
+                {/* Styled Demo Credentials Strip */}
+                <div className="my-2 flex items-center justify-between rounded-xl border border-blue-500/20 bg-blue-500/5 px-3.5 py-2.5 dark:border-blue-500/20 dark:bg-blue-950/25">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                    <p className="text-[11px] font-semibold text-muted-foreground">
+                      Default Demo Credentials
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
@@ -373,7 +381,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                       }
                       setErrorMessage("");
                     }}
-                    className="font-mono text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400"
+                    className="font-mono text-xs font-bold text-blue-600 hover:underline dark:text-blue-400"
                   >
                     Fill Demo {role === "rescuer" ? "Rescuer" : "Hospital"}
                   </button>
@@ -383,10 +391,10 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                   <button
                     type="submit"
                     disabled={isSubmitting || !email.trim() || !password || !governmentCode.trim()}
-                    className="submit-button !h-12 w-full text-sm font-bold"
+                    className="submit-button !h-12 w-full text-sm font-bold shadow-md shadow-blue-600/30 transition active:scale-[0.98]"
                   >
-                    <span className="button-text flex items-center justify-center gap-2">
-                      <Icon className="h-4 w-4" />
+                    <span className="button-text flex items-center justify-center gap-2.5">
+                      <Icon className="h-4.5 w-4.5" />
                       {isSubmitting ? "Authenticating…" : `Sign In as ${role === "rescuer" ? "Rescuer" : "Hospital Staff"}`}
                     </span>
                     <div className="button-glow"></div>
