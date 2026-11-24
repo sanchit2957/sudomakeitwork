@@ -52,9 +52,15 @@ export function SosClassificationModal({
   onCancel,
 }: SosClassificationModalProps) {
   const { t } = useLanguage();
-  const selectCategory = trpc.rescue.emergency.selectCategory.useMutation();
-  const updateDetails = trpc.rescue.emergency.updateMyDetails.useMutation();
-  const cancelSos = trpc.rescue.emergency.cancel.useMutation();
+  const selectCategory = trpc.rescue?.emergency?.selectCategory?.useMutation
+    ? trpc.rescue.emergency.selectCategory.useMutation()
+    : ({ mutateAsync: async () => ({}) } as any);
+  const updateDetails = trpc.rescue?.emergency?.updateMyDetails?.useMutation
+    ? trpc.rescue.emergency.updateMyDetails.useMutation()
+    : ({ mutateAsync: async () => ({}) } as any);
+  const cancelSos = trpc.rescue?.emergency?.cancel?.useMutation
+    ? trpc.rescue.emergency.cancel.useMutation()
+    : ({ mutateAsync: async () => ({}) } as any);
 
   const [currentStep, setCurrentStep] = useState<"categories" | "details">("categories");
   const [selectedCategory, setSelectedCategory] = useState<SOSCategoryOption | null>(null);
@@ -192,7 +198,7 @@ export function SosClassificationModal({
         incidentId,
         category: backendCategory,
       })
-      .catch(err => console.warn("[Triage] selectCategory mutation warning:", err));
+      .catch((err: any) => console.warn("[Triage] selectCategory mutation warning:", err));
 
     // Transition to non-blocking details screen (no timer displayed on details screen!)
     setCurrentStep("details");
@@ -212,7 +218,7 @@ export function SosClassificationModal({
           incidentId,
           category: finalCat,
         })
-        .catch(err => console.warn("[Triage] selectCategory on continue warning:", err));
+        .catch((err: any) => console.warn("[Triage] selectCategory on continue warning:", err));
     }
 
     // Save details in background (never blocks tracking navigation)
@@ -226,7 +232,7 @@ export function SosClassificationModal({
           helpNeeds: helpNeeds.trim() || undefined,
           notes: notes.trim() || undefined,
         })
-        .catch(err => console.warn("[Triage] updateMyDetails on continue warning:", err));
+        .catch((err: any) => console.warn("[Triage] updateMyDetails on continue warning:", err));
     }
 
     onComplete(finalCat);
