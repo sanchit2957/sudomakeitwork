@@ -104,7 +104,7 @@ export function DesktopOnlyGate({
       />
 
       {/* Main Glass Shield Panel */}
-      <div className="relative z-10 w-full max-w-xl rounded-3xl border border-white/20 bg-[#111C44]/80 p-6 sm:p-8 shadow-2xl backdrop-blur-2xl liquid-glass">
+      <div className="relative z-10 w-full max-w-xl rounded-3xl border border-white/20 bg-[#111C44]/80 p-6 sm:p-8 shadow-2xl backdrop-blur-2xl glass-panel-dark">
         {/* Top Header Badge */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-2.5">
