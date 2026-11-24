@@ -312,36 +312,44 @@ export default function UserHome() {
   });
 
   return (
-    <div className="victim-page relative min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden">
-      <main className="mx-auto min-h-screen w-full max-w-5xl px-4 sm:px-6 lg:px-8 pb-28 pt-4">
-        {/* Top Header Card */}
-        <header className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <UserProfileBadge
-            user={user}
-            size="lg"
-            clickable
-            onClick={() => setLocation(user ? "/profile" : "/login")}
-            fallbackName={t("Citizen")}
-            subtext={user ? (user.role ? t(user.role.toUpperCase()) : t("Verified Citizen")) : t("Emergency Response Active")}
-          />
-          <div className="flex flex-col items-end gap-1.5">
+    <div className="victim-page relative min-h-screen bg-white text-slate-900 transition-colors dark:bg-[#0A0E17] dark:text-slate-100 overflow-x-hidden flex flex-col justify-between">
+      <main className="mx-auto w-full max-w-md sm:max-w-xl px-5 pb-32 pt-3 flex-1 flex flex-col justify-between">
+        {/* Top Seamless Header (Reference Image 3: Human-Centric) */}
+        <header className="flex items-center justify-between gap-2 pt-2 pb-4">
+          <div className="min-w-0 pr-1">
+            <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate">
+              {t("Welcome back,")}
+            </p>
+            <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">
+              {user?.name || t("Citizen")}
+            </h2>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
             <LanguageSelector compact />
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                online
-                  ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                  : "border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-              }`}
+            <button
+              type="button"
+              onClick={() => setLocation(user ? "/profile" : "/login")}
+              aria-label={t("User profile")}
+              className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:ring-2 hover:ring-rose-500/30 transition shadow-xs"
             >
-              {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              {online ? t("Connected") : t("Offline Mode")}
-            </span>
+              {user?.name ? (
+                <span className="text-xs font-bold">{user.name.charAt(0).toUpperCase()}</span>
+              ) : (
+                <span className="text-[10px] font-bold text-rose-600">IN</span>
+              )}
+              {/* Online/Offline status indicator dot */}
+              <span
+                className={`absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-[#0A0E17] ${
+                  online ? "bg-emerald-500" : "bg-amber-500"
+                }`}
+              />
+            </button>
           </div>
         </header>
 
         {/* Offline SOS & Cellular Radio / BLE Options */}
         {(!online || pendingCount > 0 || bleActive) && (
-          <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-50/70 p-4 text-xs text-amber-950 shadow-xs dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-50/70 p-3.5 text-xs text-amber-950 shadow-xs dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 font-bold">
                 <Database className="h-4 w-4 text-amber-600 dark:text-amber-400" />
@@ -366,202 +374,192 @@ export default function UserHome() {
             </div>
 
             {/* BLE Beacon Pulse Indicator */}
-            <div className="mt-2.5 flex items-center justify-between rounded-xl bg-cyan-950/10 px-3 py-2 text-[11px] font-bold text-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-200">
+            <div className="mt-2.5 flex items-center justify-between rounded-xl bg-cyan-950/10 px-3 py-1.5 text-[11px] font-bold text-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-200">
               <span className="flex items-center gap-1.5">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75"></span>
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500"></span>
                 </span>
                 <Bluetooth className="h-3.5 w-3.5" />
-                {t("Bluetooth BLE SOS Beacon: Broadcasting")}
+                {t("BLE SOS Beacon Broadcasting")}
               </span>
-              <span className="text-[10px] opacity-80">{t("~50-100m range")}</span>
-            </div>
-
-            {/* 1-Tap Emergency SMS */}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <a
-                href={emergencySmsUrl}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-center text-xs font-bold text-white shadow-xs transition hover:bg-amber-700 active:scale-95"
-              >
-                <MessageSquare className="h-3.5 w-3.5" />
-                <span>{t("SMS 112 (No Internet)")}</span>
-              </a>
-              <a
-                href="tel:112"
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-center text-xs font-bold text-white shadow-xs transition hover:bg-rose-700 active:scale-95"
-              >
-                <PhoneCall className="h-3.5 w-3.5" />
-                <span>{t("Call 112 (All Towers)")}</span>
-              </a>
+              <span className="text-[10px] opacity-80">{t("~50-100m")}</span>
             </div>
           </div>
         )}
 
-        {/* Citizen Emergency Section (Direction 3: Human-Centric Emergency Service) */}
-        <div className="space-y-4">
-          {/* Main Distress Trigger Block */}
-          <section className="rounded-xl border border-border bg-card p-5 sm:p-6 shadow-xs">
-            <div className="mb-4 text-center sm:text-left">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                {t("National Emergency Dispatch")}
-              </span>
-              <h1 className="mt-1 text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                {t("Need Emergency Assistance?")}
-              </h1>
-              <p className="mt-1 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                {t("Press the button below to immediately broadcast your verified location to the nearest disaster rescue teams.")}
-              </p>
-            </div>
+        {/* Primary Human-Centric Crisis Section (Middle Screen of Reference Image 3) */}
+        <div className="my-auto flex flex-col items-center justify-center py-4">
+          {/* Headline & Calm Prompt */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+              {t("Are you in emergency?")}
+            </h1>
+            <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+              {t("Press the button below, help will reach you soon.")}
+            </p>
+          </div>
 
-            {/* Functional Flat Emergency Trigger (Zero 3D shine, Zero ripples) */}
-            <div className="my-3 flex justify-center">
+          {/* Balanced Circular SOS Button & Concentric Pedestal Frame */}
+          <div className="sahay-sos-pedestal my-3">
+            <div className="sahay-sos-pedestal-inner">
               <button
+                type="button"
                 onClick={startRapidSos}
                 disabled={authLoading || rapidStatus === "locating" || rapidStatus === "sending"}
                 aria-label={t("Send SOS")}
-                className="sahay-sos-btn w-full"
+                className="sahay-sos-btn"
               >
-                <div className="flex items-center justify-center gap-3">
+                <span className="relative z-10 flex flex-col items-center justify-center select-none pointer-events-none">
                   {rapidStatus === "locating" || rapidStatus === "sending" ? (
-                    <Radio className="h-6 w-6 animate-pulse text-white" />
+                    <Radio className="mb-1 h-7 w-7 animate-pulse text-white drop-shadow-sm" />
                   ) : (
-                    <Siren className="h-6 w-6 text-white" />
+                    <Siren className="mb-0.5 h-6 w-6 text-white drop-shadow-sm" />
                   )}
-                  <div className="text-left">
-                    <span className="block text-xl sm:text-2xl font-black uppercase tracking-wide">
-                      {rapidStatus === "locating"
-                        ? t("Acquiring GPS…")
-                        : rapidStatus === "sending"
-                        ? t("Broadcasting SOS…")
-                        : t("Request Emergency Rescue")}
-                    </span>
-                    <span className="block text-[11px] font-normal text-white/90">
-                      {user ? t("Tap once to alert emergency forces") : t("Sign in to activate SOS")}
-                    </span>
-                  </div>
-                </div>
-              </button>
-            </div>
-
-            {rapidNotice && (
-              <div
-                role="status"
-                className={`mt-3 rounded-lg border p-3 text-center text-xs font-semibold leading-relaxed ${
-                  rapidStatus === "error"
-                    ? "border-destructive/30 bg-destructive/10 text-destructive"
-                    : "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
-                }`}
-              >
-                {rapidNotice}
-              </div>
-            )}
-
-            {/* Direct 1-Tap Offline Emergency Call & SMS */}
-            <div className="mt-4 pt-3 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <a
-                href="tel:112"
-                className="flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-white dark:text-neutral-900 px-4 py-2.5 text-center text-xs font-bold text-white transition hover:opacity-90 active:scale-[0.98]"
-              >
-                <PhoneCall className="h-4 w-4" />
-                <span>{t("Call 112 (National Emergency)")}</span>
-              </a>
-              <a
-                href={emergencySmsUrl}
-                className="flex items-center justify-center gap-2 rounded-lg border border-border bg-muted/60 px-4 py-2.5 text-center text-xs font-semibold text-foreground transition hover:bg-muted active:scale-[0.98]"
-              >
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                <span>{t("SMS 112 with GPS Location")}</span>
-              </a>
-            </div>
-          </section>
-
-          {/* Grid Layout for Telemetry & Nearby Resources */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-            {/* Map Preview with Live Telemetry */}
-            <div className="lg:col-span-7">
-              <LocationPreview
-                point={position}
-                state={locationStatus}
-                hospitals={nearbyHospitals}
-                shelters={nearbyShelters}
-                onRecenter={handleGpsLocate}
-                recenterLoading={isLocating}
-              />
-            </div>
-
-            {/* Quick Actions & AI Sahayak */}
-            <div className="lg:col-span-5 space-y-4">
-              <QuickActionsPanel onOpenAi={() => setIsAiModalOpen(true)} />
-
-              {/* Nearby Emergency Facilities & Hospitals */}
-              <section className="rounded-xl border border-border bg-card p-4 shadow-xs">
-                <div className="flex items-center justify-between pb-3 border-b border-border">
-                  <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground">
-                    <Hospital className="h-4 w-4 text-muted-foreground" />
-                    <span>{t("Nearby Emergency Facilities")}</span>
-                  </h2>
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    {nearbyHospitals.length + nearbyShelters.length} {t("within 50 km")}
+                  <span className="text-4xl sm:text-5xl font-black tracking-wider text-white">
+                    SOS
                   </span>
-                </div>
-
-                {nearbyHospitals.length > 0 || nearbyShelters.length > 0 ? (
-                  <div className="mt-3 space-y-2">
-                    {nearbyHospitals.slice(0, 3).map((h) => (
-                      <div
-                        key={`hosp-${h.id}`}
-                        className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-2.5 text-xs"
-                      >
-                        <div className="min-w-0 pr-2">
-                          <div className="font-semibold text-foreground truncate">{h.name}</div>
-                          <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                            {h.distanceKm !== undefined ? `${h.distanceKm.toFixed(1)} km` : ""} ·{" "}
-                            <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                              {h.availableEmergencyBeds ?? 0} {t("beds open")}
-                            </span>
-                          </div>
-                        </div>
-                        {h.contactPhone && (
-                          <a
-                            href={`tel:${h.contactPhone}`}
-                            className="shrink-0 rounded-md bg-neutral-900 dark:bg-white dark:text-neutral-900 px-2.5 py-1 text-[11px] font-semibold text-white transition hover:opacity-90"
-                          >
-                            {t("Call")}
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                    {nearbyShelters.slice(0, 2).map((s) => (
-                      <div
-                        key={`sh-${s.id}`}
-                        className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-2.5 text-xs"
-                      >
-                        <div className="min-w-0 pr-2">
-                          <div className="font-semibold text-foreground truncate">{s.name}</div>
-                          <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                            {s.distanceKm !== undefined ? `${s.distanceKm.toFixed(1)} km` : ""} · {t("Capacity")}: {s.capacity ?? "—"}
-                          </div>
-                        </div>
-                        <span className="font-mono text-[10px] text-muted-foreground">
-                          {t("Relief Camp")}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    {position
-                      ? t("No verified facilities registered within 50 km. Call 112 for state coordination.")
-                      : t("Acquiring GPS to locate nearest emergency hospitals and relief camps…")}
-                  </p>
-                )}
-              </section>
+                  <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-white/90">
+                    {rapidStatus === "locating"
+                      ? t("Acquiring GPS…")
+                      : rapidStatus === "sending"
+                      ? t("Broadcasting…")
+                      : user
+                      ? t("Tap for Help")
+                      : t("Sign in to SOS")}
+                  </span>
+                </span>
+              </button>
             </div>
           </div>
 
-          {/* Live Weather & Environmental Advisories */}
-          <div>
+          {/* Status or Error Notice */}
+          {rapidNotice && (
+            <div
+              role="status"
+              className={`mt-3 max-w-xs text-center text-xs font-semibold leading-relaxed px-4 py-1.5 rounded-full ${
+                rapidStatus === "error"
+                  ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                  : "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+              }`}
+            >
+              {rapidNotice}
+            </div>
+          )}
+
+          {/* Direct 1-Tap Emergency Dispatch Actions: Call 112 & SMS 112 */}
+          <div className="mt-6 flex items-center justify-center gap-3 w-full max-w-xs">
+            <a
+              href="tel:112"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-center text-xs font-bold text-white shadow-sm hover:bg-rose-700 active:scale-95 transition"
+            >
+              <PhoneCall className="h-4 w-4" />
+              <span>{t("Call 112")}</span>
+            </a>
+            <a
+              href={emergencySmsUrl}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-4 py-3 text-center text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition"
+            >
+              <MessageSquare className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              <span>{t("SMS 112")}</span>
+            </a>
+          </div>
+
+          {/* Floating Current Address Card (Reference Image 3) */}
+          <div className="mt-8 w-full max-w-sm rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-sm flex items-center gap-3">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-rose-600 dark:text-rose-400">
+              <MapPin className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-900 dark:text-white leading-none">
+                {t("Your current address")}
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 truncate">
+                {manualLocation?.name ||
+                  (position
+                    ? `${position.latitude.toFixed(4)}° N, ${position.longitude.toFixed(4)}° E`
+                    : t("Acquiring emergency coordinates…"))}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleGpsLocate}
+              disabled={isLocating}
+              aria-label={t("Refresh GPS location")}
+              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLocating ? "animate-spin text-rose-600" : ""}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Secondary Operational Services & Facilities Accordion */}
+        <details className="group mt-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 p-4 transition">
+          <summary className="flex cursor-pointer items-center justify-between font-bold text-xs text-slate-700 dark:text-slate-300 select-none">
+            <span className="flex items-center gap-2">
+              <Hospital className="h-4 w-4 text-slate-500" />
+              <span>{t("Nearby Hospitals & Operational Map")}</span>
+            </span>
+            <span className="text-[11px] font-normal text-rose-600 dark:text-rose-400 group-open:rotate-180 transition-transform">
+              ▼
+            </span>
+          </summary>
+
+          <div className="mt-4 space-y-4 pt-3 border-t border-slate-200/60 dark:border-slate-800">
+            {/* Quick Actions Panel & AI Sahayak */}
+            <QuickActionsPanel onOpenAi={() => setIsAiModalOpen(true)} />
+
+            {/* Map Preview */}
+            <LocationPreview
+              point={position}
+              state={locationStatus}
+              hospitals={nearbyHospitals}
+              shelters={nearbyShelters}
+              onRecenter={handleGpsLocate}
+              recenterLoading={isLocating}
+            />
+
+            {/* Nearby Emergency Facilities List */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-400">
+                <span>{t("Verified Medical Centers")}</span>
+                <span className="font-mono text-[10px]">
+                  {nearbyHospitals.length} {t("within 50 km")}
+                </span>
+              </div>
+              {nearbyHospitals.length > 0 ? (
+                nearbyHospitals.slice(0, 3).map((h) => (
+                  <div
+                    key={`hosp-${h.id}`}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 text-xs shadow-xs"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="font-semibold text-slate-900 dark:text-white truncate">{h.name}</div>
+                      <div className="mt-0.5 font-mono text-[11px] text-slate-500">
+                        {h.distanceKm !== undefined ? `${h.distanceKm.toFixed(1)} km` : ""} ·{" "}
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {h.availableEmergencyBeds ?? 0} {t("beds")}
+                        </span>
+                      </div>
+                    </div>
+                    {h.contactPhone && (
+                      <a
+                        href={`tel:${h.contactPhone}`}
+                        className="shrink-0 rounded-lg bg-slate-900 dark:bg-white dark:text-slate-900 px-3 py-1.5 text-[11px] font-bold text-white transition hover:opacity-90"
+                      >
+                        {t("Call")}
+                      </a>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-400">
+                  {t("No nearby hospitals within 50 km. Call 112 for state coordination.")}
+                </p>
+              )}
+            </div>
+
+            {/* Flood Conditions Panel */}
             <FloodConditionsPanel
               conditions={conditions.data}
               loading={conditions.isLoading}
@@ -574,7 +572,7 @@ export default function UserHome() {
               onGpsLocate={handleGpsLocate}
             />
           </div>
-        </div>
+        </details>
 
         <SahayakAiModal isOpen={isAiModalOpen} onClose={() => setIsAiModalOpen(false)} />
 

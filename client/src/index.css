@@ -122,8 +122,8 @@ body {
 }
 
 /* ==========================================================================
-   FUNCTIONAL CRISIS TRIGGER (FLAT, HIGH-CONTRAST, ACCESSIBLE)
-   Direction 3: Clean, trauma-informed emergency trigger with zero 3D shine.
+   FUNCTIONAL CRISIS TRIGGER (FLAT, CIRCULAR, HIGH-CONTRAST, ACCESSIBLE)
+   Direction 3: Clean, trauma-informed circular emergency trigger with zero 3D shine.
    ========================================================================== */
 
 .sahay-sos-btn {
@@ -131,39 +131,83 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  max-width: 340px;
-  min-height: 120px;
-  padding: 1.5rem 1rem;
-  border-radius: var(--radius);
+  width: 11rem;
+  height: 11rem;
+  border-radius: 9999px;
   background-color: #DC2626;
   color: #FFFFFF;
-  border: 2px solid #B91C1C;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 25px -5px rgba(220, 38, 38, 0.4), 0 8px 10px -6px rgba(220, 38, 38, 0.2);
   cursor: pointer;
   outline: none;
   touch-action: manipulation;
   user-select: none;
-  font-weight: 700;
-  transition: background-color 0.15s ease, transform 0.1s ease;
+  font-weight: 800;
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+@media (min-width: 640px) {
+  .sahay-sos-btn {
+    width: 12.5rem;
+    height: 12.5rem;
+  }
 }
 
 .sahay-sos-btn:hover:not(:disabled) {
   background-color: #B91C1C;
+  transform: scale(1.02);
 }
 
 .sahay-sos-btn:active:not(:disabled) {
   background-color: #991B1B;
-  transform: scale(0.99);
+  transform: scale(0.96);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
 }
 
 .sahay-sos-btn:focus-visible {
   outline: 3px solid #0F172A;
-  outline-offset: 4px;
+  outline-offset: 6px;
 }
 
 .dark .sahay-sos-btn:focus-visible {
   outline: 3px solid #FFFFFF;
-  outline-offset: 4px;
+  outline-offset: 6px;
+}
+
+.sahay-sos-pedestal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 9999px;
+  background-color: rgba(239, 68, 68, 0.08);
+  transition: all 0.3s ease;
+}
+
+@media (min-width: 640px) {
+  .sahay-sos-pedestal {
+    width: 20rem;
+    height: 20rem;
+  }
+}
+
+.sahay-sos-pedestal-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14.5rem;
+  height: 14.5rem;
+  border-radius: 9999px;
+  background-color: rgba(239, 68, 68, 0.12);
+  transition: all 0.3s ease;
+}
+
+@media (min-width: 640px) {
+  .sahay-sos-pedestal-inner {
+    width: 16rem;
+    height: 16rem;
+  }
 }
 
 /* Navigation bar */
