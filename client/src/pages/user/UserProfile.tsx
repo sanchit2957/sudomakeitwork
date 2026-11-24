@@ -267,7 +267,7 @@ export default function UserProfile() {
         </header>
 
         {/* User Hero Banner */}
-        <section className="glass-panel overflow-hidden bg-[#0F172A] p-5 text-white dark:bg-[#182353]">
+        <section className="glass-panel glass-panel-dark overflow-hidden bg-[#0F172A] p-5 text-white dark:bg-[#182353]">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4">
               <ProfileAvatar
@@ -282,12 +282,12 @@ export default function UserProfile() {
                 className="ring-2 ring-white/30"
               />
               <div>
-                <p className="text-lg font-black leading-tight text-[#F8F1E4]">
+                <p className="text-lg font-black leading-tight text-[#F8FAFC]">
                   {getFirstName(name || user?.name, user?.email, t("Citizen"))}
                 </p>
-                <p className="mt-0.5 text-xs text-[#D8E3FF]/80">{user?.email || t("Account verified")}</p>
-                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#F8F1E4]">
-                  <ShieldCheck className="h-3 w-3 text-[#D8E3FF]" />
+                <p className="mt-0.5 text-xs text-[#CBD5E1]">{user?.email || t("Account verified")}</p>
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#F8FAFC]">
+                  <ShieldCheck className="h-3 w-3 text-emerald-400" />
                   {roleLabel}
                 </div>
               </div>

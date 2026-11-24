@@ -153,14 +153,14 @@ export default function UserSafety() {
         </header>
 
         {/* Hero Notice Banner */}
-        <section className="glass-panel overflow-hidden bg-[#0F172A] p-5 text-white dark:bg-[#0c1433]">
+        <section className="glass-panel glass-panel-dark overflow-hidden bg-[#0F172A] p-5 text-white dark:bg-[#0c1433]">
           <div className="flex gap-4 items-start">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 text-[#F1F5F9]">
               <ShieldCheck className="h-6 w-6" />
             </span>
             <div>
               <h1 className="text-xl font-black tracking-tight text-[#F8FAFC]">{t("Stay safe, stay informed")}</h1>
-              <p className="mt-1 text-sm leading-6 text-[#F1F5F9]/80">
+              <p className="mt-1 text-sm leading-6 text-[#CBD5E1]">
                 {t("Find verified nearby medical care. For immediate danger, send an SOS now.")}
               </p>
             </div>
@@ -278,8 +278,8 @@ function HospitalCard({
                   href={`https://www.google.com/maps/dir/?api=1&destination=${hospital.latitude},${hospital.longitude}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={t("Get directions")}
-                  title={t("Get directions")}
+                  aria-label={`Open Google Maps directions to ${hospital.name}`}
+                  title={`Open Google Maps directions to ${hospital.name}`}
                   className="grid h-8 w-8 shrink-0 place-items-center rounded-lg glass-card text-[#1D4ED8] dark:text-[#F1F5F9] transition active:scale-95 hover:bg-[#1D4ED8]/10"
                 >
                   <Navigation className="h-4 w-4" />
