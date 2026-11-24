@@ -107,7 +107,7 @@ export function recordDbFailure(error?: any, operationName?: string) {
   if (isNetworkFailure && _consecutiveFailures >= 5 && _pool) {
     _poolCounters.poolResets++;
     console.warn(`[Database] Auto-healing: Resetting corrupted pool after ${_consecutiveFailures} consecutive network failures (last code: ${safe.code})`);
-    _pool.end().catch(() => {});
+    _pool.end().catch(() => { });
     _pool = null;
     _db = null;
   }
@@ -268,7 +268,7 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
         if (!colNames.has("loginMethod")) await execDdl("ALTER TABLE `users` ADD COLUMN `loginMethod` VARCHAR(64) NULL", "addCol_users_loginMethod");
         if (!colNames.has("lastSignedIn")) await execDdl("ALTER TABLE `users` ADD COLUMN `lastSignedIn` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP", "addCol_users_lastSignedIn");
         await execDdl("ALTER TABLE `users` MODIFY COLUMN `role` VARCHAR(32) NOT NULL DEFAULT 'user'", "modifyCol_users_role");
-      } catch {}
+      } catch { }
 
       // 2. roleAccessCodes
       await execDdl(`
@@ -293,10 +293,17 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
           "seed_adminUser"
         );
         // Clear out legacy mock citizen data so only live real-time citizen accounts are stored
-        await execDdl("DELETE FROM `emergencyContacts` WHERE `userId` IN (SELECT `id` FROM `users` WHERE `role` = 'user' OR `openId` = 'user-citizen' OR `email` LIKE '%citizen%' OR `name` LIKE '%Anamika%')", "clean_mockCitizenContacts");
-        await execDdl("DELETE FROM `users` WHERE `role` = 'user' OR `openId` = 'user-citizen' OR `email` = 'citizen@assamrescue.gov.in' OR `name` LIKE '%Anamika%'", "clean_mockCitizen");
+        await execDdl("DELETE FROM `emergencyContacts` WHERE `userId` IN (SELECT `id` FROM `users` WHERE `openId` = 'user-citizen' OR `email` LIKE '%citizen%' OR `name` LIKE '%Anamika%')", "clean_mockCitizenContacts");
+        await execDdl("DELETE FROM `users` WHERE `openId` = 'user-citizen' OR `email` = 'citizen@assamrescue.gov.in' OR `name` LIKE '%Anamika%'", "clean_mockCitizen");
         await execDdl("UPDATE `users` SET `role` = 'admin' WHERE `openId` = 'user-admin' AND `role` != 'admin'", "resetAdminRole");
-      } catch {}
+
+        // Seed Pre-Set Default Citizen (Xavier)
+        const xavierHash = hashPassword("xavier123");
+        await execDdl(
+          `INSERT INTO \`users\` (\`openId\`, \`name\`, \`email\`, \`password\`, \`role\`, \`status\`, \`loginMethod\`, \`lastSignedIn\`) VALUES ('user-citizen-xavier', 'Xavier', 'xavi@yahoo.com', '${xavierHash}', 'user', 'active', 'platform-login', NOW()) ON DUPLICATE KEY UPDATE \`name\` = 'Xavier', \`password\` = '${xavierHash}'`,
+          "seed_citizenXavier"
+        );
+      } catch { }
 
       // 3. emergencyContacts
       await execDdl(`
@@ -340,7 +347,7 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
         const [rCols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `rescueProfiles`"), 4000, "ensureSchema_showRCols");
         const rColNames = new Set((rCols || []).map((c: any) => c.Field));
         if (!rColNames.has("category")) await execDdl("ALTER TABLE `rescueProfiles` ADD COLUMN `category` ENUM('medical', 'boat', 'ground-team', 'other') NOT NULL DEFAULT 'ground-team'", "addCol_rescueProfiles_category");
-      } catch {}
+      } catch { }
 
       // 5. rescuerRegistrationRequests
       await execDdl(`
@@ -417,7 +424,7 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
         if (!incColNames.has("destinationHospitalName")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `destinationHospitalName` VARCHAR(180) NULL", "addCol_incidents_destinationHospitalName");
         if (!incColNames.has("dispatchedAt")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `dispatchedAt` TIMESTAMP NULL", "addCol_incidents_dispatchedAt");
         if (!incColNames.has("resolvedAt")) await execDdl("ALTER TABLE `incidents` ADD COLUMN `resolvedAt` TIMESTAMP NULL", "addCol_incidents_resolvedAt");
-      } catch {}
+      } catch { }
 
       // 7. incidentMessages
       await execDdl(`
@@ -582,7 +589,7 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
         if (!hColNames.has("powerBackupStatus")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `powerBackupStatus` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available'", "addCol_hospitals_powerBackupStatus");
         if (!hColNames.has("status")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `status` ENUM('open', 'limited', 'critical', 'closed') NOT NULL DEFAULT 'open'", "addCol_hospitals_status");
         if (!hColNames.has("updatedBy")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `updatedBy` INT NULL", "addCol_hospitals_updatedBy");
-      } catch {}
+      } catch { }
 
       // 15. hospitalRegistrationRequests
       await execDdl(`
@@ -816,7 +823,7 @@ export function setDbInstanceForTesting(dbInstance: any) {
 
 // Default development seed accounts with salted scrypt hashed passwords
 const defaultAdminHash = hashPassword("admin");
-const defaultCitizenHash = hashPassword("citizen");
+const defaultCitizenHash = hashPassword("xavier123");
 const defaultRescuerHash = hashPassword("rescuer");
 const defaultHospitalHash = hashPassword("hospital");
 
@@ -862,6 +869,22 @@ export const _memoryUsers: Map<string, any> = new Map([
       email: "hospital@assamrescue.gov.in",
       password: defaultHospitalHash,
       role: "hospital",
+      status: "active",
+      loginMethod: "platform-login",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "user-citizen-xavier",
+    {
+      id: 4,
+      openId: "user-citizen-xavier",
+      name: "Xavier",
+      email: "xavi@yahoo.com",
+      password: defaultCitizenHash,
+      role: "user",
       status: "active",
       loginMethod: "platform-login",
       createdAt: new Date(),
@@ -1189,7 +1212,7 @@ export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat
       lastLatitude: 26.1445,
       lastLongitude: 91.7362,
     });
-  } catch {}
+  } catch { }
 }
 
 export async function ensureHospitalStaffProfile(userId: number) {
@@ -1261,7 +1284,7 @@ export async function ensureHospitalStaffProfile(userId: number) {
       hospitalId: 1,
       designation: "Emergency Medical Coordinator",
     });
-  } catch {}
+  } catch { }
 }
 
 export const _memoryEmergencyContacts: Map<number, EmergencyContact> = new Map([

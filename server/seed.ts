@@ -64,6 +64,14 @@ export async function seedDatabase(): Promise<SeedResult> {
   // 1. Defined standard seed users
   const demoUsers = [
     {
+      openId: "user-citizen-xavier",
+      name: "Xavier",
+      email: "xavi@yahoo.com",
+      rawPassword: getInitialSeedPassword("user", "xavier123"),
+      role: "user" as const,
+      loginMethod: "platform-login",
+    },
+    {
       openId: "user-admin",
       name: "Superadmin",
       email: "admin@assamrescue.gov.in",
