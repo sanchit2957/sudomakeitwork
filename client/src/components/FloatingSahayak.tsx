@@ -1,11 +1,17 @@
 import React, { useState } from "react";
 import { Sparkles, MessageSquare } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useLocation } from "wouter";
 import { SahayakAiModal } from "./SahayakAiModal";
 
 export function FloatingSahayak() {
   const [isOpen, setIsOpen] = useState(false);
   const { t } = useLanguage();
+  const [location] = useLocation();
+
+  // Keep authentication screens completely clean and unobstructed
+  const isAuthScreen = location.includes("/login");
+  if (isAuthScreen) return null;
 
   return (
     <>

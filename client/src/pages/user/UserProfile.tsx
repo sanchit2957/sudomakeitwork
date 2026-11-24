@@ -255,7 +255,7 @@ export default function UserProfile() {
                 {t("Medical Evacuation Credentials")}
               </p>
               <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-                {t("Citizen Safety Profile")}
+                {t("Profile Customization")}
               </h1>
             </div>
           </div>
@@ -314,7 +314,7 @@ export default function UserProfile() {
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
-                {t("Emergency Contacts & Next-of-Kin")}
+                {t("Emergency Contacts (Rescue & Hospital Sync)")}
               </span>
             </div>
             <button
@@ -494,7 +494,7 @@ export default function UserProfile() {
             <div className="flex items-center gap-2 border-b border-border pb-3">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
-                {t("Personal Identity & Contact Information")}
+                {t("Personal Identity & Phone")}
               </span>
             </div>
 
@@ -552,7 +552,7 @@ export default function UserProfile() {
             <div className="flex items-center gap-2 border-b border-border pb-3">
               <HeartPulse className="h-4 w-4 text-rose-600 dark:text-rose-400" />
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
-                {t("Medical Notes & Special Evacuation Needs")}
+                {t("Medical & Disaster Assistance")}
               </span>
             </div>
 
@@ -599,7 +599,7 @@ export default function UserProfile() {
             <div className="flex items-center gap-2 border-b border-border pb-3">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
-                {t("Jurisdiction, District & Locality")}
+                {t("State, District & Locality")}
               </span>
             </div>
 
