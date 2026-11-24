@@ -136,7 +136,7 @@ export default function UserDonations() {
         </header>
 
         {/* Hero Section */}
-        <section className="glass-panel overflow-hidden bg-[#0F172A] p-5 text-white dark:bg-[#0c1433]">
+        <section className="glass-panel glass-panel-dark overflow-hidden bg-[#0F172A] p-5 text-white dark:bg-[#0c1433]">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15 backdrop-blur-sm text-[#F1F5F9]">

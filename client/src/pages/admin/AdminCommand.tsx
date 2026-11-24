@@ -291,7 +291,7 @@ function CommandWorkspace() {
                   SOS, flood zones, shelters, hospitals, and active teams appear as the latest recorded positions.
                 </p>
               </div>
-              <div className="glass-panel overflow-hidden rounded-3xl bg-[#0F172A] p-5 text-white dark:bg-[#182353]">
+              <div className="glass-panel glass-panel-dark overflow-hidden rounded-3xl bg-[#0F172A] p-5 text-white dark:bg-[#182353]">
                 <div className="flex items-center gap-3">
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-[#F1F5F9]">
                     <ShieldCheck className="h-5 w-5" />
