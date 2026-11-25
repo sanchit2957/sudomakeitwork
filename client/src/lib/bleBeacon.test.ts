@@ -618,6 +618,28 @@ describe("Bluetooth Low Energy (BLE) SOS Beacon & Rescuer Radar", () => {
       expect(perms).toHaveProperty("granted");
       expect(perms).toHaveProperty("message");
     });
+
+    it("detects Web Bluetooth availability when navigator.bluetooth is supported", async () => {
+      const originalBluetooth = (navigator as any).bluetooth;
+      Object.defineProperty(navigator, "bluetooth", {
+        configurable: true,
+        value: {
+          getAvailability: async () => true,
+          requestDevice: async () => ({ id: "dev-1", name: "Rescue Beacon" }),
+        },
+      });
+      try {
+        const status = await getBleStatus();
+        expect(status.isAvailable).toBe(true);
+        expect(status.isEnabled).toBe(true);
+        expect(status.isScanningSupported).toBe(true);
+      } finally {
+        Object.defineProperty(navigator, "bluetooth", {
+          configurable: true,
+          value: originalBluetooth,
+        });
+      }
+    });
   });
 
   describe("Unique 8-Character Beacon ID Lifecycle & Collision Prevention", () => {

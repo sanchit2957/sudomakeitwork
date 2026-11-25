@@ -131,7 +131,7 @@ export function BleEmergencyRadar({
   const handleGrantPermissions = async () => {
     setIsRequestingPerms(true);
     try {
-      const res = await requestBlePermissions();
+      const res = await requestBlePermissions({ interactive: true });
       if (!res.granted) {
         setErrorMessage(res.message || t("Bluetooth permissions denied."));
       } else {
@@ -306,16 +306,30 @@ export function BleEmergencyRadar({
           </div>
         </div>
 
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={scanning}
-          onClick={runScan}
-          className="h-7 rounded-xl border-[#1D4ED8]/40 bg-[#1D4ED8]/20 px-2.5 text-[11px] font-bold text-[#F1F5F9] hover:bg-[#1D4ED8]/30"
-        >
-          <RefreshCw className={`mr-1 h-3 w-3 ${scanning ? "animate-spin" : ""}`} />
-          {scanning ? t("Scanning…") : t("Scan Radio")}
-        </Button>
+        <div className="flex items-center gap-1.5">
+          {!isNative && bleStatus?.isScanningSupported && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isRequestingPerms}
+              onClick={handleGrantPermissions}
+              className="h-7 rounded-xl border-cyan-400/40 bg-cyan-500/15 px-2.5 text-[11px] font-bold text-cyan-200 hover:bg-cyan-500/25"
+            >
+              <Bluetooth className="mr-1 h-3 w-3" />
+              {isRequestingPerms ? t("Pairing…") : t("Pair Bluetooth")}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={scanning}
+            onClick={runScan}
+            className="h-7 rounded-xl border-[#1D4ED8]/40 bg-[#1D4ED8]/20 px-2.5 text-[11px] font-bold text-[#F1F5F9] hover:bg-[#1D4ED8]/30"
+          >
+            <RefreshCw className={`mr-1 h-3 w-3 ${scanning ? "animate-spin" : ""}`} />
+            {scanning ? t("Scanning…") : t("Scan Radio")}
+          </Button>
+        </div>
       </div>
 
       {/* Error or Permission Callout */}
@@ -349,7 +363,11 @@ export function BleEmergencyRadar({
           ) : !isNative ? (
             <>
               <span className="h-2 w-2 rounded-full bg-cyan-400" />
-              <span>{t("Dev Mesh Simulation Ready")}</span>
+              <span>
+                {bleStatus?.isAvailable
+                  ? t("Web Bluetooth + Mesh Ready")
+                  : t("Mesh Simulation Ready")}
+              </span>
             </>
           ) : !isBluetoothReady ? (
             <>

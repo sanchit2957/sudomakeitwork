@@ -29,7 +29,24 @@ export const BLE_SENTINEL_COORDINATE_UNAVAILABLE = 0x7FFFFFFF;
 export const BLE_COORDINATE_SCALE = 10_000_000;
 export const BLE_BEACON_STORAGE_KEY = "sudo-makeitwork-ble-beacons-v1";
 export const BLE_ACTIVE_BEACON_ID_KEY = "sudo-active-ble-beacon-id-v1";
+export const BLE_PERMISSION_COOKIE = "sahay_ble_permission";
 export const BLE_BROADCAST_CHANNEL = "sahay-ble-mesh";
+
+function rememberBlePermissionCookie(granted: boolean): void {
+  if (typeof document === "undefined") return;
+  try {
+    document.cookie = `${BLE_PERMISSION_COOKIE}=${granted ? "granted" : "denied"}; path=/; max-age=31536000; SameSite=Lax`;
+  } catch { }
+}
+
+function hasBlePermissionCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    return /(?:^|;\s*)sahay_ble_permission=granted(?:;|$)/.test(document.cookie);
+  } catch {
+    return false;
+  }
+}
 
 function broadcastBleMeshUpdate(beacon: BleBeaconPayload | null): void {
   if (typeof window !== "undefined") {
@@ -531,6 +548,8 @@ export function calculateBleDistanceMeters(rssi: number, txPower: number = -59):
 let activeBroadcastingBeacon: BleBeaconPayload | null = null;
 const memoryDetectedBeacons = new Map<string, BleBeaconPayload>();
 let beaconScanListenerRemover: (() => Promise<void>) | null = null;
+let webBleScanSession: { stop?: () => void } | null = null;
+let webBleAdvHandler: ((event: any) => void) | null = null;
 
 export function isBleSosBeaconActive(): boolean {
   return activeBroadcastingBeacon !== null;
@@ -541,8 +560,7 @@ export function getActiveBleBeacon(): BleBeaconPayload | null {
 }
 
 /**
- * Gets real Bluetooth status from the native Android plugin.
- * In a desktop/browser development environment, returns development state.
+ * Gets real Bluetooth status from the native Android plugin or Web Bluetooth API.
  */
 export async function getBleStatus(): Promise<BleStatus> {
   if (Capacitor.isNativePlatform()) {
@@ -553,36 +571,84 @@ export async function getBleStatus(): Promise<BleStatus> {
     }
   }
 
+  const navBle = typeof navigator !== "undefined" ? (navigator as any).bluetooth : undefined;
+  let webAvailable = false;
+  if (navBle && typeof navBle.getAvailability === "function") {
+    try {
+      webAvailable = Boolean(await navBle.getAvailability());
+    } catch {
+      webAvailable = false;
+    }
+  } else if (navBle) {
+    webAvailable = true;
+  }
+
+  const scanningSupported = Boolean(
+    navBle && (typeof navBle.requestLEScan === "function" || typeof navBle.requestDevice === "function")
+  );
+
   return {
-    isAvailable: false,
-    isEnabled: false,
+    isAvailable: webAvailable,
+    isEnabled: webAvailable,
     isAdvertisingSupported: false,
-    isScanningSupported: false,
-    permissionsGranted: false,
+    isScanningSupported: scanningSupported,
+    permissionsGranted: Boolean(webBleScanSession || hasBlePermissionCookie()),
     isAdvertising: isBleSosBeaconActive(),
-    isScanning: false,
+    isScanning: Boolean(webBleScanSession),
     activeBroadcast: activeBroadcastingBeacon,
     detectedCount: memoryDetectedBeacons.size,
   };
 }
 
 /**
- * Requests required Android Bluetooth permissions via native plugin.
+ * Requests required Bluetooth permissions via Capacitor Android plugin or Web Bluetooth API.
  */
-export async function requestBlePermissions(): Promise<{ granted: boolean; message: string }> {
+export async function requestBlePermissions(options?: {
+  interactive?: boolean;
+}): Promise<{ granted: boolean; message: string }> {
   if (Capacitor.isNativePlatform()) {
     try {
-      return await BleSos.requestBlePermissions();
+      const res = await BleSos.requestBlePermissions();
+      rememberBlePermissionCookie(Boolean(res.granted));
+      return res;
     } catch (e: any) {
       return { granted: false, message: e?.message || "Failed to request Bluetooth permissions." };
     }
   }
-  return { granted: true, message: "Browser simulation environment: permissions mock granted." };
+
+  const navBle = typeof navigator !== "undefined" ? (navigator as any).bluetooth : undefined;
+  if (options?.interactive && navBle) {
+    try {
+      if (typeof navBle.requestLEScan === "function") {
+        await startWebBluetoothLeScan();
+        rememberBlePermissionCookie(true);
+        return { granted: true, message: "Web Bluetooth LE scanning enabled." };
+      }
+      if (typeof navBle.requestDevice === "function") {
+        const device = await navBle.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: [BLE_SOS_SERVICE_UUID],
+        });
+        rememberBlePermissionCookie(true);
+        return {
+          granted: true,
+          message: device?.name
+            ? `Bluetooth radio authorized (${device.name}).`
+            : "Bluetooth device access authorized.",
+        };
+      }
+    } catch (e: any) {
+      const msg = e?.message || "Bluetooth permission request cancelled.";
+      return { granted: false, message: msg };
+    }
+  }
+
+  return { granted: true, message: "Browser Bluetooth mesh ready." };
 }
 
 /**
  * Activates real Android Bluetooth Low Energy emergency SOS beacon advertising.
- * Starts native foreground service with persistent alarm notification.
+ * Automatically requests Android Bluetooth permissions first when needed.
  */
 export async function startBleSosBeacon(
   payload: Omit<BleBeaconPayload, "timestamp"> & { timestamp?: number }
@@ -620,6 +686,22 @@ export async function startBleSosBeacon(
 
   if (Capacitor.isNativePlatform()) {
     try {
+      const status = await BleSos.getBleStatus();
+      if (!status.permissionsGranted) {
+        const perm = await BleSos.requestBlePermissions();
+        rememberBlePermissionCookie(Boolean(perm.granted));
+        if (!perm.granted) {
+          return { success: false, id: cleanId, error: perm.message };
+        }
+      }
+      if (!status.isEnabled) {
+        return {
+          success: false,
+          id: cleanId,
+          error: "Bluetooth is turned off. Please enable Bluetooth to broadcast SOS.",
+        };
+      }
+
       const res = await BleSos.startAdvertising({
         id: cleanId,
         emergencyType: fullPayload.emergencyType,
@@ -670,6 +752,66 @@ export async function stopBleSosBeacon(options?: { clearId?: boolean }): Promise
   broadcastBleMeshUpdate(null);
 }
 
+async function startWebBluetoothLeScan(
+  onBeaconUpdate?: (beacons: BleBeaconPayload[]) => void
+): Promise<boolean> {
+  const navBle = typeof navigator !== "undefined" ? (navigator as any).bluetooth : undefined;
+  if (!navBle || typeof navBle.requestLEScan !== "function") {
+    return false;
+  }
+
+  if (webBleScanSession) {
+    return true;
+  }
+
+  const handler = (event: any) => {
+    try {
+      const serviceDataMap = event?.serviceData;
+      if (!serviceDataMap || typeof serviceDataMap.get !== "function") return;
+      const view: DataView | undefined =
+        serviceDataMap.get(BLE_SOS_SERVICE_UUID) ||
+        serviceDataMap.get(0xfc01);
+      if (!view) return;
+
+      const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+      const decoded = decodeBleSosPayload(bytes);
+      if (!decoded) return;
+
+      const rssi = typeof event.rssi === "number" ? event.rssi : -70;
+      const approx = calculateApproximateBleDistance(rssi);
+      const beacon: BleBeaconPayload = {
+        ...decoded,
+        rssi,
+        approxDistanceMeters: approx.distanceMeters,
+        distanceMeters: approx.distanceMeters,
+        proximityCategory: approx.proximityCategory,
+        lastSeenMs: Date.now(),
+        deviceAddress: event?.device?.id,
+        isSimulation: false,
+      };
+      memoryDetectedBeacons.set(beacon.id, beacon);
+      pruneStaleDetectedBeacons();
+      onBeaconUpdate?.(Array.from(memoryDetectedBeacons.values()));
+    } catch { }
+  };
+
+  webBleAdvHandler = handler;
+  navBle.addEventListener("advertisementreceived", handler);
+  try {
+    webBleScanSession = await navBle.requestLEScan({
+      filters: [{ services: [BLE_SOS_SERVICE_UUID] }],
+      keepRepeatedDevices: true,
+    });
+    rememberBlePermissionCookie(true);
+    return true;
+  } catch (err) {
+    navBle.removeEventListener("advertisementreceived", handler);
+    webBleAdvHandler = null;
+    webBleScanSession = null;
+    throw err;
+  }
+}
+
 /**
  * Starts continuous BLE scanning for rescuer boats.
  */
@@ -679,6 +821,16 @@ export async function startBleRadar(
 ): Promise<boolean> {
   if (Capacitor.isNativePlatform()) {
     try {
+      const status = await BleSos.getBleStatus();
+      if (!status.permissionsGranted) {
+        const perm = await BleSos.requestBlePermissions();
+        rememberBlePermissionCookie(Boolean(perm.granted));
+        if (!perm.granted) {
+          if (onError) onError(perm.message);
+          return false;
+        }
+      }
+
       // Clean up previous listener
       if (beaconScanListenerRemover) {
         await beaconScanListenerRemover();
@@ -705,9 +857,9 @@ export async function startBleRadar(
 
       beaconScanListenerRemover = listenerHandle.remove;
 
-      await BleSos.addListener("onScanStatusChanged", (status) => {
-        if (status.error && onError) {
-          onError(status.error);
+      await BleSos.addListener("onScanStatusChanged", (statusEvent) => {
+        if (statusEvent.error && onError) {
+          onError(statusEvent.error);
         }
       });
 
@@ -719,7 +871,11 @@ export async function startBleRadar(
     }
   }
 
-  return false;
+  try {
+    return await startWebBluetoothLeScan(onBeaconUpdate);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -731,6 +887,20 @@ export async function stopBleRadar(): Promise<void> {
       await beaconScanListenerRemover();
     } catch { }
     beaconScanListenerRemover = null;
+  }
+
+  if (webBleScanSession) {
+    try {
+      webBleScanSession.stop?.();
+    } catch { }
+    webBleScanSession = null;
+  }
+
+  if (webBleAdvHandler && typeof navigator !== "undefined" && (navigator as any).bluetooth) {
+    try {
+      (navigator as any).bluetooth.removeEventListener("advertisementreceived", webBleAdvHandler);
+    } catch { }
+    webBleAdvHandler = null;
   }
 
   if (Capacitor.isNativePlatform()) {
@@ -794,9 +964,11 @@ export async function scanForNearbyBleBeacons(
     }
   }
 
-  // Development/browser-only fallback with explicit simulation flag
+  // Merge real Web Bluetooth detected beacons with browser local mesh beacons
+  pruneStaleDetectedBeacons();
+  const realWebBeacons = Array.from(memoryDetectedBeacons.values());
   const stored = getStoredBleBeacons();
-  return stored.map((beacon) => {
+  const simBeacons = stored.map((beacon) => {
     let approxDist = 35;
     let rssi = -68;
 
@@ -826,4 +998,9 @@ export async function scanForNearbyBleBeacons(
       isSimulation: true,
     };
   });
+
+  const merged = new Map<string, BleBeaconPayload>();
+  simBeacons.forEach((b) => merged.set(b.id, b));
+  realWebBeacons.forEach((b) => merged.set(b.id, b));
+  return Array.from(merged.values());
 }
