@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   BleBeaconPayload,
+  BLE_BEACON_STORAGE_KEY,
+  BLE_BROADCAST_CHANNEL,
   BleStatus,
   getBleStatus,
   requestBlePermissions,
@@ -207,9 +209,34 @@ export function BleEmergencyRadar({
       void runScan();
     }, 15_000);
 
+    const handleStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === BLE_BEACON_STORAGE_KEY) {
+        void runScan();
+      }
+    };
+    const handleBeaconUpdated = () => {
+      void runScan();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("sudo-ble-beacon-updated", handleBeaconUpdated);
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        channel = new BroadcastChannel(BLE_BROADCAST_CHANNEL);
+        channel.onmessage = () => {
+          void runScan();
+        };
+      } catch { }
+    }
+
     return () => {
       isMountedRef.current = false;
       clearInterval(interval);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("sudo-ble-beacon-updated", handleBeaconUpdated);
+      channel?.close();
       void stopBleRadar();
     };
   }, [runScan]);

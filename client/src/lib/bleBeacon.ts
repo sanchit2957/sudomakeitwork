@@ -29,6 +29,20 @@ export const BLE_SENTINEL_COORDINATE_UNAVAILABLE = 0x7FFFFFFF;
 export const BLE_COORDINATE_SCALE = 10_000_000;
 export const BLE_BEACON_STORAGE_KEY = "sudo-makeitwork-ble-beacons-v1";
 export const BLE_ACTIVE_BEACON_ID_KEY = "sudo-active-ble-beacon-id-v1";
+export const BLE_BROADCAST_CHANNEL = "sahay-ble-mesh";
+
+function broadcastBleMeshUpdate(beacon: BleBeaconPayload | null): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("sudo-ble-beacon-updated", { detail: beacon }));
+  }
+  if (typeof BroadcastChannel !== "undefined") {
+    try {
+      const ch = new BroadcastChannel(BLE_BROADCAST_CHANNEL);
+      ch.postMessage({ type: "ble-beacon-updated", beacon });
+      ch.close();
+    } catch { }
+  }
+}
 
 /**
  * Generates an 8-character uppercase alphanumeric ID (A-Z, 0-9).
@@ -601,9 +615,7 @@ export async function startBleSosBeacon(
     const existing = getStoredBleBeacons().filter(b => b.id !== cleanId);
     existing.unshift(fullPayload);
     localStorage.setItem(BLE_BEACON_STORAGE_KEY, JSON.stringify(existing.slice(0, 20)));
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("sudo-ble-beacon-updated", { detail: fullPayload }));
-    }
+    broadcastBleMeshUpdate(fullPayload);
   } catch { }
 
   if (Capacitor.isNativePlatform()) {
@@ -632,8 +644,18 @@ export async function startBleSosBeacon(
  * Stops broadcasting the BLE SOS beacon.
  */
 export async function stopBleSosBeacon(options?: { clearId?: boolean }): Promise<void> {
+  const prevId = activeBroadcastingBeacon?.id;
   activeBroadcastingBeacon = null;
   if (options?.clearId) {
+    try {
+      const activeId = prevId || (typeof localStorage !== "undefined" ? localStorage.getItem(BLE_ACTIVE_BEACON_ID_KEY) : null);
+      if (typeof localStorage !== "undefined") {
+        const remaining = activeId
+          ? getStoredBleBeacons().filter(b => b.id !== activeId)
+          : [];
+        localStorage.setItem(BLE_BEACON_STORAGE_KEY, JSON.stringify(remaining));
+      }
+    } catch { }
     clearActiveBleBeaconId();
   }
 
@@ -645,9 +667,7 @@ export async function stopBleSosBeacon(options?: { clearId?: boolean }): Promise
     }
   }
 
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("sudo-ble-beacon-updated", { detail: null }));
-  }
+  broadcastBleMeshUpdate(null);
 }
 
 /**
