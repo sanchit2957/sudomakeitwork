@@ -1246,25 +1246,9 @@ export async function ensureHospitalStaffProfile(_userId: number) {
   return;
 }
 
-export const _memoryEmergencyContacts: Map<number, EmergencyContact> = new Map([
-  [
-    1,
-    {
-      id: 1,
-      userId: 4, // citizen
-      name: "Manashi Deka",
-      relation: "Spouse",
-      phone: "+91 94350 98765",
-      alternatePhone: "+91 361 223344",
-      isPrimary: "yes",
-      notes: "Emergency contact for Guwahati residence.",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ],
-]);
+export const _memoryEmergencyContacts: Map<number, EmergencyContact> = new Map();
 
-let _nextEmergencyContactId = 2;
+let _nextEmergencyContactId = 1;
 
 export async function getEmergencyContactsByUserId(userId: number): Promise<EmergencyContact[]> {
   const db = await getDb();

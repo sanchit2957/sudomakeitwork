@@ -99,16 +99,8 @@ function Router() {
             </DesktopOnlyGate>
           </Route>
           <Route path={"/responder/login"} component={RescuerLogin} />
-          <Route path={"/hospital/login"}>
-            <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
-              <HospitalLogin />
-            </DesktopOnlyGate>
-          </Route>
-          <Route path={"/medical/login"}>
-            <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
-              <HospitalLogin />
-            </DesktopOnlyGate>
-          </Route>
+          <Route path={"/hospital/login"} component={HospitalLogin} />
+          <Route path={"/medical/login"} component={HospitalLogin} />
 
           {/* Main Homepage: 4-Panel Unified Portal Hub */}
           <Route path={"/"} component={LandingHub} />
@@ -150,26 +142,18 @@ function Router() {
           <RoleGate><UserHospitalRegister /></RoleGate>
         </Route>
 
-        {/* Single Canonical Hospital Operations Portal - Desktop Only */}
+        {/* Hospital Operations Portal - Flexible Across All Screens */}
         <Route path={"/hospital/:rest*"}>
-          <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
-            <HospitalPortal />
-          </DesktopOnlyGate>
+          <HospitalPortal />
         </Route>
         <Route path={"/hospital"}>
-          <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
-            <HospitalPortal />
-          </DesktopOnlyGate>
+          <HospitalPortal />
         </Route>
         <Route path={"/medical/:rest*"}>
-          <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
-            <HospitalPortal />
-          </DesktopOnlyGate>
+          <HospitalPortal />
         </Route>
         <Route path={"/medical"}>
-          <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
-            <HospitalPortal />
-          </DesktopOnlyGate>
+          <HospitalPortal />
         </Route>
 
         {/* Rescuer Portal - Fully Responsive Across All Devices */}

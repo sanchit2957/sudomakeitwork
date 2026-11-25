@@ -215,7 +215,8 @@ async function startServer() {
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/ (NODE_ENV=${process.env.NODE_ENV || "production"})`);
+    console.log(`\n  ➜  Local:   http://localhost:${port}/`);
+    console.log(`  ➜  Mode:    ${process.env.NODE_ENV || "production"}\n`);
     // Verify Web Push VAPID credentials for background delivery
     import("../push").then(p => p.verifyVapidConfiguration()).catch(console.warn);
     // Start automated emergency dispatch background orchestrator

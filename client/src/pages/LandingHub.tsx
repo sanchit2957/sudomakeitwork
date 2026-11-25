@@ -16,11 +16,8 @@ import {
 import { useLocation } from "wouter";
 
 type PortalCardConfig = {
-  id: "citizen" | "rescuer" | "hospital" | "admin";
+  id: "citizen" | "rescuer";
   title: string;
-  subtitle: string;
-  description: string;
-  badge: string;
   loginPath: string;
   registerPath: string;
   icon: typeof Siren;
@@ -28,17 +25,12 @@ type PortalCardConfig = {
   accentText: string;
   accentBorder: string;
   buttonBg: string;
-  highlights: string[];
 };
 
 const PORTAL_CARDS: PortalCardConfig[] = [
   {
     id: "citizen",
     title: "Citizen Portal",
-    subtitle: "SOS Emergency Hub & Safety",
-    description:
-      "Trigger rapid GPS SOS alerts, record voice distress notes, track rescue units live, and locate verified Pan-India hospitals.",
-    badge: "Public Safety",
     loginPath: "/login?mode=signin",
     registerPath: "/login?mode=register",
     icon: Siren,
@@ -46,15 +38,10 @@ const PORTAL_CARDS: PortalCardConfig[] = [
     accentText: "text-red-600 dark:text-red-400",
     accentBorder: "hover:border-red-500/50",
     buttonBg: "bg-[#DC2626] hover:bg-[#b91c1c] text-white",
-    highlights: ["1-Tap Emergency SOS", "Live Rescue Tracking", "9,360+ Verified Hospitals"],
   },
   {
     id: "rescuer",
     title: "Rescuer Portal",
-    subtitle: "Field Operations & Dispatch",
-    description:
-      "Receive instant emergency offers, navigate with flood-aware road routing, coordinate victim chat, and manage active missions.",
-    badge: "Gov Code Gated",
     loginPath: "/responder/login?mode=signin",
     registerPath: "/responder/login?mode=register",
     icon: Radio,
@@ -62,39 +49,6 @@ const PORTAL_CARDS: PortalCardConfig[] = [
     accentText: "text-emerald-700 dark:text-emerald-400",
     accentBorder: "hover:border-emerald-500/50",
     buttonBg: "bg-[#0f766e] hover:bg-[#0d625b] text-white",
-    highlights: ["Real-Time Mission Offers", "Flood-Aware Routing", "BLE Radar & Voice Playback"],
-  },
-  {
-    id: "hospital",
-    title: "Hospital Portal",
-    subtitle: "ER / ICU Readiness & Triage",
-    description:
-      "Publish live emergency & ICU bed capacity, oxygen and blood reserves, manage multiple branches, and prepare for incoming SOS cases.",
-    badge: "Medical Desk",
-    loginPath: "/hospital/login?mode=signin",
-    registerPath: "/hospital/login?mode=register",
-    icon: Hospital,
-    accentBg: "bg-blue-500/12 dark:bg-blue-500/20",
-    accentText: "text-[#1D4ED8] dark:text-blue-400",
-    accentBorder: "hover:border-[#1D4ED8]/50",
-    buttonBg: "bg-[#1D4ED8] hover:bg-[#1e40af] text-white",
-    highlights: ["Live ER & ICU Capacity", "Inbound SOS Alerts", "Multi-Branch Management"],
-  },
-  {
-    id: "admin",
-    title: "Admin Portal",
-    subtitle: "State Command & Governance",
-    description:
-      "Oversee Pan-India incidents, inspect DBSCAN spatial SOS clusters, manage flood zones & shelters, and authorize responders & hospitals.",
-    badge: "Command Authority",
-    loginPath: "/admin/login?mode=signin",
-    registerPath: "/admin/login?mode=register",
-    icon: Shield,
-    accentBg: "bg-indigo-500/12 dark:bg-indigo-500/20",
-    accentText: "text-indigo-700 dark:text-indigo-300",
-    accentBorder: "hover:border-indigo-500/50",
-    buttonBg: "bg-[#0F172A] hover:bg-[#1e293b] dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white",
-    highlights: ["DBSCAN SOS Clusters", "Access Code Governance", "Staff & Hospital Approvals"],
   },
 ];
 
@@ -124,6 +78,16 @@ export default function LandingHub() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            <Button
+              data-testid="portal-panel-admin"
+              onClick={() => setLocation("/admin/login?mode=signin")}
+              variant="outline"
+              size="sm"
+              className="inline-flex items-center gap-1.5 rounded-xl border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-500/20 dark:border-indigo-400/30 dark:bg-indigo-950/40 dark:text-indigo-300"
+            >
+              <Shield className="h-3.5 w-3.5" />
+              <span data-testid="portal-login-admin">Admin Portal</span>
+            </Button>
             <a
               href="tel:112"
               className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-[#DC2626] px-3 py-1.5 text-xs font-black text-white shadow-sm transition hover:bg-[#b91c1c]"
@@ -149,12 +113,32 @@ export default function LandingHub() {
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
             Each role operates with an independent session, dedicated authentication flow, and specialized dashboard. Choose a panel below to sign in or register.
           </p>
+
+          {/* Portal Scope Switcher Tab */}
+          <div className="mx-auto mt-7 flex max-w-sm items-center justify-center rounded-2xl border border-black/5 bg-black/5 p-1.5 dark:border-white/10 dark:bg-white/5">
+            <button
+              type="button"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white px-3.5 py-2 text-xs font-black text-foreground shadow-xs dark:bg-[#151718]"
+            >
+              <Radio className="h-3.5 w-3.5 text-[#0f766e]" />
+              Public &amp; Responders
+            </button>
+            <button
+              type="button"
+              data-testid="portal-panel-hospital"
+              onClick={() => setLocation("/hospital/login?mode=signin")}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold text-muted-foreground transition hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10"
+            >
+              <Hospital className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              Hospital Desk →
+            </button>
+          </div>
         </section>
 
-        {/* 4 Clearly Separated Role Panels */}
+        {/* 2 Cleanly Rearranged Public & Field Operation Panels */}
         <section
           aria-label="Platform Portals"
-          className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4"
+          className="mx-auto mt-8 grid max-w-3xl grid-cols-1 gap-6 sm:grid-cols-2"
         >
           {PORTAL_CARDS.map((card) => {
             const Icon = card.icon;
@@ -165,68 +149,98 @@ export default function LandingHub() {
                 onClick={() => setLocation(card.loginPath)}
                 className={`glass-panel group relative flex cursor-pointer flex-col justify-between rounded-3xl border border-black/8 bg-white/95 p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-white/12 dark:bg-[#111827]/95 ${card.accentBorder}`}
               >
-                <div>
-                  {/* Card Header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <span className={`grid h-12 w-12 place-items-center rounded-2xl ${card.accentBg} ${card.accentText}`}>
-                      <Icon className="h-6 w-6" />
-                    </span>
-                    <span className={`rounded-full px-2.5 py-1 font-mono text-[10px] font-extrabold uppercase tracking-wider ${card.accentBg} ${card.accentText}`}>
-                      {card.badge}
-                    </span>
-                  </div>
-
-                  {/* Title & Purpose */}
-                  <h2 className="mt-5 text-xl font-black tracking-tight text-foreground">
+                <div className="flex flex-col items-center py-6 text-center">
+                  <span className={`grid h-16 w-16 place-items-center rounded-2xl ${card.accentBg} ${card.accentText} transition-transform group-hover:scale-105 shadow-sm`}>
+                    <Icon className="h-8 w-8" />
+                  </span>
+                  <h2 className="mt-5 text-xl font-bold tracking-tight text-foreground">
                     {card.title}
                   </h2>
-                  <p className={`mt-0.5 text-xs font-bold ${card.accentText}`}>
-                    {card.subtitle}
-                  </p>
-                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-                    {card.description}
-                  </p>
-
-                  {/* Capabilities */}
-                  <ul className="mt-4 space-y-1.5 border-t border-black/5 pt-4 dark:border-white/10">
-                    {card.highlights.map((item) => (
-                      <li key={item} className="flex items-center gap-2 text-xs font-semibold text-foreground/85">
-                        <span className={`h-1.5 w-1.5 rounded-full ${card.accentText} bg-current`} />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
                 </div>
 
-                {/* Separate Login & Registration Actions */}
+                {/* Role Actions */}
                 <div
-                  className="mt-6 flex flex-col gap-2 pt-2"
+                  className="mt-4 flex flex-col gap-2.5 pt-2"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Button
                     type="button"
                     data-testid={`portal-login-${card.id}`}
                     onClick={() => setLocation(card.loginPath)}
-                    className={`h-11 w-full rounded-xl text-xs font-black shadow-sm transition active:scale-[0.98] ${card.buttonBg}`}
+                    className={`h-11 w-full rounded-xl text-xs font-bold shadow-sm transition active:scale-[0.98] ${card.buttonBg}`}
                   >
                     <Lock className="mr-2 h-3.5 w-3.5" />
                     Sign In
                     <ArrowRight className="ml-auto h-3.5 w-3.5 opacity-80" />
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    data-testid={`portal-register-${card.id}`}
-                    onClick={() => setLocation(card.registerPath)}
-                    className="h-10 w-full rounded-xl border-black/15 text-xs font-bold hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/5"
-                  >
-                    <UserPlus className="mr-2 h-3.5 w-3.5" />
-                    Register
-                  </Button>
+                  {card.registerPath && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      data-testid={`portal-register-${card.id}`}
+                      onClick={() => setLocation(card.registerPath)}
+                      className="h-10 w-full rounded-xl border-black/15 text-xs font-semibold hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/5"
+                    >
+                      <UserPlus className="mr-2 h-3.5 w-3.5" />
+                      Register
+                    </Button>
+                  )}
                 </div>
               </article>
             );
           })}
+        </section>
+
+        {/* Hospital Portal Redirection Banner */}
+        <section className="mx-auto mt-8 max-w-3xl">
+          <div
+            onClick={() => setLocation("/hospital/login?mode=signin")}
+            className="group flex cursor-pointer flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-3xl border border-blue-500/25 bg-blue-500/5 p-5 shadow-xs transition hover:border-blue-500/45 hover:bg-blue-500/10 dark:border-blue-400/20 dark:bg-blue-950/25"
+          >
+            <div className="flex items-center gap-3.5">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-blue-500/15 text-blue-600 shadow-xs dark:text-blue-400">
+                <Hospital className="h-6 w-6" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-foreground">Hospital Medical Desk</h3>
+                  <span className="rounded-md bg-blue-500/15 px-2 py-0.5 font-mono text-[9px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                    Medical Authority
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Publish ER &amp; ICU bed capacity, blood reserves, and manage inbound trauma dispatch.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                data-testid="portal-login-hospital"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLocation("/hospital/login?mode=signin");
+                }}
+                className="h-10 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-[0.98]"
+              >
+                Sign In
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="portal-register-hospital"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLocation("/hospital/login?mode=register");
+                }}
+                className="h-10 rounded-xl border-black/15 text-xs font-semibold hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/5"
+              >
+                Register
+              </Button>
+            </div>
+          </div>
         </section>
 
         {/* Bottom Info & Independent Session Guarantee */}

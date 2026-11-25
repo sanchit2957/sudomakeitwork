@@ -338,44 +338,6 @@ export default function UserLogin() {
           </p>
         </div>
 
-        {/* Active Session Notice if already logged in */}
-        {user && (
-          <div className="mt-6 overflow-hidden rounded-3xl border border-[#0f766e]/30 bg-white p-5 shadow-sm dark:border-emerald-500/20 dark:bg-[#151718]">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-left">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-extrabold">{user.name || user.email}</p>
-                  <span className="rounded-md bg-[#0f766e]/15 px-2 py-0.5 font-mono text-[10px] font-extrabold uppercase text-[#0f766e] dark:text-emerald-400">
-                    {user.role}
-                  </span>
-                </div>
-                <p className="truncate text-xs text-muted-foreground">
-                  Active Session ({user.email})
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => setLocation(getDashboardDestinationForRole(user.role))}
-                  className="rounded-xl bg-[#0f766e] text-xs font-bold text-white shadow-sm hover:bg-[#0f766e]/90"
-                >
-                  {user.role === "user" ? "Enter SOS Hub" : "Go to Dashboard"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleLogout}
-                  disabled={isSubmitting}
-                  className="rounded-xl text-xs font-semibold text-destructive hover:bg-destructive/10"
-                >
-                  <LogOut className="mr-1.5 h-3.5 w-3.5" />
-                  {isSubmitting ? "Signing Out…" : "Sign Out"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Top Sign In / Register Switcher */}
         <div className="my-7 sm:my-8 grid grid-cols-2 gap-2.5 rounded-2xl bg-black/5 p-2 dark:bg-white/5">
           <button

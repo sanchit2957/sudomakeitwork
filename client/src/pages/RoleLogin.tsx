@@ -24,7 +24,6 @@ import {
   ShieldCheck,
   UserPlus,
 } from "lucide-react";
-import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import React, { FormEvent, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -216,26 +215,6 @@ export function RoleLogin({ role }: { role: PortalRole }) {
           <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{config.description}</p>
         </div>
 
-        {/* Active Session Banner if already signed into this operational portal */}
-        {user && (user.role === role || user.role === "admin" || (role === "hospital" && user.role === "medical")) && (
-          <div className="mt-6 overflow-hidden rounded-3xl border border-[#0f766e]/30 bg-white p-5 shadow-sm dark:border-emerald-500/20 dark:bg-[#151718]">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-extrabold">{user.name || user.email}</p>
-                <p className="truncate text-xs text-muted-foreground">Active {config.title} Session</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" onClick={() => setLocation(config.destination)} className="rounded-xl bg-[#0f766e] text-xs font-bold text-white">
-                  Enter Dashboard
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => void logout()} className="rounded-xl text-xs">
-                  Sign Out
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Mode Switcher */}
         <div className="my-7 sm:my-8 grid grid-cols-2 gap-2.5 rounded-2xl bg-black/5 p-2 dark:bg-white/5">
           <button
@@ -245,11 +224,10 @@ export function RoleLogin({ role }: { role: PortalRole }) {
               setErrorMessage("");
               setSuccessMessage("");
             }}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
-              authMode === "signin"
-                ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${authMode === "signin"
+              ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             <Lock className="h-3.5 w-3.5" />
             Sign In
@@ -261,11 +239,10 @@ export function RoleLogin({ role }: { role: PortalRole }) {
               setErrorMessage("");
               setSuccessMessage("");
             }}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
-              authMode === "register"
-                ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${authMode === "register"
+              ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             <UserPlus className="h-3.5 w-3.5" />
             Sign Up
@@ -384,34 +361,6 @@ export function RoleLogin({ role }: { role: PortalRole }) {
                   <p className="mt-1.5 text-[11px] text-muted-foreground">
                     Access is gated on the active code set by the system administrator.
                   </p>
-                </div>
-
-                {/* Styled Demo Credentials Strip */}
-                <div className="my-2 flex items-center justify-between rounded-xl border border-blue-500/20 bg-blue-500/5 px-3.5 py-2.5 dark:border-blue-500/20 dark:bg-blue-950/25">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                    <p className="text-[11px] font-semibold text-muted-foreground">
-                      Default Demo Credentials
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (role === "rescuer") {
-                        setEmail("rescuer@assamrescue.gov.in");
-                        setPassword("rescuer");
-                        setGovernmentCode("RESCUER-2026");
-                      } else {
-                        setEmail("hospital@assamrescue.gov.in");
-                        setPassword("hospital");
-                        setGovernmentCode("HOSPITAL-2026");
-                      }
-                      setErrorMessage("");
-                    }}
-                    className="font-mono text-xs font-bold text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    Fill Demo {role === "rescuer" ? "Rescuer" : "Hospital"}
-                  </button>
                 </div>
 
                 <div className="pt-2">
@@ -569,11 +518,7 @@ export function RescuerLogin() {
 }
 
 export function HospitalLogin() {
-  return (
-    <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
-      <RoleLogin role="hospital" />
-    </DesktopOnlyGate>
-  );
+  return <RoleLogin role="hospital" />;
 }
 
 export const MedicalLogin = HospitalLogin;

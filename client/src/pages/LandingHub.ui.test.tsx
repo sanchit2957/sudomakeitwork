@@ -59,8 +59,6 @@ describe("Unified 4-Panel Main Homepage (LandingHub)", () => {
 
     fireEvent.click(screen.getByTestId("portal-login-admin"));
     expect(mockNavigate).toHaveBeenLastCalledWith("/admin/login?mode=signin");
-
-    fireEvent.click(screen.getByTestId("portal-register-admin"));
-    expect(mockNavigate).toHaveBeenLastCalledWith("/admin/login?mode=register");
+    expect(screen.queryByTestId("portal-register-admin")).toBeNull();
   });
 });

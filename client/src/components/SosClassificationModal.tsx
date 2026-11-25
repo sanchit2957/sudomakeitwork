@@ -107,18 +107,18 @@ export function SosClassificationModal({
     selectedCategoryRef.current = selectedCategory;
   }, [selectedCategory]);
 
-  // Authoritative server deadline for the initial cancellation / triage window (10s)
-  const deadlineMs = useMemo(() => {
-    return triageDeadlineAt ? new Date(triageDeadlineAt).getTime() : Date.now() + TRIAGE_CANCEL_WINDOW_MS;
-  }, [triageDeadlineAt]);
-
   // Master 10-second timer for initial triage/cancellation window
   useEffect(() => {
     if (!isOpen) return;
 
-    const interval = setInterval(() => {
+    const targetDeadline = triageDeadlineAt
+      ? Math.max(Date.now() + 1000, new Date(triageDeadlineAt).getTime())
+      : Date.now() + TRIAGE_CANCEL_WINDOW_MS;
+
+    setIsExpired(false);
+    const updateTimer = () => {
       const now = Date.now();
-      const remainingMs = Math.max(0, deadlineMs - now);
+      const remainingMs = Math.max(0, targetDeadline - now);
       const remainingSec = Math.ceil(remainingMs / 1000);
       setTimeLeft(remainingSec);
 
@@ -129,10 +129,13 @@ export function SosClassificationModal({
           handleAutoTimeout();
         }
       }
-    }, 150);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 250);
 
     return () => clearInterval(interval);
-  }, [isOpen, deadlineMs]);
+  }, [isOpen, triageDeadlineAt]);
 
   // Map category safely to backend supported enum ('medical' | 'rescue' | 'emergency')
   const resolveBackendCategory = (cat: SOSCategoryOption | null): "medical" | "rescue" | "emergency" => {
@@ -350,7 +353,7 @@ export function SosClassificationModal({
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E2E8F0]/25 dark:bg-white/10">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-red-500 via-amber-500 to-[#1D4ED8] transition-all duration-200 ease-linear"
-                  style={{ width: `${Math.min(100, Math.max(0, (timeLeft / 15) * 100))}%` }}
+                  style={{ width: `${Math.min(100, Math.max(0, (timeLeft / (TRIAGE_CANCEL_WINDOW_MS / 1000)) * 100))}%` }}
                 />
               </div>
             </div>
