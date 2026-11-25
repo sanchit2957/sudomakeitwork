@@ -61,17 +61,15 @@ export default function UserHome() {
   // Secondary defense: Route operational users reaching "/" to their canonical workspace
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const isDesktop = window.innerWidth >= 1024;
     const allowCitizen = sessionStorage.getItem("sahay_allow_citizen_home");
-    // On mobile screens (<1024px), admin & hospital portals are desktop-only, so users remain on Citizen SOS Hub
-    if (!isDesktop || allowCitizen) return;
+    if (allowCitizen) return;
 
     if (!authLoading && user && user.role && user.role !== "user") {
       const canonicalPath =
         user.role === "admin"
           ? "/command"
           : user.role === "hospital" || user.role === "medical"
-            ? "/medical"
+            ? "/hospital"
             : user.role === "rescuer"
               ? "/responder"
               : null;
@@ -397,7 +395,13 @@ export default function UserHome() {
       if (lastKnown) {
         void submitSosWithCoords(lastKnown.latitude, lastKnown.longitude, t("Last known device location"));
       } else {
-        void submitSosWithCoords(undefined, undefined, t("Location unavailable (No GPS fix on phone)"));
+        void getCurrentCoordinates({ enableHighAccuracy: true, timeout: 1500 })
+          .then((res) => {
+            setPosition({ latitude: res.latitude, longitude: res.longitude });
+            setLocationStatus("ready");
+            return submitSosWithCoords(res.latitude, res.longitude, t("GPS location captured from this phone"));
+          })
+          .catch(() => submitSosWithCoords(undefined, undefined, t("Location unavailable (No GPS fix on phone)")));
       }
     } else {
       void getCurrentCoordinates({ enableHighAccuracy: true, timeout: 6000 })
@@ -444,6 +448,13 @@ export default function UserHome() {
           />
           <div className="flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setLocation("/")}
+                className="rounded-xl border border-black/10 bg-white/80 px-2.5 py-1 text-[11px] font-bold text-[#0F172A] transition hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-[#F8FAFC]"
+              >
+                {t("All Portals")}
+              </button>
               <LanguageSelector compact />
             </div>
             <span

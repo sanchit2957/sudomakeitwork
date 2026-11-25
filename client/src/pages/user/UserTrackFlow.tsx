@@ -112,7 +112,7 @@ const stages = useMemo(
         {/* Top Header Card */}
         <header className="glass-card mb-5 flex items-center justify-between p-3.5 shadow-sm">
           <button
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/citizen")}
             className="flex items-center gap-3 text-left transition hover:opacity-85 active:scale-95"
           >
             <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#1D4ED8] text-white shadow-md shadow-[#1D4ED8]/20">
@@ -141,7 +141,7 @@ const stages = useMemo(
               {t("When you activate SOS, your rescue flow will remain here—even after refresh.")}
             </p>
             <Button
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/citizen")}
               className="mt-6 rounded-xl bg-[#1D4ED8] px-6 py-2.5 font-bold text-white shadow-md shadow-[#1D4ED8]/25 hover:bg-[#1d47db]"
             >
               {t("Go to SOS")}
@@ -242,7 +242,12 @@ const stages = useMemo(
               )}
 
               <div className="mt-5">
-                <IncidentChat publicCode={status.data.publicCode} active={status.data.status !== "resolved"} />
+                <IncidentChat
+                  publicCode={status.data.publicCode}
+                  active={status.data.status !== "resolved"}
+                  voiceNoteUrl={(status.data as any).voiceNoteUrl}
+                  voiceNoteDurationSeconds={(status.data as any).voiceNoteDurationSeconds}
+                />
               </div>
 
               <div className="mt-5 rounded-xl border border-[#1D4ED8]/20 bg-[#1D4ED8]/5 p-3.5 text-xs leading-5 text-[#0F172A] dark:text-[#F1F5F9]">

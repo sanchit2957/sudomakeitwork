@@ -101,7 +101,7 @@ export function getPortalDashboardPath(portal: PortalId): string {
       return "/hospital";
     case "citizen":
     default:
-      return "/";
+      return "/citizen";
   }
 }
 

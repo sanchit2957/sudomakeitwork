@@ -43,7 +43,7 @@ describe('Master Regression Suite — Production Authentication, Role Routing & 
       res: {} as any,
       user: null,
     });
-    await expect(caller.rescue.operations.activeMission()).rejects.toThrow();
+    await expect((caller.rescue.operations as any).activeMission()).rejects.toThrow();
   });
 
   // TEST 4: Unauthenticated /medical -> login
@@ -53,7 +53,7 @@ describe('Master Regression Suite — Production Authentication, Role Routing & 
       res: {} as any,
       user: null,
     });
-    await expect(caller.rescue.operations.hospitalRequests()).rejects.toThrow();
+    await expect((caller.rescue.operations as any).hospitalRequests()).rejects.toThrow();
   });
 
   // TEST 5: Unauthenticated /hospital -> login
@@ -63,7 +63,7 @@ describe('Master Regression Suite — Production Authentication, Role Routing & 
       res: {} as any,
       user: null,
     });
-    await expect(caller.rescue.operations.updateHospital({ id: 1, availableEmergencyBeds: 5 })).rejects.toThrow();
+    await expect((caller.rescue.operations as any).updateHospital({ id: 1, availableEmergencyBeds: 5 })).rejects.toThrow();
   });
 
   // TEST 6: Authenticated citizen -> /
@@ -142,7 +142,7 @@ describe('Master Regression Suite — Production Authentication, Role Routing & 
       res: {} as any,
       user: { id: 10, openId: 'citizen-10', name: 'Citizen', role: 'user' } as any,
     });
-    await expect(caller.rescue.operations.activeMission()).rejects.toThrow();
+    await expect((caller.rescue.operations as any).activeMission()).rejects.toThrow();
   });
 
   // TEST 13: Citizen cannot access /medical
@@ -152,7 +152,7 @@ describe('Master Regression Suite — Production Authentication, Role Routing & 
       res: {} as any,
       user: { id: 10, openId: 'citizen-10', name: 'Citizen', role: 'user' } as any,
     });
-    await expect(caller.rescue.operations.updateHospital({ id: 1, availableEmergencyBeds: 2 })).rejects.toThrow();
+    await expect((caller.rescue.operations as any).updateHospital({ id: 1, availableEmergencyBeds: 2 })).rejects.toThrow();
   });
 
   // TEST 14: Rescuer cannot access /command

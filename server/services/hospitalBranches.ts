@@ -103,8 +103,10 @@ export async function getBranchesForOwner(userId: number): Promise<NormalizedHos
         );
       }
       const combined = [...ownedRows, ...linkedRows];
-      combined.sort((a, b) => Number(Boolean(b.isPrimaryBranch)) - Number(Boolean(a.isPrimaryBranch)) || a.id - b.id);
-      return combined.map(normalizeHospitalBranch);
+      if (combined.length > 0) {
+        combined.sort((a, b) => Number(Boolean(b.isPrimaryBranch)) - Number(Boolean(a.isPrimaryBranch)) || a.id - b.id);
+        return combined.map(normalizeHospitalBranch);
+      }
     }
   } catch (error) {
     if (process.env.NODE_ENV === "production") {
@@ -289,10 +291,10 @@ export async function updateHospitalBranch(
 
   const orgName = input.organizationName !== undefined ? input.organizationName.trim() : existing.organizationName;
   const branchName = input.branchName !== undefined ? input.branchName.trim() : existing.branchName;
-  const erTotal = input.erTotal !== undefined ? Math.max(0, Math.trunc(Number(input.erTotal))) : existing.erTotal;
   const erAvailable = input.erAvailable !== undefined ? Math.max(0, Math.trunc(Number(input.erAvailable))) : existing.erAvailable;
-  const icuTotal = input.icuTotal !== undefined ? Math.max(0, Math.trunc(Number(input.icuTotal))) : existing.icuTotal;
   const icuAvailable = input.icuAvailable !== undefined ? Math.max(0, Math.trunc(Number(input.icuAvailable))) : existing.icuAvailable;
+  const erTotal = input.erTotal !== undefined ? Math.max(0, Math.trunc(Number(input.erTotal))) : Math.max(existing.erTotal, erAvailable);
+  const icuTotal = input.icuTotal !== undefined ? Math.max(0, Math.trunc(Number(input.icuTotal))) : Math.max(existing.icuTotal, icuAvailable);
 
   if (!hasValidHospitalCapacity(erTotal, erAvailable, icuTotal, icuAvailable)) {
     throw new Error("Available ER/ICU beds cannot exceed total capacity and must be >= 0.");

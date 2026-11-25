@@ -36,7 +36,7 @@ describe("Pan-India Locations and Boundary", () => {
 
 describe("Weather Risk Classification Engine", () => {
   it("classifies severe alerts, torrential rain, and extreme storms as CRITICAL (Red)", () => {
-    const torrentialReport: WeatherComprehensiveReport = {
+    const torrentialReport: any = {
       current: {
         temperatureC: 28,
         feelsLikeC: 32,
@@ -103,7 +103,7 @@ describe("Weather Risk Classification Engine", () => {
   });
 
   it("classifies moderate rain, elevated wind, and advisory alerts as MODERATE (Orange)", () => {
-    const moderateReport: WeatherComprehensiveReport = {
+    const moderateReport: any = {
       current: {
         temperatureC: 26,
         feelsLikeC: 27,
@@ -170,7 +170,7 @@ describe("Weather Risk Classification Engine", () => {
   });
 
   it("classifies calm, clear weather as GOOD (Green)", () => {
-    const calmReport: WeatherComprehensiveReport = {
+    const calmReport: any = {
       current: {
         temperatureC: 24,
         feelsLikeC: 24,

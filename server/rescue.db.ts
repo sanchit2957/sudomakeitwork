@@ -127,21 +127,21 @@ export interface MemoryIncident {
   notes: string | null;
   evidenceKey: string | null;
   evidenceUrl: string | null;
-  voiceNoteKey: string | null;
-  voiceNoteUrl: string | null;
-  voiceNoteDurationSeconds: number | null;
+  voiceNoteKey?: string | null;
+  voiceNoteUrl?: string | null;
+  voiceNoteDurationSeconds?: number | null;
   status: "pending" | "dispatched" | "resolved";
-  bleBeaconId: string | null;
-  dispatchStatus: "triage_pending" | "matching" | "offered" | "assigned" | "escalated" | "resolved";
-  triageStartedAt: Date | null;
-  triageDeadlineAt: Date | null;
-  triageSelectedAt: Date | null;
-  matchingStartedAt: Date | null;
-  matchingAttempts: number;
-  escalatedToCommandAt: Date | null;
-  assignedRescuerId: number | null;
-  destinationHospitalId: number | null;
-  destinationHospitalName: string | null;
+  bleBeaconId?: string | null;
+  dispatchStatus?: "triage_pending" | "matching" | "offered" | "assigned" | "escalated" | "resolved";
+  triageStartedAt?: Date | null;
+  triageDeadlineAt?: Date | null;
+  triageSelectedAt?: Date | null;
+  matchingStartedAt?: Date | null;
+  matchingAttempts?: number;
+  escalatedToCommandAt?: Date | null;
+  assignedRescuerId?: number | null;
+  destinationHospitalId?: number | null;
+  destinationHospitalName?: string | null;
   dispatchedAt: Date | null;
   resolvedAt: Date | null;
   escalationLevel?: number;
@@ -367,9 +367,9 @@ export const _memoryFloodZones: Map<number, MemoryFloodZone> = new Map([
   ],
 ]);
 
-export const _memoryRescueProfiles: Map<number, MemoryRescueProfile> = new Map();
+export const _memoryRescueProfiles: Map<number, MemoryRescueProfile | any> = new Map();
 
-export const _memoryIncidents: Map<number, MemoryIncident> = new Map([
+export const _memoryIncidents: Map<number, MemoryIncident | any> = new Map([
   [
     1,
     {
@@ -755,7 +755,7 @@ export async function listIncidents(status?: "pending" | "dispatched" | "resolve
       const offeredProfile = activeOffer ? _memoryRescueProfiles.get(activeOffer.rescuerId) : null;
 
       return {
-        incident,
+        incident: incident as unknown as typeof incidents.$inferSelect,
         rescuerName: incident.assignedRescuerId ? _memoryUsers.get(String(incident.assignedRescuerId))?.name || null : null,
         rescuerId: incident.assignedRescuerId,
         rescuerCallSign: incident.assignedRescuerId ? _memoryRescueProfiles.get(incident.assignedRescuerId)?.callSign || null : null,
@@ -817,9 +817,12 @@ export async function listMissionsForRescuer(rescuerId: number) {
     .map(mission => {
       const incident = _memoryIncidents.get(mission.incidentId);
       if (!incident) return null;
-      return { mission, incident };
+      return {
+        mission: mission as unknown as typeof missions.$inferSelect,
+        incident: incident as unknown as typeof incidents.$inferSelect,
+      };
     })
-    .filter((m): m is { mission: MemoryMission; incident: MemoryIncident } => m !== null);
+    .filter((m): m is { mission: typeof missions.$inferSelect; incident: typeof incidents.$inferSelect } => m !== null);
 }
 
 export async function getMissionForRescuer(missionId: number, rescuerId: number) {
@@ -1090,7 +1093,9 @@ export async function getAvailableRescuersNear(latitude: number, longitude: numb
   }
   const toRadians = (value: number) => (value * Math.PI) / 180;
   return candidates.filter(({ profile }) => {
-    if (profile.lastLatitude === null || profile.lastLongitude === null) return false;
+    if (profile.lastLatitude === null || profile.lastLongitude === null) {
+      return radiusKm >= 500;
+    }
     const latDistance = toRadians(profile.lastLatitude - latitude);
     const lngDistance = toRadians(profile.lastLongitude - longitude);
     const formula = Math.sin(latDistance / 2) ** 2 + Math.cos(toRadians(latitude)) * Math.cos(toRadians(profile.lastLatitude)) * Math.sin(lngDistance / 2) ** 2;

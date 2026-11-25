@@ -13,6 +13,13 @@ export interface LatLngPoint {
   longitude: number;
 }
 
+export interface RouteFloodAvoidance {
+  avoidsFloodZones: boolean;
+  intersectedZones: string[];
+  detourApplied: boolean;
+  hazardWarning?: string;
+}
+
 export interface RouteResult {
   distanceMeters: number;
   distanceKm: number;
@@ -23,6 +30,76 @@ export interface RouteResult {
   isApproximate: boolean;
   source: "osrm" | "cache" | "fallback";
   coordinates: [number, number][]; // [latitude, longitude] pairs for polyline rendering
+  floodAvoidance?: RouteFloodAvoidance;
+}
+
+export interface FloodPolygon {
+  name: string;
+  severity: string;
+  vertices: Array<{ lat: number; lng: number }>;
+}
+
+function isPointInPolygon(lat: number, lng: number, polygon: Array<{ lat: number; lng: number }>): boolean {
+  if (polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lat, yi = polygon[i].lng;
+    const xj = polygon[j].lat, yj = polygon[j].lng;
+    const intersect = yi > lng !== yj > lng && lat < ((xj - xi) * (lng - yi)) / (yj - yi + 1e-12) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+export function findIntersectedFloodZones(
+  coordinates: [number, number][],
+  zones: FloodPolygon[]
+): FloodPolygon[] {
+  if (!zones.length || !coordinates.length) return [];
+  const matched: FloodPolygon[] = [];
+  for (const zone of zones) {
+    if (zone.vertices.length < 3) continue;
+    let hits = false;
+    for (let i = 0; i < coordinates.length; i++) {
+      const [lat, lng] = coordinates[i];
+      if (isPointInPolygon(lat, lng, zone.vertices)) {
+        hits = true;
+        break;
+      }
+      // Also check midpoint between consecutive route points so straight fallback lines don't skip narrow zones
+      if (i + 1 < coordinates.length) {
+        const midLat = (lat + coordinates[i + 1][0]) / 2;
+        const midLng = (lng + coordinates[i + 1][1]) / 2;
+        if (isPointInPolygon(midLat, midLng, zone.vertices)) {
+          hits = true;
+          break;
+        }
+      }
+    }
+    if (hits) matched.push(zone);
+  }
+  return matched;
+}
+
+function computeDetourWaypoint(
+  origin: LatLngPoint,
+  destination: LatLngPoint,
+  zone: FloodPolygon
+): LatLngPoint {
+  const cLat = zone.vertices.reduce((s, v) => s + v.lat, 0) / zone.vertices.length;
+  const cLng = zone.vertices.reduce((s, v) => s + v.lng, 0) / zone.vertices.length;
+  const maxOffsetLat = Math.max(...zone.vertices.map((v) => Math.abs(v.lat - cLat)), 0.015) * 1.45;
+  const maxOffsetLng = Math.max(...zone.vertices.map((v) => Math.abs(v.lng - cLng)), 0.015) * 1.45;
+  const dLat = destination.latitude - origin.latitude;
+  const dLng = destination.longitude - origin.longitude;
+  const len = Math.hypot(dLat, dLng) || 1;
+  // Perpendicular unit vector shifted outside the flood zone polygon
+  const perpLat = -dLng / len;
+  const perpLng = dLat / len;
+  return {
+    latitude: cLat + perpLat * maxOffsetLat,
+    longitude: cLng + perpLng * maxOffsetLng,
+  };
 }
 
 interface CachedRoute {
@@ -140,11 +217,77 @@ export function calculateFallbackRoute(origin: LatLngPoint, destination: LatLngP
 }
 
 /**
- * Primary road routing function with caching, timeout, and graceful fallback.
+ * Parse FloodZone polygonJson strings into FloodPolygon objects safely.
+ */
+export function parseFloodZonesForRouting(
+  rawZones: Array<{ name: string; severity: string; polygonJson: string }>
+): FloodPolygon[] {
+  const parsed: FloodPolygon[] = [];
+  for (const z of rawZones) {
+    try {
+      const verts = JSON.parse(z.polygonJson);
+      if (Array.isArray(verts) && verts.length >= 3) {
+        const vertices = verts
+          .map((v: any) => ({ lat: Number(v.lat ?? v[0]), lng: Number(v.lng ?? v[1]) }))
+          .filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lng));
+        if (vertices.length >= 3) {
+          parsed.push({ name: z.name, severity: z.severity, vertices });
+        }
+      }
+    } catch {
+      // Skip invalid polygon JSON
+    }
+  }
+  return parsed;
+}
+
+async function fetchOsrmCoordinates(waypoints: LatLngPoint[]): Promise<{
+  distanceMeters: number;
+  durationSeconds: number;
+  coordinates: [number, number][];
+}> {
+  const baseUrl = (process.env.OSRM_ROUTER_URL || DEFAULT_OSRM_URL).replace(/\/$/, "");
+  const coordPath = waypoints.map((p) => `${p.longitude},${p.latitude}`).join(";");
+  const url = `${baseUrl}/route/v1/driving/${coordPath}?overview=full&geometries=geojson`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+  const response = await fetch(url, {
+    signal: controller.signal,
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "SahayEmergencyPlatform/1.0",
+    },
+  });
+
+  clearTimeout(timeoutId);
+
+  if (!response.ok) {
+    throw new Error(`OSRM HTTP error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (!data.routes || !data.routes.length || data.code !== "Ok") {
+    throw new Error(`OSRM route not found: ${data.code || "No route"}`);
+  }
+
+  const primaryRoute = data.routes[0];
+  const distanceMeters = Math.round(primaryRoute.distance || 0);
+  const durationSeconds = Math.round(primaryRoute.duration || 0);
+  const rawCoords: [number, number][] = primaryRoute.geometry?.coordinates || [];
+  const coordinates: [number, number][] = rawCoords.map(([lng, lat]) => [lat, lng]);
+
+  return { distanceMeters, durationSeconds, coordinates };
+}
+
+/**
+ * Primary road routing function with flood-zone avoidance, caching, timeout, and graceful fallback.
  */
 export async function calculateRoadRouteAndEta(
   origin: LatLngPoint,
-  destination: LatLngPoint
+  destination: LatLngPoint,
+  options?: { floodZones?: FloodPolygon[] }
 ): Promise<RouteResult> {
   // Validate coordinates
   if (
@@ -158,13 +301,15 @@ export async function calculateRoadRouteAndEta(
     isNaN(destination.longitude)
   ) {
     return calculateFallbackRoute(
-      { latitude: 26.1445, longitude: 91.7362 },
-      { latitude: 26.1445, longitude: 91.7362 }
+      { latitude: 20.5937, longitude: 78.9629 },
+      { latitude: 20.5937, longitude: 78.9629 }
     );
   }
 
-  // 1. Check in-memory cache
-  const cacheKey = makeCacheKey(origin, destination);
+  const activeZones = options?.floodZones || [];
+
+  // 1. Check in-memory cache (skip cache if active flood zones are supplied to ensure fresh hazard checks)
+  const cacheKey = `${makeCacheKey(origin, destination)}::fz${activeZones.length}`;
   const now = Date.now();
   const cached = ROUTE_CACHE.get(cacheKey);
   if (cached && cached.expiresAt > now) {
@@ -175,52 +320,69 @@ export async function calculateRoadRouteAndEta(
   }
 
   // 2. Query OSRM routing engine with a 3.5s timeout
-  const baseUrl = (process.env.OSRM_ROUTER_URL || DEFAULT_OSRM_URL).replace(/\/$/, "");
-  const url = `${baseUrl}/route/v1/driving/${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}?overview=full&geometries=geojson`;
-
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    let routeData = await fetchOsrmCoordinates([origin, destination]);
+    let coords =
+      routeData.coordinates.length > 0
+        ? routeData.coordinates
+        : ([
+            [origin.latitude, origin.longitude],
+            [destination.latitude, destination.longitude],
+          ] as [number, number][]);
 
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "AssamEmergencyRescuePlatform/1.0",
-      },
-    });
+    let floodAvoidance: RouteFloodAvoidance | undefined;
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`OSRM HTTP error: ${response.status}`);
+    if (activeZones.length > 0) {
+      const hits = findIntersectedFloodZones(coords, activeZones);
+      if (hits.length > 0) {
+        const detourWp = computeDetourWaypoint(origin, destination, hits[0]);
+        try {
+          const detourData = await fetchOsrmCoordinates([origin, detourWp, destination]);
+          const detourCoords =
+            detourData.coordinates.length > 0 ? detourData.coordinates : coords;
+          const remainingHits = findIntersectedFloodZones(detourCoords, activeZones);
+          routeData = detourData;
+          coords = detourCoords;
+          floodAvoidance = {
+            avoidsFloodZones: remainingHits.length === 0,
+            intersectedZones: hits.map((h) => h.name),
+            detourApplied: true,
+            hazardWarning:
+              remainingHits.length === 0
+                ? `Detour active avoiding flooded sector: ${hits.map((h) => h.name).join(", ")}`
+                : `Partial flood hazard on route (${remainingHits.map((h) => h.name).join(", ")})`,
+          };
+        } catch {
+          floodAvoidance = {
+            avoidsFloodZones: false,
+            intersectedZones: hits.map((h) => h.name),
+            detourApplied: false,
+            hazardWarning: `Route intersects active flood zone: ${hits.map((h) => h.name).join(", ")}`,
+          };
+        }
+      } else {
+        floodAvoidance = {
+          avoidsFloodZones: true,
+          intersectedZones: [],
+          detourApplied: false,
+        };
+      }
     }
 
-    const data = await response.json();
-    if (!data.routes || !data.routes.length || data.code !== "Ok") {
-      throw new Error(`OSRM route not found: ${data.code || "No route"}`);
-    }
-
-    const primaryRoute = data.routes[0];
-    const distanceMeters = Math.round(primaryRoute.distance || 0);
-    const distanceKm = Math.round((distanceMeters / 1000) * 10) / 10;
-    const durationSeconds = Math.round(primaryRoute.duration || 0);
-    const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
-
-    // Convert GeoJSON [lng, lat] coordinates to Leaflet [lat, lng]
-    const rawCoords: [number, number][] = primaryRoute.geometry?.coordinates || [];
-    const coordinates: [number, number][] = rawCoords.map(([lng, lat]) => [lat, lng]);
+    const distanceKm = Math.round((routeData.distanceMeters / 1000) * 10) / 10;
+    const durationMinutes = Math.max(1, Math.round(routeData.durationSeconds / 60));
 
     const result: RouteResult = {
-      distanceMeters,
+      distanceMeters: routeData.distanceMeters,
       distanceKm,
-      durationSeconds,
+      durationSeconds: routeData.durationSeconds,
       durationMinutes,
       etaText: formatEtaString(durationMinutes, false),
       distanceText: formatDistanceString(distanceKm),
       isApproximate: false,
       source: "osrm",
-      coordinates: coordinates.length > 0 ? coordinates : [[origin.latitude, origin.longitude], [destination.latitude, destination.longitude]],
+      coordinates: coords,
+      ...(floodAvoidance ? { floodAvoidance } : {}),
     };
 
     // Cache the result
@@ -232,8 +394,42 @@ export async function calculateRoadRouteAndEta(
 
     return result;
   } catch (err) {
-    // Graceful fallback to Haversine + road circuity
-    const fallback = calculateFallbackRoute(origin, destination);
+    // Graceful fallback to Haversine + road circuity, with flood-zone detour if intersected
+    let fallback = calculateFallbackRoute(origin, destination);
+
+    if (activeZones.length > 0) {
+      const hits = findIntersectedFloodZones(fallback.coordinates, activeZones);
+      if (hits.length > 0) {
+        const detourWp = computeDetourWaypoint(origin, destination, hits[0]);
+        const leg1 = calculateFallbackRoute(origin, detourWp);
+        const leg2 = calculateFallbackRoute(detourWp, destination);
+        const combinedMeters = leg1.distanceMeters + leg2.distanceMeters;
+        const combinedKm = Math.round((combinedMeters / 1000) * 10) / 10;
+        const combinedSec = leg1.durationSeconds + leg2.durationSeconds;
+        const combinedMin = Math.max(1, Math.round(combinedSec / 60));
+        fallback = {
+          distanceMeters: combinedMeters,
+          distanceKm: combinedKm,
+          durationSeconds: combinedSec,
+          durationMinutes: combinedMin,
+          etaText: formatEtaString(combinedMin, true),
+          distanceText: formatDistanceString(combinedKm),
+          isApproximate: true,
+          source: "fallback",
+          coordinates: [
+            [origin.latitude, origin.longitude],
+            [detourWp.latitude, detourWp.longitude],
+            [destination.latitude, destination.longitude],
+          ],
+          floodAvoidance: {
+            avoidsFloodZones: true,
+            intersectedZones: hits.map((h) => h.name),
+            detourApplied: true,
+            hazardWarning: `Detour applied around flooded zone: ${hits.map((h) => h.name).join(", ")}`,
+          },
+        };
+      }
+    }
 
     // Cache fallback for a shorter time (8 seconds) to retry OSRM on subsequent updates
     ROUTE_CACHE.set(cacheKey, {

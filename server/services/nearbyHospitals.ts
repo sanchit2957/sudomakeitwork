@@ -1,4 +1,5 @@
 import { listHospitals, type MemoryHospital } from "../rescue.db";
+import { findNearbyPanIndiaHospitals, getPanIndiaHospitals } from "../data/panIndiaHospitals";
 
 export interface NormalizedHospitalBranch {
   id: number;
@@ -380,26 +381,34 @@ export async function discoverNearbyHospitals(options: {
   const dbRows = await listHospitals();
   const normalizedBranches = dbRows.map(normalizeHospitalBranch);
 
-  // If caller explicitly requests all registered hospitals across India (e.g. "All Registered" filter)
+  // If caller explicitly requests all registered hospitals across India (e.g. "All Registered" filter) or no coordinates provided yet
   if (options.allRegistered || !hasCoords) {
-    const allItems: NearbyHospitalItem[] = normalizedBranches.map((b) => {
-      const dist = hasCoords ? haversineKm(options.lat!, options.lng!, b.latitude, b.longitude) : 0;
-      return {
+    const panIndiaAll = getPanIndiaHospitals();
+    const existingIds = new Set(normalizedBranches.map((b) => b.id));
+    const mergedAll: NearbyHospitalItem[] = [
+      ...normalizedBranches.map((b) => ({
         ...b,
-        source: "SAHAY_VERIFIED",
-        isSahayVerified: true,
-        distanceKm: parseFloat(dist.toFixed(2)),
-      };
-    });
+        source: "SAHAY_VERIFIED" as const,
+        isSahayVerified: true as const,
+        distanceKm: hasCoords ? parseFloat(haversineKm(options.lat!, options.lng!, b.latitude, b.longitude).toFixed(2)) : 0,
+      })),
+      ...panIndiaAll.filter((p) => !existingIds.has(p.id)).slice(0, 150).map((p) => ({
+        ...normalizeHospitalBranch(p),
+        source: "SAHAY_VERIFIED" as const,
+        isSahayVerified: true as const,
+        distanceKm: hasCoords ? parseFloat(haversineKm(options.lat!, options.lng!, p.latitude, p.longitude).toFixed(2)) : 0,
+      })),
+    ];
+
     if (hasCoords) {
-      allItems.sort((a, b) => a.distanceKm - b.distanceKm);
+      mergedAll.sort((a, b) => a.distanceKm - b.distanceKm);
     }
     return {
-      hospitals: allItems,
+      hospitals: mergedAll,
       counts: {
-        sahayVerified: allItems.length,
+        sahayVerified: mergedAll.length,
         publicDirectory: 0,
-        total: allItems.length,
+        total: mergedAll.length,
       },
       radiusKm,
       center: hasCoords ? { lat: options.lat!, lng: options.lng! } : null,
@@ -410,8 +419,11 @@ export async function discoverNearbyHospitals(options: {
   const userLat = options.lat!;
   const userLng = options.lng!;
 
-  // Tier 1: Active Sahay-registered hospitals within radiusKm
-  const tier1: NearbyHospitalItem[] = normalizedBranches
+  // Tier 1: Active Sahay-registered hospitals (User custom + Pan-India dataset) within radiusKm
+  const panIndiaNearby = findNearbyPanIndiaHospitals(userLat, userLng, radiusKm, 80);
+  const existingBranchIds = new Set(normalizedBranches.map((b) => b.id));
+
+  const localTier1: NearbyHospitalItem[] = normalizedBranches
     .filter((b) => b.legacyStatus !== "closed")
     .map((b) => ({
       ...b,
@@ -419,8 +431,18 @@ export async function discoverNearbyHospitals(options: {
       isSahayVerified: true,
       distanceKm: parseFloat(haversineKm(userLat, userLng, b.latitude, b.longitude).toFixed(2)),
     }))
-    .filter((b) => b.distanceKm <= radiusKm)
-    .sort((a, b) => a.distanceKm - b.distanceKm);
+    .filter((b) => b.distanceKm <= radiusKm);
+
+  const panIndiaTier1: NearbyHospitalItem[] = panIndiaNearby
+    .filter((p) => !existingBranchIds.has(p.id))
+    .map((p) => ({
+      ...normalizeHospitalBranch(p),
+      source: "SAHAY_VERIFIED" as const,
+      isSahayVerified: true,
+      distanceKm: p.distanceKm,
+    }));
+
+  const tier1: NearbyHospitalItem[] = [...localTier1, ...panIndiaTier1].sort((a, b) => a.distanceKm - b.distanceKm);
 
   // Tier 2: Overpass OpenStreetMap nearby hospitals (if enabled)
   let overpassAvailable = true;

@@ -9,6 +9,8 @@ import {
   ChevronRight,
   Edit3,
   HeartHandshake,
+  LayoutGrid,
+  LogOut,
   MapPin,
   ShieldCheck,
   Sparkles,
@@ -16,7 +18,7 @@ import {
 import { useLocation } from "wouter";
 
 export default function UserMore() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { t } = useLanguage();
   const [, setLocation] = useLocation();
 
@@ -148,6 +150,27 @@ export default function UserMore() {
               <ChevronRight className="h-4 w-4 text-[#E2E8F0] transition group-hover:translate-x-1 group-hover:text-[#1D4ED8] dark:group-hover:text-[#F1F5F9]" />
             </button>
           </div>
+        </section>
+        {/* Portal Switch & Session Controls */}
+        <section className="glass-panel mt-5 p-4 flex flex-col gap-2.5 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => setLocation("/")}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-black/10 bg-white/80 px-4 py-3 text-xs font-bold text-[#0F172A] transition hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-[#F8FAFC]"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            <span>{t("All Portals (Main Hub)")}</span>
+          </button>
+          {user && (
+            <button
+              type="button"
+              onClick={() => void logout().then(() => setLocation("/login"))}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-700 transition hover:bg-rose-500/20 dark:text-rose-300"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>{t("Sign Out")}</span>
+            </button>
+          )}
         </section>
       </main>
 

@@ -67,6 +67,7 @@ export type AirQualityNormalized = {
   ozone: number | null;
   sulphurDioxide: number | null;
   carbonMonoxide: number | null;
+  dominantPollutant?: string | null;
 };
 
 export type FloodRiskNormalized = {
@@ -109,6 +110,8 @@ export type NormalizedWeatherReport = {
     rainAmountMm: number | null;
     hourly24h: HourlyForecastItemNormalized[];
     days7: DailyForecastItemNormalized[];
+    daily?: any;
+    hourly?: any;
   };
   trend: {
     source: string;
@@ -116,10 +119,14 @@ export type NormalizedWeatherReport = {
   };
   alerts: WeatherAlert[];
   floodRisk: FloodRiskNormalized;
+  floodAlert?: any;
   airQuality: AirQualityNormalized;
   river: OfficialRiverGauge;
   source: WeatherDataSourceInfo;
+  providerHealth?: any;
 };
+
+export type WeatherComprehensiveReport = NormalizedWeatherReport;
 
 export interface IWeatherProvider {
   readonly id: string;

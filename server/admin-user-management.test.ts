@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import { _memoryUsers, upsertUser } from "./db";
-import { _memoryAuditLogs } from "./rescue.db";
+import { _memoryAuditLogs, _memoryHospitals } from "./rescue.db";
 
 function createMockContext(
   role?: "admin" | "rescuer" | "hospital" | "medical" | "user",
@@ -37,7 +37,7 @@ function createMockContext(
     res: {
       cookie: () => {},
       clearCookie: () => {},
-    } as TrpcContext["res"],
+    } as unknown as TrpcContext["res"],
   };
 }
 
@@ -145,6 +145,35 @@ describe("Admin User Management & RBAC Security Suite", () => {
   });
 
   it("admin can change a citizen's role to 'hospital' with facility linkage", async () => {
+    if (!_memoryHospitals.has(1)) {
+      _memoryHospitals.set(1, {
+        id: 1,
+        ownerUserId: 3,
+        organizationName: "Gauhati Medical College & Hospital",
+        branchName: "Main Hospital",
+        isPrimaryBranch: true,
+        name: "Gauhati Medical College & Hospital",
+        address: "Bhangagarh, Guwahati, Assam",
+        contactPhone: "+913612529457",
+        latitude: 26.1584,
+        longitude: 91.7709,
+        totalEmergencyBeds: 60,
+        availableEmergencyBeds: 24,
+        totalIcuBeds: 20,
+        availableIcuBeds: 8,
+        oxygenCylinderCount: 50,
+        bloodUnitCount: 70,
+        ambulanceCount: 6,
+        foodSupplyStatus: "available",
+        medicineSupplyStatus: "available",
+        waterSupplyStatus: "available",
+        powerBackupStatus: "available",
+        status: "open",
+        isSahayVerified: true,
+        updatedBy: null,
+        updatedAt: new Date(),
+      });
+    }
     const adminCtx = createMockContext("admin", { id: 1 });
     const adminCaller = appRouter.createCaller(adminCtx);
 

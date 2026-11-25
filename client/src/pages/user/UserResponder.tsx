@@ -121,7 +121,7 @@ function ResponderWorkspace() {
     onMutate: async ({ availability }) => {
       await utils.rescue.rescuer.profile.cancel();
       const previous = utils.rescue.rescuer.profile.getData();
-      utils.rescue.rescuer.profile.setData(undefined, profile => reconcileAvailability(profile, availability));
+      utils.rescue.rescuer.profile.setData(undefined, (profile: any) => reconcileAvailability(profile, availability));
       return { previous };
     },
     onError: (_error, _input, context) => {

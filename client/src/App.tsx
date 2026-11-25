@@ -14,7 +14,8 @@ import { isRoleAllowedInPortal } from "@shared/const";
 import { RoleGate } from "./components/RoleGate";
 import AccessCodeRevokedModal from "./components/AccessCodeRevokedModal";
 
-// Critical synchronous core auth routes
+// Critical synchronous core auth & landing routes
+import LandingHub from "./pages/LandingHub";
 import { AdminLogin } from "./pages/admin";
 import { UserHome, UserLogin } from "./pages/user";
 import { HospitalLogin, RescuerLogin } from "./pages/RoleLogin";
@@ -64,6 +65,16 @@ function Router() {
 
   const native = isNativeApp();
 
+  function CitizenDashboardGate() {
+    const { user: activeUser, loading: authLoading } = useAuth();
+    const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+    if (authLoading) return <RouteLoadingFallback />;
+    if (!activeUser && !isOffline) {
+      return <RoleGate roles={["user", "admin", "rescuer", "hospital", "medical"]}><UserHome /></RoleGate>;
+    }
+    return <UserHome />;
+  }
+
   return (
     <>
       <AccessCodeRevokedModal
@@ -99,9 +110,12 @@ function Router() {
             </DesktopOnlyGate>
           </Route>
 
-          {/* Main Entry: User Home Emergency Hub */}
-          <Route path={"/"}>
-            <UserHome />
+          {/* Main Homepage: 4-Panel Unified Portal Hub */}
+          <Route path={"/"} component={LandingHub} />
+
+          {/* Dedicated Citizen SOS Dashboard */}
+          <Route path={"/citizen"}>
+            <CitizenDashboardGate />
           </Route>
 
         {/* User Section Routes */}

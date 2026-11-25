@@ -35,7 +35,7 @@ export function VictimNavigation({ current, hide = false }: VictimNavigationProp
   if (hide || hasOpenDialog) return null;
 
   const items = [
-    { id: "home" as const, icon: Siren, label: t("SOS"), path: "/" },
+    { id: "home" as const, icon: Siren, label: t("SOS"), path: "/citizen" },
     { id: "track" as const, icon: Navigation, label: t("Track"), path: "/track" },
     { id: "safety" as const, icon: ShieldCheck, label: t("Safety"), path: "/safety" },
     { id: "more" as const, icon: MoreHorizontal, label: t("More"), path: "/more" },

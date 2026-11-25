@@ -30,7 +30,7 @@ describe("Incident Chat & Post-Rescue Check-In IDOR Security", () => {
     severity: "critical",
     status: "dispatched",
     requestCategory: "rescue",
-    dispatchStatus: "dispatched",
+    dispatchStatus: "assigned",
     assignedRescuerId: 701,
     destinationHospitalId: null,
     destinationHospitalName: null,

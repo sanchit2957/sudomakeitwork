@@ -302,7 +302,7 @@ export function HospitalStaffDashboard({
       medicineSupplyStatus: draft.medicineSupplyStatus,
       waterSupplyStatus: draft.waterSupplyStatus,
       powerBackupStatus: draft.powerBackupStatus,
-      status: draft.status,
+      status: normalizeHospitalStatus(draft.status),
     });
   };
 

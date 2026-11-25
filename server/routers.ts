@@ -342,6 +342,7 @@ export const appRouter = router({
           role: z.enum(["admin", "rescuer", "hospital", "medical", "user"]).default("user"),
           portal: portalEnum.optional(),
           governmentCode: z.string().optional(),
+          commandKey: z.string().optional(),
           phone: z.string().optional(),
           callSign: z.string().optional(),
           supabaseUserId: z.string().optional(),
@@ -353,10 +354,21 @@ export const appRouter = router({
         const effectivePortal = input.portal ?? ctx.portal ?? sdk.resolveRequestPortal(ctx.req);
         const emailVal = input.email.trim().toLowerCase();
         const requestedRole = input.role === "medical" ? "hospital" : input.role;
-        let assignedRole: "user" | "rescuer" | "hospital" = "user";
+        let assignedRole: "user" | "rescuer" | "hospital" | "admin" = "user";
         let codeVersion: number | undefined;
 
-        if (requestedRole === "rescuer" || requestedRole === "hospital") {
+        if (requestedRole === "admin" && input.commandKey !== undefined) {
+          const expectedKey =
+            process.env.ADMIN_REGISTRATION_KEY ||
+            (process.env.NODE_ENV !== "production" ? "ADMIN-2026" : process.env.ADMIN_INITIAL_PASSWORD);
+          if (!expectedKey || input.commandKey.trim() !== expectedKey) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "Invalid Command Provisioning Key for Administrator registration.",
+            });
+          }
+          assignedRole = "admin";
+        } else if (requestedRole === "rescuer" || requestedRole === "hospital") {
           if (!input.governmentCode || !input.governmentCode.trim()) {
             throw new TRPCError({
               code: "BAD_REQUEST",
@@ -463,7 +475,7 @@ export const appRouter = router({
         .mutation(async ({ input, ctx }) => {
           const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
           const prefix = input.role === "rescuer" ? "RESC" : "HOSP";
-          const generatedCode = `SAHAY-${prefix}-${randomSuffix}`;
+          const generatedCode = `ASSAM-${prefix}-${randomSuffix}`;
           const res = await setRoleAccessCode(input.role, generatedCode, ctx.user.id);
           broadcastPortalEvent({
             type: "access_code_revoked",

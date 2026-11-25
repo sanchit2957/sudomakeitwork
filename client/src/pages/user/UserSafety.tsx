@@ -125,9 +125,6 @@ export default function UserSafety() {
 
   // Fetch Tier-1 (Sahay Verified) + Tier-2 (OpenStreetMap Public Directory) hospitals dynamically
   useEffect(() => {
-    if (!position && filterMode !== "all") {
-      return;
-    }
     let active = true;
     const fetchDiscovery = async () => {
       setNearbyLoading(true);
@@ -136,6 +133,8 @@ export default function UserSafety() {
         if (position) {
           params.set("lat", String(position.latitude));
           params.set("lng", String(position.longitude));
+        } else {
+          params.set("allRegistered", "true");
         }
         params.set("radiusKm", String(radiusKm));
         if (filterMode === "verified") params.set("includePublic", "false");
@@ -185,6 +184,7 @@ export default function UserSafety() {
       })
       .filter(h => {
         if (filterMode === "all" || filterMode === "verified") return true;
+        if (!position) return true;
         if (h.distanceKm === null || h.distanceKm === undefined) return true;
         return h.distanceKm <= radiusKm;
       })
@@ -213,7 +213,7 @@ export default function UserSafety() {
         {/* Header */}
         <header className="glass-card mb-5 flex items-center justify-between p-3.5 shadow-sm">
           <button
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/citizen")}
             className="flex items-center gap-3 text-left transition hover:opacity-85 active:scale-95"
           >
             <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#1D4ED8] text-white shadow-md shadow-[#1D4ED8]/20">
@@ -253,7 +253,7 @@ export default function UserSafety() {
               {t("Call 112")}
             </a>
             <button
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/citizen")}
               className="inline-flex items-center justify-center rounded-xl border border-[#1D4ED8]/40 bg-[#1D4ED8] px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-[#1d47db] active:scale-95"
             >
               <AlertTriangle className="mr-2 h-4 w-4 text-amber-300" />

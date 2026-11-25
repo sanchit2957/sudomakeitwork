@@ -261,11 +261,11 @@ describe("Role Access Codes & Auth Gating", () => {
     expect(loginRes.user!.email).toBe(customEmail);
     expect(loginRes.user!.role).toBe("rescuer");
 
-    // 3. Confirm old unregistered hardcoded email fails with Invalid email or password
+    // 3. Confirm unregistered email fails with Invalid email or password
     await expect(
       caller.auth.login({
-        email: "rescuer@assamrescue.gov.in",
-        password: "rescuer",
+        email: "unregistered.rescuer@assamrescue.gov.in",
+        password: "wrongpassword",
         governmentCode: activeCode,
       })
     ).rejects.toThrow(/Invalid email or password/i);

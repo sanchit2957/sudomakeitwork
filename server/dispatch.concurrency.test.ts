@@ -24,9 +24,13 @@ describe("Automated Dispatch Concurrency & Security Rules", () => {
     _memoryUsers.set("302", { id: 302, openId: "rescuer-302", name: "Unit 302", email: "302@gov.in", loginMethod: "password", role: "rescuer", createdAt: baseTime, updatedAt: baseTime, lastSignedIn: baseTime });
 
     _memoryRescueProfiles.set(301, {
+      id: 301,
       userId: 301,
       callSign: "UNIT-301",
       phone: "+919876543201",
+      photoKey: null,
+      photoUrl: null,
+      contactSharing: "yes",
       availability: "available",
       locationSharing: "yes",
       lastLatitude: 26.15,
@@ -36,9 +40,13 @@ describe("Automated Dispatch Concurrency & Security Rules", () => {
     });
 
     _memoryRescueProfiles.set(302, {
+      id: 302,
       userId: 302,
       callSign: "UNIT-302",
       phone: "+919876543202",
+      photoKey: null,
+      photoUrl: null,
+      contactSharing: "yes",
       availability: "available",
       locationSharing: "yes",
       lastLatitude: 26.16,

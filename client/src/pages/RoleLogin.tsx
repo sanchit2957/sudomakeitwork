@@ -56,11 +56,17 @@ const portalConfig = {
 export function RoleLogin({ role }: { role: PortalRole }) {
   const config = portalConfig[role];
   const Icon = config.icon;
-  const { login, register, logout } = useAuth();
+  const { user, login, register, logout } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Mode: "signin" vs "register"
-  const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
+  // Mode: "signin" vs "register" (supports ?mode=register / ?mode=signin)
+  const [authMode, setAuthMode] = useState<"signin" | "register">(() => {
+    if (typeof window !== "undefined") {
+      const m = new URLSearchParams(window.location.search).get("mode");
+      if (m === "register") return "register";
+    }
+    return "signin";
+  });
 
   // Sign In fields
   const [email, setEmail] = useState("");
@@ -178,7 +184,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
       <header className="sticky top-0 z-30 border-b border-black/5 bg-white/85 px-4 py-3 backdrop-blur-md dark:border-white/10 dark:bg-[#111214]/85">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <button
-            onClick={() => setLocation("/login")}
+            onClick={() => setLocation("/")}
             className="flex items-center gap-2.5 text-left transition hover:opacity-80 focus:outline-none"
           >
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0f766e] text-white shadow-sm">
@@ -192,8 +198,8 @@ export function RoleLogin({ role }: { role: PortalRole }) {
             </span>
           </button>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => setLocation("/login")} className="text-xs">
-              Citizen Portal
+            <Button variant="outline" size="sm" onClick={() => setLocation("/")} className="text-xs">
+              All Portals
             </Button>
             <LanguageSelector compact />
           </div>
@@ -209,6 +215,26 @@ export function RoleLogin({ role }: { role: PortalRole }) {
           <h1 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">{config.heading}</h1>
           <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{config.description}</p>
         </div>
+
+        {/* Active Session Banner if already signed into this operational portal */}
+        {user && (user.role === role || user.role === "admin" || (role === "hospital" && user.role === "medical")) && (
+          <div className="mt-6 overflow-hidden rounded-3xl border border-[#0f766e]/30 bg-white p-5 shadow-sm dark:border-emerald-500/20 dark:bg-[#151718]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-extrabold">{user.name || user.email}</p>
+                <p className="truncate text-xs text-muted-foreground">Active {config.title} Session</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={() => setLocation(config.destination)} className="rounded-xl bg-[#0f766e] text-xs font-bold text-white">
+                  Enter Dashboard
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => void logout()} className="rounded-xl text-xs">
+                  Sign Out
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mode Switcher */}
         <div className="my-7 sm:my-8 grid grid-cols-2 gap-2.5 rounded-2xl bg-black/5 p-2 dark:bg-white/5">
@@ -527,10 +553,10 @@ export function RoleLogin({ role }: { role: PortalRole }) {
 
         <div className="mt-6 text-center">
           <button
-            onClick={() => setLocation("/login")}
+            onClick={() => setLocation("/")}
             className="text-xs font-bold text-[#0f766e] hover:underline dark:text-emerald-400"
           >
-            ← Back to Citizen / All Portals
+            ← Back to All Portals (Main Homepage)
           </button>
         </div>
       </main>

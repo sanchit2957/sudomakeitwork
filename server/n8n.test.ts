@@ -134,8 +134,8 @@ describe("n8n SOS Escalation & Status Monitoring Integration", () => {
         publicCode: inc!.publicCode,
         severity: inc!.severity,
         status: inc!.status,
-        escalationLevel: inc!.escalationLevel ?? 0,
-        automationStatus: inc!.automationStatus ?? "active",
+        escalationLevel: (inc as any)?.escalationLevel ?? 0,
+        automationStatus: (inc as any)?.automationStatus ?? "active",
       };
     };
 
@@ -199,9 +199,9 @@ describe("n8n SOS Escalation & Status Monitoring Integration", () => {
     });
 
     const updated = await getIncidentById(incidentId);
-    expect(updated?.escalationLevel).toBe(2);
-    expect(updated?.automationStatus).toBe("escalated_level_2");
-    expect(updated?.lastEscalatedAt).toBeDefined();
+    expect((updated as any)?.escalationLevel).toBe(2);
+    expect((updated as any)?.automationStatus).toBe("escalated_level_2");
+    expect((updated as any)?.lastEscalatedAt).toBeDefined();
   });
 
   it("Accepts offline SOS via POST /api/sos/offline and stores incident with valid public code", async () => {

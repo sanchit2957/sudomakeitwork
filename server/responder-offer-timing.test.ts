@@ -32,6 +32,7 @@ function createRescuerContext(
       email: `rescuer${id}@test.org`,
       loginMethod: "test",
       role: "rescuer",
+      password: null,
       status: "active",
       createdAt: now,
       updatedAt: now,

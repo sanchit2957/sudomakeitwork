@@ -12,7 +12,7 @@ const { appRouter } = await import("./routers");
 function adminContext(): TrpcContext {
   const now = new Date();
   return {
-    user: { id: 700001, openId: "approval-test-admin", name: "Test administrator", email: null, loginMethod: "test", role: "admin", createdAt: now, updatedAt: now, lastSignedIn: now },
+    user: { id: 700001, openId: "approval-test-admin", name: "Test administrator", email: null, password: null, status: "active", loginMethod: "test", role: "admin", createdAt: now, updatedAt: now, lastSignedIn: now },
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: {} as TrpcContext["res"],
   };

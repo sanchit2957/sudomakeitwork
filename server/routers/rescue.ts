@@ -36,6 +36,8 @@ import {
   POPULAR_INDIAN_LOCATIONS,
   weatherProviderManager,
 } from "../weather.service";
+import { findNearbyPanIndiaHospitals, getPanIndiaHospitals, haversineFast } from "../data/panIndiaHospitals";
+import { clusterIncidentsDBSCAN } from "../dispatch/clustering";
 import {
   adminProcedure,
   medicalOperationsProcedure,
@@ -113,7 +115,7 @@ import {
 } from "../safety-assistance.policy";
 import { sendRescuerPush } from "../push";
 import { triggerN8nSosWebhook } from "../n8n";
-import { calculateRoadRouteAndEta } from "../routing/routing.service";
+import { calculateRoadRouteAndEta, parseFloodZonesForRouting } from "../routing/routing.service";
 import { broadcastLiveTrackingUpdate, broadcastMissionStatusUpdate } from "../tracking/liveStream";
 import {
   authorizeHospitalBranchMutation,
@@ -278,10 +280,19 @@ async function emitIncidentAlerts(
   latitude: number,
   longitude: number
 ) {
-  if (severity !== "critical" && severity !== "high") return;
-  const nearbyRescuers = await getAvailableRescuersNear(latitude, longitude, 25);
+  let nearbyRescuers = await getAvailableRescuersNear(latitude, longitude, 50);
+  if (nearbyRescuers.length === 0) {
+    nearbyRescuers = await getAvailableRescuersNear(latitude, longitude, 500);
+  }
+  if (nearbyRescuers.length === 0) {
+    const allRescuers = Array.from(_memoryUsers.values()).filter(u => u.role === "rescuer" && u.status === "active");
+    nearbyRescuers = allRescuers.map(u => ({ user: u, profile: _memoryRescueProfiles.get(u.id) || { userId: u.id, availability: "available" } }));
+  }
+
   if (nearbyRescuers.length) {
     const db = await database();
+    const alertTitle = `${severity === "critical" ? "Critical" : severity === "high" ? "High-priority" : "Emergency"} SOS nearby`;
+    const alertBody = `${publicCode} reported at ${locationLabel}. Immediate response required.`;
     if (db) {
       try {
         await db.insert(notifications).values(
@@ -289,8 +300,8 @@ async function emitIncidentAlerts(
             recipientId: user.id,
             incidentId,
             type: "priority_incident" as const,
-            title: `${severity === "critical" ? "Critical" : "High-priority"} SOS nearby`,
-            body: `${publicCode} reported at ${locationLabel}. Review the operations board.`,
+            title: alertTitle,
+            body: alertBody,
           }))
         );
       } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
@@ -301,8 +312,8 @@ async function emitIncidentAlerts(
         recipientId: user.id,
         incidentId,
         type: "priority_incident",
-        title: `${severity === "critical" ? "Critical" : "High-priority"} SOS nearby`,
-        body: `${publicCode} reported at ${locationLabel}. Review the operations board.`,
+        title: alertTitle,
+        body: alertBody,
         readAt: null,
         createdAt: new Date(),
       });
@@ -311,8 +322,8 @@ async function emitIncidentAlerts(
       await sendRescuerPush(
         nearbyRescuers.map(({ user }) => user.id),
         {
-          title: `${severity === "critical" ? "Critical" : "High-priority"} SOS nearby`,
-          body: `${publicCode} reported at ${locationLabel}. Review the operations board.`,
+          title: alertTitle,
+          body: alertBody,
           incidentId,
           url: "/responder/alerts",
         }
@@ -321,10 +332,50 @@ async function emitIncidentAlerts(
       console.warn("[Alerts] Rescuer push notification skipped:", pushErr);
     }
   }
+
+  // Notify nearest hospitals so medical emergency facilities can prepare
+  try {
+    const panIndiaNearest = findNearbyPanIndiaHospitals(latitude, longitude, 50, 3);
+    const liveHospitals = (await listHospitals()).filter(h => {
+      if (h.status === "closed") return false;
+      const d = haversineFast(latitude, longitude, h.latitude, h.longitude);
+      return d <= 50;
+    });
+
+    const hospitalsToNotify = [...liveHospitals, ...panIndiaNearest];
+    const seenHospIds = new Set<number>();
+
+    for (const hosp of hospitalsToNotify) {
+      if (seenHospIds.has(hosp.id)) continue;
+      seenHospIds.add(hosp.id);
+      const distKm = (hosp as any).distanceKm ?? haversineFast(latitude, longitude, hosp.latitude, hosp.longitude);
+      await createHospitalCaseNotification({
+        incidentId,
+        hospitalId: hosp.id,
+        rescuerId: nearbyRescuers[0]?.user?.id || 1,
+        severity,
+        patientCount: 1,
+        estimatedArrivalMinutes: Math.max(5, Math.round(distKm / 0.8)),
+        requiredDepartment: "Emergency Medicine",
+        icuRequired: severity === "critical" ? "yes" : "no",
+        oxygenRequired: severity === "critical" || severity === "high" ? "yes" : "no",
+        notes: `Inbound Emergency Alert from SOS ${publicCode} near ${locationLabel} (~${Math.round(distKm)} km away).`,
+      });
+    }
+    broadcastPortalEvent({
+      type: "hospital_case" as any,
+      portals: ["hospital", "admin"],
+      action: "created",
+      data: { incidentId },
+    });
+  } catch (hospErr) {
+    console.warn("[Alerts] Hospital case notification error:", hospErr);
+  }
+
   try {
     await notifyOwner({
-      title: `${severity === "critical" ? "Critical" : "High-priority"} SOS: ${publicCode}`,
-      content: `New SOS at ${locationLabel}. ${nearbyRescuers.length} nearby available rescuer(s) notified in-app.`,
+      title: `${severity === "critical" ? "Critical" : "Emergency"} SOS: ${publicCode}`,
+      content: `New SOS at ${locationLabel}. ${nearbyRescuers.length} responder(s) notified in-app.`,
     });
   } catch (ownerErr) {
     console.warn("[Alerts] Owner notification skipped:", ownerErr);
@@ -837,7 +888,14 @@ export const rescueRouter = router({
         });
         broadcastPortalEvent({
           type: "incident_update",
-          portals: ["admin", "hospital", "citizen"],
+          portals: ["admin", "hospital", "rescuer"],
+          publicCode,
+          action: "created",
+          data: { incidentId },
+        });
+        broadcastPortalEvent({
+          type: "incident_update",
+          portals: ["citizen"],
           targetUserIds: [ctx.user.id],
           publicCode,
           action: "created",
@@ -992,9 +1050,17 @@ export const rescueRouter = router({
 
         if (presentedRescuer && presentedRescuer.location) {
           const targetPoint = { latitude: incident.latitude, longitude: incident.longitude };
+          let activeFloodPolygons: ReturnType<typeof parseFloodZonesForRouting> = [];
+          try {
+            const layers = await getMapLayers(false);
+            activeFloodPolygons = parseFloodZonesForRouting(layers.floodZones || []);
+          } catch {
+            activeFloodPolygons = [];
+          }
           const route = await calculateRoadRouteAndEta(
             { latitude: presentedRescuer.location.latitude, longitude: presentedRescuer.location.longitude },
-            targetPoint
+            targetPoint,
+            activeFloodPolygons.length ? { floodZones: activeFloodPolygons } : undefined
           );
           computedRoute = {
             distanceKm: route.distanceKm,
@@ -1003,6 +1069,7 @@ export const rescueRouter = router({
             etaText: route.etaText,
             isApproximate: route.isApproximate,
             coordinates: route.coordinates,
+            floodAvoidance: route.floodAvoidance,
           };
         }
 
@@ -1018,6 +1085,8 @@ export const rescueRouter = router({
           latitude: incident.latitude,
           longitude: incident.longitude,
           severity: incident.severity,
+          voiceNoteUrl: incident.voiceNoteUrl ?? null,
+          voiceNoteDurationSeconds: incident.voiceNoteDurationSeconds ?? null,
           createdAt: incident.createdAt,
           dispatchedAt: incident.dispatchedAt,
           resolvedAt: incident.resolvedAt,
@@ -1347,12 +1416,21 @@ export const rescueRouter = router({
               .from(hospitals)
               .where(inArray(hospitals.status, ["open", "limited", "critical"])),
           ]);
-          return { shelters: shelterRows, hospitals: hospitalRows };
+          let mergedHospitals = hospitalRows;
+          if (mergedHospitals.length < 50) {
+            const panIndia = getPanIndiaHospitals().slice(0, 100);
+            mergedHospitals = [...mergedHospitals, ...panIndia as any];
+          }
+          return { shelters: shelterRows, hospitals: mergedHospitals };
         } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
       }
+      const memHospitals = Array.from(_memoryHospitals.values()).filter(h => h.status !== "closed");
+      const fallbackHospitals = memHospitals.length >= 50
+        ? memHospitals
+        : [...memHospitals, ...getPanIndiaHospitals().slice(0, 100) as any];
       return {
         shelters: Array.from(_memoryShelters.values()).filter(s => s.status === "open"),
-        hospitals: Array.from(_memoryHospitals.values()).filter(h => h.status !== "closed"),
+        hospitals: fallbackHospitals,
       };
     }),
     createRequest: protectedProcedure
@@ -1606,7 +1684,7 @@ export const rescueRouter = router({
         action: "registration_requested",
         data: { requestId: reqId },
       });
-      return { status: "pending" as const };
+      return { success: true, status: "pending" as const, requestId: reqId };
     }),
     mine: protectedProcedure.query(async ({ ctx }) => {
       const db = await database();
@@ -1630,6 +1708,18 @@ export const rescueRouter = router({
     incidents: adminProcedure
       .input(z.object({ status: missionStatusSchema.optional() }).optional())
       .query(({ input }) => listIncidents(input?.status)),
+    clusteredIncidents: operationalProcedure
+      .input(z.object({ epsilonKm: z.number().min(0.05).max(20).optional(), minPoints: z.number().int().min(2).max(20).optional() }).optional())
+      .query(async ({ input }) => {
+        const rows = await listIncidents();
+        const active = rows
+          .filter(r => r.incident.status !== "resolved")
+          .map(r => r.incident);
+        return clusterIncidentsDBSCAN(active, {
+          epsilonKm: input?.epsilonKm ?? 0.5,
+          minPoints: input?.minPoints ?? 2,
+        });
+      }),
     analytics: adminProcedure.query(() => getAnalytics()),
     postRescueRecords: adminProcedure.query(() => listPostRescueCheckIns(24)),
     mapLayers: operationalProcedure.query(({ ctx }) => getMapLayers(ctx.user.role !== "user")),
@@ -2253,7 +2343,9 @@ export const rescueRouter = router({
               if (h) hospitalExists = true;
             } catch (err) {}
           } else {
-            hospitalExists = _memoryHospitals.has(input.hospitalId);
+            hospitalExists =
+              _memoryHospitals.has(input.hospitalId) ||
+              getPanIndiaHospitals().some(h => h.id === input.hospitalId);
           }
           if (!hospitalExists) {
             throw new TRPCError({ code: "NOT_FOUND", message: "Selected hospital facility was not found." });
@@ -2605,6 +2697,10 @@ export const rescueRouter = router({
             } catch (err) {}
             try {
               const created = await db.insert(hospitals).values({
+                ownerUserId: request.userId,
+                organizationName: request.hospitalName,
+                branchName: "Main Hospital",
+                isPrimaryBranch: true,
                 name: request.hospitalName,
                 address: request.address,
                 contactPhone: request.contactPhone,
@@ -2636,6 +2732,10 @@ export const rescueRouter = router({
           }
           _memoryHospitals.set(hospitalId, {
             id: hospitalId,
+            ownerUserId: request.userId,
+            organizationName: request.hospitalName,
+            branchName: "Main Hospital",
+            isPrimaryBranch: true,
             name: request.hospitalName,
             address: request.address,
             contactPhone: request.contactPhone,

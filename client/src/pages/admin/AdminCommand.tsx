@@ -58,6 +58,7 @@ function CommandWorkspace() {
   const liveAdmin = { refetchInterval: sseConnected ? false : 15_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const analytics = trpc.rescue.operations.analytics.useQuery(undefined, liveIncidents);
   const incidents = trpc.rescue.operations.incidents.useQuery(undefined, liveIncidents);
+  const clustered = trpc.rescue.operations.clusteredIncidents.useQuery(undefined, liveIncidents);
   const roster = trpc.rescue.operations.rescueRoster.useQuery(undefined, liveResources);
   const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, liveResources);
   const hospitals = trpc.rescue.operations.hospitals.useQuery(undefined, liveResources);
@@ -160,6 +161,31 @@ function CommandWorkspace() {
                   </Select>
                 </div>
               </div>
+
+              {clustered.data && clustered.data.clusters.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                      Spatial SOS Clusters Detected ({clustered.data.clusters.length})
+                    </p>
+                    <span className="font-mono text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                      DBSCAN · 500m radius
+                    </span>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {clustered.data.clusters.map(cl => (
+                      <div key={cl.clusterId} className="rounded-xl border border-amber-500/25 bg-white/80 p-2.5 text-xs dark:bg-black/30">
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="font-mono text-[#1D4ED8] dark:text-[#93C5FD]">{cl.clusterId} · {cl.incidentCount} SOS calls</span>
+                          <span className="uppercase text-[10px] text-red-600 dark:text-red-400">{cl.highestSeverity}</span>
+                        </div>
+                        <p className="mt-0.5 truncate text-[11px] font-semibold text-foreground">{cl.primaryLocationLabel}</p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">{cl.totalPeopleAffected} people · Codes: {cl.publicCodes.join(", ")}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-5 space-y-3">
                 {visibleIncidents.length ? (

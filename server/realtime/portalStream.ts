@@ -30,6 +30,7 @@ export type PortalSseEventType =
   | "incident_update"
   | "mission_offer"
   | "hospital_update"
+  | "hospital_case"
   | "shelter_update"
   | "safety_request_update"
   | "post_rescue_update"

@@ -42,10 +42,10 @@ export function RoleGate({
       user.role === "admin"
         ? "/command"
         : user.role === "hospital" || user.role === "medical"
-        ? "/medical"
+        ? "/hospital"
         : user.role === "rescuer"
         ? "/responder"
-        : "/";
+        : "/citizen";
     return <Redirect to={dashboard} />;
   }
 

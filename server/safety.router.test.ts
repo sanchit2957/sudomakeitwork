@@ -23,7 +23,7 @@ import { appRouter } from "./routers";
 
 function contextFor(role: "user" | "rescuer" | "medical" | "admin", id: number): TrpcContext {
   const now = new Date();
-  return { user: { id, openId: `test-${id}`, name: "Safety test", email: null, loginMethod: "test", role, createdAt: now, updatedAt: now, lastSignedIn: now }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] };
+  return { user: { id, openId: `test-${id}`, name: "Safety test", email: null, password: null, status: "active", loginMethod: "test", role, createdAt: now, updatedAt: now, lastSignedIn: now }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] };
 }
 
 const queueSeed = [

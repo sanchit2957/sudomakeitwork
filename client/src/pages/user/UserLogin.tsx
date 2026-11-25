@@ -77,8 +77,14 @@ export default function UserLogin() {
         : null
     : null;
 
-  // Top level auth mode: "signin" or "register"
-  const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
+  // Top level auth mode: "signin" or "register" (supports ?mode=register / ?mode=signin)
+  const [authMode, setAuthMode] = useState<"signin" | "register">(() => {
+    if (typeof window !== "undefined") {
+      const m = new URLSearchParams(window.location.search).get("mode");
+      if (m === "register") return "register";
+    }
+    return "signin";
+  });
   const [signinMethod, setSigninMethod] = useState<"otp" | "password">(() =>
     isSupabaseConfigured() ? "otp" : "password"
   );
@@ -272,9 +278,9 @@ export default function UserLogin() {
         return "/responder";
       case "hospital":
       case "medical":
-        return "/medical";
+        return "/hospital";
       default:
-        return "/";
+        return "/citizen";
     }
   };
 
@@ -302,114 +308,109 @@ export default function UserLogin() {
           </button>
 
           <div className="flex items-center gap-2.5">
-            {/* Admin Portal Button - Hidden on Mobile App */}
-            {!isMobileApp && (
-              <button
-                onClick={() => setLocation("/admin/login")}
-                className="hidden items-center gap-1.5 rounded-xl border border-[#0f766e]/30 bg-[#0f766e]/10 px-3 py-1.5 text-xs font-bold text-[#0f766e] transition hover:bg-[#0f766e]/20 dark:text-emerald-400 sm:flex"
-              >
-                <Shield className="h-3.5 w-3.5" />
-                Admin Portal
-              </button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setLocation("/")}
+              className="hidden sm:inline-flex text-xs font-bold"
+            >
+              All Portals
+            </Button>
             <LanguageSelector compact />
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-lg px-4 py-6 sm:py-10">
-        {/* Active Session Card if already logged in */}
-        {user ? (
-          <div className="mt-8 overflow-hidden rounded-3xl border border-[#0f766e]/30 bg-white p-6 shadow-md dark:border-emerald-500/20 dark:bg-[#151718] sm:p-8">
-            <div className="flex flex-col items-center gap-4 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-3xl bg-[#0f766e] text-white shadow-lg">
-                <User className="h-8 w-8" />
-              </span>
+        {/* Title Header */}
+        <div className="text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-3.5 py-1 font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0f766e] dark:text-emerald-400">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Citizen Emergency Portal
+          </div>
+          <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl md:text-4xl">
+            {authMode === "signin" ? "Sign In" : "Create Account"}
+          </h1>
+          <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-muted-foreground sm:text-sm">
+            {authMode === "signin"
+              ? "Access your citizen safety profile, live disaster tracking, and instant SOS alerts."
+              : "Register a citizen account for rapid SOS dispatch and emergency contacts management."}
+          </p>
+        </div>
+
+        {/* Active Session Notice if already logged in */}
+        {user && (
+          <div className="mt-6 overflow-hidden rounded-3xl border border-[#0f766e]/30 bg-white p-5 shadow-sm dark:border-emerald-500/20 dark:bg-[#151718]">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-left">
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <h2 className="text-xl font-black sm:text-2xl">
-                    Hi, {user.name ? user.name.trim().split(/\s+/)[0] : (user.email ? user.email.split("@")[0] : "Citizen")}
-                  </h2>
-                  <span className="rounded-md bg-[#0f766e]/15 px-2.5 py-0.5 font-mono text-[10px] font-extrabold uppercase text-[#0f766e] dark:text-emerald-400">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-extrabold">{user.name || user.email}</p>
+                  <span className="rounded-md bg-[#0f766e]/15 px-2 py-0.5 font-mono text-[10px] font-extrabold uppercase text-[#0f766e] dark:text-emerald-400">
                     {user.role}
                   </span>
                 </div>
-                {user.name && <p className="mt-0.5 text-xs font-semibold text-foreground">{user.name}</p>}
-                <p className="mt-0.5 text-xs text-muted-foreground">{user.email || "Active User Session"}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  Active Session ({user.email})
+                </p>
               </div>
-
-              <div className="mt-4 flex w-full max-w-sm flex-col gap-3">
+              <div className="flex items-center gap-2">
                 <Button
+                  size="sm"
                   onClick={() => setLocation(getDashboardDestinationForRole(user.role))}
-                  className="h-12 rounded-xl bg-[#0f766e] text-sm font-bold text-white shadow-md hover:bg-[#0f766e]/90"
+                  className="rounded-xl bg-[#0f766e] text-xs font-bold text-white shadow-sm hover:bg-[#0f766e]/90"
                 >
-                  {user.role === "user" ? "Enter Citizen SOS Hub" : `Enter ${user.role.toUpperCase()} Workspace`}
+                  {user.role === "user" ? "Enter SOS Hub" : "Go to Dashboard"}
                 </Button>
                 <Button
+                  size="sm"
+                  variant="outline"
                   onClick={handleLogout}
                   disabled={isSubmitting}
-                  variant="outline"
-                  className="h-11 rounded-xl text-xs font-semibold text-destructive hover:bg-destructive/10"
+                  className="rounded-xl text-xs font-semibold text-destructive hover:bg-destructive/10"
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
+                  <LogOut className="mr-1.5 h-3.5 w-3.5" />
                   {isSubmitting ? "Signing Out…" : "Sign Out"}
                 </Button>
               </div>
             </div>
           </div>
-        ) : (
-          <>
-            {/* Title Header */}
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-3.5 py-1 font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0f766e] dark:text-emerald-400">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Citizen Emergency Portal
-              </div>
-              <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl md:text-4xl">
-                {authMode === "signin" ? "Sign In" : "Create Account"}
-              </h1>
-              <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {authMode === "signin"
-                  ? "Access your citizen safety profile, live disaster tracking, and instant SOS alerts."
-                  : "Register a citizen account for rapid SOS dispatch and emergency contacts management."}
-              </p>
-            </div>
+        )}
 
-            {/* Top Sign In / Register Switcher */}
-            <div className="my-7 sm:my-8 grid grid-cols-2 gap-2.5 rounded-2xl bg-black/5 p-2 dark:bg-white/5">
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode("signin");
-                  setErrorMessage("");
-                  setSuccessMessage("");
-                }}
-                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
-                  authMode === "signin"
-                    ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Lock className="h-3.5 w-3.5" />
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode("register");
-                  setErrorMessage("");
-                  setSuccessMessage("");
-                }}
-                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
-                  authMode === "register"
-                    ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <UserPlus className="h-3.5 w-3.5" />
-                Register
-              </button>
-            </div>
+        {/* Top Sign In / Register Switcher */}
+        <div className="my-7 sm:my-8 grid grid-cols-2 gap-2.5 rounded-2xl bg-black/5 p-2 dark:bg-white/5">
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMode("signin");
+              setErrorMessage("");
+              setSuccessMessage("");
+            }}
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
+              authMode === "signin"
+                ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Lock className="h-3.5 w-3.5" />
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMode("register");
+              setErrorMessage("");
+              setSuccessMessage("");
+            }}
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all ${
+              authMode === "register"
+                ? "bg-white text-foreground shadow-sm dark:bg-[#1a1c20]"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            Register
+          </button>
+        </div>
 
         {/* Main Auth Container - Modern Form Adapted from Uiverse.io honest-snail-17 */}
         <div className="modern-form mt-6 sm:mt-8 !max-w-xl !p-6 sm:!p-8 shadow-xl">
@@ -707,7 +708,7 @@ export default function UserLogin() {
                 </p>
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                   <Button
-                    onClick={() => setLocation("/")}
+                    onClick={() => setLocation("/citizen")}
                     className="flex-1 h-11 rounded-xl bg-blue-600 text-xs font-bold text-white hover:bg-blue-700"
                   >
                     Go to Home & SOS Hub
@@ -939,8 +940,6 @@ export default function UserLogin() {
             </span>
           </button>
         </div>
-          </>
-        )}
       </main>
     </div>
   );

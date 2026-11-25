@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { startLogin } from "@/const";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { getApiUrl } from "@/lib/apiConfig";
 import { trpc } from "@/lib/trpc";
 import { ARRIVING_DISTANCE_KM, LIVE_LOCATION_STALE_THRESHOLD_MS } from "@/hooks/useLiveRescuerStream";
-import { CheckCircle2, Clock3, MessageCircle, Navigation, Phone, Radio, Send, UserRound, Wifi, WifiOff } from "lucide-react";
+import { CheckCircle2, Clock3, MessageCircle, Mic, Navigation, Phone, Radio, Send, UserRound, Wifi, WifiOff } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 export type AssignedRescuer = {
@@ -21,7 +22,17 @@ export type AssignedRescuer = {
   route?: { distanceKm: number; distanceText: string; durationMinutes: number; etaText: string; isApproximate: boolean; coordinates: [number, number][] } | null;
 };
 
-export function IncidentChat({ publicCode, active }: { publicCode: string; active: boolean }) {
+export function IncidentChat({
+  publicCode,
+  active,
+  voiceNoteUrl,
+  voiceNoteDurationSeconds,
+}: {
+  publicCode: string;
+  active: boolean;
+  voiceNoteUrl?: string | null;
+  voiceNoteDurationSeconds?: number | null;
+}) {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [message, setMessage] = useState("");
@@ -47,6 +58,18 @@ export function IncidentChat({ publicCode, active }: { publicCode: string; activ
           </p>
         </div>
       </div>
+      {voiceNoteUrl && (
+        <div className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 dark:bg-amber-950/30">
+          <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-extrabold text-amber-800 dark:text-amber-300">
+            <Mic className="h-3.5 w-3.5 shrink-0" />
+            <span>{t("Attached Emergency Voice Note")}</span>
+            {typeof voiceNoteDurationSeconds === "number" && voiceNoteDurationSeconds > 0 && (
+              <span className="font-mono text-[10px] opacity-80">({voiceNoteDurationSeconds}s)</span>
+            )}
+          </p>
+          <audio controls preload="metadata" src={getApiUrl(voiceNoteUrl)} className="h-9 w-full" />
+        </div>
+      )}
       <div className="mt-3 max-h-36 space-y-2 overflow-y-auto pr-1">
         {messages.data?.length ? (
           messages.data.map((item) => (
@@ -207,6 +230,11 @@ export function AssignedRescuerCard({
               )}
             </div>
           </div>
+          {effectiveRoute.floodAvoidance?.hazardWarning && (
+            <p className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 py-1.5 text-[11px] font-bold text-amber-900 dark:text-amber-300">
+              ⚠️ {effectiveRoute.floodAvoidance.hazardWarning}
+            </p>
+          )}
         </div>
       )}
 

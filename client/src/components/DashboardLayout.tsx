@@ -154,6 +154,12 @@ export default function DashboardLayout({
             </div>
             <div className="mt-2.5 flex flex-col gap-1 border-t border-[#E2E8F0]/20 dark:border-[#F1F5F9]/10 pt-2 group-data-[collapsible=icon]:hidden">
               <button
+                onClick={() => setLocation("/")}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-xs font-semibold text-[#0F172A]/80 hover:bg-black/5 dark:text-[#F1F5F9]/80 dark:hover:bg-white/10 transition"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" /> All Portals
+              </button>
+              <button
                 onClick={() => void logout().then(() => setLocation(portalLoginPath))}
                 className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-500/10 dark:text-rose-400 transition"
               >

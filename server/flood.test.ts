@@ -224,7 +224,7 @@ describe("Feature #2: Flood Risk Early-Warning & Operations Alert Workflow", () 
 
   it("TEST 5: Duplicate alert state can be identified and suppressed", async () => {
     // Helper to generate mock high risk report
-    const mockHighReport = (): NormalizedWeatherReport => ({
+    const mockHighReport = (): any => ({
       available: true,
       provider: "Open-Meteo",
       location: { latitude: 26.1445, longitude: 91.7362 },

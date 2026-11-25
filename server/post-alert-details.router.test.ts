@@ -16,7 +16,7 @@ import { appRouter } from "./routers";
 
 function contextFor(id: number): TrpcContext {
   const now = new Date();
-  return { user: { id, openId: `victim-${id}`, name: "Victim", email: null, loginMethod: "test", role: "user", createdAt: now, updatedAt: now, lastSignedIn: now }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] };
+  return { user: { id, openId: `victim-${id}`, name: "Victim", email: null, password: null, status: "active", loginMethod: "test", role: "user", createdAt: now, updatedAt: now, lastSignedIn: now }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] };
 }
 
 describe("post-alert details router access", () => {
