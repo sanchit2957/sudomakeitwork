@@ -29,16 +29,13 @@ export default defineConfig({
             if (id.includes("react") || id.includes("react-dom") || id.includes("wouter")) {
               return "vendor-react";
             }
-            if (id.includes("recharts") || id.includes("d3-")) {
-              return "vendor-charts";
-            }
             if (id.includes("leaflet")) {
               return "vendor-leaflet";
             }
             if (id.includes("@tanstack") || id.includes("@trpc") || id.includes("superjson")) {
               return "vendor-query";
             }
-            if (id.includes("framer-motion") || id.includes("lucide-react") || id.includes("@radix-ui")) {
+            if (id.includes("lucide-react") || id.includes("@radix-ui")) {
               return "vendor-ui";
             }
           }
