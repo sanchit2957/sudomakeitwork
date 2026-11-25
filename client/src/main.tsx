@@ -1,6 +1,6 @@
 import { getApiUrl } from "@/lib/apiConfig";
 import { trpc } from "@/lib/trpc";
-import { COOKIE_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
+import { PORTAL_HEADER_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
@@ -9,6 +9,11 @@ import { Capacitor } from "@capacitor/core";
 import App from "./App";
 import { startLogin } from "./const";
 import { ensureLocationPermissionCookie } from "./lib/nativeLocation";
+import {
+  clearNativePortalToken,
+  getCurrentPortal,
+  getNativePortalToken,
+} from "./lib/portalAuth";
 import "leaflet/dist/leaflet.css";
 import "./index.css";
 
@@ -69,13 +74,10 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  try {
-    localStorage.removeItem("app-runtime-session-token");
-    localStorage.removeItem("app-runtime-user-info");
-    localStorage.removeItem("app_native_bearer_token");
-  } catch {}
+  const activePortal = getCurrentPortal();
+  clearNativePortalToken(activePortal);
 
-  startLogin();
+  startLogin(undefined, activePortal);
 };
 
 queryClient.getQueryCache().subscribe(event => {
@@ -98,17 +100,16 @@ const trpcClient = trpc.createClient({
       url: getApiUrl("/api/trpc"),
       transformer: superjson,
       headers() {
-        const headers: Record<string, string> = {};
-        // Web browser uses secure HTTP-only cookies; native platform uses bearer token
+        const portal = getCurrentPortal();
+        const headers: Record<string, string> = {
+          [PORTAL_HEADER_NAME]: portal,
+        };
+        // Web browser uses portal-isolated HTTP-only cookies; native platform uses portal-isolated bearer token
         if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-          try {
-            const nativeToken =
-              localStorage.getItem("app_native_bearer_token") ||
-              localStorage.getItem("app-runtime-session-token");
-            if (nativeToken) {
-              headers["Authorization"] = `Bearer ${nativeToken}`;
-            }
-          } catch {}
+          const nativeToken = getNativePortalToken(portal);
+          if (nativeToken) {
+            headers["Authorization"] = `Bearer ${nativeToken}`;
+          }
         }
         return headers;
       },

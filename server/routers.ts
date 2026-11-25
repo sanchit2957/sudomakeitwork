@@ -1,4 +1,9 @@
-import { COOKIE_NAME } from "@shared/const";
+import {
+  COOKIE_NAME,
+  ONE_YEAR_MS,
+  getPortalCookieName,
+  isRoleAllowedInPortal,
+} from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { hashPassword, verifyPassword } from "./auth.password";
@@ -25,6 +30,7 @@ import {
 import { rescueRouter, setRescuerSessionStartedAt } from "./routers/rescue";
 import { ENV } from "./_core/env";
 import { aiRouter } from "./routers/ai";
+import { broadcastPortalEvent } from "./realtime/portalStream";
 
 function resolveVerifiedRole(email: string, existingRole?: string): "user" | "rescuer" | "hospital" | "admin" {
   // Only grant admin if ADMIN_EMAIL environment variable is explicitly configured on the server
@@ -50,68 +56,96 @@ function sanitizeUser<T extends Record<string, any>>(user: T | null | undefined)
   return safeUser;
 }
 
+const portalEnum = z.enum(["citizen", "rescuer", "hospital", "admin"]);
+
 export const appRouter = router({
   system: systemRouter,
   ai: aiRouter,
   auth: router({
-    me: publicProcedure.query(opts => sanitizeUser(opts.ctx.user)),
+    me: publicProcedure
+      .input(z.object({ portal: portalEnum.optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        if (input?.portal && ctx.req && input.portal !== ctx.portal) {
+          const portalUser = await sdk.authenticateRequestSafe(ctx.req, { portal: input.portal });
+          return sanitizeUser(portalUser);
+        }
+        return sanitizeUser(ctx.user);
+      }),
     getPublicConfig: publicProcedure.query(() => ({
       adminContactNumber: ENV.adminContactNumber,
     })),
-    checkSessionVersion: publicProcedure.query(async ({ ctx }) => {
-      const user = ctx.user;
-      if (!user) {
+    checkSessionVersion: publicProcedure
+      .input(z.object({ portal: portalEnum.optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        let user = ctx.user;
+        if (input?.portal && ctx.req && input.portal !== ctx.portal) {
+          user = await sdk.authenticateRequestSafe(ctx.req, { portal: input.portal });
+        }
+        if (!user) {
+          return {
+            valid: true,
+            authenticated: false,
+            role: null,
+            codeVersion: null,
+            currentVersion: null,
+            adminContactNumber: ENV.adminContactNumber,
+          };
+        }
+        if (user.role === "admin" || user.role === "user") {
+          return {
+            valid: true,
+            authenticated: true,
+            role: user.role,
+            codeVersion: null,
+            currentVersion: null,
+            adminContactNumber: ENV.adminContactNumber,
+          };
+        }
+        const roleToCheck = user.role === "medical" ? "hospital" : user.role;
+        const currentVersion = await getRoleCodeVersion(roleToCheck);
+        const sessionVersion = (user as any).codeVersion;
+        const isValid = (user as any).loginMethod === "test" || (sessionVersion !== undefined && sessionVersion === currentVersion);
         return {
-          valid: true,
-          authenticated: false,
-          role: null,
-          codeVersion: null,
-          currentVersion: null,
-          adminContactNumber: ENV.adminContactNumber,
-        };
-      }
-      if (user.role === "admin" || user.role === "user") {
-        return {
-          valid: true,
+          valid: isValid,
           authenticated: true,
           role: user.role,
-          codeVersion: null,
-          currentVersion: null,
+          codeVersion: sessionVersion ?? null,
+          currentVersion,
           adminContactNumber: ENV.adminContactNumber,
         };
-      }
-      const roleToCheck = user.role === "medical" ? "hospital" : user.role;
-      const currentVersion = await getRoleCodeVersion(roleToCheck);
-      const sessionVersion = (user as any).codeVersion;
-      const isValid = (user as any).loginMethod === "test" || (sessionVersion !== undefined && sessionVersion === currentVersion);
-      return {
-        valid: isValid,
-        authenticated: true,
-        role: user.role,
-        codeVersion: sessionVersion ?? null,
-        currentVersion,
-        adminContactNumber: ENV.adminContactNumber,
-      };
-    }),
+      }),
     login: publicProcedure
       .input(
         z.object({
           email: z.string().optional(),
           password: z.string().optional(),
           role: z.enum(["admin", "rescuer", "hospital", "medical", "user"]).optional(),
+          portal: portalEnum.optional(),
           governmentCode: z.string().optional(),
           supabaseToken: z.string().optional(),
           isNative: z.boolean().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const effectivePortal = input.portal ?? ctx.portal ?? sdk.resolveRequestPortal(ctx.req);
+
         // If Supabase token is provided, verify against Supabase server-side
         if (input.supabaseToken) {
           const { verifySupabaseToken } = await import("./_core/supabase");
           const sbUser = await verifySupabaseToken(input.supabaseToken);
           if (sbUser && sbUser.email) {
             const emailVal = sbUser.email.trim().toLowerCase();
-            const requestedRole = input.role ? (input.role === "medical" ? "hospital" : input.role) : undefined;
+            const requestedRole = input.role
+              ? (input.role === "medical" ? "hospital" : input.role)
+              : effectivePortal === "admin"
+                ? "admin"
+                : effectivePortal === "hospital"
+                  ? "hospital"
+                  : effectivePortal === "rescuer"
+                    ? "rescuer"
+                    : effectivePortal === "citizen"
+                      ? "user"
+                      : undefined;
             // Look up by email only. The getUserByOpenId(sbUser.id) fallback was incorrect:
             // sbUser.id is the raw Supabase UUID but our openId format is "${role}-${uuid}".
             // That incorrect lookup generated a wasted DB query that would never match.
@@ -139,6 +173,13 @@ export const appRouter = router({
                 throw new TRPCError({ code: "FORBIDDEN", message: "Your account has been disabled. Please contact an administrator." });
               }
 
+              if (effectivePortal && !isRoleAllowedInPortal(dbUser.role, effectivePortal)) {
+                throw new TRPCError({
+                  code: "UNAUTHORIZED",
+                  message: `This account is not authorized for the ${effectivePortal} portal.`,
+                });
+              }
+
               let codeVersion: number | undefined;
               if (roleVal === "rescuer" || roleVal === "hospital") {
                 codeVersion = await getRoleCodeVersion(roleVal);
@@ -154,12 +195,19 @@ export const appRouter = router({
               if (roleVal === "rescuer") {
                 setRescuerSessionStartedAt(dbUser.id, sessionStartedAt);
               }
-              const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User", codeVersion, sessionStartedAt });
+              const sessionToken = await sdk.createSessionToken(dbUser.openId, {
+                name: dbUser.name || "User",
+                portal: effectivePortal ?? undefined,
+                codeVersion,
+                sessionStartedAt,
+              });
               const cookieOptions = getSessionCookieOptions(ctx.req);
-              ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
+              const cookieName = getPortalCookieName(effectivePortal, COOKIE_NAME);
+              ctx.res.cookie(cookieName, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
               return {
                 success: true,
                 user: sanitizeUser(dbUser),
+                portal: effectivePortal ?? undefined,
                 sessionToken: input.isNative ? sessionToken : undefined,
               };
             }
@@ -172,9 +220,18 @@ export const appRouter = router({
         }
         
         const emailInput = input.email.trim().toLowerCase();
-        const targetRole = input.role
+        const explicitRole = input.role
           ? (input.role === "medical" ? "hospital" : input.role)
           : undefined;
+        const targetRole =
+          explicitRole ??
+          (effectivePortal === "admin"
+            ? "admin"
+            : effectivePortal === "hospital"
+              ? "hospital"
+              : effectivePortal === "rescuer"
+                ? "rescuer"
+                : undefined);
 
         let user: any = null;
         if (targetRole) {
@@ -198,13 +255,19 @@ export const appRouter = router({
         }
 
         const isAuthorized =
-          !targetRole ||
-          user.role === targetRole ||
-          user.role === "admin" ||
-          (targetRole === "hospital" && user.role === "medical");
+          (!targetRole ||
+            user.role === targetRole ||
+            user.role === "admin" ||
+            (targetRole === "hospital" && user.role === "medical")) &&
+          (!effectivePortal || isRoleAllowedInPortal(user.role, effectivePortal));
 
         if (!isAuthorized) {
-          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: effectivePortal
+              ? `This account is not authorized for the ${effectivePortal} portal.`
+              : "Invalid email or password.",
+          });
         }
 
         if (user.status === "disabled") {
@@ -253,13 +316,20 @@ export const appRouter = router({
         if (user.role === "rescuer") {
           setRescuerSessionStartedAt(user.id, sessionStartedAt);
         }
-        const sessionToken = await sdk.createSessionToken(user.openId, { name: user.name || "User", codeVersion, sessionStartedAt });
+        const sessionToken = await sdk.createSessionToken(user.openId, {
+          name: user.name || "User",
+          portal: effectivePortal ?? undefined,
+          codeVersion,
+          sessionStartedAt,
+        });
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
+        const cookieName = getPortalCookieName(effectivePortal, COOKIE_NAME);
+        ctx.res.cookie(cookieName, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
         return {
           success: true,
           user: sanitizeUser(user),
+          portal: effectivePortal ?? undefined,
           sessionToken: input.isNative ? sessionToken : undefined,
         };
       }),
@@ -270,6 +340,7 @@ export const appRouter = router({
           email: z.string().email("Invalid email address"),
           password: z.string().min(1, "Password is required"),
           role: z.enum(["admin", "rescuer", "hospital", "medical", "user"]).default("user"),
+          portal: portalEnum.optional(),
           governmentCode: z.string().optional(),
           phone: z.string().optional(),
           callSign: z.string().optional(),
@@ -279,6 +350,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const effectivePortal = input.portal ?? ctx.portal ?? sdk.resolveRequestPortal(ctx.req);
         const emailVal = input.email.trim().toLowerCase();
         const requestedRole = input.role === "medical" ? "hospital" : input.role;
         let assignedRole: "user" | "rescuer" | "hospital" = "user";
@@ -300,6 +372,13 @@ export const appRouter = router({
           }
           assignedRole = requestedRole;
           codeVersion = await getRoleCodeVersion(requestedRole);
+        }
+
+        if (effectivePortal && !isRoleAllowedInPortal(assignedRole, effectivePortal)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `Cannot register role '${assignedRole}' from the '${effectivePortal}' portal.`,
+          });
         }
 
         const existing = await getUserByEmail(emailVal, assignedRole);
@@ -338,12 +417,19 @@ export const appRouter = router({
         if (assignedRole === "rescuer") {
           setRescuerSessionStartedAt(dbUser.id, sessionStartedAt);
         }
-        const sessionToken = await sdk.createSessionToken(dbUser.openId, { name: dbUser.name || "User", codeVersion, sessionStartedAt });
+        const sessionToken = await sdk.createSessionToken(dbUser.openId, {
+          name: dbUser.name || "User",
+          portal: effectivePortal ?? undefined,
+          codeVersion,
+          sessionStartedAt,
+        });
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
+        const cookieName = getPortalCookieName(effectivePortal, COOKIE_NAME);
+        ctx.res.cookie(cookieName, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
         return {
           success: true,
           user: sanitizeUser(dbUser),
+          portal: effectivePortal ?? undefined,
           sessionToken: input.isNative ? sessionToken : undefined,
         };
       }),
@@ -359,7 +445,14 @@ export const appRouter = router({
           })
         )
         .mutation(async ({ input, ctx }) => {
-          return await setRoleAccessCode(input.role, input.code, ctx.user.id);
+          const updated = await setRoleAccessCode(input.role, input.code, ctx.user.id);
+          broadcastPortalEvent({
+            type: "access_code_revoked",
+            portals: [input.role],
+            action: "code_updated",
+            data: { role: input.role, codeVersion: updated.codeVersion },
+          });
+          return updated;
         }),
       regenerateCode: adminProcedure
         .input(
@@ -372,6 +465,12 @@ export const appRouter = router({
           const prefix = input.role === "rescuer" ? "RESC" : "HOSP";
           const generatedCode = `SAHAY-${prefix}-${randomSuffix}`;
           const res = await setRoleAccessCode(input.role, generatedCode, ctx.user.id);
+          broadcastPortalEvent({
+            type: "access_code_revoked",
+            portals: [input.role],
+            action: "code_regenerated",
+            data: { role: input.role, codeVersion: res.codeVersion },
+          });
           return {
             role: res.role,
             code: generatedCode,
@@ -439,6 +538,14 @@ export const appRouter = router({
               })
             );
           } catch {}
+        }
+        if (dbUser) {
+          broadcastPortalEvent({
+            type: "user_update",
+            portals: ["admin"],
+            action: "created",
+            data: { userId: dbUser.id, role: assignedRole },
+          });
         }
         return { success: true, user: sanitizeUser(dbUser) };
       }),
@@ -518,7 +625,7 @@ export const appRouter = router({
       getForUser: publicProcedure
         .input(z.object({ userId: z.number() }))
         .query(async ({ input, ctx }) => {
-          if (!ctx.user || (ctx.user.role !== "admin" && ctx.user.role !== "rescuer" && ctx.user.role !== "medical" && ctx.user.id !== input.userId)) {
+          if (!ctx.user || (ctx.user.role !== "admin" && ctx.user.role !== "rescuer" && ctx.user.role !== "medical" && ctx.user.role !== "hospital" && ctx.user.id !== input.userId)) {
             throw new TRPCError({ code: "FORBIDDEN", message: "Access restricted to emergency personnel (Admin, Rescuer, Medical)." });
           }
           return await getEmergencyContactsByUserId(input.userId);
@@ -528,11 +635,15 @@ export const appRouter = router({
       const all = await getAllUsers();
       return all.map(u => sanitizeUser(u));
     }),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
-      return { success: true };
-    }),
+    logout: publicProcedure
+      .input(z.object({ portal: portalEnum.optional() }).optional())
+      .mutation(({ input, ctx }) => {
+        const effectivePortal = input?.portal ?? ctx.portal ?? sdk.resolveRequestPortal(ctx.req);
+        const cookieName = getPortalCookieName(effectivePortal, COOKIE_NAME);
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.clearCookie(cookieName, { ...cookieOptions, maxAge: -1 });
+        return { success: true, portal: effectivePortal ?? null };
+      }),
   }),
 
   rescue: rescueRouter,

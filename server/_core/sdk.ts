@@ -1,9 +1,23 @@
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS, decodeOAuthState } from "@shared/const";
+import {
+  AXIOS_TIMEOUT_MS,
+  COOKIE_NAME,
+  ONE_YEAR_MS,
+  PORTAL_COOKIE_NAMES,
+  PORTAL_HEADER_NAME,
+  PORTAL_IDS,
+  type PortalId,
+  decodeOAuthState,
+  getPortalCookieName,
+  getPortalForPath,
+  isRoleAllowedInPortal,
+  normalizePortalId,
+} from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
+import { randomUUID } from "node:crypto";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
@@ -22,6 +36,8 @@ export type SessionPayload = {
   openId: string;
   appId: string;
   name: string;
+  portal?: PortalId;
+  sessionId?: string;
   codeVersion?: number;
   sessionStartedAt?: number;
 };
@@ -152,6 +168,21 @@ class SDKServer {
     return new Map(Object.entries(parsed));
   }
 
+  resolveRequestPortal(req?: Pick<Request, "headers" | "query"> | null): PortalId | null {
+    if (!req) return null;
+    const rawHeader = req.headers?.[PORTAL_HEADER_NAME];
+    const headerVal = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    const fromHeader = normalizePortalId(headerVal);
+    if (fromHeader) return fromHeader;
+
+    const rawQuery = (req as any).query?.portal;
+    const queryVal = Array.isArray(rawQuery) ? rawQuery[0] : rawQuery;
+    const fromQuery = normalizePortalId(queryVal);
+    if (fromQuery) return fromQuery;
+
+    return null;
+  }
+
   private getSessionSecret() {
     const secret = ENV.cookieSecret || "development-session-secret-key-32-chars-min";
     return new TextEncoder().encode(secret);
@@ -164,14 +195,24 @@ class SDKServer {
    */
   async createSessionToken(
     openId: string,
-    options: { expiresInMs?: number; name?: string; codeVersion?: number; sessionStartedAt?: number } = {}
+    options: {
+      expiresInMs?: number;
+      name?: string;
+      portal?: PortalId;
+      sessionId?: string;
+      codeVersion?: number;
+      sessionStartedAt?: number;
+    } = {}
   ): Promise<string> {
     const sessionStartedAt = options.sessionStartedAt ?? Date.now();
+    const sessionId = options.sessionId || randomUUID();
     return this.signSession(
       {
         openId,
         appId: ENV.appId || "local-app",
         name: options.name || "User",
+        portal: options.portal,
+        sessionId,
         codeVersion: options.codeVersion,
         sessionStartedAt,
       },
@@ -188,15 +229,19 @@ class SDKServer {
     const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
+    const sessionId = payload.sessionId || randomUUID();
 
     return new SignJWT({
       openId: payload.openId,
       appId: payload.appId || "local-app",
       name: payload.name || "User",
       sessionStartedAt,
+      sessionId,
+      ...(payload.portal ? { portal: payload.portal } : {}),
       ...(payload.codeVersion !== undefined ? { codeVersion: payload.codeVersion } : {}),
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setJti(sessionId)
       .setIssuedAt(Math.floor(issuedAt / 1000))
       .setExpirationTime(expirationSeconds)
       .sign(secretKey);
@@ -204,7 +249,15 @@ class SDKServer {
 
   async verifySession(
     cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string; codeVersion?: number; sessionStartedAt?: number } | null> {
+  ): Promise<{
+    openId: string;
+    appId: string;
+    name: string;
+    portal?: PortalId;
+    sessionId?: string;
+    codeVersion?: number;
+    sessionStartedAt?: number;
+  } | null> {
     if (!cookieValue) {
       return null;
     }
@@ -214,7 +267,8 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
-      const { openId, appId, name, codeVersion, sessionStartedAt, iat } = payload as Record<string, unknown>;
+      const { openId, appId, name, portal, sessionId, jti, codeVersion, sessionStartedAt, iat } =
+        payload as Record<string, unknown>;
 
       if (!isNonEmptyString(openId)) {
         console.warn("[Auth] Session payload missing openId");
@@ -232,6 +286,8 @@ class SDKServer {
         openId,
         appId: typeof appId === "string" && appId ? appId : "local-app",
         name: typeof name === "string" && name ? name : "User",
+        portal: normalizePortalId(portal) ?? undefined,
+        sessionId: typeof sessionId === "string" ? sessionId : typeof jti === "string" ? jti : undefined,
         codeVersion: typeof codeVersion === "number" ? codeVersion : undefined,
         sessionStartedAt: startedAt,
       };
@@ -265,14 +321,19 @@ class SDKServer {
     } as GetUserInfoWithJwtResponse;
   }
 
-  async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
-    // 1. Prefer the session cookie (regular OAuth login).
-    const cookies = this.parseCookies(req.headers.cookie);
-    let sessionToken = cookies.get(COOKIE_NAME);
+  async authenticateRequest(
+    req: Request,
+    options?: { portal?: PortalId | null }
+  ): Promise<AuthenticatedUser> {
+    const requestedPortal =
+      options?.portal !== undefined ? options.portal : this.resolveRequestPortal(req);
+    const cookieName = getPortalCookieName(requestedPortal, COOKIE_NAME);
 
-    // 2. Fallback to the Authorization header (Preview auto-login via
-    //    sessionStorage), used when the browser blocks iframe cookies such as
-    //    Safari ITP, private browsing, or iOS/Android WebView.
+    // 1. Read strictly from the portal-scoped session cookie (or legacy COOKIE_NAME if unscoped).
+    const cookies = this.parseCookies(req.headers.cookie);
+    let sessionToken = cookies.get(cookieName);
+
+    // 2. Fallback to the Authorization header (Native / Bearer token mode).
     if (!sessionToken) {
       const authHeader = req.headers.authorization;
       if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
@@ -284,6 +345,10 @@ class SDKServer {
 
     if (!session) {
       throw ForbiddenError("Invalid session cookie");
+    }
+
+    if (requestedPortal && session.portal && session.portal !== requestedPortal) {
+      throw ForbiddenError("Invalid session cookie for portal");
     }
 
     if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
@@ -302,8 +367,12 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
+    if (requestedPortal && !isRoleAllowedInPortal(user.role, requestedPortal)) {
+      throw ForbiddenError("User role is not authorized for this portal");
+    }
+
     // Throttle lastSignedIn update: only write once every 15 minutes per active user session
-    // instead of hammering the users table with write locks on every 1s polling tick
+    // instead of hammering the users table with write locks on every active query
     const lastSigned = user.lastSignedIn ? new Date(user.lastSignedIn).getTime() : 0;
     if (!lastSigned || Date.now() - lastSigned > 15 * 60 * 1000) {
       db.upsertUser({
@@ -314,9 +383,70 @@ class SDKServer {
 
     return {
       ...user,
+      portal: requestedPortal ?? session.portal,
+      sessionId: session.sessionId,
       codeVersion: session.codeVersion,
       sessionStartedAt: session.sessionStartedAt ?? (user.lastSignedIn ? new Date(user.lastSignedIn).getTime() : undefined),
     };
+  }
+
+  /**
+   * Authenticates for an explicit or inferred portal, returning null on unauthenticated
+   * requests while propagating transient database/system errors.
+   */
+  async authenticateRequestSafe(
+    req: Request,
+    options?: { portal?: PortalId | null }
+  ): Promise<AuthenticatedUser | null> {
+    try {
+      return await this.authenticateRequest(req, options);
+    } catch (error: any) {
+      if (
+        error?.name === "ForbiddenError" ||
+        error?.status === 403 ||
+        error?.statusCode === 403 ||
+        error?.message?.includes("Invalid session") ||
+        error?.message?.includes("User not found") ||
+        error?.message?.includes("not authorized for this portal")
+      ) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Used strictly for shared media/evidence endpoints (like `/storage/*`) where
+   * browser `<img>` or `<audio>` tags cannot attach custom portal headers.
+   */
+  async authenticateAnyPortalRequest(req: Request): Promise<AuthenticatedUser | null> {
+    const explicit = this.resolveRequestPortal(req);
+    if (explicit) {
+      return await this.authenticateRequestSafe(req, { portal: explicit });
+    }
+
+    const referer = typeof req.headers.referer === "string" ? req.headers.referer : "";
+    if (referer) {
+      try {
+        const refererPortal = getPortalForPath(new URL(referer).pathname);
+        const user = await this.authenticateRequestSafe(req, { portal: refererPortal });
+        if (user) return user;
+      } catch {}
+    }
+
+    const cookies = this.parseCookies(req.headers.cookie);
+    for (const portal of PORTAL_IDS) {
+      if (cookies.get(PORTAL_COOKIE_NAMES[portal])) {
+        const user = await this.authenticateRequestSafe(req, { portal });
+        if (user) return user;
+      }
+    }
+
+    if (cookies.get(COOKIE_NAME) || req.headers.authorization) {
+      return await this.authenticateRequestSafe(req, { portal: null });
+    }
+
+    return null;
   }
 }
 
@@ -326,6 +456,8 @@ const CRON_OPEN_ID_PREFIX = "cron_";
 export type AuthenticatedUser = User & {
   taskUid?: string;
   isCron?: boolean;
+  portal?: PortalId;
+  sessionId?: string;
   codeVersion?: number;
   sessionStartedAt?: number;
 };

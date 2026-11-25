@@ -1,4 +1,10 @@
-import { OAUTH_STATE_COOKIE, encodeOAuthState } from "@shared/const";
+import {
+  OAUTH_STATE_COOKIE,
+  type PortalId,
+  encodeOAuthState,
+  getPortalForPath,
+  getPortalLoginPath,
+} from "@shared/const";
 
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
@@ -12,18 +18,27 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 // call would desync it from an in-flight login and the callback would reject it
 // with "invalid oauth state". It returns void by design, so there is no URL to
 // stash across renders.
-export const startLogin = (redirectPath?: string) => {
+export const startLogin = (redirectPath?: string, explicitPortal?: PortalId) => {
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
   const appId = import.meta.env.VITE_APP_ID;
 
   if (!oauthPortalUrl) {
     if (typeof window === "undefined") return;
     const current = window.location.pathname;
-    if (current === "/login" || current.startsWith("/user/login") || current.startsWith("/responder/login")) {
+    if (
+      current === "/login" ||
+      current.startsWith("/user/login") ||
+      current.startsWith("/responder/login") ||
+      current.startsWith("/hospital/login") ||
+      current.startsWith("/medical/login") ||
+      current.startsWith("/admin/login")
+    ) {
       return;
     }
+    const portal = explicitPortal ?? getPortalForPath(current);
+    const loginBase = getPortalLoginPath(portal);
     const target = redirectPath || (current !== "/" && !current.includes("index.html") ? current : "");
-    const dest = `/login${target && target !== "/login" ? `?redirect=${encodeURIComponent(target)}` : ""}`;
+    const dest = `${loginBase}${target && target !== loginBase ? `?redirect=${encodeURIComponent(target)}` : ""}`;
     window.location.href = dest;
     return;
   }

@@ -2,12 +2,15 @@ import React, { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 
 import { useAuth } from "./_core/hooks/useAuth";
+import { usePortalStream } from "./hooks/usePortalStream";
+import { getPortalForPath } from "./lib/portalAuth";
+import { isRoleAllowedInPortal } from "@shared/const";
 import { RoleGate } from "./components/RoleGate";
 import AccessCodeRevokedModal from "./components/AccessCodeRevokedModal";
 
@@ -45,7 +48,20 @@ function RouteLoadingFallback() {
 
 function Router() {
   useMobileLifecycle();
-  const { user, revokedModalState, closeRevokedModal } = useAuth();
+  const [location] = useLocation();
+  const { user, revokedModalState, closeRevokedModal, refresh } = useAuth();
+  const activePortal = getPortalForPath(location || (typeof window !== "undefined" ? window.location.pathname : "/"));
+  const canStream =
+    activePortal === "citizen" ||
+    Boolean(user && isRoleAllowedInPortal(user.role, activePortal));
+
+  usePortalStream(activePortal, {
+    enabled: canStream,
+    onAccessCodeRevoked: () => {
+      void refresh();
+    },
+  });
+
   const native = isNativeApp();
 
   return (

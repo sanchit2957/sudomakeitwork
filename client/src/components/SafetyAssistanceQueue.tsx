@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { usePortalConnectionStatus } from "@/hooks/usePortalStream";
 import { trpc } from "@/lib/trpc";
 import { CheckCircle2, HeartPulse, MapPin, ShieldCheck, TentTree, UsersRound } from "lucide-react";
 import { EmergencyContactsDisplay } from "./EmergencyContactsDisplay";
@@ -22,9 +24,11 @@ export function SafetyAssistanceQueue({
   compact?: boolean;
   guidance?: string[];
 }) {
+  const { portal } = useAuth();
+  const sseConnected = usePortalConnectionStatus(portal);
   const utils = trpc.useUtils();
   const queue = trpc.rescue.safety.queue.useQuery(undefined, {
-    refetchInterval: 8_000,
+    refetchInterval: sseConnected ? false : 8_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });

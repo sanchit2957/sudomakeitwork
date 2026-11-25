@@ -500,7 +500,9 @@ donationRouter.post("/donations", async (req: Request, res: Response) => {
   try {
     let donorUserId: number | null = null;
     try {
-      const authUser = await sdk.authenticateRequest(req);
+      const authUser = await sdk.authenticateRequestSafe(req, {
+        portal: sdk.resolveRequestPortal(req) ?? "citizen",
+      });
       if (authUser?.id) {
         donorUserId = authUser.id;
       }

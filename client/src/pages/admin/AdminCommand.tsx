@@ -27,6 +27,7 @@ import { AdminUserManagement } from "@/components/AdminUserManagement";
 import { AdminAccessCodes } from "@/components/AdminAccessCodes";
 import { PostRescueRecords } from "@/components/PostRescueRecords";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { usePortalConnectionStatus } from "@/hooks/usePortalStream";
 
 export default function AdminCommand() {
   return (
@@ -51,9 +52,10 @@ function CommandWorkspace() {
     { label: "System users", path: "/command/users", icon: UserPlus },
   ];
   const [location, setLocation] = useLocation(); const [filter, setFilter] = useState<StatusFilter>("all"); const [search, setSearch] = useState(""); const utils = trpc.useUtils();
-  const liveIncidents = { refetchInterval: 4_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
-  const liveResources = { refetchInterval: 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
-  const liveAdmin = { refetchInterval: 15_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const sseConnected = usePortalConnectionStatus("admin");
+  const liveIncidents = { refetchInterval: sseConnected ? false : 4_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const liveResources = { refetchInterval: sseConnected ? false : 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const liveAdmin = { refetchInterval: sseConnected ? false : 15_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const analytics = trpc.rescue.operations.analytics.useQuery(undefined, liveIncidents);
   const incidents = trpc.rescue.operations.incidents.useQuery(undefined, liveIncidents);
   const roster = trpc.rescue.operations.rescueRoster.useQuery(undefined, liveResources);

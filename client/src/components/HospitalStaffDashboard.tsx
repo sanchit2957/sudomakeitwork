@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
+import { usePortalConnectionStatus } from "@/hooks/usePortalStream";
 import {
   Activity,
   AlertOctagon,
@@ -137,8 +138,9 @@ export function HospitalStaffDashboard({
   const [coordUrgency, setCoordUrgency] = useState<"critical" | "high" | "normal">("high");
   const [coordSuccess, setCoordSuccess] = useState("");
 
-  const liveCases = { refetchInterval: 4_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true } as const;
-  const liveLayers = { refetchInterval: 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const sseConnected = usePortalConnectionStatus("hospital");
+  const liveCases = { refetchInterval: sseConnected ? false : 4_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const liveLayers = { refetchInterval: sseConnected ? false : 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
 
   // Live queries
   const incomingCases = trpc.rescue.operations.hospitalCases.useQuery(

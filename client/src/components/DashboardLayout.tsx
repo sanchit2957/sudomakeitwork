@@ -18,6 +18,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
+import { getPortalForPath, getPortalLoginPath } from "@/lib/portalAuth";
 import { cn } from "@/lib/utils";
 import { LogOut, Menu, ShieldCheck, type LucideIcon } from "lucide-react";
 import { useLocation } from "wouter";
@@ -42,6 +43,9 @@ export default function DashboardLayout({
   const { loading, user, logout } = useAuth();
   const { t } = useLanguage();
   const [location, setLocation] = useLocation();
+  const portalLoginPath = getPortalLoginPath(
+    getPortalForPath(location || (typeof window !== "undefined" ? window.location.pathname : "/"))
+  );
 
   if (loading) {
     return (
@@ -150,7 +154,7 @@ export default function DashboardLayout({
             </div>
             <div className="mt-2.5 flex flex-col gap-1 border-t border-[#E2E8F0]/20 dark:border-[#F1F5F9]/10 pt-2 group-data-[collapsible=icon]:hidden">
               <button
-                onClick={() => void logout().then(() => setLocation("/login"))}
+                onClick={() => void logout().then(() => setLocation(portalLoginPath))}
                 className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-500/10 dark:text-rose-400 transition"
               >
                 <LogOut className="h-3.5 w-3.5" /> Sign out
@@ -189,7 +193,7 @@ export default function DashboardLayout({
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> {t("general.live")}
             </div>
             <Button
-              onClick={() => void logout().then(() => setLocation("/login"))}
+              onClick={() => void logout().then(() => setLocation(portalLoginPath))}
               variant="outline"
               size="sm"
               className="h-9 rounded-xl border-rose-500/30 px-3 text-xs font-bold text-rose-600 hover:bg-rose-500/10 dark:text-rose-400"

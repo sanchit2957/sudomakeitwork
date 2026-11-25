@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { UserProfileBadge } from "@/components/ProfileAvatar";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { usePortalConnectionStatus } from "@/hooks/usePortalStream";
 import { useLanguage } from "@/contexts/LanguageContext";
 import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -91,14 +92,15 @@ function ResponderWorkspace() {
     { label: t("responder.hospitals") || "Hospitals", path: "/responder/hospitals", icon: Hospital },
     { label: t("responder.alerts"), path: "/responder/alerts", icon: Bell },
   ];
+  const sseConnected = usePortalConnectionStatus("rescuer");
   const utils = trpc.useUtils();
   const [pushState, setPushState] = useState<PushState>("not_requested");
   const [pushDetail, setPushDetail] = useState("");
-  const liveMissionQuery = { refetchInterval: 3_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, refetchOnReconnect: true } as const;
-  // activeOffer MUST poll at 1s: 30-second emergency window requires near-instant detection
+  const liveMissionQuery = { refetchInterval: sseConnected ? false : 3_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, refetchOnReconnect: true } as const;
+  // activeOffer uses instant SSE invalidation + 1s fallback timing contract
   const liveOfferQuery = { refetchInterval: 1_000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, refetchOnReconnect: true, staleTime: 0 } as const;
-  const liveLayersQuery = { refetchInterval: 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
-  const liveProfileQuery = { refetchInterval: 15_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const liveLayersQuery = { refetchInterval: sseConnected ? false : 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const liveProfileQuery = { refetchInterval: sseConnected ? false : 15_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const profile = trpc.rescue.rescuer.profile.useQuery(undefined, liveProfileQuery);
   const missions = trpc.rescue.rescuer.missions.useQuery(undefined, liveMissionQuery);
   const activeOffer = trpc.rescue.rescuer.activeOffer.useQuery(undefined, liveOfferQuery);

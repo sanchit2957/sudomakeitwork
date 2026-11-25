@@ -22,20 +22,61 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
+  const candidateTemplatePaths = [
+    path.resolve(import.meta.dirname, "../..", "client", "index.html"),
+    path.resolve(process.cwd(), "client", "index.html"),
+    path.resolve(process.cwd(), "index.html"),
+  ];
+
+  let resolvedTemplatePath = candidateTemplatePaths.find(p => fs.existsSync(p)) || candidateTemplatePaths[0];
+  let inMemoryTemplate = "";
+
+  try {
+    if (fs.existsSync(resolvedTemplatePath)) {
+      inMemoryTemplate = fs.readFileSync(resolvedTemplatePath, "utf-8");
+    }
+  } catch (err) {
+    console.warn("[Vite] Warning: initial template pre-load deferred:", (err as Error)?.message);
+  }
+
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
+    // Only handle GET/HEAD requests for SPA fallback; let non-GET and API routes pass through
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      return next();
+    }
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+      return next();
+    }
+
     const url = req.originalUrl;
 
     try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "../..",
-        "client",
-        "index.html"
-      );
+      // Re-resolve candidate if the previous path is unavailable
+      if (!fs.existsSync(resolvedTemplatePath)) {
+        const found = candidateTemplatePaths.find(p => fs.existsSync(p));
+        if (found) resolvedTemplatePath = found;
+      }
 
-      // always reload the index.html file from disk incase it changes
-      const template = await fs.promises.readFile(clientTemplate, "utf-8");
+      let template = inMemoryTemplate;
+      if (fs.existsSync(resolvedTemplatePath)) {
+        try {
+          template = await fs.promises.readFile(resolvedTemplatePath, "utf-8");
+          inMemoryTemplate = template;
+        } catch {
+          // If Windows encounters a transient lock or ENOENT, fallback safely to cached template
+          if (!template) {
+            template = inMemoryTemplate;
+          }
+        }
+      }
+
+      if (!template) {
+        throw new Error(
+          `Unable to load index.html from any candidate location: ${candidateTemplatePaths.join(", ")}`
+        );
+      }
+
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
@@ -74,7 +115,13 @@ export function serveStatic(app: Express) {
   );
 
   // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  app.use("*", (req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      return next();
+    }
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+      return next();
+    }
     res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
     res.sendFile(path.resolve(distPath, "index.html"));
   });

@@ -366,7 +366,10 @@ export function registerN8nRoutes(app: Express) {
       // Extract optional authenticated user if session cookie is present
       let authUserId: number | null = null;
       try {
-        const user = await (await import("./_core/sdk")).sdk.authenticateRequest(req);
+        const sdkModule = (await import("./_core/sdk")).sdk;
+        const user = await sdkModule.authenticateRequestSafe(req, {
+          portal: sdkModule.resolveRequestPortal(req) ?? "citizen",
+        });
         if (user) authUserId = user.id;
       } catch {}
 
@@ -504,6 +507,27 @@ export function registerN8nRoutes(app: Express) {
         createdAt: now,
       });
 
+      try {
+        const { broadcastPortalEvent } = await import("./realtime/portalStream");
+        broadcastPortalEvent({
+          type: "incident_update",
+          portals: ["admin"],
+          publicCode,
+          action: "offline_created",
+          data: { incidentId },
+        });
+        if (authUserId) {
+          broadcastPortalEvent({
+            type: "incident_update",
+            portals: ["citizen"],
+            targetUserIds: [authUserId],
+            publicCode,
+            action: "offline_created",
+            data: { incidentId },
+          });
+        }
+      } catch {}
+
       console.log(`[Offline SOS] Delivered offline SOS ${publicCode} (incident ${incidentId})`);
       return res.status(201).json({ publicCode, incidentId, status: "pending" });
     } catch (err: any) {
@@ -530,8 +554,8 @@ export function registerN8nRoutes(app: Express) {
 
         let isStaff = false;
         try {
-          const user = await (await import("./_core/sdk")).sdk.authenticateRequest(req);
-          if (user && (user.role === "admin" || user.role === "rescuer" || user.role === "medical")) {
+          const user = await (await import("./_core/sdk")).sdk.authenticateAnyPortalRequest(req);
+          if (user && (user.role === "admin" || user.role === "rescuer" || user.role === "medical" || user.role === "hospital")) {
             isStaff = true;
           }
         } catch {}

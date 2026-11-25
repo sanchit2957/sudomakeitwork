@@ -22,7 +22,7 @@ export function registerStorageProxy(app: Express) {
         if (!req.headers.authorization && req.query?.token) {
           req.headers.authorization = `Bearer ${req.query.token}`;
         }
-        const user = await sdk.authenticateRequest(req);
+        const user = await sdk.authenticateAnyPortalRequest(req);
         if (!user) {
           res.status(401).send("Authentication required for private emergency records");
           return;

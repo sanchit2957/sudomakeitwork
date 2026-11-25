@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { usePortalConnectionStatus } from "@/hooks/usePortalStream";
 import { RoleGate } from "@/components/RoleGate";
 import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import { HospitalStaffDashboard } from "@/components/HospitalStaffDashboard";
@@ -43,7 +44,8 @@ function HospitalWorkspace() {
     ...(user?.role === "admin" ? [{ label: "Hospital Approvals", path: "/hospital/access", icon: UserPlus }] : []),
   ];
 
-  const live = { refetchInterval: 6_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
+  const sseConnected = usePortalConnectionStatus("hospital");
+  const live = { refetchInterval: sseConnected ? false : 6_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const hospitals = trpc.rescue.operations.hospitals.useQuery(undefined, live);
   const myBranches = trpc.rescue.operations.myBranches.useQuery(undefined, {
     ...live,
@@ -83,7 +85,7 @@ function HospitalWorkspace() {
     branchList.find(b => b.id === activeBranchId) ?? branchList.find(b => b.isPrimaryBranch) ?? branchList[0] ?? null;
 
   const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, {
-    refetchInterval: 12_000,
+    refetchInterval: sseConnected ? false : 12_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });

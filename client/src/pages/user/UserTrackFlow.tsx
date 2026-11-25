@@ -9,6 +9,7 @@ import { VictimNavigation } from "@/components/VictimNavigation";
 import { AssignedRescuerCard, IncidentChat, PostRescueCheckInCard } from "@/components/TrackIncidentComponents";
 export { AssignedRescuerCard, IncidentChat, PostRescueCheckInCard } from "@/components/TrackIncidentComponents";
 import { useLiveRescuerStream } from "@/hooks/useLiveRescuerStream";
+import { usePortalStream } from "@/hooks/usePortalStream";
 import { pendingSosCount, flushOfflineSos } from "@/lib/offlineSos";
 import { clearSosVoiceNote } from "@/lib/sosVoiceNote";
 import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, MapPin, Radio, ShieldCheck, Siren } from "lucide-react";
@@ -67,7 +68,9 @@ export default function UserTrackFlow() {
     };
   }, []);
 
-  const liveStream = useLiveRescuerStream(/^SOS-[A-Z0-9]{8}$/.test(publicCode) ? publicCode : null);
+  const validPublicCode = /^SOS-[A-Z0-9]{8}$/.test(publicCode) ? publicCode : null;
+  usePortalStream("citizen", { enabled: Boolean(validPublicCode), trackingCode: validPublicCode });
+  const liveStream = useLiveRescuerStream(validPublicCode);
   const status = trpc.rescue.emergency.statusByCode.useQuery(
     { publicCode },
     {

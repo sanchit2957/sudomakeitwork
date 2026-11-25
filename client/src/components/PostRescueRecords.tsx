@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { usePortalConnectionStatus } from "@/hooks/usePortalStream";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   CheckCircle2,
@@ -36,8 +37,9 @@ export function PostRescueRecords() {
   const [reliefFilter, setReliefFilter] = useState<"all" | "yes" | "no">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
+  const sseConnected = usePortalConnectionStatus("admin");
   const recordsQuery = trpc.rescue.operations.postRescueRecords.useQuery(undefined, {
-    refetchInterval: 8_000,
+    refetchInterval: sseConnected ? false : 8_000,
     refetchOnWindowFocus: true,
   });
 

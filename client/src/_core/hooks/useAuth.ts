@@ -1,15 +1,25 @@
 import { startLogin } from "@/const";
+import {
+  type PortalId,
+  broadcastPortalAuthEvent,
+  clearNativePortalToken,
+  getCurrentPortal,
+  getPortalForPath,
+  setNativePortalToken,
+  subscribeSamePortalAuthEvents,
+} from "@/lib/portalAuth";
+import { usePortalConnectionStatus } from "@/hooks/usePortalStream";
 import { trpc } from "@/lib/trpc";
+import { isRoleAllowedInPortal } from "@shared/const";
 import { TRPCClientError } from "@trpc/client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { Capacitor } from "@capacitor/core";
 import {
   isSupabaseConfigured,
   supabase,
   supabaseSendOtp,
-  supabaseSignIn,
   supabaseSignOut,
-  supabaseSignUp,
   supabaseVerifyOtp,
   getSupabaseSession,
 } from "@/lib/supabase";
@@ -17,30 +27,30 @@ import {
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
   redirectPath?: string;
+  portalOverride?: PortalId;
 };
 
-// Helper for client session token persistence strictly for native mobile bearer authorization
-function storeNativeTokenIfPresent(sessionToken?: string) {
+// Helper for client session token persistence strictly for native mobile bearer authorization, scoped by portal
+function storeNativeTokenIfPresent(portal: PortalId, sessionToken?: string) {
   if (sessionToken && typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-    try {
-      localStorage.setItem("app_native_bearer_token", sessionToken);
-      localStorage.setItem("app-runtime-session-token", sessionToken);
-    } catch {}
+    setNativePortalToken(portal, sessionToken);
   }
 }
 
-// Global state for access code revocation modal
-let _globalRevokedDetail: { isOpen: boolean; role?: string | null; adminContactNumber: string } = {
+// Global state for access code revocation modal (scoped per portal so revoking one never affects another)
+type RevokedDetail = { isOpen: boolean; role?: string | null; portal?: PortalId; adminContactNumber: string };
+let _globalRevokedDetail: RevokedDetail = {
   isOpen: false,
   role: null,
+  portal: undefined,
   adminContactNumber: "+91-361-2237011",
 };
-const _revocationListeners = new Set<(detail: typeof _globalRevokedDetail) => void>();
+const _revocationListeners = new Set<(detail: RevokedDetail) => void>();
 
-// Module-scoped in-flight login mutation promise to prevent concurrent duplicate login requests
-let _inFlightLoginPromise: Promise<any> | null = null;
+// In-flight login promises keyed by portal to avoid cross-portal collisions
+const _inFlightLoginPromises = new Map<PortalId, Promise<any>>();
 
-function notifyRevocationListeners(detail: typeof _globalRevokedDetail) {
+function notifyRevocationListeners(detail: RevokedDetail) {
   _globalRevokedDetail = detail;
   _revocationListeners.forEach(listener => listener(detail));
 }
@@ -48,14 +58,22 @@ function notifyRevocationListeners(detail: typeof _globalRevokedDetail) {
 export function useAuth(options: UseAuthOptions = {}) {
   const {
     redirectOnUnauthenticated = false,
-    redirectPath = "/login",
+    redirectPath,
+    portalOverride,
   } = options;
+  const [location] = useLocation();
+  const activePortal: PortalId =
+    portalOverride ??
+    getPortalForPath(
+      location || (typeof window !== "undefined" ? window.location.pathname : "/")
+    );
+  const sseConnected = usePortalConnectionStatus(activePortal);
   const utils = trpc.useUtils();
 
   const [revokedModalState, setRevokedModalState] = useState(_globalRevokedDetail);
 
   useEffect(() => {
-    const listener = (detail: typeof _globalRevokedDetail) => {
+    const listener = (detail: RevokedDetail) => {
       setRevokedModalState(detail);
     };
     _revocationListeners.add(listener);
@@ -70,47 +88,80 @@ export function useAuth(options: UseAuthOptions = {}) {
     return () => clearTimeout(t);
   }, []);
 
-  const meQuery = trpc.auth.me.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
+  const meQuery = trpc.auth.me.useQuery(
+    { portal: activePortal },
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
-  const [lastKnownUser, setLastKnownUser] = useState<any>(() => {
-    return meQuery.data ?? null;
-  });
+  // Store last known user per portal so SPA navigation across portals never flickers another portal's session
+  const [lastKnownByPortal, setLastKnownByPortal] = useState<Partial<Record<PortalId, any>>>(() => ({
+    [activePortal]: meQuery.data ?? null,
+  }));
 
   useEffect(() => {
     if (meQuery.data !== undefined) {
-      setLastKnownUser(meQuery.data);
+      setLastKnownByPortal(prev => ({
+        ...prev,
+        [activePortal]: meQuery.data,
+      }));
     } else if (
       meQuery.error &&
       meQuery.error.data?.code === "UNAUTHORIZED"
     ) {
-      setLastKnownUser(null);
+      setLastKnownByPortal(prev => ({
+        ...prev,
+        [activePortal]: null,
+      }));
     }
-  }, [meQuery.data, meQuery.error]);
+  }, [activePortal, meQuery.data, meQuery.error]);
 
-  const effectiveUser = meQuery.data !== undefined ? meQuery.data : lastKnownUser;
+  // Synchronize auth state strictly across tabs of the SAME portal (never cross-portal)
+  const activePortalRef = useRef(activePortal);
+  activePortalRef.current = activePortal;
+  useEffect(() => {
+    return subscribeSamePortalAuthEvents(activePortal, (action) => {
+      if (action === "logout") {
+        setLastKnownByPortal(prev => ({ ...prev, [activePortal]: null }));
+        utils.auth.me.setData({ portal: activePortal }, null);
+      }
+      void utils.auth.me.invalidate({ portal: activePortal });
+    });
+  }, [activePortal, utils]);
+
+  const effectiveUser =
+    meQuery.data !== undefined
+      ? meQuery.data
+      : lastKnownByPortal[activePortal] !== undefined
+        ? lastKnownByPortal[activePortal]
+        : null;
   const currentUser = effectiveUser;
 
   const isOperationalRole = Boolean(
     currentUser &&
+      isRoleAllowedInPortal(currentUser.role, activePortal) &&
       (currentUser.role === "rescuer" ||
         currentUser.role === "hospital" ||
         currentUser.role === "medical")
   );
 
   const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
-      setLastKnownUser(null);
-      utils.auth.me.setData(undefined, null);
+    onSuccess: (_data, variables) => {
+      const targetPortal = variables?.portal ?? activePortal;
+      setLastKnownByPortal(prev => ({ ...prev, [targetPortal]: null }));
+      utils.auth.me.setData({ portal: targetPortal }, null);
     },
   });
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (targetPortalOverride?: PortalId) => {
+    const portalToLogout = targetPortalOverride ?? activePortalRef.current;
     try {
-      await supabaseSignOut();
-      await logoutMutation.mutateAsync();
+      if (portalToLogout === "citizen") {
+        await supabaseSignOut();
+      }
+      await logoutMutation.mutateAsync({ portal: portalToLogout });
     } catch (error: unknown) {
       if (
         error instanceof TRPCClientError &&
@@ -120,51 +171,56 @@ export function useAuth(options: UseAuthOptions = {}) {
       }
       throw error;
     } finally {
-      try {
-        localStorage.removeItem("app-runtime-session-token");
-        localStorage.removeItem("app-runtime-user-info");
-        localStorage.removeItem("app_native_bearer_token");
-      } catch {}
-      setLastKnownUser(null);
-      utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
+      clearNativePortalToken(portalToLogout);
+      setLastKnownByPortal(prev => ({ ...prev, [portalToLogout]: null }));
+      utils.auth.me.setData({ portal: portalToLogout }, null);
+      await utils.auth.me.invalidate({ portal: portalToLogout });
+      broadcastPortalAuthEvent(portalToLogout, "logout");
     }
   }, [logoutMutation, utils]);
 
-  // Periodic 30s session version check for operational roles
-  const sessionVersionQuery = trpc.auth.checkSessionVersion.useQuery(undefined, {
-    refetchInterval: 30000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
-    enabled: isOperationalRole,
-    retry: false,
-  });
+  // Fallback polling only when SSE stream is disconnected; SSE triggers immediate invalidation on code rotation
+  const sessionVersionQuery = trpc.auth.checkSessionVersion.useQuery(
+    { portal: activePortal },
+    {
+      refetchInterval: sseConnected ? false : 30000,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: true,
+      enabled: isOperationalRole,
+      retry: false,
+    }
+  );
 
   useEffect(() => {
     if (sessionVersionQuery.data && sessionVersionQuery.data.valid === false && isOperationalRole) {
       const contactNum = sessionVersionQuery.data.adminContactNumber || "+91-361-2237011";
       const role = currentUser?.role;
-      void logout();
+      void logout(activePortal);
       notifyRevocationListeners({
         isOpen: true,
         role,
+        portal: activePortal,
         adminContactNumber: contactNum,
       });
     }
-  }, [sessionVersionQuery.data, isOperationalRole, currentUser?.role, logout]);
+  }, [sessionVersionQuery.data, isOperationalRole, currentUser?.role, activePortal, logout]);
 
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: async (data) => {
-      storeNativeTokenIfPresent((data as any).sessionToken);
-      utils.auth.me.setData(undefined, data.user as any);
-      await utils.auth.me.invalidate();
+    onSuccess: async (data, variables) => {
+      const targetPortal = variables?.portal ?? activePortal;
+      storeNativeTokenIfPresent(targetPortal, (data as any).sessionToken);
+      setLastKnownByPortal(prev => ({ ...prev, [targetPortal]: data.user }));
+      utils.auth.me.setData({ portal: targetPortal }, data.user as any);
+      await utils.auth.me.invalidate({ portal: targetPortal });
+      broadcastPortalAuthEvent(targetPortal, "login");
     },
     onError: (err) => {
       if (err.message.includes("ACCESS_CODE_REVOKED")) {
-        void logout();
+        void logout(activePortal);
         notifyRevocationListeners({
           isOpen: true,
           role: currentUser?.role,
+          portal: activePortal,
           adminContactNumber: "+91-361-2237011",
         });
       }
@@ -176,29 +232,36 @@ export function useAuth(options: UseAuthOptions = {}) {
       email: string;
       password: string;
       role?: "user" | "rescuer" | "hospital" | "medical" | "admin";
+      portal?: PortalId;
       governmentCode?: string;
       supabaseToken?: string;
       isNative?: boolean;
     }) => {
-      if (_inFlightLoginPromise) {
-        return _inFlightLoginPromise;
+      const targetPortal = params.portal ?? activePortalRef.current;
+      const existingPromise = _inFlightLoginPromises.get(targetPortal);
+      if (existingPromise) {
+        return existingPromise;
       }
-      _inFlightLoginPromise = (async () => {
+      const promise = (async () => {
         try {
           const isNative = typeof params.isNative === "boolean" ? params.isNative : Capacitor.isNativePlatform();
           const res = await loginMutation.mutateAsync({
             ...params,
+            portal: targetPortal,
             isNative,
           });
-          storeNativeTokenIfPresent((res as any).sessionToken);
-          utils.auth.me.setData(undefined, res.user as any);
-          await utils.auth.me.invalidate();
+          storeNativeTokenIfPresent(targetPortal, (res as any).sessionToken);
+          setLastKnownByPortal(prev => ({ ...prev, [targetPortal]: res.user }));
+          utils.auth.me.setData({ portal: targetPortal }, res.user as any);
+          await utils.auth.me.invalidate({ portal: targetPortal });
+          broadcastPortalAuthEvent(targetPortal, "login");
           return res;
         } finally {
-          _inFlightLoginPromise = null;
+          _inFlightLoginPromises.delete(targetPortal);
         }
       })();
-      return _inFlightLoginPromise;
+      _inFlightLoginPromises.set(targetPortal, promise);
+      return promise;
     },
     [loginMutation, utils]
   );
@@ -206,10 +269,13 @@ export function useAuth(options: UseAuthOptions = {}) {
   const loginAsRole = login;
 
   const registerMutation = trpc.auth.register.useMutation({
-    onSuccess: async (data) => {
-      storeNativeTokenIfPresent((data as any).sessionToken);
-      utils.auth.me.setData(undefined, data.user as any);
-      await utils.auth.me.invalidate();
+    onSuccess: async (data, variables) => {
+      const targetPortal = variables?.portal ?? activePortal;
+      storeNativeTokenIfPresent(targetPortal, (data as any).sessionToken);
+      setLastKnownByPortal(prev => ({ ...prev, [targetPortal]: data.user }));
+      utils.auth.me.setData({ portal: targetPortal }, data.user as any);
+      await utils.auth.me.invalidate({ portal: targetPortal });
+      broadcastPortalAuthEvent(targetPortal, "login");
     },
   });
 
@@ -219,6 +285,7 @@ export function useAuth(options: UseAuthOptions = {}) {
       email: string;
       password: string;
       role?: "user" | "rescuer" | "hospital" | "medical" | "admin";
+      portal?: PortalId;
       governmentCode?: string;
       phone?: string;
       callSign?: string;
@@ -226,14 +293,18 @@ export function useAuth(options: UseAuthOptions = {}) {
       supabaseToken?: string;
       isNative?: boolean;
     }) => {
+      const targetPortal = params.portal ?? activePortalRef.current;
       const isNative = typeof params.isNative === "boolean" ? params.isNative : Capacitor.isNativePlatform();
       const res = await registerMutation.mutateAsync({
         ...params,
+        portal: targetPortal,
         isNative,
       });
-      storeNativeTokenIfPresent((res as any).sessionToken);
-      utils.auth.me.setData(undefined, res.user as any);
-      await utils.auth.me.invalidate();
+      storeNativeTokenIfPresent(targetPortal, (res as any).sessionToken);
+      setLastKnownByPortal(prev => ({ ...prev, [targetPortal]: res.user }));
+      utils.auth.me.setData({ portal: targetPortal }, res.user as any);
+      await utils.auth.me.invalidate({ portal: targetPortal });
+      broadcastPortalAuthEvent(targetPortal, "login");
       return res;
     },
     [registerMutation, utils]
@@ -261,23 +332,32 @@ export function useAuth(options: UseAuthOptions = {}) {
         email: params.email,
         password: "supabase-otp-verified",
         supabaseToken: sbToken,
-        role: params.role,
+        role: params.role ?? "user",
+        portal: "citizen",
       });
     },
     [login]
   );
 
-  // Listen for Supabase Magic Link redirect or Auth State Change
+  // Listen for Supabase Magic Link redirect or Auth State Change strictly on Citizen portal
   useEffect(() => {
+    if (activePortal !== "citizen") return;
     if (!isSupabaseConfigured() || !supabase) return;
 
     const handleSession = async (session: any) => {
-      if (session?.access_token && session?.user?.email && !meQuery.data && !_inFlightLoginPromise) {
+      if (
+        session?.access_token &&
+        session?.user?.email &&
+        !meQuery.data &&
+        !_inFlightLoginPromises.has("citizen")
+      ) {
         try {
           await login({
             email: session.user.email,
             password: "supabase-magic-link",
             supabaseToken: session.access_token,
+            role: "user",
+            portal: "citizen",
           });
           if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
             window.history.replaceState(null, "", window.location.pathname);
@@ -303,7 +383,7 @@ export function useAuth(options: UseAuthOptions = {}) {
     return () => {
       authListener?.subscription?.unsubscribe();
     };
-  }, [login, meQuery.data]);
+  }, [activePortal, login, meQuery.data]);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
@@ -324,24 +404,25 @@ export function useAuth(options: UseAuthOptions = {}) {
     ) {
       return;
     }
-    startLogin(redirectPath);
+    startLogin(redirectPath, getCurrentPortal());
   }, [redirectOnUnauthenticated, redirectPath, meQuery.isLoading, effectiveUser, meQuery.error]);
 
   const state = useMemo(() => {
     return {
       user: effectiveUser,
+      portal: activePortal,
       loading: !initTimeoutReached && meQuery.isLoading && !effectiveUser,
       error: meQuery.error ?? null,
       isAuthenticated: Boolean(effectiveUser),
     };
-  }, [effectiveUser, meQuery.isLoading, meQuery.error, initTimeoutReached]);
+  }, [effectiveUser, activePortal, meQuery.isLoading, meQuery.error, initTimeoutReached]);
 
   const updateProfileMutation = trpc.auth.updateProfile.useMutation({
     onSuccess: async (data) => {
       if (data.user) {
-        utils.auth.me.setData(undefined, data.user as any);
+        utils.auth.me.setData({ portal: activePortal }, data.user as any);
       }
-      await utils.auth.me.invalidate();
+      await utils.auth.me.invalidate({ portal: activePortal });
     },
   });
 
@@ -359,21 +440,20 @@ export function useAuth(options: UseAuthOptions = {}) {
     }) => {
       const res = await updateProfileMutation.mutateAsync(params);
       if (res.user) {
-        try {
-          localStorage.setItem("app-runtime-user-info", JSON.stringify(res.user));
-        } catch {}
-        utils.auth.me.setData(undefined, res.user as any);
+        setLastKnownByPortal(prev => ({ ...prev, [activePortal]: res.user }));
+        utils.auth.me.setData({ portal: activePortal }, res.user as any);
       }
-      await utils.auth.me.invalidate();
+      await utils.auth.me.invalidate({ portal: activePortal });
       return res;
     },
-    [updateProfileMutation, utils]
+    [activePortal, updateProfileMutation, utils]
   );
 
   const closeRevokedModal = useCallback(() => {
     notifyRevocationListeners({
       isOpen: false,
       role: null,
+      portal: undefined,
       adminContactNumber: _globalRevokedDetail.adminContactNumber,
     });
   }, []);

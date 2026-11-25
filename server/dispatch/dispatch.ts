@@ -24,6 +24,7 @@ import {
 import { findRankedMatchesForIncident } from "./matching";
 import type { IncidentDispatchTarget, SOSCategory } from "./scoring";
 import { sendRescuerPush } from "../push";
+import { broadcastPortalEvent } from "../realtime/portalStream";
 
 export const CITIZEN_TRIAGE_WINDOW_MS = 15_000; // 15 seconds
 export const RESPONDER_OFFER_WINDOW_MS = Number(process.env.RESPONDER_OFFER_WINDOW_MS) || 30_000; // 30 seconds (configurable)
@@ -394,6 +395,15 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
       }
     }
 
+    broadcastPortalEvent({
+      type: "mission_offer",
+      portals: ["rescuer", "admin"],
+      targetUserIds: rankedMatches.map(r => r.candidate.user.id),
+      publicCode: incident.publicCode,
+      action: "offered",
+      data: { incidentId: incident.id },
+    });
+
     return { status: "offered", offers: createdOffers, candidates: rankedMatches.map(r => r.candidate) };
   } else {
     // Zero available responders right now in any tier -> maintain "matching" search status
@@ -479,6 +489,28 @@ export async function acceptMissionOffer(
       `Rescuer ${rescuerId} accepted offer within response window. Mission ${result.missionId} active.`
     );
 
+    const incident = await getIncidentById(offer.incidentId);
+    const otherRescuerIds = (await listOffersForIncident(offer.incidentId))
+      .map(o => o.rescuerId)
+      .filter(id => id !== rescuerId);
+
+    broadcastPortalEvent({
+      type: "mission_offer",
+      portals: ["rescuer", "admin"],
+      targetUserIds: [rescuerId, ...otherRescuerIds],
+      publicCode: incident?.publicCode,
+      action: "accepted",
+      data: { incidentId: offer.incidentId, missionId: result.missionId },
+    });
+    broadcastPortalEvent({
+      type: "incident_update",
+      portals: ["admin", "hospital", "rescuer", ...(incident?.reporterId ? ["citizen" as const] : [])],
+      targetUserIds: incident?.reporterId ? [rescuerId, incident.reporterId] : [rescuerId],
+      publicCode: incident?.publicCode,
+      action: "dispatched",
+      data: { incidentId: offer.incidentId },
+    });
+
     return result;
   } catch (err: any) {
     if (err.message && err.message.includes("already been assigned")) {
@@ -529,6 +561,14 @@ export async function declineMissionOffer(
     "Offer declined",
     "Responder declined mission. Searching for next nearest unit."
   );
+
+  broadcastPortalEvent({
+    type: "mission_offer",
+    portals: ["rescuer", "admin"],
+    targetUserIds: [rescuerId],
+    action: "declined",
+    data: { incidentId: offer.incidentId, offerId },
+  });
 
   // Advance dispatch to next candidate immediately
   return await advanceIncidentDispatch(offer.incidentId, currentTime);

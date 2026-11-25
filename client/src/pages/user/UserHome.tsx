@@ -18,6 +18,7 @@ import { startBleSosBeacon, stopBleSosBeacon, isBleSosBeaconActive, getOrCreateA
 import { getCurrentCoordinates, getLastKnownCoordinates } from "@/lib/nativeLocation";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { portalFetch } from "@/lib/portalAuth";
 import { startLogin } from "@/const";
 import { getWeatherRiskPresentation } from "@/lib/weatherRisk";
 import { INDIA_CENTER } from "@shared/india-locations";
@@ -227,11 +228,15 @@ export default function UserHome() {
         }
       }
     }
-    const response = await fetch("/api/sos/offline", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const response = await portalFetch(
+      "/api/sos/offline",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      "citizen"
+    );
     if (!response.ok) {
       throw new Error(`Offline SOS sync failed (${response.status})`);
     }

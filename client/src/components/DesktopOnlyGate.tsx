@@ -3,6 +3,7 @@ import { Monitor, ShieldAlert, ArrowLeft, HeartPulse, Shield, Radio, Sparkles, L
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { isNativeApp } from "@/lib/apiConfig";
+import { getPortalLoginPath } from "@/lib/portalAuth";
 
 // Desktop threshold: 1024px (standard desktop/laptop viewport)
 export const DESKTOP_MIN_WIDTH = 1024;
@@ -84,7 +85,13 @@ export function DesktopOnlyGate({
     try {
       sessionStorage.removeItem("sahay_allow_citizen_home");
     } catch { }
-    setLocation("/login");
+    const loginDest =
+      portalType === "admin"
+        ? getPortalLoginPath("admin")
+        : portalType === "hospital"
+          ? getPortalLoginPath("hospital")
+          : getPortalLoginPath("citizen");
+    setLocation(loginDest);
   };
 
   if (isDesktop && children) {

@@ -1,6 +1,7 @@
 import LanguageSelector from "@/components/LanguageSelector";
 import { VictimNavigation } from "@/components/VictimNavigation";
 import { trpc } from "@/lib/trpc";
+import { usePortalConnectionStatus } from "@/hooks/usePortalStream";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getCurrentCoordinates, getLastKnownCoordinates } from "@/lib/nativeLocation";
 import { getWeatherRiskPresentation } from "@/lib/weatherRisk";
@@ -95,8 +96,9 @@ export default function UserSafety() {
   const [nearbyApiData, setNearbyApiData] = useState<HospitalResource[] | null>(null);
   const [nearbyLoading, setNearbyLoading] = useState(false);
 
+  const sseConnected = usePortalConnectionStatus("citizen");
   const resources = trpc.rescue.safety.resources.useQuery(undefined, {
-    refetchInterval: 15_000,
+    refetchInterval: sseConnected ? false : 15_000,
     refetchOnWindowFocus: true,
   });
   const conditions = trpc.rescue.emergency.conditions.useQuery(

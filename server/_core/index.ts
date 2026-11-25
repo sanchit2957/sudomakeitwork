@@ -14,6 +14,7 @@ import { donationRouter } from "../routers/donations";
 import { registerN8nRoutes } from "../n8n";
 import { registerHospitalRoutes } from "../hospital";
 import { liveTrackingRouter } from "../tracking/liveStream";
+import { portalStreamRouter } from "../realtime/portalStream";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
@@ -86,6 +87,8 @@ async function startServer() {
       "Cache-Control",
       "Pragma",
       "X-Webhook-Secret",
+      "x-lifelink-portal",
+      "X-LifeLink-Portal",
     ],
   });
 
@@ -107,8 +110,9 @@ async function startServer() {
   // Multi-branch hospital & Pan-India nearby geo-discovery routes
   registerHospitalRoutes(app);
 
-  // Real-time SSE Live Tracking stream
+  // Real-time SSE Live Tracking stream & Multi-Portal SSE hub
   app.use(liveTrackingRouter);
+  app.use(portalStreamRouter);
 
   // Minimal public production health check endpoint (Render compatible)
   app.get("/health", async (_req, res) => {
@@ -155,7 +159,10 @@ async function startServer() {
     // In production, reject unless authenticated as admin
     if (process.env.NODE_ENV === "production") {
       try {
-        const user = await (await import("./sdk")).sdk.authenticateRequest(req);
+        const sdk = (await import("./sdk")).sdk;
+        const user = await sdk.authenticateRequest(req, {
+          portal: sdk.resolveRequestPortal(req) ?? "admin",
+        });
         if (!user || user.role !== "admin") {
           return res.status(403).json({ error: "Access denied. Admin authorization required." });
         }

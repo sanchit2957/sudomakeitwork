@@ -10,6 +10,7 @@ import {
 } from "./services/hospitalBranches";
 import { discoverNearbyHospitals, normalizeHospitalBranch } from "./services/nearbyHospitals";
 import { writeAudit, listHospitals, _memoryHospitals, type MemoryHospital } from "./rescue.db";
+import { broadcastPortalEvent } from "./realtime/portalStream";
 
 export type ShortageLevel = "adequate" | "low" | "critical" | "unknown";
 
@@ -305,7 +306,8 @@ export async function getHospitalAlertStatus(hospitalId: number) {
 
 async function requireHospitalOfficerOrAdmin(req: Request, res: Response) {
   try {
-    const user = await sdk.authenticateRequest(req);
+    const portal = sdk.resolveRequestPortal(req) ?? "hospital";
+    const user = await sdk.authenticateRequest(req, { portal });
     if (!user) {
       res.status(401).json({ error: "Authentication required." });
       return null;
@@ -348,6 +350,12 @@ export function registerHospitalRoutes(app: Express) {
     if (!user) return;
     try {
       const branch = await createHospitalBranch(user.id, req.body || {});
+      broadcastPortalEvent({
+        type: "hospital_update",
+        portals: ["admin", "hospital", "rescuer", "citizen"],
+        action: "branch_created",
+        data: { hospitalId: branch.id },
+      });
       return res.status(201).json({ success: true, branch });
     } catch (err: any) {
       const msg = err?.message || "Failed to register hospital branch.";
@@ -365,6 +373,12 @@ export function registerHospitalRoutes(app: Express) {
     }
     try {
       const branch = await updateHospitalBranch(branchId, { id: user.id, role: user.role }, req.body || {});
+      broadcastPortalEvent({
+        type: "hospital_update",
+        portals: ["admin", "hospital", "rescuer", "citizen"],
+        action: "branch_updated",
+        data: { hospitalId: branch.id },
+      });
       return res.json({ success: true, branch });
     } catch (err: any) {
       const msg = err?.message || "Failed to update hospital branch.";
@@ -386,6 +400,12 @@ export function registerHospitalRoutes(app: Express) {
     }
     try {
       const result = await deleteHospitalBranch(branchId, { id: user.id, role: user.role });
+      broadcastPortalEvent({
+        type: "hospital_update",
+        portals: ["admin", "hospital", "rescuer", "citizen"],
+        action: "branch_deleted",
+        data: { hospitalId: branchId },
+      });
       return res.json(result);
     } catch (err: any) {
       const msg = err?.message || "Failed to delete hospital branch.";

@@ -1,4 +1,5 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
+import type { PortalId } from "@shared/const";
 import type { User } from "../../drizzle/schema";
 import { sdk, type AuthenticatedUser } from "./sdk";
 
@@ -6,15 +7,17 @@ export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: AuthenticatedUser | null;
+  portal?: PortalId | null;
 };
 
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
+  const portal = sdk.resolveRequestPortal(opts.req);
   let user: User | null = null;
 
   try {
-    user = await sdk.authenticateRequest(opts.req);
+    user = await sdk.authenticateRequest(opts.req, { portal });
   } catch (error: any) {
     // If it's an explicit unauthenticated state (missing/invalid cookie, user missing in DB)
     if (
@@ -22,7 +25,8 @@ export async function createContext(
       error?.status === 403 ||
       error?.statusCode === 403 ||
       error?.message?.includes("Invalid session") ||
-      error?.message?.includes("User not found")
+      error?.message?.includes("User not found") ||
+      error?.message?.includes("not authorized for this portal")
     ) {
       user = null;
     } else {
@@ -40,5 +44,6 @@ export async function createContext(
     req: opts.req,
     res: opts.res,
     user,
+    portal,
   };
 }

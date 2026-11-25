@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
+import { usePortalConnectionStatus } from "@/hooks/usePortalStream";
 import {
   Activity,
   AlertTriangle,
@@ -57,6 +58,8 @@ export function AdminUserManagement({ currentUserId }: AdminUserManagementProps)
   const [statusModalUser, setStatusModalUser] = useState<any | null>(null);
   const [detailsModalUserId, setDetailsModalUserId] = useState<number | null>(null);
 
+  const sseConnected = usePortalConnectionStatus("admin");
+
   // Queries
   const usersQuery = trpc.rescue.operations.adminUsersList.useQuery(
     {
@@ -65,7 +68,7 @@ export function AdminUserManagement({ currentUserId }: AdminUserManagementProps)
       status: statusFilter,
       limit: 100,
     },
-    { refetchInterval: 10_000, refetchOnWindowFocus: true }
+    { refetchInterval: sseConnected ? false : 10_000, refetchOnWindowFocus: true }
   );
 
   const hospitalsQuery = trpc.rescue.operations.hospitals.useQuery(undefined, {

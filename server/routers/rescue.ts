@@ -25,6 +25,7 @@ import {
 } from "../../drizzle/schema";
 import { getDb, withDbTimeout, getEmergencyContactsByUserId, upsertEmergencyContact, deleteEmergencyContact, getUserByOpenId, getUserById, upsertUser, getAllUsers } from "../db";
 import { notifyOwner } from "../_core/notification";
+import { broadcastPortalEvent } from "../realtime/portalStream";
 import { getOfficialAssamRiverGauge } from "../assam-river-gauge";
 import {
   ASSAM_DISTRICT_LOCATIONS,
@@ -834,6 +835,14 @@ export const rescueRouter = router({
           voiceNoteUrl: uploadedVoiceNote?.url ?? null,
           createdAt: now,
         });
+        broadcastPortalEvent({
+          type: "incident_update",
+          portals: ["admin", "hospital", "citizen"],
+          targetUserIds: [ctx.user.id],
+          publicCode,
+          action: "created",
+          data: { incidentId },
+        });
         return { incidentId, publicCode, status: "pending" as const, triageDeadlineAt, requestCategory: defaultCategory, voiceNoteUrl: uploadedVoiceNote?.url ?? null };
       }),
     selectCategory: publicProcedure
@@ -853,6 +862,12 @@ export const rescueRouter = router({
         if (!incidentId) throw new TRPCError({ code: "NOT_FOUND", message: "SOS incident not found." });
         const { selectIncidentCategory } = await import("../dispatch/dispatch");
         const result = await selectIncidentCategory(incidentId, input.category, ctx.user?.id ?? null);
+        broadcastPortalEvent({
+          type: "incident_update",
+          portals: ["admin", "hospital"],
+          action: "triage_selected",
+          data: { incidentId, category: input.category },
+        });
         return { success: true, result };
       }),
     cancel: protectedProcedure
@@ -950,6 +965,15 @@ export const rescueRouter = router({
           "Reporter cancelled the emergency request during the cancellation window."
         );
         await writeAudit(ctx.user.id, "incident.cancel", "incident", incident.id, `Cancelled SOS ${incident.publicCode}`);
+
+        broadcastPortalEvent({
+          type: "incident_update",
+          portals: ["admin", "hospital", "rescuer", "citizen"],
+          targetUserIds: incident.reporterId ? [incident.reporterId] : undefined,
+          publicCode: incident.publicCode,
+          action: "cancelled",
+          data: { incidentId: incident.id },
+        });
 
         return { success: true, publicCode: incident.publicCode, status: "resolved" as const };
       }),
@@ -1056,6 +1080,13 @@ export const rescueRouter = router({
           reliefCentreAllotted: input.reliefCentreAllotted,
           helpCategory: input.helpCategory,
           notes: input.notes ?? null,
+        });
+        broadcastPortalEvent({
+          type: "post_rescue_update",
+          portals: ["admin", "hospital"],
+          publicCode: incident.publicCode,
+          action: "submitted",
+          data: { incidentId: incident.id },
         });
         return { success: true, checkIn: result };
       }),
@@ -1228,6 +1259,18 @@ export const rescueRouter = router({
           message: input.message,
           createdAt: new Date(),
         });
+        const chatTargets = [
+          ...(incident.reporterId ? [incident.reporterId] : []),
+          ...(incident.assignedRescuerId ? [incident.assignedRescuerId] : []),
+        ];
+        broadcastPortalEvent({
+          type: "chat_message",
+          portals: ["citizen", "rescuer", "admin"],
+          targetUserIds: chatTargets.length ? chatTargets : undefined,
+          publicCode: incident.publicCode,
+          action: "message_sent",
+          data: { incidentId: incident.id, messageId },
+        });
         return { success: true };
       }),
     mine: protectedProcedure.query(({ ctx }) => listIncidentsForReporter(ctx.user.id)),
@@ -1359,6 +1402,13 @@ export const rescueRouter = router({
           requestId,
           `Requested ${input.category} assistance`
         );
+        broadcastPortalEvent({
+          type: "safety_request_update",
+          portals: ["admin", "hospital", "rescuer", "citizen"],
+          targetUserIds: [ctx.user.id],
+          action: "created",
+          data: { requestId, category: input.category },
+        });
         return { id: requestId, status: "new" as const };
       }),
     mine: protectedProcedure.query(async ({ ctx }) => {
@@ -1464,6 +1514,13 @@ export const rescueRouter = router({
           input.id,
           `Marked ${input.status}`
         );
+        broadcastPortalEvent({
+          type: "safety_request_update",
+          portals: ["admin", "hospital", "rescuer", "citizen"],
+          targetUserIds: request.requesterId ? [request.requesterId] : undefined,
+          action: input.status,
+          data: { requestId: input.id },
+        });
         return { success: true };
       }),
   }),
@@ -1543,6 +1600,12 @@ export const rescueRouter = router({
         reqId,
         input.hospitalName
       );
+      broadcastPortalEvent({
+        type: "hospital_update",
+        portals: ["admin"],
+        action: "registration_requested",
+        data: { requestId: reqId },
+      });
       return { status: "pending" as const };
     }),
     mine: protectedProcedure.query(async ({ ctx }) => {
@@ -1600,6 +1663,12 @@ export const rescueRouter = router({
       .mutation(async ({ input, ctx }) => {
         try {
           const branch = await createHospitalBranch(ctx.user.id, input);
+          broadcastPortalEvent({
+            type: "hospital_update",
+            portals: ["admin", "hospital", "rescuer", "citizen"],
+            action: "branch_created",
+            data: { hospitalId: branch.id },
+          });
           return { success: true, branch };
         } catch (err: any) {
           throw new TRPCError({ code: "BAD_REQUEST", message: err?.message || "Failed to register hospital branch." });
@@ -1611,6 +1680,12 @@ export const rescueRouter = router({
         try {
           const { id, ...rest } = input;
           const branch = await updateHospitalBranch(id, { id: ctx.user.id, role: ctx.user.role }, rest);
+          broadcastPortalEvent({
+            type: "hospital_update",
+            portals: ["admin", "hospital", "rescuer", "citizen"],
+            action: "branch_updated",
+            data: { hospitalId: branch.id },
+          });
           return { success: true, branch };
         } catch (err: any) {
           const msg = err?.message || "Failed to update hospital branch.";
@@ -1623,7 +1698,14 @@ export const rescueRouter = router({
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ input, ctx }) => {
         try {
-          return await deleteHospitalBranch(input.id, { id: ctx.user.id, role: ctx.user.role });
+          const deleted = await deleteHospitalBranch(input.id, { id: ctx.user.id, role: ctx.user.role });
+          broadcastPortalEvent({
+            type: "hospital_update",
+            portals: ["admin", "hospital", "rescuer", "citizen"],
+            action: "branch_deleted",
+            data: { hospitalId: input.id },
+          });
+          return deleted;
         } catch (err: any) {
           const msg = err?.message || "Failed to delete hospital branch.";
           if (msg.startsWith("FORBIDDEN:")) throw new TRPCError({ code: "FORBIDDEN", message: msg.replace("FORBIDDEN: ", "") });
@@ -1721,6 +1803,24 @@ export const rescueRouter = router({
           input.notificationId,
           `Updated case status to ${input.status} (${hospitalName})`
         );
+
+        broadcastPortalEvent({
+          type: "hospital_update",
+          portals: ["admin", "hospital"],
+          action: "case_status_updated",
+          data: { incidentId: updated.incidentId, hospitalId: updated.hospitalId, status: input.status },
+        });
+        broadcastPortalEvent({
+          type: "incident_update",
+          portals: ["admin", "rescuer", "citizen"],
+          targetUserIds: [
+            ...(incident?.reporterId ? [incident.reporterId] : []),
+            ...(incident?.assignedRescuerId ? [incident.assignedRescuerId] : []),
+          ],
+          publicCode: incident?.publicCode,
+          action: `hospital_${input.status}`,
+          data: { incidentId: updated.incidentId },
+        });
 
         return { success: true, notification: updated };
       }),
@@ -2255,6 +2355,13 @@ export const rescueRouter = router({
           })
         );
 
+        broadcastPortalEvent({
+          type: "user_update",
+          portals: ["admin"],
+          action: "role_changed",
+          data: { userId: input.userId, newRole: input.role },
+        });
+
         return { success: true, newRole: input.role };
       }),
     adminSetUserStatus: adminProcedure
@@ -2310,6 +2417,13 @@ export const rescueRouter = router({
             reason: input.reason || (input.status === "disabled" ? "Disabled by administrator" : "Re-activated by administrator"),
           })
         );
+
+        broadcastPortalEvent({
+          type: "user_update",
+          portals: ["admin"],
+          action: "status_changed",
+          data: { userId: input.userId, status: input.status },
+        });
 
         return { success: true, status: input.status };
       }),
@@ -2374,6 +2488,12 @@ export const rescueRouter = router({
           input.userId,
           `Assigned call sign ${input.callSign}`
         );
+        broadcastPortalEvent({
+          type: "user_update",
+          portals: ["admin"],
+          action: "rescuer_promoted",
+          data: { userId: input.userId },
+        });
         return { success: true };
       }),
     promoteMedical: adminProcedure
@@ -2562,6 +2682,18 @@ export const rescueRouter = router({
             request.id,
             `Created hospital ${hospitalId}`
           );
+          broadcastPortalEvent({
+            type: "hospital_update",
+            portals: ["admin", "hospital", "rescuer", "citizen"],
+            action: "registration_approved",
+            data: { hospitalId, userId: request.userId },
+          });
+          broadcastPortalEvent({
+            type: "user_update",
+            portals: ["admin"],
+            action: "hospital_approved",
+            data: { userId: request.userId },
+          });
           return { success: true, hospitalId };
         }
         await writeAudit(
@@ -2571,6 +2703,13 @@ export const rescueRouter = router({
           request.id,
           input.reviewNote ?? null
         );
+        broadcastPortalEvent({
+          type: "hospital_update",
+          portals: ["admin", "citizen"],
+          targetUserIds: [request.userId],
+          action: "registration_rejected",
+          data: { requestId: request.id },
+        });
         return { success: true, hospitalId: null };
       }),
     reviewRescuerRegistration: adminProcedure
@@ -2673,6 +2812,12 @@ export const rescueRouter = router({
           request.id,
           input.callSign ?? input.reviewNote ?? null
         );
+        broadcastPortalEvent({
+          type: "user_update",
+          portals: ["admin"],
+          action: "rescuer_registration_reviewed",
+          data: { requestId: request.id, decision: input.decision },
+        });
         return { success: true };
       }),
     assignMission: adminProcedure
@@ -2686,6 +2831,15 @@ export const rescueRouter = router({
             rescuerId: input.rescuerId,
             assignedBy: ctx.user.id,
             notes: "Manually assigned via Command Centre override.",
+          });
+          const inc = await getIncidentById(input.incidentId);
+          broadcastPortalEvent({
+            type: "incident_update",
+            portals: ["admin", "hospital", "rescuer", ...(inc?.reporterId ? ["citizen" as const] : [])],
+            targetUserIds: inc?.reporterId ? [input.rescuerId, inc.reporterId] : [input.rescuerId],
+            publicCode: inc?.publicCode,
+            action: "assigned",
+            data: { incidentId: input.incidentId, missionId: result.missionId },
           });
           return { missionId: result.missionId };
         } catch (err: any) {
@@ -2722,6 +2876,12 @@ export const rescueRouter = router({
           updatedAt: new Date(),
         });
         await writeAudit(ctx.user.id, "shelter.create", "shelter", shelterId, input.name);
+        broadcastPortalEvent({
+          type: "shelter_update",
+          portals: ["admin", "hospital", "rescuer", "citizen"],
+          action: "created",
+          data: { shelterId },
+        });
         return { id: shelterId };
       }),
     updateShelter: adminProcedure
@@ -2763,6 +2923,12 @@ export const rescueRouter = router({
           mem.updatedAt = new Date();
         }
         await writeAudit(ctx.user.id, "shelter.update", "shelter", input.id, input.name);
+        broadcastPortalEvent({
+          type: "shelter_update",
+          portals: ["admin", "hospital", "rescuer", "citizen"],
+          action: "updated",
+          data: { shelterId: input.id },
+        });
         return { success: true };
       }),
     addHospital: adminProcedure.input(hospitalInput).mutation(async ({ input, ctx }) => {
@@ -2812,6 +2978,12 @@ export const rescueRouter = router({
         updatedAt: new Date(),
       });
       await writeAudit(ctx.user.id, "hospital.create", "hospital", hospitalId, input.name);
+      broadcastPortalEvent({
+        type: "hospital_update",
+        portals: ["admin", "hospital", "rescuer", "citizen"],
+        action: "created",
+        data: { hospitalId },
+      });
       return { id: hospitalId };
     }),
     updateHospital: adminProcedure
@@ -2849,6 +3021,12 @@ export const rescueRouter = router({
           mem.updatedAt = new Date();
         }
         await writeAudit(ctx.user.id, "hospital.update", "hospital", input.id, input.name);
+        broadcastPortalEvent({
+          type: "hospital_update",
+          portals: ["admin", "hospital", "rescuer", "citizen"],
+          action: "updated",
+          data: { hospitalId: input.id },
+        });
         return { success: true };
       }),
     updateMyHospitalResources: medicalOperationsProcedure
@@ -2900,6 +3078,12 @@ export const rescueRouter = router({
           input.id,
           "Published live hospital resource update"
         );
+        broadcastPortalEvent({
+          type: "hospital_update",
+          portals: ["admin", "hospital", "rescuer", "citizen"],
+          action: "resources_updated",
+          data: { hospitalId: input.id },
+        });
         return { success: true };
       }),
     addFloodZone: adminProcedure
@@ -3162,6 +3346,14 @@ export const rescueRouter = router({
           // Broadcast status change immediately so any live SSE viewers on Phone A instantly transition to dispatched
           try {
             broadcastMissionStatusUpdate(incident.publicCode, "dispatched", "Assigned via offline BLE response reconciliation");
+            broadcastPortalEvent({
+              type: "incident_update",
+              portals: ["admin", "hospital", "rescuer", ...(incident.reporterId ? ["citizen" as const] : [])],
+              targetUserIds: incident.reporterId ? [ctx.user.id, incident.reporterId] : [ctx.user.id],
+              publicCode: incident.publicCode,
+              action: "ble_reconciled",
+              data: { incidentId: incident.id },
+            });
           } catch { }
 
           return {
@@ -3259,6 +3451,15 @@ export const rescueRouter = router({
           authorId: ctx.user.id,
           message: input.message,
           createdAt: new Date(),
+        });
+        const inc = await getIncidentById(mission.incidentId);
+        broadcastPortalEvent({
+          type: "chat_message",
+          portals: ["citizen", "rescuer", "admin"],
+          targetUserIds: inc?.reporterId ? [ctx.user.id, inc.reporterId] : [ctx.user.id],
+          publicCode: inc?.publicCode,
+          action: "message_sent",
+          data: { incidentId: mission.incidentId, messageId },
         });
         return { id: messageId };
       }),
@@ -3485,6 +3686,13 @@ export const rescueRouter = router({
           `Notified ${hospitalName} of incoming case (ETA: ${input.estimatedArrivalMinutes} min)`
         );
 
+        broadcastPortalEvent({
+          type: "hospital_update",
+          portals: ["admin", "hospital"],
+          action: "inbound_case_notified",
+          data: { incidentId: input.incidentId, hospitalId: input.hospitalId },
+        });
+
         return { success: true, notification: record };
       }),
     missions: rescuerProcedure.query(({ ctx }) => listMissionsForRescuer(ctx.user.id)),
@@ -3572,6 +3780,12 @@ export const rescueRouter = router({
           mem.updatedAt = new Date();
         }
         await writeAudit(ctx.user.id, "rescuer.availability", "rescueProfile", profile.id, input.availability);
+        broadcastPortalEvent({
+          type: "user_update",
+          portals: ["admin"],
+          action: "rescuer_availability",
+          data: { userId: ctx.user.id, availability: input.availability },
+        });
         return { success: true };
       }),
     updateMission: rescuerProcedure
@@ -3657,6 +3871,14 @@ export const rescueRouter = router({
           );
         }
         await writeAudit(ctx.user.id, "mission.update", "mission", mission.id, input.status);
+        broadcastPortalEvent({
+          type: "incident_update",
+          portals: ["admin", "hospital", "rescuer", ...(incForBroadcast?.reporterId ? ["citizen" as const] : [])],
+          targetUserIds: incForBroadcast?.reporterId ? [ctx.user.id, incForBroadcast.reporterId] : [ctx.user.id],
+          publicCode: incForBroadcast?.publicCode,
+          action: `mission_${input.status}`,
+          data: { incidentId: mission.incidentId, missionId: mission.id },
+        });
         return { success: true };
       }),
     markNotificationRead: rescuerProcedure
