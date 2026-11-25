@@ -370,7 +370,7 @@ export const appRouter = router({
         .mutation(async ({ input, ctx }) => {
           const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
           const prefix = input.role === "rescuer" ? "RESC" : "HOSP";
-          const generatedCode = `ASSAM-${prefix}-${randomSuffix}`;
+          const generatedCode = `SAHAY-${prefix}-${randomSuffix}`;
           const res = await setRoleAccessCode(input.role, generatedCode, ctx.user.id);
           return {
             role: res.role,

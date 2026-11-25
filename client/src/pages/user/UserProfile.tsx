@@ -35,41 +35,27 @@ import {
 import React, { FormEvent, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
-const ASSAM_DISTRICTS = [
+const POPULAR_INDIA_CITIES_DISTRICTS = [
+  "New Delhi (Delhi)",
+  "Mumbai (Maharashtra)",
+  "Bengaluru (Karnataka)",
+  "Chennai (Tamil Nadu)",
+  "Hyderabad (Telangana)",
+  "Kolkata (West Bengal)",
+  "Pune (Maharashtra)",
+  "Ahmedabad (Gujarat)",
+  "Jaipur (Rajasthan)",
+  "Lucknow (Uttar Pradesh)",
+  "Patna (Bihar)",
+  "Bhopal (Madhya Pradesh)",
+  "Bhubaneswar (Odisha)",
+  "Kochi (Kerala)",
+  "Guwahati (Assam)",
   "Kamrup Metropolitan",
-  "Kamrup",
-  "Cachar",
-  "Dibrugarh",
-  "Jorhat",
-  "Nagaon",
-  "Sonitpur",
-  "Barpeta",
-  "Dhubri",
-  "Goalpara",
-  "Golaghat",
-  "Hailakandi",
-  "Hojai",
-  "Karimganj",
-  "Kokrajhar",
-  "Lakhimpur",
-  "Majuli",
-  "Morigaon",
-  "Nalbari",
-  "Sivasagar",
-  "Tinsukia",
-  "Baksa",
-  "Biswanath",
-  "Charaideo",
-  "Chirang",
-  "Darrang",
-  "Dhemaji",
-  "Dima Hasao",
-  "Karbi Anglong",
-  "South Salmara-Mankachar",
-  "Tamulpur",
-  "Udalguri",
-  "West Karbi Anglong",
-  "Bajali",
+  "Chandigarh",
+  "Dehradun (Uttarakhand)",
+  "Srinagar (Jammu & Kashmir)",
+  "Silchar (Cachar)",
 ];
 
 const BLOOD_GROUPS = ["Not specified", "A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
@@ -98,7 +84,7 @@ export default function UserProfile() {
   const [emergencyContact, setEmergencyContact] = useState((user as any)?.emergencyContact || "");
   const [bloodGroup, setBloodGroup] = useState((user as any)?.bloodGroup || "Not specified");
   const [medicalNotes, setMedicalNotes] = useState((user as any)?.medicalNotes || "");
-  const [homeDistrict, setHomeDistrict] = useState((user as any)?.homeDistrict || "Kamrup Metropolitan");
+  const [homeDistrict, setHomeDistrict] = useState((user as any)?.homeDistrict || "");
   const [address, setAddress] = useState((user as any)?.address || "");
   const [preferredLanguage, setPreferredLanguage] = useState((user as any)?.preferredLanguage || "en");
   const [safetyNotifications, setSafetyNotifications] = useState<boolean>(
@@ -603,34 +589,35 @@ export default function UserProfile() {
             <div className="mt-4 space-y-3.5">
               <div>
                 <Label htmlFor="prof-district" className="text-xs font-bold text-[#0F172A] dark:text-[#F8FAFC]">
-                  {t("State & District")}
+                  {t("City / District / State")}
                 </Label>
-                <select
+                <Input
                   id="prof-district"
+                  list="india-district-suggestions"
                   value={homeDistrict}
                   onChange={(e) => setHomeDistrict(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-[#E2E8F0]/40 dark:border-white/10 glass-card px-3 py-2 text-xs font-semibold text-[#0F172A] dark:text-[#F8FAFC]"
-                >
-                  {ASSAM_DISTRICTS.map((dist) => (
-                    <option key={dist} value={dist}>
-                      {t(dist)}
-                    </option>
+                  placeholder={t("e.g. Mumbai, New Delhi, Bengaluru, or District Name")}
+                  className="mt-1 rounded-xl glass-card border-[#E2E8F0]/40 dark:border-white/10 text-xs font-semibold"
+                />
+                <datalist id="india-district-suggestions">
+                  {POPULAR_INDIA_CITIES_DISTRICTS.map((dist) => (
+                    <option key={dist} value={dist} />
                   ))}
-                </select>
+                </datalist>
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  {t("Configures default weather forecast & local environmental alerts for your area.")}
+                  {t("Configures default weather forecast & local environmental alerts for your area across India.")}
                 </p>
               </div>
 
               <div>
                 <Label htmlFor="prof-address" className="text-xs font-bold text-[#0F172A] dark:text-[#F8FAFC]">
-                  {t("Home Address / Village / Ward")}
+                  {t("Home Address / Locality / Pincode")}
                 </Label>
                 <Input
                   id="prof-address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder={t("e.g. House 42, Ward 12, Lachit Nagar, Guwahati")}
+                  placeholder={t("e.g. House 42, Sector 14, Indiranagar / New Delhi")}
                   className="mt-1 rounded-xl glass-card border-[#E2E8F0]/40 dark:border-white/10 text-xs font-semibold"
                 />
               </div>

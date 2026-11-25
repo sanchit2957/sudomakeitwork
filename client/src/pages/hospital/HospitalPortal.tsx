@@ -1,15 +1,21 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { RoleGate } from "@/components/RoleGate";
 import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import { HospitalStaffDashboard } from "@/components/HospitalStaffDashboard";
+import { HospitalMyBranches } from "@/components/HospitalMyBranches";
+import type { HospitalBranchRecord } from "@/components/HospitalBranchForm";
 import DashboardLayout, { type WorkspaceNavItem } from "@/components/DashboardLayout";
 import OperationsMap from "@/components/OperationsMap";
+import { INDIA_CENTER } from "@shared/india-locations";
 import { Button } from "@/components/ui/button";
 import { HospitalManager } from "@/pages/admin/AdminCommand";
 import HospitalRegistration from "./HospitalRegistration";
 import { trpc } from "@/lib/trpc";
 import { Building2, CheckCircle2, Hospital, MapPinned, ShieldCheck, UserPlus, XCircle } from "lucide-react";
 import { useLocation } from "wouter";
+
+const ACTIVE_BRANCH_STORAGE_KEY = "sahay_active_hospital_branch_id";
 
 export default function HospitalPortal() {
   const { user, loading } = useAuth();
@@ -26,34 +32,113 @@ export default function HospitalPortal() {
 }
 
 function HospitalWorkspace() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user } = useAuth();
+  const isOfficer = user?.role === "hospital" || user?.role === "medical";
+
   const nav: WorkspaceNavItem[] = [
     { label: user?.role === "admin" ? "Hospital Overview" : "Hospital Command Desk", path: "/hospital", icon: Hospital },
+    ...(isOfficer ? [{ label: "My Branches", path: "/hospital/branches", icon: Building2 }] : []),
     { label: "Operations Map", path: "/hospital/map", icon: MapPinned },
     ...(user?.role === "admin" ? [{ label: "Hospital Approvals", path: "/hospital/access", icon: UserPlus }] : []),
   ];
 
   const live = { refetchInterval: 6_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
   const hospitals = trpc.rescue.operations.hospitals.useQuery(undefined, live);
-  const myHospital = trpc.rescue.operations.myHospital.useQuery(undefined, { ...live, enabled: user?.role === "hospital" || user?.role === "medical" });
-  const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, { refetchInterval: 12_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true });
+  const myBranches = trpc.rescue.operations.myBranches.useQuery(undefined, {
+    ...live,
+    enabled: isOfficer,
+  });
+
+  const branchList = (myBranches.data || []) as unknown as HospitalBranchRecord[];
+  const [activeBranchId, setActiveBranchId] = useState<number | null>(() => {
+    try {
+      const saved = localStorage.getItem(ACTIVE_BRANCH_STORAGE_KEY);
+      return saved ? parseInt(saved, 10) || null : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (!branchList.length) {
+      if (activeBranchId !== null) setActiveBranchId(null);
+      return;
+    }
+    const stillExists = activeBranchId != null && branchList.some(b => b.id === activeBranchId);
+    if (!stillExists) {
+      const primary = branchList.find(b => b.isPrimaryBranch) ?? branchList[0];
+      setActiveBranchId(primary.id);
+    }
+  }, [branchList, activeBranchId]);
+
+  const handleSelectBranch = (branchId: number) => {
+    setActiveBranchId(branchId);
+    try {
+      localStorage.setItem(ACTIVE_BRANCH_STORAGE_KEY, String(branchId));
+    } catch {}
+  };
+
+  const activeBranch =
+    branchList.find(b => b.id === activeBranchId) ?? branchList.find(b => b.isPrimaryBranch) ?? branchList[0] ?? null;
+
+  const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, {
+    refetchInterval: 12_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+  });
 
   return (
     <DashboardLayout
       navItems={nav}
       workspace="Hospital Command Portal"
-      roleLabel={user?.role === "admin" ? "State Command Coordinator" : "Authorized Hospital Operations Officer"}
+      roleLabel={user?.role === "admin" ? "National / State Command Coordinator" : "Authorized Hospital Operations Officer"}
       desktopSidebar="fixed"
     >
-      {location === "/hospital/map" ? (
+      {location === "/hospital/branches" && isOfficer ? (
+        <HospitalMyBranches
+          branches={branchList}
+          activeBranchId={activeBranch?.id ?? null}
+          onSelectBranch={handleSelectBranch}
+          onOpenDashboard={() => setLocation("/hospital")}
+        />
+      ) : location === "/hospital/map" ? (
         <section className="space-y-4">
-          <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Shared Operating Picture</p>
-            <h1 className="mt-1 text-2xl font-extrabold">Hospital & Emergency Response Sector Map</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                Shared Operating Picture
+              </p>
+              <h1 className="mt-1 text-2xl font-extrabold">
+                {activeBranch
+                  ? `${activeBranch.organizationName} — ${activeBranch.branchName} Map`
+                  : "Hospital & Emergency Response Map (India)"}
+              </h1>
+            </div>
+            {isOfficer && branchList.length > 1 && (
+              <select
+                aria-label="Center map on branch"
+                value={activeBranch?.id ?? ""}
+                onChange={e => handleSelectBranch(Number(e.target.value))}
+                className="h-9 rounded-xl border border-input bg-background px-3 text-xs font-bold"
+              >
+                {branchList.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.organizationName} — {b.branchName} ({b.city})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="mt-4">
-            <OperationsMap layers={layers.data} />
+            <OperationsMap
+              layers={layers.data}
+              focusCenter={
+                activeBranch ? { lat: activeBranch.latitude, lng: activeBranch.longitude } : INDIA_CENTER
+              }
+              focusZoom={activeBranch ? 14 : 5}
+              highlightedHospitalId={activeBranch?.id ?? null}
+            />
           </div>
         </section>
       ) : location === "/hospital/access" && user?.role === "admin" ? (
@@ -61,7 +146,13 @@ function HospitalWorkspace() {
       ) : user?.role === "admin" ? (
         <HospitalManager hospitals={hospitals.data || []} layers={layers.data} />
       ) : (
-        <HospitalStaffDashboard hospital={myHospital.data} />
+        <HospitalStaffDashboard
+          hospital={activeBranch as any}
+          branches={branchList}
+          activeBranchId={activeBranch?.id ?? null}
+          onSelectBranch={handleSelectBranch}
+          loadingBranches={myBranches.isLoading}
+        />
       )}
     </DashboardLayout>
   );

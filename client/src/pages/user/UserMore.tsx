@@ -120,7 +120,7 @@ export default function UserMore() {
           </div>
 
           <p className="mt-2 text-xs leading-relaxed text-[#0F172A]/70 dark:text-[#F1F5F9]/70 text-prose-justified">
-            {t("Connect with verified relief NGOs and community disaster foundations operating in Assam.")}
+            {t("Connect with verified relief NGOs and community disaster foundations operating across India.")}
           </p>
 
           <div className="mt-4">

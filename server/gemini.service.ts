@@ -584,11 +584,11 @@ const geminiFunctionDeclarations: FunctionDeclaration[] = [
   },
   {
     name: "findNearbyHospitals",
-    description: "Find real registered hospitals and medical centers in Assam with live bed availability, ICU capacity, oxygen cylinders, contact numbers, and distance when coordinates are provided.",
+    description: "Find real registered hospitals and medical centers across India with live bed availability, ICU capacity, oxygen cylinders, contact numbers, and distance when coordinates are provided.",
     parameters: {
       type: Type.OBJECT,
       properties: {
-        district: { type: Type.STRING, description: "District to filter by (e.g. Kamrup Metro, Cachar, Dibrugarh, etc.)" },
+        district: { type: Type.STRING, description: "City, district, or state to filter by (e.g. Mumbai, Delhi, Bengaluru, Kamrup Metro, Chennai, etc.)" },
         query: { type: Type.STRING, description: "Search term for hospital name or department" },
         lat: { type: Type.NUMBER, description: "Optional user latitude coordinate for proximity sorting" },
         lng: { type: Type.NUMBER, description: "Optional user longitude coordinate for proximity sorting" },
@@ -597,17 +597,17 @@ const geminiFunctionDeclarations: FunctionDeclaration[] = [
   },
   {
     name: "getReliefShelters",
-    description: "Get real active flood relief shelters and evacuation camps in Assam with capacity and location details.",
+    description: "Get real active flood relief shelters and evacuation camps across India with capacity and location details.",
     parameters: {
       type: Type.OBJECT,
       properties: {
-        district: { type: Type.STRING, description: "District to filter by" },
+        district: { type: Type.STRING, description: "City or district to filter by" },
       },
     },
   },
   {
     name: "getEmergencyHelplines",
-    description: "Get official Assam disaster response helplines and emergency contact numbers (State & District EOC, SDRF, NDRF, 112, 108, 100, 101).",
+    description: "Get official India disaster response helplines and emergency contact numbers (NDMA 1078, State & District EOC 1070/1077, SDRF, NDRF, 112, 108, 100, 101).",
     parameters: {
       type: Type.OBJECT,
       properties: {},
@@ -898,12 +898,12 @@ Stay alert and move to higher ground if heavy rain continues. Dial 112 / 1070 fo
               `${i + 1}. **${h.name}**${h.distanceKm !== undefined ? ` (${h.distanceKm} km away)` : ""}\n   📍 ${h.address}\n   📞 ${h.phone || "108 (Ambulance)"}\n   🛏️ Emergency Beds: ${h.availableBeds}/${h.totalBeds} | ICU: ${h.icuBeds}/${h.totalIcuBeds} | 💨 Oxygen: ${h.oxygenCylinders}`
           )
           .join("\n\n");
-        return `🏥 **Assam Hospital Bed & Medical Availability (${matchedDistrict || "Nearest"})**:\n\n${listStr}\n\n🚑 **For immediate medical emergencies or ambulance dispatch, call 108.**`;
+        return `🏥 **Hospital Bed & Medical Availability (${matchedDistrict || "Nearest"})**:\n\n${listStr}\n\n🚑 **For immediate medical emergencies or ambulance dispatch, call 108 / 112.**`;
       }
     } catch {
       // ignore
     }
-    return `🏥 For urgent hospital admission and ambulance dispatch in Assam, please dial **108** immediately. You can also view registered medical centers with live bed capacity in the Hospital Portal.`;
+    return `🏥 For urgent hospital admission and ambulance dispatch across India, please dial **108** or **112** immediately. You can also view nearby verified hospitals and live bed availability under Safety → Nearby Hospitals.`;
   }
 
   // 5. Relief Shelters & Camps
@@ -925,12 +925,12 @@ Stay alert and move to higher ground if heavy rain continues. Dial 112 / 1070 fo
               `${i + 1}. **${s.name}**\n   📍 ${s.address}\n   👥 Capacity: ${s.capacity} | Current Occupancy: ${s.currentOccupancy}`
           )
           .join("\n\n");
-        return `⛺ **Active Flood Relief Shelters (${matchedDistrict})**:\n\n${listStr}\n\n📞 For official relief camp allocation, contact District Disaster Control Room at **1077**.`;
+        return `⛺ **Active Relief Shelters (${matchedDistrict || "Pan-India"})**:\n\n${listStr}\n\n📞 For official relief camp allocation, contact your District Disaster Control Room at **1077** or **112**.`;
       }
     } catch {
       // ignore
     }
-    return `⛺ Active flood relief camps and evacuation centers are set up in schools, college grounds, and higher elevation buildings. Contact DEOC at **1077** or ASDMA at **1070** for the nearest designated camp.`;
+    return `⛺ Active flood relief camps and evacuation centers are set up in schools, community halls, and higher elevation buildings. Contact DEOC at **1077**, SEOC at **1070**, or NDMA at **1078** for the nearest designated camp.`;
   }
 
   // 6. Emergency Helplines & Contacts
@@ -945,23 +945,23 @@ Stay alert and move to higher ground if heavy rain continues. Dial 112 / 1070 fo
     normalized.includes("sdrf") ||
     normalized.includes("ndrf")
   ) {
-    return `📞 **Official Assam Emergency Helplines**:
-• **National Emergency**: 112
-• **Assam State Emergency Operations Centre (SEOC)**: 1070 / 0361-2237011
+    return `📞 **Official Pan-India Emergency Helplines**:
+• **National Unified Emergency**: 112
+• **National Disaster Management Authority (NDMA)**: 1078 / 011-26701728
+• **State Emergency Operations Centre (SEOC)**: 1070
 • **District Emergency Operations Centre (DEOC)**: 1077
-• **Ambulance Service**: 108
+• **Ambulance Service**: 108 / 102
 • **Police Control Room**: 100
 • **Fire & Emergency Services**: 101
-• **SDRF Assam Control Room**: 0361-2800557 / 94350-00108
-• **NDRF 1st Bn Guwahati**: 0361-2849005 / 94359-62222
+• **NDRF HQ Control Room**: 011-23438091 / 9711077372
 • **Child Helpline**: 1098
 • **Women Helpline**: 181`;
   }
 
   // 7. General Flood Safety & First Aid
-  return `🚨 **Assam Flood Safety & Emergency Guidance**:
+  return `🚨 **Disaster Safety & Emergency Guidance (India)**:
 1. **Immediate Danger**: Move to higher ground immediately. Do NOT walk, swim, or drive through moving floodwaters.
-2. **One-Tap SOS**: Tap the red circular SOS button on the home screen to send your GPS coordinates to SDRF/NDRF.
+2. **One-Tap SOS**: Tap the SOS button on the home screen to send your GPS coordinates to SDRF/NDRF dispatchers.
 3. **Emergency Numbers**: Call **112** (National Emergency), **1070** (State Disaster Control), or **108** (Ambulance).
 4. **Clean Water & Food**: Boil all drinking water and keep emergency dry rations in a waterproof bag.
 5. **Electrical Safety**: Turn off main electrical switches before water enters your dwelling.`;

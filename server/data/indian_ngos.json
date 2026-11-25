@@ -1,0 +1,202 @@
+[
+  {
+    "name": "Indian Red Cross Society (National HQ)",
+    "address": "1 Red Cross Road, Sansad Marg, New Delhi, Delhi 110001",
+    "phone": "+91 11 2371 6441",
+    "latitude": 28.6219,
+    "longitude": 77.2099,
+    "city": "New Delhi",
+    "state": "Delhi",
+    "scope": "national"
+  },
+  {
+    "name": "Goonj — National Disaster Relief & Rahat Hub",
+    "address": "J-93, Sarita Vihar, New Delhi, Delhi 110076",
+    "phone": "+91 11 4140 1216",
+    "latitude": 28.5326,
+    "longitude": 77.2721,
+    "city": "New Delhi",
+    "state": "Delhi",
+    "scope": "national"
+  },
+  {
+    "name": "SEEDS India (Disaster Resilience & Shelter Aid)",
+    "address": "15A Institutional Area, Sector IV, R.K. Puram, New Delhi, Delhi 110022",
+    "phone": "+91 11 2617 4272",
+    "latitude": 28.5473,
+    "longitude": 77.1945,
+    "city": "New Delhi",
+    "state": "Delhi",
+    "scope": "national"
+  },
+  {
+    "name": "Rapid Response India",
+    "address": "18/21, Perambur High Road, Jamalia, Chennai, Tamil Nadu 600012",
+    "phone": "+91 44 2662 4444",
+    "latitude": 13.1067,
+    "longitude": 80.2449,
+    "city": "Chennai",
+    "state": "Tamil Nadu",
+    "scope": "national"
+  },
+  {
+    "name": "Doctors For You — Emergency Medical Relief",
+    "address": "Flat 401, Sahayog CHS, Chembur East, Mumbai, Maharashtra 400071",
+    "phone": "+91 22 2520 5550",
+    "latitude": 19.0436,
+    "longitude": 72.9092,
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "scope": "national"
+  },
+  {
+    "name": "Khalsa Aid India — Humanitarian & Rescue Operations",
+    "address": "Nabha Road, Patiala, Punjab 147001",
+    "phone": "+91 175 230 0786",
+    "latitude": 30.3398,
+    "longitude": 76.3869,
+    "city": "Patiala",
+    "state": "Punjab",
+    "scope": "national"
+  },
+  {
+    "name": "Hemkunt Foundation — Disaster Oxygen & Rescue Relief",
+    "address": "Sector 45, Gurugram, Haryana 122003",
+    "phone": "+91 99906 91313",
+    "latitude": 28.4451,
+    "longitude": 77.0652,
+    "city": "Gurugram",
+    "state": "Haryana",
+    "scope": "national"
+  },
+  {
+    "name": "Goonj Mumbai Regional Relief Hub",
+    "address": "MIDC Cross Road, Andheri East, Mumbai, Maharashtra 400093",
+    "phone": "+91 22 2839 0348",
+    "latitude": 19.1197,
+    "longitude": 72.8745,
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "scope": "regional"
+  },
+  {
+    "name": "Indian Red Cross Society (Maharashtra State Branch)",
+    "address": "Town Hall Compound, Shahid Bhagat Singh Road, Fort, Mumbai, Maharashtra 400001",
+    "phone": "+91 22 2266 3560",
+    "latitude": 18.9322,
+    "longitude": 72.8358,
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "scope": "regional"
+  },
+  {
+    "name": "Indian Red Cross Society (Karnataka State Branch)",
+    "address": "26, Red Cross Bhavan, Race Course Road, Bengaluru, Karnataka 560001",
+    "phone": "+91 80 2226 8435",
+    "latitude": 12.9817,
+    "longitude": 77.5815,
+    "city": "Bengaluru",
+    "state": "Karnataka",
+    "scope": "regional"
+  },
+  {
+    "name": "Hasiru Dala & Bengaluru Civic Relief Network",
+    "address": "Richmond Town, Langford Road, Bengaluru, Karnataka 560025",
+    "phone": "+91 80 2211 3344",
+    "latitude": 12.9634,
+    "longitude": 77.6001,
+    "city": "Bengaluru",
+    "state": "Karnataka",
+    "scope": "regional"
+  },
+  {
+    "name": "Bhumi Disaster Volunteer Network",
+    "address": "3/2, Karpaga Vinayagar Koil Street, Alandur, Chennai, Tamil Nadu 600016",
+    "phone": "+91 44 2232 4567",
+    "latitude": 13.0025,
+    "longitude": 80.2061,
+    "city": "Chennai",
+    "state": "Tamil Nadu",
+    "scope": "regional"
+  },
+  {
+    "name": "Indian Red Cross Society (West Bengal State Branch)",
+    "address": "5 & 6, Government Place North, Esplanade, Kolkata, West Bengal 700001",
+    "phone": "+91 33 2248 3636",
+    "latitude": 22.5701,
+    "longitude": 88.3489,
+    "city": "Kolkata",
+    "state": "West Bengal",
+    "scope": "regional"
+  },
+  {
+    "name": "Indian Red Cross Society (Telangana State Branch)",
+    "address": "Red Cross Marg, Vidya Nagar, Hyderabad, Telangana 500044",
+    "phone": "+91 40 2763 3087",
+    "latitude": 17.4021,
+    "longitude": 78.5112,
+    "city": "Hyderabad",
+    "state": "Telangana",
+    "scope": "regional"
+  },
+  {
+    "name": "Anbodu Kochi Disaster Relief Hub",
+    "address": "MG Road North End, Ernakulam, Kochi, Kerala 682018",
+    "phone": "+91 484 239 5000",
+    "latitude": 9.9816,
+    "longitude": 76.2797,
+    "city": "Kochi",
+    "state": "Kerala",
+    "scope": "regional"
+  },
+  {
+    "name": "CYSD Odisha Cyclone & Flood Response Centre",
+    "address": "E-1, Institutional Area, Gangadhar Meher Marg, Bhubaneswar, Odisha 751013",
+    "phone": "+91 674 230 0983",
+    "latitude": 20.3059,
+    "longitude": 85.8266,
+    "city": "Bhubaneswar",
+    "state": "Odisha",
+    "scope": "regional"
+  },
+  {
+    "name": "SEWA Gujarat Emergency Relief Wing",
+    "address": "SEWA Reception Centre, Opp. Victoria Garden, Bhadra, Ahmedabad, Gujarat 380001",
+    "phone": "+91 79 2550 6444",
+    "latitude": 23.0258,
+    "longitude": 72.5811,
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "scope": "regional"
+  },
+  {
+    "name": "Uttarakhand Himalayan Rescue & Relief Trust",
+    "address": "Rajpur Road, Jakhan, Dehradun, Uttarakhand 248001",
+    "phone": "+91 135 273 4100",
+    "latitude": 30.3596,
+    "longitude": 78.0672,
+    "city": "Dehradun",
+    "state": "Uttarakhand",
+    "scope": "regional"
+  },
+  {
+    "name": "Bihar Flood Response & Kosi Relief Coalition",
+    "address": "Boring Road Crossing, Sri Krishnapuri, Patna, Bihar 800001",
+    "phone": "+91 612 254 0222",
+    "latitude": 25.6119,
+    "longitude": 85.1185,
+    "city": "Patna",
+    "state": "Bihar",
+    "scope": "regional"
+  },
+  {
+    "name": "Indian Red Cross Society (North-East / Assam Regional Hub)",
+    "address": "Red Cross Bhawan, Chandmari, Guwahati, Assam 781003",
+    "phone": "+91 361 266 5115",
+    "latitude": 26.1890,
+    "longitude": 91.7760,
+    "city": "Guwahati",
+    "state": "Assam",
+    "scope": "regional"
+  }
+]

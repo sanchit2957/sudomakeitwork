@@ -58,8 +58,16 @@ export interface MemoryShelter {
 
 export interface MemoryHospital {
   id: number;
+  ownerUserId?: number | null;
+  organizationName?: string | null;
+  branchName?: string | null;
+  registrationId?: string | null;
+  isPrimaryBranch?: boolean;
   name: string;
   address: string;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
   contactPhone: string | null;
   specialty?: string;
   latitude: number;
@@ -76,7 +84,9 @@ export interface MemoryHospital {
   waterSupplyStatus: "available" | "limited" | "critical" | "unavailable";
   powerBackupStatus: "available" | "limited" | "critical" | "unavailable";
   status: "open" | "limited" | "critical" | "closed";
+  isSahayVerified?: boolean;
   updatedBy: number | null;
+  createdAt?: Date;
   updatedAt: Date;
 }
 
@@ -335,60 +345,7 @@ export const _memoryShelters: Map<number, MemoryShelter> = new Map([
   ],
 ]);
 
-export const _memoryHospitals: Map<number, MemoryHospital> = new Map([
-  [
-    1,
-    {
-      id: 1,
-      name: "Gauhati Medical College & Hospital (GMCH)",
-      address: "Bhangagarh, Guwahati, Assam 781032",
-      contactPhone: "+91 361 2529457",
-      specialty: "Trauma, Emergency & Critical Care",
-      latitude: 26.1558,
-      longitude: 91.7645,
-      totalEmergencyBeds: 120,
-      availableEmergencyBeds: 34,
-      totalIcuBeds: 45,
-      availableIcuBeds: 12,
-      oxygenCylinderCount: 85,
-      bloodUnitCount: 140,
-      ambulanceCount: 14,
-      foodSupplyStatus: "available",
-      medicineSupplyStatus: "available",
-      waterSupplyStatus: "available",
-      powerBackupStatus: "available",
-      status: "open",
-      updatedBy: 1,
-      updatedAt: new Date(),
-    },
-  ],
-  [
-    2,
-    {
-      id: 2,
-      name: "Assam Medical College & Hospital (AMCH)",
-      address: "Barbari, Dibrugarh, Assam 786002",
-      contactPhone: "+91 373 2300080",
-      specialty: "Pediatric, General & Emergency Surgery",
-      latitude: 27.4612,
-      longitude: 94.9215,
-      totalEmergencyBeds: 90,
-      availableEmergencyBeds: 28,
-      totalIcuBeds: 30,
-      availableIcuBeds: 8,
-      oxygenCylinderCount: 60,
-      bloodUnitCount: 95,
-      ambulanceCount: 10,
-      foodSupplyStatus: "available",
-      medicineSupplyStatus: "available",
-      waterSupplyStatus: "available",
-      powerBackupStatus: "available",
-      status: "open",
-      updatedBy: 1,
-      updatedAt: new Date(),
-    },
-  ],
-]);
+export const _memoryHospitals: Map<number, MemoryHospital> = new Map();
 
 export const _memoryFloodZones: Map<number, MemoryFloodZone> = new Map([
   [
@@ -1045,9 +1002,6 @@ export async function listHospitals() {
   try {
     const db = await database();
     const rows = await withDbTimeout(db.select().from(hospitals).orderBy(hospitals.name), 4000, "listHospitals");
-    if (rows.length === 0) {
-      return Array.from(_memoryHospitals.values());
-    }
     return rows;
   } catch (error) {
     failClosedInProduction(error);
@@ -1240,7 +1194,12 @@ export async function createHospitalCaseNotification(data: {
   return record;
 }
 
-export async function listHospitalCaseNotifications(hospitalId?: number | null) {
+export async function listHospitalCaseNotifications(hospitalId?: number | number[] | null) {
+  const hospitalIds = Array.isArray(hospitalId)
+    ? hospitalId
+    : hospitalId
+    ? [hospitalId]
+    : null;
   try {
     const db = await database();
     const { hospitalCaseNotifications } = await import("../drizzle/schema");
@@ -1254,7 +1213,7 @@ export async function listHospitalCaseNotifications(hospitalId?: number | null) 
         .from(hospitalCaseNotifications)
         .innerJoin(incidents, eq(hospitalCaseNotifications.incidentId, incidents.id))
         .innerJoin(users, eq(hospitalCaseNotifications.rescuerId, users.id))
-        .where(hospitalId ? eq(hospitalCaseNotifications.hospitalId, hospitalId) : undefined)
+        .where(hospitalIds && hospitalIds.length > 0 ? inArray(hospitalCaseNotifications.hospitalId, hospitalIds) : undefined)
         .orderBy(desc(hospitalCaseNotifications.createdAt)),
       4000,
       "listHospitalCaseNotifications"
@@ -1262,7 +1221,7 @@ export async function listHospitalCaseNotifications(hospitalId?: number | null) 
   } catch (error) {
     failClosedInProduction(error);
     const list = Array.from(_memoryHospitalCaseNotifications.values())
-      .filter(n => !hospitalId || n.hospitalId === hospitalId)
+      .filter(n => !hospitalIds || hospitalIds.length === 0 || hospitalIds.includes(n.hospitalId))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     return list.map(notification => {
@@ -1270,9 +1229,9 @@ export async function listHospitalCaseNotifications(hospitalId?: number | null) 
         id: notification.incidentId,
         publicCode: `CASE-${notification.incidentId}`,
         emergencyType: "flood",
-        locationLabel: "Assam Rescue Sector",
-        latitude: 26.1445,
-        longitude: 91.7362,
+        locationLabel: "Emergency Rescue Sector",
+        latitude: 20.5937,
+        longitude: 78.9629,
         severity: notification.severity,
         peopleAffected: notification.patientCount,
         notes: notification.notes,

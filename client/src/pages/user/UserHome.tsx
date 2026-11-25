@@ -149,8 +149,37 @@ export default function UserHome() {
     };
   }, []);
 
+  const [nearbyApiHospitals, setNearbyApiHospitals] = useState<MapHospital[] | null>(null);
+
+  // Dynamically discover Tier-1 (Sahay Verified) + Tier-2 (Public Directory) hospitals around live GPS
+  useEffect(() => {
+    if (!position) return;
+    let active = true;
+    const loadNearby = async () => {
+      try {
+        const res = await fetch(
+          `/api/hospitals/nearby?lat=${encodeURIComponent(position.latitude)}&lng=${encodeURIComponent(
+            position.longitude
+          )}&radiusKm=50`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active && Array.isArray(data?.hospitals)) {
+          setNearbyApiHospitals(data.hospitals);
+        }
+      } catch {
+        // Ignore offline fallback
+      }
+    };
+    void loadNearby();
+    return () => {
+      active = false;
+    };
+  }, [position?.latitude, position?.longitude]);
+
   // Filter nearby hospitals (within 50km of user position)
   const nearbyHospitals: MapHospital[] = useMemo(() => {
+    if (nearbyApiHospitals) return nearbyApiHospitals;
     if (!position || !resourcesQuery.data?.hospitals) return [];
     return resourcesQuery.data.hospitals
       .map((h) => {
@@ -162,7 +191,7 @@ export default function UserHome() {
       })
       .filter((h) => h.distanceKm <= 50)
       .sort((a, b) => a.distanceKm - b.distanceKm);
-  }, [position, resourcesQuery.data?.hospitals]);
+  }, [nearbyApiHospitals, position, resourcesQuery.data?.hospitals]);
 
   // Filter nearby shelters (within 50km of user position)
   const nearbyShelters: MapShelter[] = useMemo(() => {
@@ -558,35 +587,53 @@ export default function UserHome() {
 
             {/* Nearby Emergency Facilities & Hospitals */}
             <section className="glass-panel p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <h3 className="flex items-center gap-2.5 text-sm font-black text-[#0F172A] dark:text-[#F8FAFC]">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLocation("/safety")}
+                  className="flex items-center gap-2.5 text-left text-sm font-black text-[#0F172A] hover:text-[#2457FF] dark:text-[#F8FAFC] dark:hover:text-[#93C5FD] transition"
+                >
                   <Hospital className="h-4.5 w-4.5 text-[#1D4ED8] dark:text-[#F1F5F9]" />
                   <span>{t("Nearby Emergency Facilities")}</span>
-                </h3>
-                <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocation("/safety")}
+                  className="rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] font-black text-emerald-800 hover:bg-emerald-500/25 dark:bg-emerald-950/60 dark:text-emerald-300 transition"
+                >
                   {nearbyHospitals.length + nearbyShelters.length} {t("within 50 km")}
-                </span>
+                </button>
               </div>
 
               {nearbyHospitals.length > 0 || nearbyShelters.length > 0 ? (
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {nearbyHospitals.slice(0, 4).map((h) => (
+                  {nearbyHospitals.slice(0, 4).map((h: any) => (
                     <div
                       key={`hosp-${h.id}`}
-                      className="glass-card flex items-center justify-between p-3 text-xs shadow-xs"
+                      onClick={() => setLocation("/safety")}
+                      className="glass-card flex cursor-pointer items-center justify-between p-3 text-xs shadow-xs transition hover:border-[#2457FF]/40"
                     >
                       <div className="min-w-0 pr-2">
-                        <div className="font-extrabold text-[#0F172A] dark:text-[#F8FAFC] truncate">{h.name}</div>
+                        <div className="font-extrabold text-[#0F172A] dark:text-[#F8FAFC] truncate">
+                          {h.organizationName || h.name}
+                        </div>
                         <div className="text-[10px] text-[#0F172A]/70 dark:text-[#F1F5F9]/70 mt-0.5">
-                          {h.distanceKm !== undefined ? `${h.distanceKm.toFixed(1)} km away` : ""} ·{" "}
-                          <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                            {h.availableEmergencyBeds ?? 0} {t("beds available")}
-                          </span>
+                          {h.distanceKm !== undefined ? `${Number(h.distanceKm).toFixed(1)} km away` : ""} ·{" "}
+                          {h.source === "PUBLIC_DIRECTORY" ? (
+                            <span className="font-semibold text-slate-600 dark:text-slate-300">
+                              {t("Public Directory")}
+                            </span>
+                          ) : (
+                            <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                              {h.availableEmergencyBeds ?? 0} {t("beds available")}
+                            </span>
+                          )}
                         </div>
                       </div>
                       {h.contactPhone && (
                         <a
                           href={`tel:${h.contactPhone}`}
+                          onClick={e => e.stopPropagation()}
                           className="shrink-0 rounded-lg bg-[#1D4ED8] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#1d47db] active:scale-95"
                         >
                           {t("Call")}

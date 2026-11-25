@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { createHash } from "node:crypto";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { z } from "zod";
 import {
@@ -114,6 +114,14 @@ import { sendRescuerPush } from "../push";
 import { triggerN8nSosWebhook } from "../n8n";
 import { calculateRoadRouteAndEta } from "../routing/routing.service";
 import { broadcastLiveTrackingUpdate, broadcastMissionStatusUpdate } from "../tracking/liveStream";
+import {
+  authorizeHospitalBranchMutation,
+  createHospitalBranch,
+  deleteHospitalBranch,
+  getBranchesForOwner,
+  updateHospitalBranch,
+} from "../services/hospitalBranches";
+import { discoverNearbyHospitals, normalizeHospitalBranch } from "../services/nearbyHospitals";
 
 const incidentCode = customAlphabet("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 8);
 const severitySchema = z.enum(["critical", "high", "medium", "low"]);
@@ -122,9 +130,16 @@ const hospitalStatusSchema = z.enum(["open", "limited", "critical", "closed"]);
 const supplyStatusSchema = z.enum(["available", "limited", "critical", "unavailable"]);
 const pointSchema = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
 const hospitalInput = z.object({
+  organizationName: z.string().trim().max(180).optional(),
+  branchName: z.string().trim().max(180).optional(),
+  registrationId: z.string().trim().max(120).optional(),
   name: z.string().trim().min(2).max(180),
   address: z.string().trim().min(3).max(360),
+  city: z.string().trim().max(120).optional(),
+  state: z.string().trim().max(120).optional(),
+  pincode: z.string().trim().max(16).optional(),
   contactPhone: z.string().trim().max(32).optional(),
+  specialty: z.string().trim().max(180).optional(),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   totalEmergencyBeds: z.number().int().min(0).max(1_000_000),
@@ -139,6 +154,41 @@ const hospitalInput = z.object({
   waterSupplyStatus: supplyStatusSchema.default("available"),
   powerBackupStatus: supplyStatusSchema.default("available"),
   status: hospitalStatusSchema,
+});
+
+const hospitalBranchCreateInput = z.object({
+  organizationName: z.string().trim().min(2, "Hospital / Organization name is required").max(180),
+  branchName: z.string().trim().min(1, "Branch name is required").max(180),
+  registrationId: z.string().trim().max(120).optional().nullable(),
+  isPrimaryBranch: z.boolean().optional(),
+  address: z.string().trim().min(3, "Address is required").max(360),
+  city: z.string().trim().min(1, "City is required").max(120),
+  state: z.string().trim().min(1, "State is required").max(120),
+  pincode: z.string().trim().min(3, "Pincode is required").max(16),
+  phone: z.string().trim().min(6, "Valid emergency contact number is required").max(32),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  specialties: z.union([z.array(z.string()), z.string()]).optional(),
+  erTotal: z.number().int().min(0).max(1_000_000),
+  erAvailable: z.number().int().min(0).max(1_000_000),
+  icuTotal: z.number().int().min(0).max(1_000_000),
+  icuAvailable: z.number().int().min(0).max(1_000_000),
+  oxygenUnits: z.number().int().min(0).max(1_000_000).default(0),
+  bloodUnits: z.number().int().min(0).max(1_000_000).default(0),
+  ambulances: z.number().int().min(0).max(1_000_000).default(0),
+  supplies: z
+    .object({
+      food: z.boolean().optional(),
+      medicine: z.boolean().optional(),
+      water: z.boolean().optional(),
+      power: z.boolean().optional(),
+    })
+    .optional(),
+  foodSupplyStatus: supplyStatusSchema.optional(),
+  medicineSupplyStatus: supplyStatusSchema.optional(),
+  waterSupplyStatus: supplyStatusSchema.optional(),
+  powerBackupStatus: supplyStatusSchema.optional(),
+  status: z.enum(["OPEN", "LIMITED", "FULL", "CLOSED", "open", "limited", "critical", "closed"]).optional(),
 });
 const hospitalRegistrationInput = z.object({
   hospitalName: z.string().trim().min(2).max(180),
@@ -1184,6 +1234,27 @@ export const rescueRouter = router({
   }),
 
   safety: router({
+    nearbyHospitals: publicProcedure
+      .input(
+        z
+          .object({
+            lat: z.number().min(-90).max(90).optional().nullable(),
+            lng: z.number().min(-180).max(180).optional().nullable(),
+            radiusKm: z.number().min(1).max(2500).optional(),
+            includePublicDirectory: z.boolean().optional(),
+            allRegistered: z.boolean().optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        return await discoverNearbyHospitals({
+          lat: input?.lat ?? null,
+          lng: input?.lng ?? null,
+          radiusKm: input?.radiusKm ?? 50,
+          includePublicDirectory: input?.includePublicDirectory ?? true,
+          allRegistered: input?.allRegistered ?? false,
+        });
+      }),
     resources: publicProcedure.query(async () => {
       const db = await database();
       if (db) {
@@ -1205,9 +1276,14 @@ export const rescueRouter = router({
             db
               .select({
                 id: hospitals.id,
+                organizationName: hospitals.organizationName,
+                branchName: hospitals.branchName,
+                city: hospitals.city,
+                state: hospitals.state,
                 name: hospitals.name,
                 address: hospitals.address,
                 contactPhone: hospitals.contactPhone,
+                specialty: hospitals.specialty,
                 latitude: hospitals.latitude,
                 longitude: hospitals.longitude,
                 totalEmergencyBeds: hospitals.totalEmergencyBeds,
@@ -1222,17 +1298,18 @@ export const rescueRouter = router({
                 waterSupplyStatus: hospitals.waterSupplyStatus,
                 powerBackupStatus: hospitals.powerBackupStatus,
                 status: hospitals.status,
+                isSahayVerified: hospitals.isSahayVerified,
                 updatedAt: hospitals.updatedAt,
               })
               .from(hospitals)
-              .where(and(eq(hospitals.status, "open"))),
+              .where(inArray(hospitals.status, ["open", "limited", "critical"])),
           ]);
           return { shelters: shelterRows, hospitals: hospitalRows };
         } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
       }
       return {
         shelters: Array.from(_memoryShelters.values()).filter(s => s.status === "open"),
-        hospitals: Array.from(_memoryHospitals.values()).filter(h => h.status === "open"),
+        hospitals: Array.from(_memoryHospitals.values()).filter(h => h.status !== "closed"),
       };
     }),
     createRequest: protectedProcedure
@@ -1494,38 +1571,66 @@ export const rescueRouter = router({
     postRescueRecords: adminProcedure.query(() => listPostRescueCheckIns(24)),
     mapLayers: operationalProcedure.query(({ ctx }) => getMapLayers(ctx.user.role !== "user")),
     hospitals: medicalOperationsProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role === "admin") return listHospitals();
-      const db = await database();
-      if (db) {
-        try {
-          const profile = (
-            await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
-          )[0];
-          if (!profile) return [];
-          return await db.select().from(hospitals).where(eq(hospitals.id, profile.hospitalId));
-        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+      if (ctx.user.role === "admin") {
+        const all = await listHospitals();
+        return all.map((h: any) => ({ ...h, ...normalizeHospitalBranch(h) }));
       }
-      const memProfile = _memoryHospitalStaffProfiles.get(ctx.user.id);
-      if (!memProfile) return [];
-      const memHosp = _memoryHospitals.get(memProfile.hospitalId);
-      return memHosp ? [memHosp] : [];
+      return await getBranchesForOwner(ctx.user.id);
     }),
-    myHospital: medicalOperationsProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role === "admin") return null;
-      const db = await database();
-      if (db) {
-        try {
-          const profile = (
-            await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
-          )[0];
-          if (!profile) return null;
-          return (await db.select().from(hospitals).where(eq(hospitals.id, profile.hospitalId)).limit(1))[0] ?? null;
-        } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
+    myBranches: medicalOperationsProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role === "admin") {
+        const all = await listHospitals();
+        return all.map(normalizeHospitalBranch);
       }
-      const memProfile = _memoryHospitalStaffProfiles.get(ctx.user.id);
-      if (!memProfile) return null;
-      return _memoryHospitals.get(memProfile.hospitalId) ?? null;
+      return await getBranchesForOwner(ctx.user.id);
     }),
+    myHospital: medicalOperationsProcedure
+      .input(z.object({ branchId: z.number().int().positive().optional() }).optional())
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.role === "admin") return null;
+        const branches = await getBranchesForOwner(ctx.user.id);
+        if (!branches.length) return null;
+        if (input?.branchId) {
+          return branches.find(b => b.id === input.branchId) ?? branches[0];
+        }
+        return branches.find(b => b.isPrimaryBranch) ?? branches[0];
+      }),
+    createMyHospitalBranch: medicalOperationsProcedure
+      .input(hospitalBranchCreateInput)
+      .mutation(async ({ input, ctx }) => {
+        try {
+          const branch = await createHospitalBranch(ctx.user.id, input);
+          return { success: true, branch };
+        } catch (err: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: err?.message || "Failed to register hospital branch." });
+        }
+      }),
+    updateMyHospitalBranch: medicalOperationsProcedure
+      .input(hospitalBranchCreateInput.partial().extend({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          const { id, ...rest } = input;
+          const branch = await updateHospitalBranch(id, { id: ctx.user.id, role: ctx.user.role }, rest);
+          return { success: true, branch };
+        } catch (err: any) {
+          const msg = err?.message || "Failed to update hospital branch.";
+          if (msg.startsWith("FORBIDDEN:")) throw new TRPCError({ code: "FORBIDDEN", message: msg.replace("FORBIDDEN: ", "") });
+          if (msg.startsWith("NOT_FOUND:")) throw new TRPCError({ code: "NOT_FOUND", message: msg.replace("NOT_FOUND: ", "") });
+          throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+        }
+      }),
+    deleteMyHospitalBranch: medicalOperationsProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          return await deleteHospitalBranch(input.id, { id: ctx.user.id, role: ctx.user.role });
+        } catch (err: any) {
+          const msg = err?.message || "Failed to delete hospital branch.";
+          if (msg.startsWith("FORBIDDEN:")) throw new TRPCError({ code: "FORBIDDEN", message: msg.replace("FORBIDDEN: ", "") });
+          if (msg.startsWith("NOT_FOUND:")) throw new TRPCError({ code: "NOT_FOUND", message: msg.replace("NOT_FOUND: ", "") });
+          throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+        }
+      }),
     myHospitalRegistration: protectedProcedure.query(async ({ ctx }) => {
       const db = await database();
       if (db) {
@@ -1541,32 +1646,38 @@ export const rescueRouter = router({
       }
       return Array.from(_memoryHospitalRequests.values()).find(r => r.userId === ctx.user.id) ?? null;
     }),
-    hospitalCases: medicalOperationsProcedure.query(async ({ ctx }) => {
-      let hospitalId: number | null = null;
-      if (ctx.user.role === "hospital" || ctx.user.role === "medical") {
-        const db = await database();
-        if (db) {
-          try {
-            const profile = (
-              await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
-            )[0];
-            if (profile) hospitalId = profile.hospitalId;
-          } catch {}
+    hospitalCases: medicalOperationsProcedure
+      .input(
+        z
+          .object({
+            branchId: z.number().int().positive().optional(),
+            includeAllBranches: z.boolean().optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.role === "admin") {
+          return await listHospitalCaseNotifications(input?.branchId ?? null);
         }
-        if (!hospitalId) {
-          const memProfile = _memoryHospitalStaffProfiles.get(ctx.user.id);
-          if (memProfile) hospitalId = memProfile.hospitalId;
+
+        const ownedBranches = await getBranchesForOwner(ctx.user.id);
+        if (!ownedBranches.length) return [];
+
+        if (input?.includeAllBranches) {
+          return await listHospitalCaseNotifications(ownedBranches.map(b => b.id));
         }
-      }
 
-      if (!hospitalId && ctx.user.role === "admin") {
-        // Admin sees all cases across all hospitals in a single indexed query
-        return await listHospitalCaseNotifications(null);
-      }
+        if (input?.branchId) {
+          const isOwned = ownedBranches.some(b => b.id === input.branchId);
+          if (!isOwned) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "You do not own the requested hospital branch." });
+          }
+          return await listHospitalCaseNotifications(input.branchId);
+        }
 
-      if (!hospitalId) return [];
-      return await listHospitalCaseNotifications(hospitalId);
-    }),
+        const primary = ownedBranches.find(b => b.isPrimaryBranch) ?? ownedBranches[0];
+        return await listHospitalCaseNotifications(primary.id);
+      }),
     updateHospitalCaseStatus: medicalOperationsProcedure
       .input(
         z.object({
@@ -1631,8 +1742,23 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const hospital = (await listHospitals()).find(h => h.id === input.hospitalId);
-        const hospitalName = hospital?.name || `Hospital #${input.hospitalId}`;
+        let hospital;
+        try {
+          hospital = await authorizeHospitalBranchMutation(input.hospitalId, {
+            id: ctx.user.id,
+            role: ctx.user.role,
+          });
+        } catch (err: any) {
+          const msg = err?.message || "You are not authorized to coordinate on behalf of this hospital branch.";
+          throw new TRPCError({
+            code: msg.startsWith("NOT_FOUND:") ? "NOT_FOUND" : "FORBIDDEN",
+            message: msg.replace(/^(NOT_FOUND|FORBIDDEN):\s*/, ""),
+          });
+        }
+        const branchLabel = hospital.branchName && hospital.branchName !== "Main Hospital"
+          ? `${hospital.organizationName || hospital.name} — ${hospital.branchName}`
+          : hospital.organizationName || hospital.name;
+        const hospitalName = branchLabel || `Hospital #${input.hospitalId}`;
 
         const categoryLabels: Record<string, string> = {
           additional_ambulance: "Request: Additional Ambulance Dispatch",
@@ -1641,7 +1767,7 @@ export const rescueRouter = router({
           critical_cases_hold: "Notice: Unable to Accept New Critical Cases",
           additional_staff: "Request: Additional Medical Personnel",
           hospital_offline: "Notice: Facility Temporarily Offline",
-          general_assistance: "State Assistance Coordination Request",
+          general_assistance: "National / State Assistance Coordination Request",
         };
         const title = `${categoryLabels[input.category] || "Hospital Alert"} — ${hospitalName}`;
 
@@ -1683,24 +1809,11 @@ export const rescueRouter = router({
         return { success: true };
       }),
     hospitalActivityTimeline: medicalOperationsProcedure.query(async ({ ctx }) => {
-      let hospitalId: number | null = null;
-      if (ctx.user.role === "hospital" || ctx.user.role === "medical") {
-        const db = await database();
-        if (db) {
-          try {
-            const profile = (
-              await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1)
-            )[0];
-            if (profile) hospitalId = profile.hospitalId;
-          } catch {}
-        }
-        if (!hospitalId) {
-          const memProfile = _memoryHospitalStaffProfiles.get(ctx.user.id);
-          if (memProfile) hospitalId = memProfile.hospitalId;
-        }
-      }
+      const isOfficer = ctx.user.role === "hospital" || ctx.user.role === "medical";
+      const ownedBranches = isOfficer ? await getBranchesForOwner(ctx.user.id) : [];
+      const ownedBranchIds = new Set(ownedBranches.map(b => b.id));
 
-      // Return recent audit events related to hospital operations
+      // Return recent audit events related to hospital operations (scoped for officers)
       try {
         const db = await database();
         if (db) {
@@ -1708,6 +1821,9 @@ export const rescueRouter = router({
             .select({
               id: auditLogs.id,
               action: auditLogs.action,
+              resourceType: auditLogs.resourceType,
+              resourceId: auditLogs.resourceId,
+              actorId: auditLogs.actorId,
               detail: auditLogs.detail,
               createdAt: auditLogs.createdAt,
               actor: { id: users.id, name: users.name },
@@ -1716,13 +1832,35 @@ export const rescueRouter = router({
             .leftJoin(users, eq(auditLogs.actorId, users.id))
             .where(or(eq(auditLogs.resourceType, "hospital"), eq(auditLogs.resourceType, "hospitalCaseNotification")))
             .orderBy(desc(auditLogs.createdAt))
-            .limit(20);
-          if (rows.length > 0) return rows;
+            .limit(40);
+          const filtered = isOfficer
+            ? rows.filter(
+                r =>
+                  r.actorId === ctx.user.id ||
+                  (r.resourceType === "hospital" && r.resourceId !== null && ownedBranchIds.has(Number(r.resourceId)))
+              )
+            : rows;
+          if (filtered.length > 0) {
+            return filtered.slice(0, 20).map(({ id, action, detail, createdAt, actor }) => ({
+              id,
+              action,
+              detail,
+              createdAt,
+              actor,
+            }));
+          }
         }
       } catch {}
 
       const memLogs = Array.from(_memoryAuditLogs)
-        .filter(l => l.resourceType === "hospital" || l.resourceType === "hospitalCaseNotification")
+        .filter(l => {
+          if (l.resourceType !== "hospital" && l.resourceType !== "hospitalCaseNotification") return false;
+          if (!isOfficer) return true;
+          return (
+            l.actorId === ctx.user.id ||
+            (l.resourceType === "hospital" && l.resourceId !== null && ownedBranchIds.has(Number(l.resourceId)))
+          );
+        })
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, 20)
         .map(l => ({
@@ -2641,20 +2779,36 @@ export const rescueRouter = router({
           message: "Available beds cannot exceed the declared hospital capacity.",
         });
       let hospitalId = _memoryHospitals.size + 1;
+      const orgName = input.organizationName?.trim() || input.name;
+      const branchName = input.branchName?.trim() || "Main Hospital";
+      const insertPayload = {
+        ...input,
+        organizationName: orgName,
+        branchName,
+        registrationId: input.registrationId?.trim() || null,
+        city: input.city?.trim() || null,
+        state: input.state?.trim() || null,
+        pincode: input.pincode?.trim() || null,
+        specialty: input.specialty?.trim() || "Trauma & Emergency Care",
+        contactPhone: input.contactPhone ?? null,
+        isSahayVerified: true,
+        isPrimaryBranch: true,
+        ownerUserId: ctx.user.id,
+        updatedBy: ctx.user.id,
+      };
       const db = await database();
       if (db) {
         try {
           const result = await db
             .insert(hospitals)
-            .values({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id });
+            .values(insertPayload);
           hospitalId = Number(result[0].insertId);
         } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
       }
       _memoryHospitals.set(hospitalId, {
         id: hospitalId,
-        ...input,
-        contactPhone: input.contactPhone ?? null,
-        updatedBy: ctx.user.id,
+        ...insertPayload,
+        createdAt: new Date(),
         updatedAt: new Date(),
       });
       await writeAudit(ctx.user.id, "hospital.create", "hospital", hospitalId, input.name);
@@ -2675,18 +2829,23 @@ export const rescueRouter = router({
             code: "BAD_REQUEST",
             message: "Available beds cannot exceed the declared hospital capacity.",
           });
+        const updatePayload = {
+          ...input,
+          contactPhone: input.contactPhone ?? null,
+          updatedBy: ctx.user.id,
+        };
         const db = await database();
         if (db) {
           try {
             await db
               .update(hospitals)
-              .set({ ...input, contactPhone: input.contactPhone ?? null, updatedBy: ctx.user.id })
+              .set(updatePayload)
               .where(eq(hospitals.id, input.id));
           } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
         }
         const mem = _memoryHospitals.get(input.id);
         if (mem) {
-          Object.assign(mem, input);
+          Object.assign(mem, updatePayload);
           mem.updatedAt = new Date();
         }
         await writeAudit(ctx.user.id, "hospital.update", "hospital", input.id, input.name);
@@ -2709,56 +2868,30 @@ export const rescueRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        if (ctx.user.role !== "hospital" && ctx.user.role !== "medical")
+        if (ctx.user.role !== "hospital" && ctx.user.role !== "medical" && ctx.user.role !== "admin")
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "Only an approved hospital staff account can publish live hospital resources.",
+            message: "Only an authorized hospital officer account can publish live hospital resources.",
           });
-        const db = await database();
-        let assignedHospitalId: number | null = null;
-        if (db) {
-          try {
-            const staff = (await db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, ctx.user.id)).limit(1))[0];
-            if (staff) assignedHospitalId = staff.hospitalId;
-          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
-        } else {
-          const staff = Array.from(_memoryHospitalStaffProfiles.values()).find(s => s.userId === ctx.user.id);
-          if (staff) assignedHospitalId = staff.hospitalId;
-        }
-        
-        if (!canEditHospitalResources(ctx.user.role, assignedHospitalId, input.id)) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "You are not authorized to edit this hospital's resources." });
-        }
-        let existing = _memoryHospitals.get(input.id);
-        if (db) {
-          try {
-            const dbExisting = (await db.select().from(hospitals).where(eq(hospitals.id, input.id)).limit(1))[0];
-            if (dbExisting) existing = dbExisting as any;
-          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
-        }
-        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Hospital not found." });
-        if (
-          !hasValidHospitalCapacity(
-            existing.totalEmergencyBeds,
-            input.availableEmergencyBeds,
-            existing.totalIcuBeds,
-            input.availableIcuBeds
-          )
-        ) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Available beds cannot exceed the declared total capacity of the hospital.",
+        try {
+          await authorizeHospitalBranchMutation(input.id, { id: ctx.user.id, role: ctx.user.role });
+          await updateHospitalBranch(input.id, { id: ctx.user.id, role: ctx.user.role }, {
+            erAvailable: input.availableEmergencyBeds,
+            icuAvailable: input.availableIcuBeds,
+            oxygenUnits: input.oxygenCylinderCount,
+            bloodUnits: input.bloodUnitCount,
+            ambulances: input.ambulanceCount,
+            foodSupplyStatus: input.foodSupplyStatus,
+            medicineSupplyStatus: input.medicineSupplyStatus,
+            waterSupplyStatus: input.waterSupplyStatus,
+            powerBackupStatus: input.powerBackupStatus,
+            status: input.status,
           });
-        }
-        if (db) {
-          try {
-            await db.update(hospitals).set({ ...input, updatedBy: ctx.user.id }).where(eq(hospitals.id, input.id));
-          } catch (err) { if (process.env.NODE_ENV === 'production') throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database operation failed in production' }); }
-        }
-        const mem = _memoryHospitals.get(input.id);
-        if (mem) {
-          Object.assign(mem, input);
-          mem.updatedAt = new Date();
+        } catch (err: any) {
+          const msg = err?.message || "Failed to publish hospital resources.";
+          if (msg.startsWith("FORBIDDEN:")) throw new TRPCError({ code: "FORBIDDEN", message: msg.replace("FORBIDDEN: ", "") });
+          if (msg.startsWith("NOT_FOUND:")) throw new TRPCError({ code: "NOT_FOUND", message: msg.replace("NOT_FOUND: ", "") });
+          throw new TRPCError({ code: "BAD_REQUEST", message: msg });
         }
         await writeAudit(
           ctx.user.id,
@@ -3556,8 +3689,8 @@ export const rescueRouter = router({
           .optional()
       )
       .query(async ({ input }) => {
-        const latitude = input?.latitude ?? 26.1445;
-        const longitude = input?.longitude ?? 91.7362;
+        const latitude = input?.latitude ?? INDIA_CENTER.lat;
+        const longitude = input?.longitude ?? INDIA_CENTER.lng;
         const weather = await getComprehensiveWeather(latitude, longitude);
         return {
           available: weather.available,
@@ -3577,8 +3710,8 @@ export const rescueRouter = router({
           .optional()
       )
       .query(async ({ input }) => {
-        const latitude = input?.latitude ?? 26.1445;
-        const longitude = input?.longitude ?? 91.7362;
+        const latitude = input?.latitude ?? INDIA_CENTER.lat;
+        const longitude = input?.longitude ?? INDIA_CENTER.lng;
         const weather = await getComprehensiveWeather(latitude, longitude);
         return {
           available: weather.available,
@@ -3598,8 +3731,8 @@ export const rescueRouter = router({
           .optional()
       )
       .query(async ({ input }) => {
-        const latitude = input?.latitude ?? 26.1445;
-        const longitude = input?.longitude ?? 91.7362;
+        const latitude = input?.latitude ?? INDIA_CENTER.lat;
+        const longitude = input?.longitude ?? INDIA_CENTER.lng;
         const db = await database();
         let activeZonesCount = 0;
         if (db) {
@@ -3629,8 +3762,8 @@ export const rescueRouter = router({
           .optional()
       )
       .query(async ({ input }) => {
-        const latitude = input?.latitude ?? 26.1445;
-        const longitude = input?.longitude ?? 91.7362;
+        const latitude = input?.latitude ?? INDIA_CENTER.lat;
+        const longitude = input?.longitude ?? INDIA_CENTER.lng;
         const weather = await getComprehensiveWeather(latitude, longitude);
         return {
           available: weather.available,
@@ -3648,8 +3781,8 @@ export const rescueRouter = router({
           .optional()
       )
       .query(async ({ input }) => {
-        const latitude = input?.latitude ?? 26.1445;
-        const longitude = input?.longitude ?? 91.7362;
+        const latitude = input?.latitude ?? INDIA_CENTER.lat;
+        const longitude = input?.longitude ?? INDIA_CENTER.lng;
         const weather = await getComprehensiveWeather(latitude, longitude);
         return {
           available: weather.available,
@@ -3667,8 +3800,8 @@ export const rescueRouter = router({
           .optional()
       )
       .query(async ({ input }) => {
-        const latitude = input?.latitude ?? 26.1445;
-        const longitude = input?.longitude ?? 91.7362;
+        const latitude = input?.latitude ?? INDIA_CENTER.lat;
+        const longitude = input?.longitude ?? INDIA_CENTER.lng;
         return getComprehensiveWeather(latitude, longitude);
       }),
     locations: publicProcedure.query(() => {

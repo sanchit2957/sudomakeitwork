@@ -484,7 +484,19 @@ function ResponderWorkspace() {
         {location === "/responder/map" ? (
           <section>
             <PageHeading eyebrow={t("responder.map")} title={t("responder.mapTitle")} />
-            <OperationsMap layers={layers.data} />
+            <OperationsMap
+              layers={layers.data}
+              focusCenter={
+                activeMissionRow?.incident?.latitude && activeMissionRow?.incident?.longitude
+                  ? { lat: Number(activeMissionRow.incident.latitude), lng: Number(activeMissionRow.incident.longitude) }
+                  : profile.data?.lastLatitude && profile.data?.lastLongitude
+                  ? { lat: Number(profile.data.lastLatitude), lng: Number(profile.data.lastLongitude) }
+                  : null
+              }
+              focusZoom={
+                activeMissionRow?.incident?.latitude || profile.data?.lastLatitude ? 13 : 5
+              }
+            />
           </section>
         ) : location === "/responder/hospitals" ? (
           <RescuerHospitalsView
@@ -641,6 +653,9 @@ function RescuerHospitalsView({
 }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "open" | "has_icu" | "has_er">("all");
+  const [discoveryMode, setDiscoveryMode] = useState<"nearby" | "verified" | "all">("nearby");
+  const [discoveredHospitals, setDiscoveredHospitals] = useState<Array<any> | null>(null);
+  const [loadingDiscovery, setLoadingDiscovery] = useState(false);
   const [selectedHospitalForModal, setSelectedHospitalForModal] = useState<any | null>(null);
   const [showInboundModal, setShowInboundModal] = useState(false);
   const [selectedHospitalForInbound, setSelectedHospitalForInbound] = useState<any | null>(null);
@@ -662,23 +677,75 @@ function RescuerHospitalsView({
     : {
         lat: null,
         lng: null,
-        label: "Awaiting responder GPS coordinates",
+        label: "Awaiting responder GPS coordinates — showing registered Pan-India hospitals",
         isVictim: false,
       };
 
-  const hospitalsWithDistance = hospitals
+  useEffect(() => {
+    let active = true;
+    const loadNearby = async () => {
+      setLoadingDiscovery(true);
+      try {
+        const params = new URLSearchParams();
+        if (origin.lat && origin.lng) {
+          params.set("lat", String(origin.lat));
+          params.set("lng", String(origin.lng));
+        } else {
+          params.set("allRegistered", "true");
+        }
+        params.set("radiusKm", "50");
+        if (discoveryMode === "verified") params.set("includePublic", "false");
+        if (discoveryMode === "all") params.set("allRegistered", "true");
+        const res = await fetch(`/api/hospitals/nearby?${params.toString()}`);
+        if (res.ok) {
+          const payload = await res.json();
+          if (active && Array.isArray(payload?.hospitals)) {
+            setDiscoveredHospitals(payload.hospitals);
+          }
+        }
+      } catch {
+        // Fallback silently to mapLayers hospitals prop
+      } finally {
+        if (active) setLoadingDiscovery(false);
+      }
+    };
+    void loadNearby();
+    return () => {
+      active = false;
+    };
+  }, [origin.lat, origin.lng, discoveryMode]);
+
+  const baseHospitals = discoveredHospitals ?? hospitals.map(h => ({ ...h, source: "SAHAY_VERIFIED", isSahayVerified: true }));
+
+  const hospitalsWithDistance = baseHospitals
     .map(hospital => {
       const lat = Number(hospital.latitude) || 0;
       const lng = Number(hospital.longitude) || 0;
-      const distanceKm = origin.lat && origin.lng && lat && lng ? calculateDistanceKm(origin.lat, origin.lng, lat, lng) : 9999;
+      const distanceKm =
+        typeof hospital.distanceKm === "number"
+          ? hospital.distanceKm
+          : origin.lat && origin.lng && lat && lng
+          ? calculateDistanceKm(origin.lat, origin.lng, lat, lng)
+          : 9999;
       return { ...hospital, distanceKm };
     })
-    .sort((a, b) => a.distanceKm - b.distanceKm);
+    .sort((a, b) => {
+      const aTier = a.source === "PUBLIC_DIRECTORY" ? 1 : 0;
+      const bTier = b.source === "PUBLIC_DIRECTORY" ? 1 : 0;
+      if (aTier !== bTier) return aTier - bTier;
+      return a.distanceKm - b.distanceKm;
+    });
 
   const filteredHospitals = hospitalsWithDistance.filter(h => {
+    if (discoveryMode === "verified" && h.source === "PUBLIC_DIRECTORY") return false;
+    if (discoveryMode === "nearby" && origin.lat && origin.lng && h.distanceKm > 50) return false;
+
     const matchesSearch =
       !search.trim() ||
       h.name?.toLowerCase().includes(search.toLowerCase()) ||
+      h.organizationName?.toLowerCase().includes(search.toLowerCase()) ||
+      h.city?.toLowerCase().includes(search.toLowerCase()) ||
+      h.state?.toLowerCase().includes(search.toLowerCase()) ||
       h.address?.toLowerCase().includes(search.toLowerCase()) ||
       h.specialty?.toLowerCase().includes(search.toLowerCase());
 
@@ -689,8 +756,9 @@ function RescuerHospitalsView({
     return true;
   });
 
-  const totalEmergencyBeds = hospitals.reduce((acc, h) => acc + (h.availableEmergencyBeds || 0), 0);
-  const totalIcuBeds = hospitals.reduce((acc, h) => acc + (h.availableIcuBeds || 0), 0);
+  const verifiedOnly = hospitalsWithDistance.filter(h => h.source !== "PUBLIC_DIRECTORY");
+  const totalEmergencyBeds = verifiedOnly.reduce((acc, h) => acc + (h.availableEmergencyBeds || 0), 0);
+  const totalIcuBeds = verifiedOnly.reduce((acc, h) => acc + (h.availableIcuBeds || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -759,45 +827,71 @@ function RescuerHospitalsView({
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search hospital by name, address, or specialty…"
-            className="rounded-xl pl-3 pr-8 text-xs"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-1.5">
+      {/* Search and Discovery Filters */}
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {(
             [
-              ["all", "All Facilities"],
-              ["open", "Open Only"],
-              ["has_er", "Available ER"],
-              ["has_icu", "Available ICU"],
+              ["nearby", "Nearby (50 km)"],
+              ["verified", "Sahay Verified"],
+              ["all", "All Registered"],
             ] as const
           ).map(([key, label]) => (
             <button
               key={key}
-              onClick={() => setFilterStatus(key)}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                filterStatus === key
-                  ? "bg-primary text-white"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              type="button"
+              onClick={() => setDiscoveryMode(key)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                discoveryMode === key
+                  ? "bg-[#2457FF] text-white shadow-sm"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
               {label}
             </button>
           ))}
+          {loadingDiscovery && <span className="text-[11px] font-semibold text-muted-foreground">Scanning nearby hospitals…</span>}
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search hospital by name, city, state, address, or specialty…"
+              className="rounded-xl pl-3 pr-8 text-xs"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                ["all", "All Facilities"],
+                ["open", "Open Only"],
+                ["has_er", "Available ER"],
+                ["has_icu", "Available ICU"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setFilterStatus(key)}
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                  filterStatus === key
+                    ? "bg-primary text-white"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -878,19 +972,30 @@ function HospitalDirectoryCard({
   const occupancyPercent = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
   const isEnRoute = activeMission?.incident?.destinationHospitalName === hospital.name;
 
+  const isDirectoryOnly = hospital.source === "PUBLIC_DIRECTORY";
+  const displayName = hospital.organizationName || hospital.name;
+  const locationText = [hospital.address, hospital.city, hospital.state].filter(Boolean).join(", ");
+
   return (
-    <article className="rounded-2xl border bg-white p-5 shadow-sm transition hover:border-[#83c5b4] dark:bg-card dark:hover:border-emerald-700/50">
+    <article className="rounded-2xl border bg-white p-5 shadow-sm transition hover:border-[#2457FF]/40 dark:bg-card dark:hover:border-[#2457FF]/50">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex-1 min-w-0 space-y-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-extrabold text-base text-foreground flex items-center gap-1.5">
-                <Hospital className="h-4 w-4 text-primary" />
-                {hospital.name}
+                <Hospital className={`h-4 w-4 ${isDirectoryOnly ? "text-slate-500" : "text-primary"}`} />
+                {displayName}
               </span>
+              {hospital.branchName && hospital.branchName !== "Main Hospital" && (
+                <span className="rounded-full bg-[#2457FF]/10 px-2 py-0.5 text-[10px] font-bold text-[#2457FF]">
+                  {hospital.branchName}
+                </span>
+              )}
               <span
                 className={`rounded-full px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase ${
-                  hospital.status === "open"
+                  isDirectoryOnly
+                    ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    : hospital.status === "open"
                     ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
                     : hospital.status === "limited"
                     ? "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
@@ -899,7 +1004,7 @@ function HospitalDirectoryCard({
                     : "bg-muted text-muted-foreground"
                 }`}
               >
-                {hospital.status || "open"}
+                {isDirectoryOnly ? "Public Directory" : hospital.status || "open"}
               </span>
               <span className="rounded-full bg-primary/10 px-2.5 py-0.5 font-mono text-[10px] font-bold text-primary">
                 📍 {hospital.distanceKm < 999 ? `${hospital.distanceKm.toFixed(1)} km` : "—"} {originLabel}
@@ -912,9 +1017,16 @@ function HospitalDirectoryCard({
             </div>
             <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
               <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              {hospital.address || "Guwahati, Assam"}
+              {locationText || "Location available via GPS directions"}
             </p>
           </div>
+
+          {isDirectoryOnly ? (
+            <div className="rounded-xl border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              Public Directory Facility • Call ahead to confirm ER/ICU bed availability
+            </div>
+          ) : (
+            <>
 
           {/* Capacity Grid */}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -989,19 +1101,33 @@ function HospitalDirectoryCard({
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
 
         {/* Action Column */}
         <div className="flex flex-row flex-wrap items-center gap-2 md:flex-col md:items-end md:justify-start">
-          <a
-            href={`tel:${hospital.contactPhone || "+913612529457"}`}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-input bg-background px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
-          >
-            <Phone className="h-3.5 w-3.5 text-primary" />
-            <span>{hospital.contactPhone || "+91 361 2529457"}</span>
-          </a>
+          {hospital.contactPhone ? (
+            <a
+              href={`tel:${hospital.contactPhone}`}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-input bg-background px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
+            >
+              <Phone className="h-3.5 w-3.5 text-primary" />
+              <span>{hospital.contactPhone}</span>
+            </a>
+          ) : (
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${hospital.latitude},${hospital.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-input bg-background px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
+            >
+              <Navigation className="h-3.5 w-3.5 text-primary" />
+              <span>Directions</span>
+            </a>
+          )}
 
-          {activeMission && (
+          {activeMission && !isDirectoryOnly && (
             <>
               <Button
                 type="button"

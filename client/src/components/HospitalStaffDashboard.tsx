@@ -40,11 +40,25 @@ import {
   Zap,
 } from "lucide-react";
 import OperationsMap from "./OperationsMap";
+import {
+  HospitalBranchForm,
+  type HospitalBranchRecord,
+  type HospitalBranchSubmitPayload,
+} from "./HospitalBranchForm";
+import { toast } from "sonner";
 
 type SupplyStatus = "available" | "limited" | "critical" | "unavailable";
 type HospitalRecord = {
   id: number;
   name: string;
+  organizationName?: string | null;
+  branchName?: string | null;
+  registrationId?: string | null;
+  isPrimaryBranch?: boolean;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  specialty?: string;
   address: string;
   contactPhone: string | null;
   latitude: number;
@@ -61,7 +75,7 @@ type HospitalRecord = {
   waterSupplyStatus: SupplyStatus;
   powerBackupStatus: SupplyStatus;
   status: "open" | "limited" | "critical" | "closed";
-  updatedAt: Date;
+  updatedAt: Date | string;
 };
 
 type Draft = {
@@ -97,11 +111,25 @@ const supplyItems = [
   { key: "powerBackupStatus", label: "Power backup", icon: PlugZap },
 ] as const;
 
-export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord | null | undefined }) {
+export function HospitalStaffDashboard({
+  hospital,
+  branches = [],
+  activeBranchId,
+  onSelectBranch,
+  loadingBranches = false,
+}: {
+  hospital: HospitalRecord | null | undefined;
+  branches?: HospitalBranchRecord[];
+  activeBranchId?: number | null;
+  onSelectBranch?: (branchId: number) => void;
+  loadingBranches?: boolean;
+}) {
   const utils = trpc.useUtils();
   const [draft, setDraft] = useState<Draft | null>(hospital ? makeDraft(hospital) : null);
   const [savedNotice, setSavedNotice] = useState(false);
   const [activeTab, setActiveTab] = useState<"operations" | "resources" | "coordination" | "timeline">("operations");
+  const [includeAllBranches, setIncludeAllBranches] = useState(false);
+  const [showAddBranchModal, setShowAddBranchModal] = useState(false);
 
   // Coordination dialog state
   const [coordCategory, setCoordCategory] = useState<string>("additional_ambulance");
@@ -113,14 +141,37 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
   const liveLayers = { refetchInterval: 10_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true } as const;
 
   // Live queries
-  const incomingCases = trpc.rescue.operations.hospitalCases.useQuery(undefined, liveCases);
+  const incomingCases = trpc.rescue.operations.hospitalCases.useQuery(
+    hospital ? { branchId: hospital.id, includeAllBranches } : undefined,
+    { ...liveCases, enabled: Boolean(hospital) }
+  );
   const layers = trpc.rescue.operations.mapLayers.useQuery(undefined, liveLayers);
   const timeline = trpc.rescue.operations.hospitalActivityTimeline.useQuery(undefined, liveLayers);
 
   // Mutations
+  const createBranchMutation = trpc.rescue.operations.createMyHospitalBranch.useMutation({
+    onSuccess: async (created: any) => {
+      await Promise.all([
+        utils.rescue.operations.myBranches.invalidate(),
+        utils.rescue.operations.myHospital.invalidate(),
+        utils.rescue.operations.hospitals.invalidate(),
+        utils.rescue.operations.mapLayers.invalidate(),
+        utils.rescue.safety.resources.invalidate(),
+      ]);
+      const newId = created?.branch?.id ?? created?.id;
+      if (newId && onSelectBranch) onSelectBranch(newId);
+      setShowAddBranchModal(false);
+      toast.success("Hospital branch registered & published live!");
+    },
+    onError: err => {
+      toast.error(err.message || "Unable to save hospital branch");
+    },
+  });
+
   const updateResources = trpc.rescue.operations.updateMyHospitalResources.useMutation({
     onSuccess: () => {
       setSavedNotice(true);
+      void utils.rescue.operations.myBranches.invalidate();
       void utils.rescue.operations.myHospital.invalidate();
       void utils.rescue.operations.hospitals.invalidate();
       void utils.rescue.safety.resources.invalidate();
@@ -137,7 +188,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
 
   const sendCoordination = trpc.rescue.operations.sendHospitalCoordinationMessage.useMutation({
     onSuccess: () => {
-      setCoordSuccess("Operational message dispatched to State Command Centre.");
+      setCoordSuccess("Operational message dispatched to National & State Command Centre.");
       setCoordMessage("");
       void utils.rescue.operations.hospitalActivityTimeline.invalidate();
       setTimeout(() => setCoordSuccess(""), 5000);
@@ -173,17 +224,45 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
   const activeCasesList = incomingCases.data || [];
   const urgentInboundCount = activeCasesList.filter(c => c.notification.status === "notified" || c.notification.status === "acknowledged" || c.notification.status === "preparing").length;
 
+  if (loadingBranches && !hospital) {
+    return (
+      <section className="mx-auto max-w-3xl rounded-3xl border border-border bg-card/80 p-10 text-center">
+        <RefreshCw className="mx-auto h-7 w-7 animate-spin text-[#2457FF]" />
+        <p className="mt-3 text-sm font-bold text-foreground">Loading your hospital branches…</p>
+      </section>
+    );
+  }
+
   if (!hospital || !draft) {
     return (
-      <section className="mx-auto max-w-2xl rounded-3xl border border-[#E2E8F0]/25 bg-card/90 backdrop-blur-md p-8 text-center shadow-lg dark:border-white/10">
-        <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#1D4ED8]/10 text-[#1D4ED8]">
-          <Hospital className="h-8 w-8" />
-        </span>
-        <h1 className="mt-4 text-2xl font-black text-foreground">Hospital Portal Initialization</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Your account is authorized for Medical Operations, but it is pending linkage to an approved hospital facility.
-          Once the administrator approves your hospital registration, your live command desk will automatically unlock here.
-        </p>
+      <section className="mx-auto max-w-4xl space-y-6">
+        <div className="rounded-3xl border border-[#2457FF]/25 bg-[#111C44] p-7 text-white shadow-xl">
+          <div className="flex items-start gap-4">
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#2457FF] text-white shadow-md">
+              <Hospital className="h-7 w-7" />
+            </span>
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#DBE3FF]">
+                Pan-India Hospital Onboarding
+              </p>
+              <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+                Register Your Hospital
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80">
+                Enter your hospital name, branch details, GPS location anywhere in India, and live ER/ICU bed capacity. Once saved, citizens, rescuers, and emergency dispatchers near your location will immediately see your facility.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <HospitalBranchForm
+          mode="create"
+          isFirstBranch
+          submitting={createBranchMutation.isPending}
+          onSubmit={async (payload: HospitalBranchSubmitPayload) => {
+            await createBranchMutation.mutateAsync(payload);
+          }}
+        />
       </section>
     );
   }
@@ -241,22 +320,62 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
                   Emergency Hospital Operations Desk
                 </span>
                 <span className="rounded-md bg-[#1D4ED8]/30 px-2.5 py-0.5 font-mono text-[9px] font-black uppercase text-[#F1F5F9] border border-[#1D4ED8]/40">
-                  Verified Facility #{hospital.id}
+                  Sahay Verified #{hospital.id}
                 </span>
+                {hospital.branchName && (
+                  <span className="rounded-md bg-white/15 px-2.5 py-0.5 font-mono text-[9px] font-bold uppercase text-white">
+                    {hospital.branchName}
+                  </span>
+                )}
+                {hospital.registrationId && (
+                  <span className="rounded-md bg-white/10 px-2 py-0.5 font-mono text-[9px] text-white/80">
+                    Reg: {hospital.registrationId}
+                  </span>
+                )}
               </div>
-              <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl text-[#F8FAFC]">{hospital.name}</h1>
-              <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[#F1F5F9]/70">
-                <span>{hospital.address}</span>
+              <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl text-[#F8FAFC]">
+                {hospital.organizationName || hospital.name}
+              </h1>
+              <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[#F1F5F9]/75">
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3 text-[#3B82F6]" />
+                  {[hospital.address, hospital.city, hospital.state, hospital.pincode].filter(Boolean).join(", ")}
+                </span>
                 {hospital.contactPhone && (
                   <span className="flex items-center gap-1 font-mono font-semibold text-[#F1F5F9]">
-                    <Phone className="h-3 w-3 text-[#1D4ED8]" /> {hospital.contactPhone}
+                    <Phone className="h-3 w-3 text-[#3B82F6]" /> {hospital.contactPhone}
                   </span>
                 )}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col items-start gap-3 md:items-end">
+          <div className="flex flex-col items-start gap-2.5 md:items-end">
+            {/* Active Branch Switcher + Quick Add Branch */}
+            <div className="flex flex-wrap items-center gap-2">
+              {branches.length > 0 && onSelectBranch && (
+                <select
+                  aria-label="Switch active hospital branch"
+                  value={activeBranchId ?? hospital.id}
+                  onChange={e => onSelectBranch(Number(e.target.value))}
+                  className="h-9 max-w-[260px] rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-bold text-white backdrop-blur-sm focus:outline-none"
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id} className="bg-[#0F172A] text-white">
+                      {b.organizationName} — {b.branchName} ({b.city})
+                    </option>
+                  ))}
+                </select>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setShowAddBranchModal(true)}
+                className="h-9 rounded-xl bg-[#2457FF] px-3.5 text-xs font-extrabold text-white hover:bg-[#1d47db] shadow-sm"
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" /> Add Branch
+              </Button>
+            </div>
             <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-1.5 backdrop-blur-sm border border-white/10">
               <span className={`h-3 w-3 rounded-full ${readiness.color} animate-pulse shadow-sm`} />
               <span className="font-mono text-xs font-black uppercase tracking-wider text-[#F8FAFC]">
@@ -334,8 +453,32 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
               </p>
               <h2 className="text-xl font-extrabold tracking-tight">Incoming & Active Emergency Cases</h2>
             </div>
-            <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Live Synchronized
+            <div className="flex flex-wrap items-center gap-3">
+              {branches.length > 1 && (
+                <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setIncludeAllBranches(false)}
+                    className={`rounded-lg px-2.5 py-1 transition ${
+                      !includeAllBranches ? "bg-[#2457FF] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Active Branch Only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIncludeAllBranches(true)}
+                    className={`rounded-lg px-2.5 py-1 transition ${
+                      includeAllBranches ? "bg-[#2457FF] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All My Branches
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Live Synchronized
+              </div>
             </div>
           </div>
 
@@ -370,7 +513,13 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
               </p>
               <h3 className="text-lg font-extrabold text-foreground">Facility & Response Sector Map</h3>
             </div>
-            <OperationsMap layers={layers.data} compact />
+            <OperationsMap
+              layers={layers.data}
+              compact
+              focusCenter={{ lat: hospital.latitude, lng: hospital.longitude }}
+              focusZoom={14}
+              highlightedHospitalId={hospital.id}
+            />
           </div>
         </section>
       )}
@@ -521,7 +670,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
             </p>
             <h2 className="text-xl font-extrabold tracking-tight text-foreground">State Command Centre Coordination</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Direct emergency channel between {hospital.name} and the Assam Disaster Management Command Centre.
+              Direct emergency channel between {hospital.organizationName || hospital.name} and the National / State Disaster Management Command Centre.
             </p>
           </div>
 
@@ -631,7 +780,7 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
                   desc="Refill tanker requested within 3 hours"
                   onClick={() => {
                     setCoordCategory("oxygen_low");
-                    setCoordMessage("Oxygen reserves below 20%. Requesting urgent refill tanker dispatch from Guwahati medical warehouse.");
+                    setCoordMessage("Oxygen reserves below 20%. Requesting urgent refill tanker dispatch from the nearest regional medical depot.");
                     setCoordUrgency("critical");
                   }}
                 />
@@ -689,6 +838,33 @@ export function HospitalStaffDashboard({ hospital }: { hospital: HospitalRecord 
             )}
           </div>
         </section>
+      )}
+      {/* QUICK ADD BRANCH MODAL */}
+      {showAddBranchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-border bg-background p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
+              <div>
+                <h2 className="text-lg font-black text-foreground">Add Hospital Branch</h2>
+                <p className="text-xs text-muted-foreground">
+                  Register another hospital branch or emergency campus under {hospital.organizationName || hospital.name}.
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowAddBranchModal(false)}>
+                <XCircle className="h-5 w-5" />
+              </Button>
+            </div>
+            <HospitalBranchForm
+              mode="create"
+              defaultOrganizationName={hospital.organizationName || hospital.name}
+              submitting={createBranchMutation.isPending}
+              onCancel={() => setShowAddBranchModal(false)}
+              onSubmit={async (payload: HospitalBranchSubmitPayload) => {
+                await createBranchMutation.mutateAsync(payload);
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

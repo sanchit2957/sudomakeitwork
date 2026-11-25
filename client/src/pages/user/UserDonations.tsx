@@ -4,6 +4,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSelector from "@/components/LanguageSelector";
 import { VictimNavigation } from "@/components/VictimNavigation";
 import { Button } from "@/components/ui/button";
+import { INDIA_CENTER } from "@shared/india-locations";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -27,9 +28,14 @@ export type NgoItem = {
   phone: string;
   latitude: number;
   longitude: number;
+  city?: string;
+  state?: string;
+  scope?: "national" | "regional";
   distanceKm?: number;
   distance?: string;
 };
+
+type NgoFilterMode = "nearest" | "national" | "all";
 
 const NO_PHONE_TEXT = "Contact number not listed — reach out via address";
 
@@ -39,15 +45,16 @@ export default function UserDonations() {
 
   const [position, setPosition] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"locating" | "ready" | "fallback">("locating");
+  const [filterMode, setFilterMode] = useState<NgoFilterMode>("nearest");
   const [ngos, setNgos] = useState<NgoItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Get user's device location
+  // Get user's device location (neutral Pan-India center if unavailable)
   const requestLocation = () => {
     if (!navigator.geolocation) {
       setLocationStatus("fallback");
-      setPosition({ latitude: 26.1445, longitude: 91.7362 });
+      setPosition({ latitude: INDIA_CENTER.lat, longitude: INDIA_CENTER.lng });
       return;
     }
 
@@ -61,10 +68,9 @@ export default function UserDonations() {
         setLocationStatus("ready");
       },
       err => {
-        console.warn("[UserDonations] Geolocation unavailable, using Assam central coordinates:", err.message);
+        console.warn("[UserDonations] Geolocation unavailable, using Pan-India coordinates:", err.message);
         setLocationStatus("fallback");
-        // Fallback to Guwahati / Assam central coordinates
-        setPosition({ latitude: 26.1445, longitude: 91.7362 });
+        setPosition({ latitude: INDIA_CENTER.lat, longitude: INDIA_CENTER.lng });
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
@@ -154,7 +160,7 @@ export default function UserDonations() {
           </div>
 
           <p className="mt-3 text-xs leading-relaxed text-[#F1F5F9]/85 text-prose-justified">
-            {t("Connect directly with grassroots flood relief and disaster rehabilitation teams across Assam.")}
+            {t("Connect directly with verified grassroots flood relief and disaster rehabilitation teams near your location across India.")}
           </p>
 
           <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/10 pt-3">
@@ -165,7 +171,7 @@ export default function UserDonations() {
                   ? t("Locating nearby NGOs…")
                   : locationStatus === "ready"
                   ? t("Sorted by nearest distance")
-                  : t("Showing Assam relief organizations")}
+                  : t("Showing Pan-India relief organizations")}
               </span>
             </div>
             <button
@@ -179,142 +185,189 @@ export default function UserDonations() {
           </div>
         </section>
 
+        {/* Filter Pills */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {(
+            [
+              { id: "nearest", label: t("Nearest to Me") },
+              { id: "national", label: t("Pan-India National") },
+              { id: "all", label: t("All India") },
+            ] as const
+          ).map(pill => (
+            <button
+              key={pill.id}
+              type="button"
+              onClick={() => setFilterMode(pill.id)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                filterMode === pill.id
+                  ? "bg-[#2457FF] text-white shadow-sm"
+                  : "glass-card text-[#0F172A] hover:bg-white/70 dark:text-[#F8FAFC] dark:hover:bg-white/10"
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+
         {/* NGO List Section */}
-        <section className="mt-6">
-          <div className="mb-3 flex items-center justify-between px-1">
-            <h2 className="text-sm font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
-              {t("Nearby Relief Teams")} {ngos.length > 0 && `(${ngos.length})`}
-            </h2>
-            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
-              {t("Sorted by distance")}
-            </span>
-          </div>
+        <section className="mt-4">
+          {(() => {
+            const visibleNgos =
+              filterMode === "national"
+                ? ngos.filter(n => n.scope === "national")
+                : filterMode === "nearest" && locationStatus === "ready"
+                ? ngos.slice(0, 12)
+                : ngos;
 
-          {loading ? (
-            <div className="glass-panel flex flex-col items-center justify-center p-12 text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[#1D4ED8]" />
-              <p className="mt-3 text-sm font-bold text-[#0F172A] dark:text-[#F8FAFC]">
-                {t("Finding nearby NGOs…")}
-              </p>
-              <p className="mt-1 text-xs text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
-                {t("Calculating distances from your location")}
-              </p>
-            </div>
-          ) : error ? (
-            <div className="glass-panel border-red-500/30 bg-red-500/10 p-6 text-center text-red-700 dark:text-red-300">
-              <p className="text-sm font-bold">{error}</p>
-              <Button
-                onClick={requestLocation}
-                variant="outline"
-                className="mt-3 rounded-xl border-red-500/40 text-xs"
-              >
-                {t("Retry")}
-              </Button>
-            </div>
-          ) : ngos.length === 0 ? (
-            <div className="glass-panel p-8 text-center border-dashed border-[#E2E8F0]/40">
-              <Building2 className="mx-auto h-10 w-10 text-[#E2E8F0]" />
-              <p className="mt-3 text-sm font-bold text-[#0F172A] dark:text-[#F8FAFC]">
-                {t("No NGOs found nearby")}
-              </p>
-              <p className="mt-1 text-xs text-[#0F172A]/70 dark:text-[#F1F5F9]/70 max-w-sm mx-auto">
-                {t("Check your device location permissions or refresh to load all Assam relief organizations.")}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3.5">
-              {ngos.map((ngo, idx) => {
-                const hasValidPhone = Boolean(
-                  ngo.phone &&
-                    ngo.phone.trim() !== "" &&
-                    ngo.phone.trim() !== NO_PHONE_TEXT &&
-                    !ngo.phone.toLowerCase().includes("not listed")
-                );
+            return (
+              <>
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <h2 className="text-sm font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
+                    {t("Relief Organizations")} {visibleNgos.length > 0 && `(${visibleNgos.length})`}
+                  </h2>
+                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
+                    {filterMode === "national" ? t("National Network") : t("Sorted by distance")}
+                  </span>
+                </div>
 
-                return (
-                  <article
-                    key={`${ngo.name}-${idx}`}
-                    className="glass-panel p-4.5 transition hover:shadow-md"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#F1F5F9] text-[#1D4ED8] dark:bg-[#1D4ED8]/30 dark:text-[#F1F5F9]">
-                            <Building2 className="h-4 w-4" />
-                          </span>
-                          <h3 className="truncate text-sm font-black tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
-                            {ngo.name}
-                          </h3>
-                        </div>
+                {loading ? (
+                  <div className="glass-panel flex flex-col items-center justify-center p-12 text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#1D4ED8]" />
+                    <p className="mt-3 text-sm font-bold text-[#0F172A] dark:text-[#F8FAFC]">
+                      {t("Finding nearby NGOs…")}
+                    </p>
+                    <p className="mt-1 text-xs text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
+                      {t("Calculating distances from your location")}
+                    </p>
+                  </div>
+                ) : error ? (
+                  <div className="glass-panel border-red-500/30 bg-red-500/10 p-6 text-center text-red-700 dark:text-red-300">
+                    <p className="text-sm font-bold">{error}</p>
+                    <Button
+                      onClick={requestLocation}
+                      variant="outline"
+                      className="mt-3 rounded-xl border-red-500/40 text-xs"
+                    >
+                      {t("Retry")}
+                    </Button>
+                  </div>
+                ) : visibleNgos.length === 0 ? (
+                  <div className="glass-panel p-8 text-center border-dashed border-[#E2E8F0]/40">
+                    <Building2 className="mx-auto h-10 w-10 text-[#E2E8F0]" />
+                    <p className="mt-3 text-sm font-bold text-[#0F172A] dark:text-[#F8FAFC]">
+                      {t("No NGOs found nearby")}
+                    </p>
+                    <p className="mt-1 text-xs text-[#0F172A]/70 dark:text-[#F1F5F9]/70 max-w-sm mx-auto">
+                      {t("Check your device location permissions or view all verified Pan-India relief organizations.")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3.5">
+                    {visibleNgos.map((ngo, idx) => {
+                      const hasValidPhone = Boolean(
+                        ngo.phone &&
+                          ngo.phone.trim() !== "" &&
+                          ngo.phone.trim() !== NO_PHONE_TEXT &&
+                          !ngo.phone.toLowerCase().includes("not listed")
+                      );
 
-                        {/* Address */}
-                        <div className="mt-2.5 flex items-start gap-2 text-xs leading-5 text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
-                          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1D4ED8] dark:text-[#F1F5F9]" />
-                          <span>{ngo.address}</span>
-                        </div>
+                      const mapHref =
+                        Number.isFinite(ngo.latitude) && Number.isFinite(ngo.longitude)
+                          ? `https://www.google.com/maps/search/?api=1&query=${ngo.latitude},${ngo.longitude}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                              `${ngo.name}, ${ngo.address}`
+                            )}`;
 
-                        {/* Phone Number */}
-                        <div className="mt-2 flex items-start gap-2 text-xs font-semibold">
-                          <Phone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1D4ED8] dark:text-[#F1F5F9]" />
-                          {hasValidPhone ? (
-                            <a
-                              href={`tel:${ngo.phone.replace(/[^0-9+]/g, "")}`}
-                              className="text-[#1D4ED8] hover:underline dark:text-[#F1F5F9]"
-                            >
-                              {ngo.phone}
-                            </a>
-                          ) : (
-                            <span className="font-normal italic text-muted-foreground">
-                              {NO_PHONE_TEXT}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Distance Badge */}
-                      {ngo.distance && (
-                        <div className="shrink-0 rounded-xl glass-card px-2.5 py-1 text-right">
-                          <span className="block font-mono text-[11px] font-black text-[#1D4ED8] dark:text-[#F1F5F9]">
-                            {ngo.distance}
-                          </span>
-                          <span className="block text-[9px] font-bold uppercase tracking-wider text-[#0F172A]/60 dark:text-[#F1F5F9]/60">
-                            {t("Distance")}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action Bar */}
-                    <div className="mt-3.5 flex items-center gap-2 border-t border-[#E2E8F0]/20 dark:border-[#F1F5F9]/10 pt-3">
-                      {hasValidPhone ? (
-                        <a
-                          href={`tel:${ngo.phone.replace(/[^0-9+]/g, "")}`}
-                          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#1d47db] active:scale-95"
+                      return (
+                        <article
+                          key={`${ngo.name}-${idx}`}
+                          className="glass-panel p-4.5 transition hover:shadow-md"
                         >
-                          <PhoneCall className="h-3.5 w-3.5" />
-                          <span>{t("Call NGO")}</span>
-                        </a>
-                      ) : null}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#F1F5F9] text-[#1D4ED8] dark:bg-[#1D4ED8]/30 dark:text-[#F1F5F9]">
+                                  <Building2 className="h-4 w-4" />
+                                </span>
+                                <h3 className="truncate text-sm font-black tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
+                                  {ngo.name}
+                                </h3>
+                                {ngo.scope === "national" && (
+                                  <span className="shrink-0 rounded-full bg-[#2457FF]/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#2457FF] dark:bg-[#2457FF]/25 dark:text-[#DBE3FF]">
+                                    {t("Pan-India")}
+                                  </span>
+                                )}
+                              </div>
 
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                          `${ngo.name}, ${ngo.address}`
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`flex items-center justify-center gap-1.5 rounded-xl glass-card border border-[#E2E8F0]/30 px-3 py-2 text-xs font-bold text-[#0F172A] transition hover:bg-neutral-50 active:scale-95 dark:text-[#F8FAFC] dark:hover:bg-neutral-800 ${
-                          hasValidPhone ? "flex-1" : "w-full"
-                        }`}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5 text-[#1D4ED8] dark:text-[#F1F5F9]" />
-                        <span>{t("View on Map")}</span>
-                      </a>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+                              {/* Address */}
+                              <div className="mt-2.5 flex items-start gap-2 text-xs leading-5 text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
+                                <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1D4ED8] dark:text-[#F1F5F9]" />
+                                <span>{ngo.address}</span>
+                              </div>
+
+                              {/* Phone Number */}
+                              <div className="mt-2 flex items-start gap-2 text-xs font-semibold">
+                                <Phone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1D4ED8] dark:text-[#F1F5F9]" />
+                                {hasValidPhone ? (
+                                  <a
+                                    href={`tel:${ngo.phone.replace(/[^0-9+]/g, "")}`}
+                                    className="text-[#1D4ED8] hover:underline dark:text-[#F1F5F9]"
+                                  >
+                                    {ngo.phone}
+                                  </a>
+                                ) : (
+                                  <span className="font-normal italic text-muted-foreground">
+                                    {NO_PHONE_TEXT}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Distance Badge */}
+                            {ngo.distance && (
+                              <div className="shrink-0 rounded-xl glass-card px-2.5 py-1 text-right">
+                                <span className="block font-mono text-[11px] font-black text-[#1D4ED8] dark:text-[#F1F5F9]">
+                                  {ngo.distance}
+                                </span>
+                                <span className="block text-[9px] font-bold uppercase tracking-wider text-[#0F172A]/60 dark:text-[#F1F5F9]/60">
+                                  {t("Distance")}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Action Bar */}
+                          <div className="mt-3.5 flex items-center gap-2 border-t border-[#E2E8F0]/20 dark:border-[#F1F5F9]/10 pt-3">
+                            {hasValidPhone ? (
+                              <a
+                                href={`tel:${ngo.phone.replace(/[^0-9+]/g, "")}`}
+                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#1d47db] active:scale-95"
+                              >
+                                <PhoneCall className="h-3.5 w-3.5" />
+                                <span>{t("Call NGO")}</span>
+                              </a>
+                            ) : null}
+
+                            <a
+                              href={mapHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center justify-center gap-1.5 rounded-xl glass-card border border-[#E2E8F0]/30 px-3 py-2 text-xs font-bold text-[#0F172A] transition hover:bg-neutral-50 active:scale-95 dark:text-[#F8FAFC] dark:hover:bg-neutral-800 ${
+                                hasValidPhone ? "flex-1" : "w-full"
+                              }`}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 text-[#1D4ED8] dark:text-[#F1F5F9]" />
+                              <span>{t("View on Map")}</span>
+                            </a>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </section>
       </main>
 

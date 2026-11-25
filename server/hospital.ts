@@ -1,6 +1,14 @@
 import type { Express, Request, Response } from "express";
 import { getDb } from "./db";
 import { hospitals } from "../drizzle/schema";
+import { sdk } from "./_core/sdk";
+import {
+  createHospitalBranch,
+  deleteHospitalBranch,
+  getBranchesForOwner,
+  updateHospitalBranch,
+} from "./services/hospitalBranches";
+import { discoverNearbyHospitals, normalizeHospitalBranch } from "./services/nearbyHospitals";
 import { writeAudit, listHospitals, _memoryHospitals, type MemoryHospital } from "./rescue.db";
 
 export type ShortageLevel = "adequate" | "low" | "critical" | "unknown";
@@ -295,10 +303,131 @@ export async function getHospitalAlertStatus(hospitalId: number) {
   };
 }
 
+async function requireHospitalOfficerOrAdmin(req: Request, res: Response) {
+  try {
+    const user = await sdk.authenticateRequest(req);
+    if (!user) {
+      res.status(401).json({ error: "Authentication required." });
+      return null;
+    }
+    if (user.role !== "hospital" && user.role !== "medical" && user.role !== "admin") {
+      res.status(403).json({ error: "Access restricted to authorized Hospital Officers and Administrators." });
+      return null;
+    }
+    return user;
+  } catch {
+    res.status(401).json({ error: "Authentication required." });
+    return null;
+  }
+}
+
 /**
- * Registers REST API endpoints for hospital resource querying, shortage alert status, and automation event logging.
+ * Registers REST API endpoints for hospital resource querying, multi-branch self-service CRUD, nearby geo-discovery, and shortage alert status.
  */
 export function registerHospitalRoutes(app: Express) {
+  // ---------------------------------------------------------------------------
+  // PART 1: SELF-SERVICE MULTI-BRANCH HOSPITAL PORTAL CRUD
+  // ---------------------------------------------------------------------------
+
+  // GET /api/hospital/my-branches
+  app.get("/api/hospital/my-branches", async (req: Request, res: Response) => {
+    const user = await requireHospitalOfficerOrAdmin(req, res);
+    if (!user) return;
+    try {
+      const branches = await getBranchesForOwner(user.id);
+      return res.json({ branches });
+    } catch (err: any) {
+      console.error("[REST API] Error listing officer branches:", err);
+      return res.status(500).json({ error: err?.message || "Failed to load hospital branches." });
+    }
+  });
+
+  // POST /api/hospital/branches
+  app.post("/api/hospital/branches", async (req: Request, res: Response) => {
+    const user = await requireHospitalOfficerOrAdmin(req, res);
+    if (!user) return;
+    try {
+      const branch = await createHospitalBranch(user.id, req.body || {});
+      return res.status(201).json({ success: true, branch });
+    } catch (err: any) {
+      const msg = err?.message || "Failed to register hospital branch.";
+      return res.status(400).json({ error: msg });
+    }
+  });
+
+  // PUT /api/hospital/branches/:id & PATCH /api/hospital/branches/:id
+  const handleBranchUpdate = async (req: Request, res: Response) => {
+    const user = await requireHospitalOfficerOrAdmin(req, res);
+    if (!user) return;
+    const branchId = parseInt(req.params.id, 10);
+    if (Number.isNaN(branchId) || branchId <= 0) {
+      return res.status(400).json({ error: "Invalid hospital branch ID." });
+    }
+    try {
+      const branch = await updateHospitalBranch(branchId, { id: user.id, role: user.role }, req.body || {});
+      return res.json({ success: true, branch });
+    } catch (err: any) {
+      const msg = err?.message || "Failed to update hospital branch.";
+      if (msg.startsWith("FORBIDDEN:")) return res.status(403).json({ error: msg.replace("FORBIDDEN: ", "") });
+      if (msg.startsWith("NOT_FOUND:")) return res.status(404).json({ error: msg.replace("NOT_FOUND: ", "") });
+      return res.status(400).json({ error: msg });
+    }
+  };
+  app.put("/api/hospital/branches/:id", handleBranchUpdate);
+  app.patch("/api/hospital/branches/:id", handleBranchUpdate);
+
+  // DELETE /api/hospital/branches/:id
+  app.delete("/api/hospital/branches/:id", async (req: Request, res: Response) => {
+    const user = await requireHospitalOfficerOrAdmin(req, res);
+    if (!user) return;
+    const branchId = parseInt(req.params.id, 10);
+    if (Number.isNaN(branchId) || branchId <= 0) {
+      return res.status(400).json({ error: "Invalid hospital branch ID." });
+    }
+    try {
+      const result = await deleteHospitalBranch(branchId, { id: user.id, role: user.role });
+      return res.json(result);
+    } catch (err: any) {
+      const msg = err?.message || "Failed to delete hospital branch.";
+      if (msg.startsWith("FORBIDDEN:")) return res.status(403).json({ error: msg.replace("FORBIDDEN: ", "") });
+      if (msg.startsWith("NOT_FOUND:")) return res.status(404).json({ error: msg.replace("NOT_FOUND: ", "") });
+      return res.status(400).json({ error: msg });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // PART 2: PAN-INDIA NEARBY HOSPITAL GEO-DISCOVERY (TIER 1 DB + TIER 2 OSM OVERPASS)
+  // ---------------------------------------------------------------------------
+
+  // GET /api/hospitals/nearby?lat=...&lng=...&radiusKm=50
+  app.get("/api/hospitals/nearby", async (req: Request, res: Response) => {
+    try {
+      const latRaw = req.query.lat ?? req.query.latitude;
+      const lngRaw = req.query.lng ?? req.query.lon ?? req.query.longitude;
+      const radiusRaw = req.query.radiusKm ?? req.query.radius;
+      const allRegistered = String(req.query.allRegistered || req.query.mode || "").toLowerCase() === "true" ||
+        String(req.query.mode || "").toLowerCase() === "all_registered";
+      const includePublicDirectory = String(req.query.includePublicDirectory ?? "true").toLowerCase() !== "false";
+
+      const lat = latRaw !== undefined && String(latRaw).trim() !== "" ? Number(latRaw) : null;
+      const lng = lngRaw !== undefined && String(lngRaw).trim() !== "" ? Number(lngRaw) : null;
+      const radiusKm = radiusRaw !== undefined && String(radiusRaw).trim() !== "" ? Number(radiusRaw) : 50;
+
+      const result = await discoverNearbyHospitals({
+        lat: lat !== null && Number.isFinite(lat) ? lat : null,
+        lng: lng !== null && Number.isFinite(lng) ? lng : null,
+        radiusKm: Number.isFinite(radiusKm) && radiusKm > 0 ? Math.min(radiusKm, 2500) : 50,
+        includePublicDirectory,
+        allRegistered,
+      });
+
+      return res.json(result);
+    } catch (err: any) {
+      console.error("[REST API] Error discovering nearby hospitals:", err);
+      return res.status(500).json({ error: "Failed to query nearby hospitals." });
+    }
+  });
+
   // GET /api/hospitals
   app.get("/api/hospitals", async (_req: Request, res: Response) => {
     try {
@@ -306,14 +435,15 @@ export function registerHospitalRoutes(app: Express) {
       const summaryList = await Promise.all(
         all.map(async (h) => {
           const snapshot = await getConsolidatedHospitalResources(h.id);
+          const normalized = normalizeHospitalBranch(h);
           return {
+            ...normalized,
             hospitalId: h.id,
             hospitalName: h.name,
             overallStatus: h.status,
             overallShortageLevel: snapshot?.overallShortageLevel ?? "unknown",
             criticalResourcesCount: snapshot?.criticalResources.length ?? 0,
             lowResourcesCount: snapshot?.lowResources.length ?? 0,
-            updatedAt: h.updatedAt,
           };
         })
       );

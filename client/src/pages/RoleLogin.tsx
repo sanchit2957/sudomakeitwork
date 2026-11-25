@@ -48,7 +48,7 @@ const portalConfig = {
     prompt: "Enter your hospital staff credentials and the active Government Access Code.",
     destination: "/hospital",
     icon: Hospital,
-    callSignPlaceholder: "e.g. Guwahati Triage Desk",
+    callSignPlaceholder: "e.g. Metro Trauma Desk",
     callSignLabel: "Facility / Ward Label",
   },
 } as const;

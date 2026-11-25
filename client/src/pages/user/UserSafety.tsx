@@ -29,13 +29,22 @@ import { useLocation } from "wouter";
 type Position = { latitude: number; longitude: number } | null;
 type PositionState = "finding" | "ready" | "unavailable";
 type SupplyStatus = "available" | "limited" | "critical" | "unavailable";
+type DiscoveryFilter = "nearby" | "verified" | "all";
 type HospitalResource = {
-  id: number;
+  id: number | string;
+  source?: "SAHAY_VERIFIED" | "PUBLIC_DIRECTORY";
+  isSahayVerified?: boolean;
   name: string;
+  organizationName?: string;
+  branchName?: string;
   address: string;
+  city?: string;
+  state?: string;
   contactPhone: string | null;
   latitude: number;
   longitude: number;
+  distanceKm?: number | null;
+  distance?: string | null;
   totalEmergencyBeds: number;
   availableEmergencyBeds: number;
   totalIcuBeds: number;
@@ -48,7 +57,7 @@ type HospitalResource = {
   waterSupplyStatus: SupplyStatus;
   powerBackupStatus: SupplyStatus;
   status: string;
-  updatedAt: Date;
+  updatedAt: Date | string;
 };
 
 function kilometresBetween(position: Position, latitude: number, longitude: number) {
@@ -81,6 +90,11 @@ export default function UserSafety() {
   const [positionState, setPositionState] = useState<PositionState>(() =>
     getLastKnownCoordinates() ? "ready" : "finding"
   );
+  const [filterMode, setFilterMode] = useState<DiscoveryFilter>("nearby");
+  const [radiusKm, setRadiusKm] = useState<number>(50);
+  const [nearbyApiData, setNearbyApiData] = useState<HospitalResource[] | null>(null);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+
   const resources = trpc.rescue.safety.resources.useQuery(undefined, {
     refetchInterval: 15_000,
     refetchOnWindowFocus: true,
@@ -107,16 +121,79 @@ export default function UserSafety() {
     void requestPosition();
   }, []);
 
-  const hospitals = useMemo(
-    () =>
-      ((resources.data?.hospitals || []) as HospitalResource[])
-        .map((hospital) => ({
+  // Fetch Tier-1 (Sahay Verified) + Tier-2 (OpenStreetMap Public Directory) hospitals dynamically
+  useEffect(() => {
+    if (!position && filterMode !== "all") {
+      return;
+    }
+    let active = true;
+    const fetchDiscovery = async () => {
+      setNearbyLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (position) {
+          params.set("lat", String(position.latitude));
+          params.set("lng", String(position.longitude));
+        }
+        params.set("radiusKm", String(radiusKm));
+        if (filterMode === "verified") params.set("includePublic", "false");
+        if (filterMode === "all") params.set("allRegistered", "true");
+        const res = await fetch(`/api/hospitals/nearby?${params.toString()}`);
+        if (res.ok) {
+          const payload = await res.json();
+          if (active && Array.isArray(payload?.hospitals)) {
+            setNearbyApiData(payload.hospitals);
+          }
+        }
+      } catch {
+        // Fallback gracefully to tRPC resources
+      } finally {
+        if (active) setNearbyLoading(false);
+      }
+    };
+    void fetchDiscovery();
+    return () => {
+      active = false;
+    };
+  }, [position?.latitude, position?.longitude, radiusKm, filterMode]);
+
+  const hospitals = useMemo(() => {
+    const sourceList: HospitalResource[] = nearbyApiData
+      ? nearbyApiData
+      : ((resources.data?.hospitals || []) as HospitalResource[]).map(h => ({
+          ...h,
+          source: "SAHAY_VERIFIED" as const,
+          isSahayVerified: true,
+        }));
+
+    return sourceList
+      .filter(h => {
+        if (filterMode === "verified") return h.source !== "PUBLIC_DIRECTORY";
+        return true;
+      })
+      .map(hospital => {
+        const dist =
+          typeof hospital.distanceKm === "number"
+            ? hospital.distanceKm
+            : kilometresBetween(position, hospital.latitude, hospital.longitude);
+        return {
           ...hospital,
-          distance: kilometresBetween(position, hospital.latitude, hospital.longitude),
-        }))
-        .sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY)),
-    [resources.data, position]
-  );
+          distanceKm: dist,
+        };
+      })
+      .filter(h => {
+        if (filterMode === "all" || filterMode === "verified") return true;
+        if (h.distanceKm === null || h.distanceKm === undefined) return true;
+        return h.distanceKm <= radiusKm;
+      })
+      .sort((a, b) => {
+        // Rank Tier 1 (SAHAY_VERIFIED) ahead of Tier 2 (PUBLIC_DIRECTORY), then nearest first
+        const aTier = a.source === "PUBLIC_DIRECTORY" ? 1 : 0;
+        const bTier = b.source === "PUBLIC_DIRECTORY" ? 1 : 0;
+        if (aTier !== bTier) return aTier - bTier;
+        return (a.distanceKm ?? Number.POSITIVE_INFINITY) - (b.distanceKm ?? Number.POSITIVE_INFINITY);
+      });
+  }, [nearbyApiData, resources.data, position, filterMode, radiusKm]);
 
   const locationCopy =
     positionState === "ready"
@@ -186,9 +263,17 @@ export default function UserSafety() {
         {/* Verified Medical Care & Hospitals */}
         <VerifiedMedicalCare
           hospitals={hospitals}
-          loading={resources.isLoading}
+          loading={(resources.isLoading && !nearbyApiData) || nearbyLoading}
           locationCopy={locationCopy}
           refresh={requestPosition}
+          filterMode={filterMode}
+          onChangeFilter={setFilterMode}
+          radiusKm={radiusKm}
+          onExpandRadius={() => {
+            setFilterMode("nearby");
+            setRadiusKm(prev => (prev < 100 ? 100 : 200));
+          }}
+          onViewAll={() => setFilterMode("all")}
         />
 
         {/* River & Local Weather Alerts */}
@@ -207,11 +292,21 @@ function VerifiedMedicalCare({
   loading,
   locationCopy,
   refresh,
+  filterMode,
+  onChangeFilter,
+  radiusKm,
+  onExpandRadius,
+  onViewAll,
 }: {
-  hospitals: Array<HospitalResource & { distance: number | null }>;
+  hospitals: Array<HospitalResource & { distanceKm: number | null }>;
   loading: boolean;
   locationCopy: string;
   refresh: () => void;
+  filterMode: DiscoveryFilter;
+  onChangeFilter: (mode: DiscoveryFilter) => void;
+  radiusKm: number;
+  onExpandRadius: () => void;
+  onViewAll: () => void;
 }) {
   const { t } = useLanguage();
   return (
@@ -233,17 +328,41 @@ function VerifiedMedicalCare({
           <RefreshCw className="h-4 w-4" />
         </button>
       </div>
+
+      {/* Filter Pills */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {(
+          [
+            { id: "nearby", label: `${t("Nearby")} (${radiusKm} km)` },
+            { id: "verified", label: t("Sahay Verified") },
+            { id: "all", label: t("All Registered") },
+          ] as const
+        ).map(pill => (
+          <button
+            key={pill.id}
+            type="button"
+            onClick={() => onChangeFilter(pill.id)}
+            className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+              filterMode === pill.id
+                ? "bg-[#2457FF] text-white shadow-sm"
+                : "glass-card text-[#0F172A] hover:bg-white/70 dark:text-[#F8FAFC] dark:hover:bg-white/10"
+            }`}
+          >
+            {pill.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <HospitalLoading />
       ) : hospitals.length ? (
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <HospitalCard hospital={hospitals[0]} primary />
-          {hospitals.slice(1, 4).map((hospital) => (
-            <HospitalCard hospital={hospital} key={hospital.id} />
+          {hospitals.slice(0, 12).map((hospital, idx) => (
+            <HospitalCard hospital={hospital} primary={idx === 0} key={`${hospital.source || "db"}-${hospital.id}`} />
           ))}
         </div>
       ) : (
-        <NoHospitalCard />
+        <NoHospitalCard onExpandRadius={onExpandRadius} onViewAll={onViewAll} radiusKm={radiusKm} />
       )}
     </section>
   );
@@ -253,26 +372,36 @@ function HospitalCard({
   hospital,
   primary = false,
 }: {
-  hospital: HospitalResource & { distance: number | null };
+  hospital: HospitalResource & { distanceKm: number | null };
   primary?: boolean;
 }) {
   const { t } = useLanguage();
+  const isDirectoryOnly = hospital.source === "PUBLIC_DIRECTORY";
+  const erPct =
+    hospital.totalEmergencyBeds > 0
+      ? Math.min(100, Math.round((hospital.availableEmergencyBeds / hospital.totalEmergencyBeds) * 100))
+      : 0;
+  const icuPct =
+    hospital.totalIcuBeds > 0
+      ? Math.min(100, Math.round((hospital.availableIcuBeds / hospital.totalIcuBeds) * 100))
+      : 0;
+
   return (
     <article
       className={`glass-panel overflow-hidden transition-all ${
-        primary ? "ring-2 ring-[#1D4ED8]/40 shadow-md" : ""
+        primary && !isDirectoryOnly ? "ring-2 ring-[#1D4ED8]/40 shadow-md" : ""
       }`}
     >
       <div className={`p-4 border-b border-[#E2E8F0]/20 dark:border-[#F1F5F9]/10 ${primary ? "bg-[#1D4ED8]/5 dark:bg-[#1D4ED8]/10" : ""}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 gap-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#1D4ED8] text-white shadow-md shadow-[#1D4ED8]/20">
+            <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white shadow-md ${isDirectoryOnly ? "bg-slate-600 shadow-slate-600/20" : "bg-[#1D4ED8] shadow-[#1D4ED8]/20"}`}>
               <Hospital className="h-6 w-6" />
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="min-w-0 flex-1 text-base font-black leading-5 text-[#0F172A] dark:text-[#F8FAFC]">
-                  {hospital.name}
+                  {hospital.organizationName || hospital.name}
                 </p>
                 <a
                   href={`https://www.google.com/maps/dir/?api=1&destination=${hospital.latitude},${hospital.longitude}`}
@@ -285,56 +414,87 @@ function HospitalCard({
                   <Navigation className="h-4 w-4" />
                 </a>
               </div>
+              {hospital.branchName && hospital.branchName !== "Main Hospital" && (
+                <p className="mt-0.5 text-[11px] font-bold text-[#2457FF] dark:text-[#93C5FD]">
+                  {hospital.branchName}
+                </p>
+              )}
               <p className="mt-1 text-xs leading-5 text-[#0F172A]/70 dark:text-[#F1F5F9]/70">
-                {hospital.distance !== null ? `${hospital.distance.toFixed(1)} km away · ` : ""}
+                {typeof hospital.distanceKm === "number" ? `${hospital.distanceKm.toFixed(1)} km away · ` : ""}
                 {hospital.address}
               </p>
             </div>
           </div>
-          <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold uppercase text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-            {t("Open")}
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
+              isDirectoryOnly
+                ? "bg-slate-500/15 text-slate-700 dark:text-slate-300"
+                : "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+            }`}
+          >
+            {isDirectoryOnly ? t("Public Directory") : t("Sahay Verified")}
           </span>
         </div>
       </div>
 
       <div className="p-4">
-        <div className="grid grid-cols-2 gap-3">
-          <MetricTile
-            icon={BedDouble}
-            label={t("Beds ready")}
-            value={hospital.availableEmergencyBeds}
-            total={hospital.totalEmergencyBeds}
-            tone="green"
-          />
-          <MetricTile
-            icon={HeartPulse}
-            label={t("ICU ready")}
-            value={hospital.availableIcuBeds}
-            total={hospital.totalIcuBeds}
-            tone="blue"
-          />
-        </div>
+        {isDirectoryOnly ? (
+          <div className="rounded-2xl bg-slate-500/10 px-3.5 py-2.5 text-xs font-semibold text-[#0F172A]/80 dark:text-[#F1F5F9]/80">
+            {t("Public Directory • Call facility to confirm live emergency bed availability")}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <MetricTile
+                  icon={BedDouble}
+                  label={t("Beds ready")}
+                  value={hospital.availableEmergencyBeds}
+                  total={hospital.totalEmergencyBeds}
+                  tone="green"
+                />
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-emerald-500/15">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${erPct}%` }} />
+                </div>
+              </div>
+              <div>
+                <MetricTile
+                  icon={HeartPulse}
+                  label={t("ICU ready")}
+                  value={hospital.availableIcuBeds}
+                  total={hospital.totalIcuBeds}
+                  tone="blue"
+                />
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#2457FF]/15">
+                  <div className="h-full rounded-full bg-[#2457FF] transition-all" style={{ width: `${icuPct}%` }} />
+                </div>
+              </div>
+            </div>
 
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {(
-            [
-              { label: t("Food"), value: hospital.foodSupplyStatus, icon: Utensils },
-              { label: t("Medicine"), value: hospital.medicineSupplyStatus, icon: Pill },
-              { label: t("Water"), value: hospital.waterSupplyStatus, icon: GlassWater },
-              { label: t("Power"), value: hospital.powerBackupStatus, icon: PlugZap },
-            ] as const
-          ).map(({ label, value, icon: Icon }) => (
-            <span key={label} className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[10px] font-black ${supplyTone(value)}`}>
-              <Icon className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{label}: {t(humanStatus(value))}</span>
-            </span>
-          ))}
-        </div>
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(
+                [
+                  { label: t("Food"), value: hospital.foodSupplyStatus, icon: Utensils },
+                  { label: t("Medicine"), value: hospital.medicineSupplyStatus, icon: Pill },
+                  { label: t("Water"), value: hospital.waterSupplyStatus, icon: GlassWater },
+                  { label: t("Power"), value: hospital.powerBackupStatus, icon: PlugZap },
+                ] as const
+              ).map(({ label, value, icon: Icon }) => (
+                <span key={label} className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[10px] font-black ${supplyTone(value)}`}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{label}: {t(humanStatus(value))}</span>
+                </span>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#E2E8F0]/20 dark:border-[#F1F5F9]/10 pt-3">
           <span className="flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-[#0F172A]/60 dark:text-[#F1F5F9]/60">
             <Clock3 className="h-3.5 w-3.5 shrink-0" />
-            {t("Updated")} {new Date(hospital.updatedAt).toLocaleTimeString()}
+            {isDirectoryOnly
+              ? t("OpenStreetMap Public Facility")
+              : `${t("Updated")} ${new Date(hospital.updatedAt).toLocaleTimeString()}`}
           </span>
           {hospital.contactPhone ? (
             <a
@@ -397,7 +557,15 @@ function HospitalLoading() {
   );
 }
 
-function NoHospitalCard() {
+function NoHospitalCard({
+  onExpandRadius,
+  onViewAll,
+  radiusKm = 50,
+}: {
+  onExpandRadius?: () => void;
+  onViewAll?: () => void;
+  radiusKm?: number;
+}) {
   const { t } = useLanguage();
   return (
     <div className="glass-panel mt-4 p-7 text-center border-dashed border-[#E2E8F0]/40">
@@ -405,9 +573,35 @@ function NoHospitalCard() {
       <p className="mt-3 text-base font-black text-[#0F172A] dark:text-[#F8FAFC]">
         {t("No verified hospital listed nearby")}
       </p>
-      <p className="mt-2 text-xs leading-5 text-[#0F172A]/70 dark:text-[#F1F5F9]/70 max-w-sm mx-auto">
-        {t("Hospital information appears here after a hospital is verified and staff publish its current capacity.")}
+      <p className="mt-2 text-xs leading-5 text-[#0F172A]/70 dark:text-[#F1F5F9]/70 max-w-md mx-auto">
+        {t("Hospital information appears here after a hospital is verified and staff publish its current capacity, or when public directory results load within")} {radiusKm} km.
       </p>
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        {onExpandRadius && (
+          <button
+            type="button"
+            onClick={onExpandRadius}
+            className="rounded-xl bg-[#2457FF] px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#1d47db]"
+          >
+            {t("Expand Search Radius")}
+          </button>
+        )}
+        <a
+          href="tel:112"
+          className="rounded-xl border border-red-500/40 bg-red-600/10 px-3.5 py-2 text-xs font-bold text-red-700 dark:text-red-300"
+        >
+          {t("Call 112")}
+        </a>
+        {onViewAll && (
+          <button
+            type="button"
+            onClick={onViewAll}
+            className="rounded-xl glass-card px-3.5 py-2 text-xs font-bold text-[#0F172A] dark:text-[#F8FAFC]"
+          >
+            {t("View All India")}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
