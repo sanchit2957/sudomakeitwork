@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { usePortalConnectionStatus } from "@/hooks/usePortalStream";
 import { RoleGate } from "@/components/RoleGate";
-import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import { HospitalStaffDashboard } from "@/components/HospitalStaffDashboard";
 import { HospitalMyBranches } from "@/components/HospitalMyBranches";
 import type { HospitalBranchRecord } from "@/components/HospitalBranchForm";
@@ -24,11 +23,9 @@ export default function HospitalPortal() {
     return <HospitalRegistration />;
   }
   return (
-    <DesktopOnlyGate portalName="Hospital Operations Desk" portalType="hospital">
-      <RoleGate roles={["hospital", "medical", "admin"]}>
-        <HospitalWorkspace />
-      </RoleGate>
-    </DesktopOnlyGate>
+    <RoleGate roles={["hospital", "medical", "admin"]}>
+      <HospitalWorkspace />
+    </RoleGate>
   );
 }
 

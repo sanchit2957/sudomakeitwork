@@ -33,6 +33,7 @@ import {
   getComprehensiveWeather,
   getIndiaWeatherRiskGrid,
   INDIA_CENTER,
+  PAN_INDIA_WEATHER_HUBS,
   POPULAR_INDIAN_LOCATIONS,
   weatherProviderManager,
 } from "../weather.service";
@@ -736,8 +737,42 @@ export const rescueRouter = router({
         const isBleIncident = Boolean(input.bleBeaconId);
         let incidentId = nextIncidentId();
         const now = new Date();
-        const triageDeadlineAt = isBleIncident ? now : new Date(now.getTime() + 10_000);
+        // Citizen SOS gets full 10-second triage & cancellation window
+        const triageDeadlineAt = new Date(now.getTime() + 10_000);
         const defaultCategory: "medical" | "rescue" | "emergency" = input.emergencyType === "medical" ? "medical" : input.emergencyType === "trapped" ? "rescue" : "emergency";
+
+        // Enrich location label if generic or unpopulated using Pan-India geographic hubs
+        let effectiveLocationLabel = input.locationLabel;
+        if (
+          !effectiveLocationLabel ||
+          effectiveLocationLabel.trim() === "" ||
+          effectiveLocationLabel.toLowerCase().includes("gps location") ||
+          effectiveLocationLabel.toLowerCase().includes("location captured")
+        ) {
+          if (
+            input.latitude != null &&
+            input.longitude != null &&
+            (input.latitude !== 0 || input.longitude !== 0)
+          ) {
+            let nearest = PAN_INDIA_WEATHER_HUBS[0];
+            let minD = Infinity;
+            for (const hub of PAN_INDIA_WEATHER_HUBS) {
+              const d = Math.hypot(hub.latitude - input.latitude, hub.longitude - input.longitude);
+              if (d < minD) {
+                minD = d;
+                nearest = hub;
+              }
+            }
+            const approxKm = Math.round(minD * 111);
+            if (approxKm <= 60) {
+              effectiveLocationLabel = `${nearest.name}, ${nearest.state}`;
+            } else {
+              effectiveLocationLabel = `Near ${nearest.name}, ${nearest.state} (${input.latitude.toFixed(4)}° N, ${input.longitude.toFixed(4)}° E)`;
+            }
+          } else {
+            effectiveLocationLabel = "Reported Location";
+          }
+        }
 
         const db = await database();
         if (db) {
@@ -746,7 +781,7 @@ export const rescueRouter = router({
               publicCode,
               reporterId: ctx.user.id,
               contactName: input.contactName ?? null,
-              locationLabel: input.locationLabel,
+              locationLabel: effectiveLocationLabel,
               latitude: input.latitude,
               longitude: input.longitude,
               emergencyType: input.emergencyType,
@@ -762,11 +797,11 @@ export const rescueRouter = router({
               voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
               status: "pending",
               bleBeaconId: input.bleBeaconId ?? null,
-              dispatchStatus: isBleIncident ? "matching" : "triage_pending",
+              dispatchStatus: "triage_pending",
               triageStartedAt: now,
               triageDeadlineAt,
-              triageSelectedAt: isBleIncident ? now : null,
-              matchingStartedAt: isBleIncident ? now : null,
+              triageSelectedAt: null,
+              matchingStartedAt: null,
               matchingAttempts: 0,
             });
             if (result && (result[0] as any)?.insertId) {
@@ -783,7 +818,7 @@ export const rescueRouter = router({
           publicCode,
           reporterId: ctx.user.id,
           contactName: input.contactName ?? null,
-          locationLabel: input.locationLabel,
+          locationLabel: effectiveLocationLabel,
           latitude: input.latitude,
           longitude: input.longitude,
           emergencyType: input.emergencyType,
@@ -799,11 +834,11 @@ export const rescueRouter = router({
           voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
           status: "pending",
           bleBeaconId: input.bleBeaconId ?? null,
-          dispatchStatus: isBleIncident ? "matching" : "triage_pending",
+          dispatchStatus: "triage_pending",
           triageStartedAt: now,
           triageDeadlineAt,
-          triageSelectedAt: isBleIncident ? now : null,
-          matchingStartedAt: isBleIncident ? now : null,
+          triageSelectedAt: null,
+          matchingStartedAt: null,
           matchingAttempts: 0,
           escalatedToCommandAt: null,
           assignedRescuerId: null,
@@ -819,9 +854,7 @@ export const rescueRouter = router({
           ctx.user.id,
           "sos_created",
           "SOS received",
-          isBleIncident
-            ? "Offline BLE SOS synchronized. Immediate responder matching activated."
-            : "Awaiting rapid classification and automated responder dispatch."
+          "Awaiting rapid classification and automated responder dispatch."
         );
         await writeAudit(
           ctx.user.id,

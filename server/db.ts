@@ -292,6 +292,11 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
           `INSERT IGNORE INTO \`users\` (\`openId\`, \`name\`, \`email\`, \`password\`, \`role\`, \`status\`, \`loginMethod\`, \`lastSignedIn\`) VALUES ('user-admin', 'Superadmin', 'admin@assamrescue.gov.in', '${adminHash}', 'admin', 'active', 'platform-login', NOW())`,
           "seed_adminUser"
         );
+        const citizenHash = hashPassword("citizen");
+        await execDdl(
+          `INSERT IGNORE INTO \`users\` (\`openId\`, \`name\`, \`email\`, \`password\`, \`role\`, \`status\`, \`loginMethod\`, \`lastSignedIn\`) VALUES ('user-citizen', 'Citizen Patient', 'citizen@assamrescue.gov.in', '${citizenHash}', 'user', 'active', 'platform-login', NOW())`,
+          "seed_citizenUser"
+        );
         // Clear out legacy mock citizen data so only live real-time citizen accounts are stored
         await execDdl("DELETE FROM `emergencyContacts` WHERE `userId` IN (SELECT `id` FROM `users` WHERE `openId` = 'user-citizen' OR `email` LIKE '%citizen%' OR `name` LIKE '%Anamika%')", "clean_mockCitizenContacts");
         await execDdl("DELETE FROM `users` WHERE `openId` = 'user-citizen' OR `email` = 'citizen@assamrescue.gov.in' OR `name` LIKE '%Anamika%'", "clean_mockCitizen");
@@ -849,8 +854,7 @@ export function setDbInstanceForTesting(dbInstance: any) {
 // Default development seed accounts with salted scrypt hashed passwords
 const defaultAdminHash = hashPassword("admin");
 const defaultCitizenHash = hashPassword("xavier123");
-const defaultRescuerHash = hashPassword("rescuer");
-const defaultHospitalHash = hashPassword("hospital");
+const defaultCitizenAssamHash = hashPassword("citizen");
 
 export const _memoryUsers: Map<string, any> = new Map([
   [
@@ -870,45 +874,29 @@ export const _memoryUsers: Map<string, any> = new Map([
     },
   ],
   [
-    "user-rescuer",
-    {
-      id: 2,
-      openId: "user-rescuer",
-      name: "NDRF Field Officer",
-      email: "rescuer@assamrescue.gov.in",
-      password: defaultRescuerHash,
-      role: "rescuer",
-      status: "active",
-      loginMethod: "platform-login",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    },
-  ],
-  [
-    "user-hospital",
-    {
-      id: 3,
-      openId: "user-hospital",
-      name: "Hospital Operations Officer",
-      email: "hospital@assamrescue.gov.in",
-      password: defaultHospitalHash,
-      role: "hospital",
-      status: "active",
-      loginMethod: "platform-login",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    },
-  ],
-  [
     "user-citizen-xavier",
     {
-      id: 4,
+      id: 2,
       openId: "user-citizen-xavier",
       name: "Xavier",
       email: "xavi@yahoo.com",
       password: defaultCitizenHash,
+      role: "user",
+      status: "active",
+      loginMethod: "platform-login",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+  ],
+  [
+    "user-citizen",
+    {
+      id: 3,
+      openId: "user-citizen",
+      name: "Citizen Patient",
+      email: "citizen@assamrescue.gov.in",
+      password: defaultCitizenAssamHash,
       role: "user",
       status: "active",
       loginMethod: "platform-login",

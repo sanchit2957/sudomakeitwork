@@ -242,8 +242,7 @@ const stages = useMemo(
               )}
 
               <div className="mt-5">
-                <IncidentChat
-                  publicCode={status.data.publicCode}
+                <IncidentChat publicCode={status.data.publicCode}
                   active={status.data.status !== "resolved"}
                   voiceNoteUrl={(status.data as any).voiceNoteUrl}
                   voiceNoteDurationSeconds={(status.data as any).voiceNoteDurationSeconds}

@@ -21,13 +21,79 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { portalFetch } from "@/lib/portalAuth";
 import { startLogin } from "@/const";
 import { getWeatherRiskPresentation } from "@/lib/weatherRisk";
-import { INDIA_CENTER } from "@shared/india-locations";
+import { INDIA_CENTER, PAN_INDIA_WEATHER_HUBS } from "@shared/india-locations";
 import { Bluetooth, CloudRain, Database, Hospital, MapPin, MessageSquare, MoreHorizontal, Navigation, PhoneCall, Radio, RefreshCw, ShieldCheck, Siren, TentTree, ThermometerSun, Waves, Wifi, WifiOff } from "lucide-react";
 import { VictimNavigation } from "@/components/VictimNavigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
 type Point = { latitude: number; longitude: number };
+
+/**
+ * Reverse geocodes coordinates to a human-readable street/area landmark,
+ * falling back gracefully to nearby geographic hubs or formatted coordinates.
+ */
+export async function reverseGeocodeLocation(lat: number, lng: number): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(
+      lat
+    )}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`;
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      const addr = data.address || {};
+      const road = addr.road || addr.street || addr.pedestrian || addr.footway || "";
+      const neighbourhood = addr.neighbourhood || addr.suburb || addr.residential || "";
+      const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || "";
+      const state = addr.state || "";
+
+      const primary = [road, neighbourhood].filter(Boolean).join(", ");
+      if (primary && (city || state)) {
+        return `${primary}, ${city || state}`;
+      }
+      if (primary) return primary;
+      if (city && state) return `${city}, ${state}`;
+      if (data.display_name) {
+        const parts = data.display_name
+          .split(",")
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+        if (parts.length >= 2) {
+          return parts.slice(0, 3).join(", ");
+        }
+      }
+    }
+  } catch {
+    // Network offline or timeout - fallback to geographic hub
+  }
+
+  // Nearest landmark / hub from PAN_INDIA_WEATHER_HUBS
+  if (Array.isArray(PAN_INDIA_WEATHER_HUBS) && PAN_INDIA_WEATHER_HUBS.length > 0) {
+    let nearestHub = PAN_INDIA_WEATHER_HUBS[0];
+    let minD = Infinity;
+    for (const hub of PAN_INDIA_WEATHER_HUBS) {
+      const d = Math.hypot(hub.latitude - lat, hub.longitude - lng);
+      if (d < minD) {
+        minD = d;
+        nearestHub = hub;
+      }
+    }
+    const approxKm = Math.round(minD * 111);
+    if (approxKm <= 40) {
+      return `${nearestHub.name}, ${nearestHub.state}`;
+    } else if (approxKm <= 120) {
+      return `Near ${nearestHub.name}, ${nearestHub.state}`;
+    }
+  }
+
+  return `Coordinates: ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E`;
+}
 
 export default function UserHome() {
   const [, setLocation] = useLocation();
@@ -36,6 +102,7 @@ export default function UserHome() {
   const [online, setOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
   const [position, setPosition] = useState<Point | null>(() => getLastKnownCoordinates());
   const [manualLocation, setManualLocation] = useState<{ name: string; lat: number; lng: number } | null>(null);
+  const [resolvedLocationName, setResolvedLocationName] = useState<string>("");
   const [isGpsActive, setIsGpsActive] = useState(true);
   const [locationStatus, setLocationStatus] = useState<"finding" | "ready" | "unavailable">(() =>
     getLastKnownCoordinates() ? "ready" : "finding"
@@ -105,8 +172,36 @@ export default function UserHome() {
 
   const handleLocationChange = (lat: number, lng: number, name: string) => {
     setManualLocation({ name, lat, lng });
+    setResolvedLocationName(name);
     setIsGpsActive(false);
   };
+
+  const handleMapPickLocation = async (coords: { lat: number; lng: number }) => {
+    setPosition({ latitude: coords.lat, longitude: coords.lng });
+    setLocationStatus("ready");
+    setIsGpsActive(false);
+    const name = await reverseGeocodeLocation(coords.lat, coords.lng);
+    setManualLocation({ name, lat: coords.lat, lng: coords.lng });
+    setResolvedLocationName(name);
+  };
+
+  useEffect(() => {
+    if (manualLocation?.name) {
+      setResolvedLocationName(manualLocation.name);
+      return;
+    }
+    if (position?.latitude != null && position?.longitude != null) {
+      let active = true;
+      void reverseGeocodeLocation(position.latitude, position.longitude).then((name) => {
+        if (active && name) {
+          setResolvedLocationName(name);
+        }
+      });
+      return () => {
+        active = false;
+      };
+    }
+  }, [position?.latitude, position?.longitude, manualLocation?.name]);
 
   const handleGpsLocate = async () => {
     setManualLocation(null);
@@ -386,36 +481,52 @@ export default function UserHome() {
     setRapidStatus("locating");
     setRapidNotice(t("Getting location to send SOS immediately…"));
 
+    const getEffectiveLocationLabel = async (lat?: number, lng?: number): Promise<string> => {
+      if (manualLocation?.name) return manualLocation.name;
+      if (resolvedLocationName) return resolvedLocationName;
+      if (lat != null && lng != null && (lat !== 0 || lng !== 0)) {
+        return await reverseGeocodeLocation(lat, lng);
+      }
+      return t("Location coordinates pending");
+    };
+
     if (manualLocation) {
       void submitSosWithCoords(manualLocation.lat, manualLocation.lng, manualLocation.name);
     } else if (position) {
-      void submitSosWithCoords(position.latitude, position.longitude, t("GPS location captured from this phone"));
+      void getEffectiveLocationLabel(position.latitude, position.longitude).then((lbl) => {
+        submitSosWithCoords(position.latitude, position.longitude, lbl);
+      });
     } else if (isOffline) {
       const lastKnown = getLastKnownCoordinates();
       if (lastKnown) {
-        void submitSosWithCoords(lastKnown.latitude, lastKnown.longitude, t("Last known device location"));
+        void getEffectiveLocationLabel(lastKnown.latitude, lastKnown.longitude).then((lbl) => {
+          submitSosWithCoords(lastKnown.latitude, lastKnown.longitude, lbl);
+        });
       } else {
         void getCurrentCoordinates({ enableHighAccuracy: true, timeout: 1500 })
-          .then((res) => {
+          .then(async (res) => {
             setPosition({ latitude: res.latitude, longitude: res.longitude });
             setLocationStatus("ready");
-            return submitSosWithCoords(res.latitude, res.longitude, t("GPS location captured from this phone"));
+            const lbl = await getEffectiveLocationLabel(res.latitude, res.longitude);
+            return submitSosWithCoords(res.latitude, res.longitude, lbl);
           })
-          .catch(() => submitSosWithCoords(undefined, undefined, t("Location unavailable (No GPS fix on phone)")));
+          .catch(() => submitSosWithCoords(undefined, undefined, t("Location coordinates unavailable")));
       }
     } else {
       void getCurrentCoordinates({ enableHighAccuracy: true, timeout: 6000 })
-        .then((res) => {
+        .then(async (res) => {
           setPosition({ latitude: res.latitude, longitude: res.longitude });
           setLocationStatus("ready");
-          submitSosWithCoords(res.latitude, res.longitude, t("GPS location captured from this phone"));
+          const lbl = await getEffectiveLocationLabel(res.latitude, res.longitude);
+          submitSosWithCoords(res.latitude, res.longitude, lbl);
         })
-        .catch(() => {
+        .catch(async () => {
           const lastKnown = getLastKnownCoordinates();
           if (lastKnown) {
-            submitSosWithCoords(lastKnown.latitude, lastKnown.longitude, t("Last known device location"));
+            const lbl = await getEffectiveLocationLabel(lastKnown.latitude, lastKnown.longitude);
+            submitSosWithCoords(lastKnown.latitude, lastKnown.longitude, lbl);
           } else {
-            submitSosWithCoords(undefined, undefined, t("Location unavailable (No GPS fix on phone)"));
+            submitSosWithCoords(undefined, undefined, t("Location coordinates unavailable"));
           }
         });
     }
@@ -427,7 +538,7 @@ export default function UserHome() {
     longitude: activePoint?.longitude ?? 0,
     emergencyType: "flood",
     peopleAffected: 1,
-    locationLabel: manualLocation?.name || (position ? t("GPS location captured from this phone") : t("Location unavailable (No GPS fix on phone)")),
+    locationLabel: manualLocation?.name || resolvedLocationName || (position ? `${position.latitude.toFixed(4)}° N, ${position.longitude.toFixed(4)}° E` : t("Location unavailable")),
   });
 
   return (
@@ -695,6 +806,8 @@ export default function UserHome() {
               shelters={nearbyShelters}
               onRecenter={handleGpsLocate}
               recenterLoading={isLocating}
+              locationName={resolvedLocationName}
+              onPickLocation={handleMapPickLocation}
             />
 
             {/* Nearby Emergency Facilities & Hospitals */}
@@ -925,6 +1038,8 @@ function LocationPreview({
   shelters,
   onRecenter,
   recenterLoading,
+  locationName,
+  onPickLocation,
 }: {
   point: Point | null;
   state: "finding" | "ready" | "unavailable";
@@ -932,6 +1047,8 @@ function LocationPreview({
   shelters?: MapShelter[];
   onRecenter?: () => void;
   recenterLoading?: boolean;
+  locationName?: string;
+  onPickLocation?: (point: { lat: number; lng: number }) => void;
 }) {
   const { t } = useLanguage();
   const center = point ? { lat: point.latitude, lng: point.longitude } : INDIA_CENTER;
@@ -951,6 +1068,7 @@ function LocationPreview({
           shelters={shelters}
           onRecenter={onRecenter}
           recenterLoading={recenterLoading}
+          onPickLocation={onPickLocation}
           onLeafletReady={async (lMap) => {
             if (point) {
               const L = (await import("leaflet")).default;
@@ -968,16 +1086,19 @@ function LocationPreview({
           {t("Map preview")}
         </div>
       </div>
-      <div className="flex items-center justify-between px-1 pt-3">
-        <span className="flex items-center gap-2 text-xs font-bold text-[#0F172A] dark:text-[#F8FAFC]">
-          <MapPin className="h-4 w-4 text-[#DC2626]" />
-          {state === "ready"
-            ? t("Your current location")
-            : state === "finding"
-              ? t("Finding your location…")
-              : t("Location unavailable (Map centered on India)")}
+      <div className="flex items-center justify-between px-1 pt-3 gap-2">
+        <span className="flex items-center gap-2 text-xs font-bold text-[#0F172A] dark:text-[#F8FAFC] truncate max-w-[70%]">
+          <MapPin className="h-4 w-4 shrink-0 text-[#DC2626]" />
+          <span className="truncate">
+            {locationName ||
+              (state === "ready"
+                ? t("Live map location acquired")
+                : state === "finding"
+                  ? t("Finding your location…")
+                  : t("Location unavailable (Map centered on India)"))}
+          </span>
         </span>
-        <span className="font-mono text-[10px] font-bold text-[#1D4ED8] dark:text-[#F1F5F9]">
+        <span className="font-mono text-[10px] font-bold text-[#1D4ED8] dark:text-[#F1F5F9] shrink-0">
           {state === "ready" && point
             ? `${point.latitude.toFixed(4)}° N, ${point.longitude.toFixed(4)}° E`
             : "—"}

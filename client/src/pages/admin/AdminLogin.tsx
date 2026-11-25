@@ -162,6 +162,33 @@ export default function AdminLogin() {
                 </div>
               </div>
 
+              <div className="input-group">
+                <Label htmlFor="admin-password" className="text-xs font-bold mb-1.5 block text-foreground/90">
+                  Command Password
+                </Label>
+                <div className="input-wrapper">
+                  <KeyRound className="input-icon" />
+                  <Input
+                    id="admin-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter command password"
+                    className="form-input !h-12 pr-10 text-sm"
+                    autoComplete="current-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="password-toggle"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
               <div className="pt-2">
                 <button
                   type="submit"

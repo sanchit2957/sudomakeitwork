@@ -76,13 +76,8 @@ export function SosClassificationModal({
 
   const [currentStep, setCurrentStep] = useState<"categories" | "details">("categories");
   const [selectedCategory, setSelectedCategory] = useState<SOSCategoryOption | null>(null);
-  const [timeLeft, setTimeLeft] = useState(() => {
-    if (triageDeadlineAt) {
-      const remainingMs = Math.max(0, new Date(triageDeadlineAt).getTime() - Date.now());
-      return Math.ceil(remainingMs / 1000);
-    }
-    return 10;
-  });
+  const [timeLeft, setTimeLeft] = useState(10);
+  const [progressPercent, setProgressPercent] = useState(100);
   const [isExpired, setIsExpired] = useState(false);
   const [isDispatchedOnServer, setIsDispatchedOnServer] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -111,16 +106,31 @@ export function SosClassificationModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    const targetDeadline = triageDeadlineAt
-      ? Math.max(Date.now() + 1000, new Date(triageDeadlineAt).getTime())
-      : Date.now() + TRIAGE_CANCEL_WINDOW_MS;
-
+    // Reset session refs on open
+    submittedRef.current = false;
+    cancelledRef.current = false;
+    currentStepRef.current = "categories";
+    selectedCategoryRef.current = null;
     setIsExpired(false);
+    setIsDispatchedOnServer(false);
+    setCurrentStep("categories");
+    setSelectedCategory(null);
+
+    // Guaranteed full 10-second countdown window
+    const parsedDeadline = triageDeadlineAt ? new Date(triageDeadlineAt).getTime() : 0;
+    const targetDeadline =
+      parsedDeadline > Date.now() + 4000
+        ? parsedDeadline
+        : Date.now() + TRIAGE_CANCEL_WINDOW_MS;
+
+    const totalWindowMs = Math.max(TRIAGE_CANCEL_WINDOW_MS, targetDeadline - Date.now());
+
     const updateTimer = () => {
       const now = Date.now();
       const remainingMs = Math.max(0, targetDeadline - now);
       const remainingSec = Math.ceil(remainingMs / 1000);
       setTimeLeft(remainingSec);
+      setProgressPercent(Math.min(100, Math.max(0, (remainingMs / totalWindowMs) * 100)));
 
       if (remainingMs <= 0) {
         clearInterval(interval);
@@ -132,7 +142,7 @@ export function SosClassificationModal({
     };
 
     updateTimer();
-    const interval = setInterval(updateTimer, 250);
+    const interval = setInterval(updateTimer, 100);
 
     return () => clearInterval(interval);
   }, [isOpen, triageDeadlineAt]);
@@ -352,8 +362,8 @@ export function SosClassificationModal({
               </div>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E2E8F0]/25 dark:bg-white/10">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-red-500 via-amber-500 to-[#1D4ED8] transition-all duration-200 ease-linear"
-                  style={{ width: `${Math.min(100, Math.max(0, (timeLeft / (TRIAGE_CANCEL_WINDOW_MS / 1000)) * 100))}%` }}
+                  className="h-full rounded-full bg-gradient-to-r from-red-500 via-amber-500 to-[#1D4ED8] transition-all duration-100 ease-linear"
+                  style={{ width: `${progressPercent}%` }}
                 />
               </div>
             </div>
