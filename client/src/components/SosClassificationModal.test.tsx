@@ -314,4 +314,41 @@ describe("SosClassificationModal Component", () => {
     });
     expect(onComplete).toHaveBeenCalledWith("emergency");
   });
+
+  it("supports offline BLE beacon triage classification without server calls", async () => {
+    const onOfflineCategoryChange = vi.fn();
+    const onOfflineDetailsSave = vi.fn();
+    const onComplete = vi.fn();
+    render(
+      <SosClassificationModal
+        isOpen={true}
+        publicCode="BLE-TEST1234"
+        triageDeadlineAt={new Date(Date.now() + 10_000).toISOString()}
+        offlineMode={true}
+        onOfflineCategoryChange={onOfflineCategoryChange}
+        onOfflineDetailsSave={onOfflineDetailsSave}
+        onComplete={onComplete}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("triage-option-medical"));
+    });
+    expect(onOfflineCategoryChange).toHaveBeenCalledWith("medical");
+    expect(mutateSelectCategoryMock).not.toHaveBeenCalled();
+
+    const continueBtn = screen.getByTestId("continue-to-tracking-btn");
+    await act(async () => {
+      fireEvent.click(continueBtn);
+    });
+    expect(onOfflineDetailsSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: "medical",
+        emergencyType: "medical",
+        peopleAffected: 1,
+      })
+    );
+    expect(mutateUpdateDetailsMock).not.toHaveBeenCalled();
+    expect(onComplete).toHaveBeenCalledWith("medical");
+  });
 });

@@ -25,6 +25,15 @@ interface SosClassificationModalProps {
   publicCode: string;
   incidentId?: number;
   triageDeadlineAt?: Date | string | null;
+  offlineMode?: boolean;
+  onOfflineCategoryChange?: (category: "medical" | "rescue" | "emergency") => void;
+  onOfflineDetailsSave?: (details: {
+    category: "medical" | "rescue" | "emergency";
+    peopleAffected: number;
+    emergencyType: "flood" | "medical" | "trapped";
+    helpNeeds?: string;
+    notes?: string;
+  }) => void;
   onComplete: (category: "medical" | "rescue" | "emergency") => void;
   onCancel?: () => void;
 }
@@ -48,6 +57,9 @@ export function SosClassificationModal({
   publicCode,
   incidentId,
   triageDeadlineAt,
+  offlineMode = false,
+  onOfflineCategoryChange,
+  onOfflineDetailsSave,
   onComplete,
   onCancel,
 }: SosClassificationModalProps) {
@@ -144,15 +156,19 @@ export function SosClassificationModal({
     const finalCat = resolveBackendCategory(selectedCategoryRef.current);
     setIsDispatchedOnServer(true);
 
-    try {
-      // Submit fallback emergency category selection to server immediately
-      await selectCategory.mutateAsync({
-        publicCode,
-        incidentId,
-        category: finalCat,
-      });
-    } catch (err) {
-      console.warn("[Triage] Auto-timeout selectCategory notice:", err);
+    if (offlineMode) {
+      onOfflineCategoryChange?.(finalCat);
+    } else {
+      try {
+        // Submit fallback emergency category selection to server immediately
+        await selectCategory.mutateAsync({
+          publicCode,
+          incidentId,
+          category: finalCat,
+        });
+      } catch (err) {
+        console.warn("[Triage] Auto-timeout selectCategory notice:", err);
+      }
     }
 
     // Only if user remained on categories screen with no selection, advance to tracking
@@ -171,6 +187,12 @@ export function SosClassificationModal({
     setIsCancelling(true);
     setCancelError("");
 
+    if (offlineMode) {
+      cancelledRef.current = true;
+      onCancel?.();
+      return;
+    }
+
     try {
       await cancelSos.mutateAsync({
         publicCode,
@@ -184,21 +206,25 @@ export function SosClassificationModal({
     }
   };
 
-  // User selects a category: starts dispatch IMMEDIATELY on server without waiting for 10s!
+  // User selects a category: starts dispatch IMMEDIATELY on server or BLE beacon without waiting for 10s!
   const handleCategorySelect = (category: SOSCategoryOption) => {
     setSelectedCategory(category);
     selectedCategoryRef.current = category;
     const backendCategory = resolveBackendCategory(category);
     setIsDispatchedOnServer(true);
 
-    // Fire category selection mutation immediately to start matching now
-    selectCategory
-      .mutateAsync({
-        publicCode,
-        incidentId,
-        category: backendCategory,
-      })
-      .catch((err: any) => console.warn("[Triage] selectCategory mutation warning:", err));
+    if (offlineMode) {
+      onOfflineCategoryChange?.(backendCategory);
+    } else {
+      // Fire category selection mutation immediately to start matching now
+      selectCategory
+        .mutateAsync({
+          publicCode,
+          incidentId,
+          category: backendCategory,
+        })
+        .catch((err: any) => console.warn("[Triage] selectCategory mutation warning:", err));
+    }
 
     // Transition to non-blocking details screen (no timer displayed on details screen!)
     setCurrentStep("details");
@@ -209,6 +235,22 @@ export function SosClassificationModal({
   const handleContinueToTracking = async () => {
     const finalCat = resolveBackendCategory(selectedCategoryRef.current || selectedCategory);
     submittedRef.current = true;
+    const emergencyType = finalCat === "medical" ? "medical" : finalCat === "rescue" ? "trapped" : "flood";
+
+    if (offlineMode) {
+      if (!isDispatchedOnServer) {
+        onOfflineCategoryChange?.(finalCat);
+      }
+      onOfflineDetailsSave?.({
+        category: finalCat,
+        peopleAffected,
+        emergencyType,
+        helpNeeds: helpNeeds.trim() || undefined,
+        notes: notes.trim() || undefined,
+      });
+      onComplete(finalCat);
+      return;
+    }
 
     // Ensure category is sent if not already dispatched
     if (!isDispatchedOnServer) {
@@ -223,7 +265,6 @@ export function SosClassificationModal({
 
     // Save details in background (never blocks tracking navigation)
     if (peopleAffected > 1 || helpNeeds.trim() || notes.trim()) {
-      const emergencyType = finalCat === "medical" ? "medical" : finalCat === "rescue" ? "trapped" : "flood";
       updateDetails
         .mutateAsync({
           publicCode,
