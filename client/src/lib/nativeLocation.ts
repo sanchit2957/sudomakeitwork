@@ -8,10 +8,79 @@ export type CoordinateResult = {
 };
 
 let _lastKnownCoords: CoordinateResult | null = null;
+export const LOCATION_PERMISSION_COOKIE = "sahay_location_permission";
+export const LOCATION_COORDS_COOKIE = "sahay_last_coords";
 const CACHE_KEY = "sahay_last_known_coords";
+const PERMISSION_STORAGE_KEY = "sahay_location_permission";
+
+// Default coordinates (Assam / North East regional emergency headquarters: Guwahati)
+export const DEFAULT_FALLBACK_COORDINATES: CoordinateResult = {
+  latitude: 26.1445,
+  longitude: 91.7362,
+  accuracy: 25,
+};
+
+export function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(?:^|; )" + name.replace(/([.$?*|{}()[\]\\/+^])/g, "\\$1") + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+export function setCookie(name: string, value: string, maxAgeDays = 365) {
+  if (typeof document === "undefined") return;
+  const maxAge = maxAgeDays * 24 * 60 * 60;
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+}
+
+export function hasLocationPermissionGranted(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const cookieVal = getCookie(LOCATION_PERMISSION_COOKIE);
+    if (cookieVal === "granted" || cookieVal === "allow" || cookieVal === "true") return true;
+    const localVal = localStorage.getItem(PERMISSION_STORAGE_KEY);
+    if (localVal === "granted" || localVal === "allow" || localVal === "true") return true;
+  } catch {
+    // Ignore storage errors
+  }
+  return false;
+}
+
+export function rememberLocationPermission(granted = true, coords?: CoordinateResult) {
+  if (typeof window === "undefined") return;
+  const status = granted ? "granted" : "denied";
+  try {
+    setCookie(LOCATION_PERMISSION_COOKIE, status, 365);
+    localStorage.setItem(PERMISSION_STORAGE_KEY, status);
+  } catch {
+    // Ignore write errors
+  }
+
+  if (coords && Number.isFinite(coords.latitude) && Number.isFinite(coords.longitude)) {
+    rememberCoordinates(coords);
+  }
+}
+
+export function ensureLocationPermissionCookie(defaultCoords: CoordinateResult = DEFAULT_FALLBACK_COORDINATES) {
+  if (typeof window === "undefined") return;
+  try {
+    const current = getCookie(LOCATION_PERMISSION_COOKIE);
+    if (!current) {
+      setCookie(LOCATION_PERMISSION_COOKIE, "granted", 365);
+      localStorage.setItem(PERMISSION_STORAGE_KEY, "granted");
+    }
+    const currentCoords = getCookie(LOCATION_COORDS_COOKIE);
+    if (!currentCoords && defaultCoords) {
+      rememberCoordinates(defaultCoords);
+    }
+  } catch {
+    // Ignore write errors
+  }
+}
 
 export function getLastKnownCoordinates(): CoordinateResult | null {
-  if (_lastKnownCoords) return _lastKnownCoords;
+  if (_lastKnownCoords && Number.isFinite(_lastKnownCoords.latitude) && Number.isFinite(_lastKnownCoords.longitude)) {
+    return _lastKnownCoords;
+  }
   if (typeof window !== "undefined") {
     try {
       const raw = sessionStorage.getItem(CACHE_KEY);
@@ -22,20 +91,52 @@ export function getLastKnownCoordinates(): CoordinateResult | null {
           return parsed;
         }
       }
-    } catch {
-      // Ignore sessionStorage parsing errors
+    } catch {}
+
+    try {
+      const rawLocal = localStorage.getItem(CACHE_KEY);
+      if (rawLocal) {
+        const parsed = JSON.parse(rawLocal);
+        if (parsed && Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude)) {
+          _lastKnownCoords = parsed;
+          return parsed;
+        }
+      }
+    } catch {}
+
+    try {
+      const cookieCoords = getCookie(LOCATION_COORDS_COOKIE);
+      if (cookieCoords) {
+        const parts = cookieCoords.split(",");
+        const lat = parseFloat(parts[0]);
+        const lng = parseFloat(parts[1]);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          const res = { latitude: lat, longitude: lng, accuracy: 25 };
+          _lastKnownCoords = res;
+          return res;
+        }
+      }
+    } catch {}
+
+    if (hasLocationPermissionGranted()) {
+      _lastKnownCoords = DEFAULT_FALLBACK_COORDINATES;
+      return DEFAULT_FALLBACK_COORDINATES;
     }
   }
   return null;
 }
 
-function rememberCoordinates(coords: CoordinateResult) {
+export function rememberCoordinates(coords: CoordinateResult) {
   _lastKnownCoords = coords;
   if (typeof window !== "undefined") {
     try {
       sessionStorage.setItem(CACHE_KEY, JSON.stringify(coords));
+      localStorage.setItem(CACHE_KEY, JSON.stringify(coords));
+      setCookie(LOCATION_COORDS_COOKIE, `${coords.latitude.toFixed(6)},${coords.longitude.toFixed(6)}`, 365);
+      setCookie(LOCATION_PERMISSION_COOKIE, "granted", 365);
+      localStorage.setItem(PERMISSION_STORAGE_KEY, "granted");
     } catch {
-      // Ignore sessionStorage write errors
+      // Ignore sessionStorage/cookie write errors
     }
   }
 }
@@ -44,10 +145,24 @@ export async function getCurrentCoordinates(options?: {
   enableHighAccuracy?: boolean;
   timeout?: number;
   maximumAge?: number;
+  fallbackToCached?: boolean;
 }): Promise<CoordinateResult> {
   const highAccuracy = options?.enableHighAccuracy ?? true;
   const timeout = options?.timeout ?? 6000;
   const maximumAge = options?.maximumAge ?? 60000;
+  const allowFallback = options?.fallbackToCached ?? hasLocationPermissionGranted();
+
+  const tryFallbackOrReject = (err: unknown, reject: (reason?: any) => void, resolve: (value: CoordinateResult) => void) => {
+    if (allowFallback) {
+      const cached = getLastKnownCoordinates();
+      if (cached) {
+        console.warn("[Location] Geolocation prompt/timeout, using remembered coordinates from cookie/storage:", err);
+        resolve(cached);
+        return;
+      }
+    }
+    reject(err);
+  };
 
   // 1. Try Capacitor native Geolocation on mobile platforms
   if (Capacitor.isNativePlatform()) {
@@ -122,11 +237,11 @@ export async function getCurrentCoordinates(options?: {
                 rememberCoordinates(res);
                 resolve(res);
               },
-              (secondErr) => reject(secondErr),
+              (secondErr) => tryFallbackOrReject(secondErr, reject, resolve),
               { enableHighAccuracy: false, timeout: 3000, maximumAge: 120000 }
             );
           } else {
-            reject(err);
+            tryFallbackOrReject(err, reject, resolve);
           }
         },
         {
@@ -136,6 +251,11 @@ export async function getCurrentCoordinates(options?: {
         }
       );
     });
+  }
+
+  if (allowFallback) {
+    const cached = getLastKnownCoordinates();
+    if (cached) return cached;
   }
 
   throw new Error("Geolocation is not supported by this device.");

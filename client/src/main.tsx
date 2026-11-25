@@ -8,8 +8,12 @@ import superjson from "superjson";
 import { Capacitor } from "@capacitor/core";
 import App from "./App";
 import { startLogin } from "./const";
+import { ensureLocationPermissionCookie } from "./lib/nativeLocation";
 import "leaflet/dist/leaflet.css";
 import "./index.css";
+
+// Initialize browser location permission cookie and cached fallback
+ensureLocationPermissionCookie();
 
 const queryClient = new QueryClient({
   defaultOptions: {
