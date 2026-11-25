@@ -43,7 +43,16 @@ export default function UserHome() {
   const [rapidStatus, setRapidStatus] = useState<"idle" | "locating" | "sending" | "queued" | "error">("idle");
   const [rapidNotice, setRapidNotice] = useState("");
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [triageData, setTriageData] = useState<{ publicCode: string; incidentId?: number; triageDeadlineAt?: Date | string | null } | null>(null);
+  const [triageData, setTriageData] = useState<{
+    publicCode: string;
+    incidentId?: number;
+    triageDeadlineAt?: Date | string | null;
+    isOffline?: boolean;
+    bleBeaconId?: string;
+    latitude?: number;
+    longitude?: number;
+    hasCoords?: boolean;
+  } | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [bleActive, setBleActive] = useState(() => isBleSosBeaconActive());
@@ -276,6 +285,10 @@ export default function UserHome() {
       }).then((res) => {
         if (res.success) {
           setBleActive(true);
+        } else if (res.error) {
+          setRapidNotice((prev) =>
+            prev ? `${prev} (${res.error})` : `${t("SOS active")}: ${res.error}`
+          );
         }
       });
 
@@ -290,6 +303,15 @@ export default function UserHome() {
         refreshPending();
         setRapidStatus("queued");
         setRapidNotice(noticeText);
+        setTriageData({
+          publicCode: `BLE-${bleBeaconId}`,
+          triageDeadlineAt: new Date(Date.now() + 10_000),
+          isOffline: true,
+          bleBeaconId,
+          latitude: hasCoords ? latitude : undefined,
+          longitude: hasCoords ? longitude : undefined,
+          hasCoords,
+        });
       };
 
       if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -453,8 +475,17 @@ export default function UserHome() {
               </div>
             </div>
 
-            {/* 1-Tap Emergency SMS */}
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
+            {/* 1-Tap Emergency Offline Actions: Bluetooth SOS, SMS 112, Call 112 */}
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <button
+                type="button"
+                onClick={startRapidSos}
+                disabled={rapidStatus === "locating" || rapidStatus === "sending"}
+                className="flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-3 text-center text-xs font-black text-white shadow-md shadow-cyan-600/25 transition hover:bg-cyan-700 active:scale-95 disabled:opacity-60"
+              >
+                <Bluetooth className="h-4 w-4" />
+                <span>{bleActive ? t("Re-Send Bluetooth SOS") : t("Bluetooth SOS Beacon")}</span>
+              </button>
               <a
                 href={emergencySmsUrl}
                 className="flex items-center justify-center gap-2 rounded-xl bg-[#1D4ED8] px-4 py-3 text-center text-xs font-black text-white shadow-md shadow-[#1D4ED8]/25 transition hover:bg-[#1a44d6] active:scale-95"
@@ -548,6 +579,19 @@ export default function UserHome() {
                   <PhoneCall className="h-4.5 w-4.5 shrink-0" />
                   <span>{t("Call 112")}</span>
                 </a>
+                <button
+                  type="button"
+                  onClick={startRapidSos}
+                  disabled={(online && authLoading) || rapidStatus === "locating" || rapidStatus === "sending"}
+                  className="col-span-2 flex items-center justify-center gap-2 rounded-2xl border border-cyan-500/40 bg-cyan-600 px-4 py-3 text-center text-xs sm:text-sm font-black text-white shadow-md shadow-cyan-600/25 transition hover:bg-cyan-700 active:scale-95 disabled:opacity-60"
+                >
+                  <Bluetooth className="h-4.5 w-4.5 shrink-0" />
+                  <span>
+                    {bleActive
+                      ? t("Bluetooth BLE Beacon Active (Tap to Update SOS)")
+                      : t("Send SOS via Bluetooth Beacon")}
+                  </span>
+                </button>
               </div>
             </section>
 
@@ -698,11 +742,49 @@ export default function UserHome() {
           publicCode={triageData.publicCode}
           incidentId={triageData.incidentId}
           triageDeadlineAt={triageData.triageDeadlineAt}
-          onComplete={() => {
+          offlineMode={triageData.isOffline}
+          onOfflineCategoryChange={(category) => {
+            if (!triageData.bleBeaconId) return;
+            const emergencyType = category === "medical" ? "medical" : category === "rescue" ? "trapped" : "flood";
+            void startBleSosBeacon({
+              id: triageData.bleBeaconId,
+              latitude: triageData.hasCoords ? triageData.latitude : undefined,
+              longitude: triageData.hasCoords ? triageData.longitude : undefined,
+              emergencyType,
+              priority: category === "medical" || category === "rescue" ? "critical" : "high",
+              peopleAffected: 1,
+            });
+          }}
+          onOfflineDetailsSave={(details) => {
+            if (!triageData.bleBeaconId) return;
+            void startBleSosBeacon({
+              id: triageData.bleBeaconId,
+              latitude: triageData.hasCoords ? triageData.latitude : undefined,
+              longitude: triageData.hasCoords ? triageData.longitude : undefined,
+              emergencyType: details.emergencyType,
+              priority: "critical",
+              peopleAffected: details.peopleAffected,
+            });
+            setRapidNotice(
+              t(`Bluetooth BLE Beacon (${triageData.bleBeaconId}) broadcasting ${details.category.toUpperCase()} SOS for ${details.peopleAffected} person(s). Saved offline for auto-sync.`)
+            );
+          }}
+          onComplete={(category) => {
+            if (triageData.isOffline) {
+              setRapidNotice(
+                t(`Bluetooth BLE Beacon (${triageData.bleBeaconId}) active (${category.toUpperCase()} SOS). Saved in device outbox for auto-sync.`)
+              );
+              setTriageData(null);
+              return;
+            }
             redirectAfterRapidSos(triageData.publicCode, setLocation);
             setTriageData(null);
           }}
           onCancel={() => {
+            if (triageData.isOffline) {
+              void stopBleSosBeacon({ clearId: true });
+              setBleActive(false);
+            }
             setTriageData(null);
             setRapidStatus("idle");
             setRapidNotice(t("SOS cancelled. Emergency dispatch aborted."));

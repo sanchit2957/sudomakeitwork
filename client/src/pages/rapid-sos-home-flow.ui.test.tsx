@@ -87,5 +87,6 @@ describe("Home rapid-SOS success flow", () => {
     })));
     expect(runtime.mutateAsync).not.toHaveBeenCalled();
     expect(view.getByRole("status").textContent).toContain("BLE Beacon");
+    expect(await view.findByTestId("triage-option-medical")).toBeTruthy();
   });
 });
