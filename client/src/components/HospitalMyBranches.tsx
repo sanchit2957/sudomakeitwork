@@ -6,7 +6,6 @@ import {
   type HospitalBranchSubmitPayload,
 } from "./HospitalBranchForm";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import {
   AlertTriangle,
@@ -229,13 +228,13 @@ export function HospitalMyBranches({
                       <h2 className="text-base font-black text-foreground truncate">
                         {branch.organizationName || branch.name}
                       </h2>
-                      <Badge variant="outline" className="text-[10px] font-bold">
+                      <span className="inline-flex items-center rounded-md border border-border px-2 py-0.5 text-[10px] font-bold text-foreground">
                         {branch.branchName}
-                      </Badge>
+                      </span>
                       {branch.isPrimaryBranch && (
-                        <Badge className="bg-[#2457FF]/12 text-[#2457FF] border-0 text-[10px] font-bold">
+                        <span className="inline-flex items-center rounded-md bg-[#2457FF]/12 px-2 py-0.5 text-[10px] font-bold text-[#2457FF]">
                           Primary
-                        </Badge>
+                        </span>
                       )}
                     </div>
                     <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
