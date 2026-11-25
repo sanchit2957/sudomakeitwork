@@ -79,6 +79,17 @@ type HospitalRecord = {
   updatedAt: Date | string;
 };
 
+export type CanonicalHospitalStatus = "open" | "limited" | "critical" | "closed";
+
+export function normalizeHospitalStatus(raw?: string | null): CanonicalHospitalStatus {
+  if (!raw) return "open";
+  const lower = raw.toLowerCase().trim();
+  if (lower === "full" || lower === "critical") return "critical";
+  if (lower === "limited") return "limited";
+  if (lower === "closed") return "closed";
+  return "open";
+}
+
 type Draft = {
   availableEmergencyBeds: string;
   availableIcuBeds: string;
@@ -89,7 +100,7 @@ type Draft = {
   medicineSupplyStatus: SupplyStatus;
   waterSupplyStatus: SupplyStatus;
   powerBackupStatus: SupplyStatus;
-  status: HospitalRecord["status"];
+  status: CanonicalHospitalStatus;
 };
 
 const makeDraft = (hospital: HospitalRecord): Draft => ({
@@ -102,7 +113,7 @@ const makeDraft = (hospital: HospitalRecord): Draft => ({
   medicineSupplyStatus: hospital.medicineSupplyStatus,
   waterSupplyStatus: hospital.waterSupplyStatus,
   powerBackupStatus: hospital.powerBackupStatus,
-  status: hospital.status,
+  status: normalizeHospitalStatus(hospital.status),
 });
 
 const supplyItems = [
@@ -605,7 +616,7 @@ export function HospitalStaffDashboard({
                 <Hospital className="h-5 w-5" />
               </span>
               <Label className="mt-4 block text-sm font-extrabold text-foreground">Overall Facility Service Status</Label>
-              <Select value={draft.status} onValueChange={val => updateDraft("status", val as any)}>
+              <Select value={draft.status} onValueChange={val => updateDraft("status", normalizeHospitalStatus(val))}>
                 <SelectTrigger className="mt-3 h-12 text-sm font-bold">
                   <SelectValue />
                 </SelectTrigger>
