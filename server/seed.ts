@@ -215,98 +215,48 @@ export async function seedDatabase(): Promise<SeedResult> {
 
   const adminId = userIdMap["admin@assamrescue.gov.in"];
 
-  // 3. Hospitals (Idempotent)
-  const initialHospitals = [
-    {
-      name: "Gauhati Medical College & Hospital (GMCH)",
-      address: "Bhangagarh, Guwahati, Assam 781032",
-      contactPhone: "+91 361 2529457",
-      latitude: 26.1558,
-      longitude: 91.7645,
-      totalEmergencyBeds: 120,
-      availableEmergencyBeds: 34,
-      totalIcuBeds: 45,
-      availableIcuBeds: 12,
-      oxygenCylinderCount: 85,
-      bloodUnitCount: 140,
-      ambulanceCount: 14,
-      foodSupplyStatus: "available" as const,
-      medicineSupplyStatus: "available" as const,
-      waterSupplyStatus: "available" as const,
-      powerBackupStatus: "available" as const,
-      status: "open" as const,
-      updatedBy: adminId || null,
-    },
-    {
-      name: "Assam Medical College & Hospital (AMCH)",
-      address: "Barbari, Dibrugarh, Assam 786002",
-      contactPhone: "+91 373 2300080",
-      latitude: 27.4612,
-      longitude: 94.9215,
-      totalEmergencyBeds: 90,
-      availableEmergencyBeds: 28,
-      totalIcuBeds: 30,
-      availableIcuBeds: 8,
-      oxygenCylinderCount: 60,
-      bloodUnitCount: 95,
-      ambulanceCount: 10,
-      foodSupplyStatus: "available" as const,
-      medicineSupplyStatus: "available" as const,
-      waterSupplyStatus: "available" as const,
-      powerBackupStatus: "available" as const,
-      status: "open" as const,
-      updatedBy: adminId || null,
-    },
-  ];
+  // 3. Hospitals (Multi-tenant self-registration — no hardcoded legacy hospitals seeded)
+  const primaryHospitalId: number | null = null;
 
-  let primaryHospitalId: number | null = null;
-
-  for (const h of initialHospitals) {
-    const existing = await db
-      .select()
-      .from(hospitals)
-      .where(eq(hospitals.name, h.name))
-      .limit(1);
-
-    if (existing.length > 0) {
-      if (h.name.includes("GMCH")) primaryHospitalId = existing[0].id;
-    } else {
-      const [insertRes] = await db.insert(hospitals).values(h);
-      result.hospitalsSeeded++;
-      if (h.name.includes("GMCH")) primaryHospitalId = insertRes.insertId;
-      console.log(`[Seed] Seeded hospital: ${h.name}`);
-    }
-  }
-
-  // 4. Shelters (Idempotent)
+  // 4. Shelters (Idempotent Pan-India emergency relief camps)
   const initialShelters = [
     {
-      name: "Guwahati Central Relief Camp",
+      name: "Delhi Yamuna Bank Relief Camp",
+      address: "Akshardham Mayur Vihar Relief Sector, New Delhi, Delhi 110091",
+      latitude: 28.6127,
+      longitude: 77.2773,
+      capacity: 600,
+      occupancy: 120,
+      status: "open" as const,
+      createdBy: adminId || null,
+    },
+    {
+      name: "Mumbai Mithi River Civic Shelter",
+      address: "BKC MMRDA Ground, Bandra East, Mumbai, Maharashtra 400051",
+      latitude: 19.0652,
+      longitude: 72.8681,
+      capacity: 550,
+      occupancy: 180,
+      status: "open" as const,
+      createdBy: adminId || null,
+    },
+    {
+      name: "Chennai Adyar Coastal Relief Hub",
+      address: "Anna University Civic Hall, Guindy, Chennai, Tamil Nadu 600025",
+      latitude: 13.0108,
+      longitude: 80.2354,
+      capacity: 450,
+      occupancy: 90,
+      status: "open" as const,
+      createdBy: adminId || null,
+    },
+    {
+      name: "Guwahati North-East Relief Camp",
       address: "Khanapara Ground, GS Road, Guwahati, Assam 781022",
       latitude: 26.1264,
       longitude: 91.7992,
       capacity: 500,
       occupancy: 140,
-      status: "open" as const,
-      createdBy: adminId || null,
-    },
-    {
-      name: "Silchar Flood Evacuation Shelter",
-      address: "DSA Ground, Club Road, Silchar, Assam 788001",
-      latitude: 24.8333,
-      longitude: 92.7789,
-      capacity: 350,
-      occupancy: 95,
-      status: "open" as const,
-      createdBy: adminId || null,
-    },
-    {
-      name: "Dibrugarh Community Disaster Camp",
-      address: "Chowkidinghee Field, Dibrugarh, Assam 786001",
-      latitude: 27.4728,
-      longitude: 94.912,
-      capacity: 400,
-      occupancy: 210,
       status: "open" as const,
       createdBy: adminId || null,
     },
@@ -326,10 +276,10 @@ export async function seedDatabase(): Promise<SeedResult> {
     }
   }
 
-  // 6. Flood Zones (Idempotent)
+  // 6. Flood Zones (Idempotent Pan-India weather hazard watch sectors)
   const initialFloodZones = [
     {
-      name: "Brahmaputra Basin - Guwahati High Risk Sector",
+      name: "North-East Brahmaputra High Water Watch Sector",
       severity: "critical" as const,
       polygonJson: JSON.stringify([
         { lat: 26.185, lng: 91.72 },
@@ -356,72 +306,72 @@ export async function seedDatabase(): Promise<SeedResult> {
     }
   }
 
-  // 7. Donation Targets (Idempotent)
+  // 7. Donation Targets (Idempotent Pan-India official funds & NGOs)
   const initialTargets = [
     {
       type: "government" as const,
-      name: "Assam State Disaster Management Authority (ASDMA)",
-      description: "Official Disaster Relief & Flood Mitigation Fund under the Government of Assam. Coordinates emergency distribution and post-flood rehabilitation.",
-      latitude: 26.1445,
-      longitude: 91.7362,
-      upiId: "asdmarelief@sbi",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=asdmarelief@sbi%26pn=ASDMA%20Relief%20Fund%26cu=INR",
-      contactInfo: "State Emergency Operations Centre: 1070 / 1079 | Email: asdma-relief@assam.gov.in",
-      verified: true,
-    },
-    {
-      type: "government" as const,
-      name: "Chief Minister's Relief Fund (CMRF) Assam",
-      description: "Official humanitarian and emergency relief assistance fund operated directly by the Government of Assam.",
-      latitude: 26.1433,
-      longitude: 91.7898,
-      upiId: "cmrfassam@sbi",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=cmrfassam@sbi%26pn=Assam%20CMRF%26cu=INR",
-      contactInfo: "Secretariat Dispur: 0361-2237054 | cmrf@assam.gov.in",
-      verified: true,
-    },
-    {
-      type: "government" as const,
-      name: "District Disaster Management Authority (DDMA) Kamrup Metro",
-      description: "District level emergency response unit managing relief camps, drinking water tankers, and dry ration distribution in Kamrup Metro.",
-      latitude: 26.1865,
-      longitude: 91.7488,
-      upiId: "ddmakamrup@icici",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=ddmakamrup@icici%26pn=DDMA%20Kamrup%20Metro%26cu=INR",
-      contactInfo: "DDMA Control Room: 0361-2733052 / 1077",
+      name: "National Disaster Response Fund (NDMA / PMNRF India)",
+      description: "Official National Disaster Relief & Emergency Assistance Fund supporting NDRF deployment, cyclone shelters, flood mitigation, and multi-state rehabilitation.",
+      latitude: 28.5706,
+      longitude: 77.2219,
+      upiId: "pmnrf@centralbank",
+      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=pmnrf@centralbank%26pn=PMNRF%20India%20Relief%26cu=INR",
+      contactInfo: "NDMA National Control Room: 1078 / 011-26701728 | controlroom@ndma.gov.in",
       verified: true,
     },
     {
       type: "ngo" as const,
-      name: "Indian Red Cross Society (Assam State Branch)",
-      description: "Providing critical medical emergency kits, water purification units, hygiene packs, and cooked meals to marooned communities.",
-      latitude: 26.1890,
-      longitude: 91.7760,
-      upiId: "assamredcross@sbi",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=assamredcross@sbi%26pn=Assam%20Red%20Cross%26cu=INR",
-      contactInfo: "Chandmari Office: +91 94350 12345 | info@assamredcross.org",
+      name: "Indian Red Cross Society (National HQ)",
+      description: "Pan-India humanitarian network providing emergency medical kits, blood banks, water purification units, shelter tents, and family relief parcels.",
+      latitude: 28.6219,
+      longitude: 77.2099,
+      upiId: "ircsnhq@sbi",
+      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=ircsnhq@sbi%26pn=Indian%20Red%20Cross%20Society%26cu=INR",
+      contactInfo: "1 Red Cross Road, New Delhi 110001 | 011-23716441 | relief@indianredcross.org",
       verified: true,
     },
     {
       type: "ngo" as const,
-      name: "Goonj Assam Relief & Rehabilitation",
-      description: "Leading nationwide NGO deploying essential family survival kits, clothing packages, dignity kits, and dry rations across flood-hit districts.",
-      latitude: 26.1265,
-      longitude: 91.8170,
-      upiId: "goonjassam@hdfcbank",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=goonjassam@hdfcbank%26pn=Goonj%20Assam%26cu=INR",
-      contactInfo: "Khanapara Hub: +91 98640 54321 | assam@goonj.org",
+      name: "Goonj — Rahat Flood & Disaster Relief",
+      description: "Nationwide NGO mobilizing family survival kits, dry ration, hygiene & dignity essentials, tarpaulins, and grassroots rehabilitation across Indian states.",
+      latitude: 28.5326,
+      longitude: 77.2721,
+      upiId: "goonjrelief@hdfcbank",
+      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=goonjrelief@hdfcbank%26pn=Goonj%20Rahat%20Relief%26cu=INR",
+      contactInfo: "Sarita Vihar, New Delhi 110076 | 011-41401216 | mail@goonj.org",
       verified: true,
     },
     {
       type: "ngo" as const,
-      name: "Brahmaputra Flood Relief & Aid Network",
-      description: "Grassroots disaster foundation operating rescue boats, community kitchens, baby food supplies, and clothes collection centres.",
-      latitude: 24.8333,
-      longitude: 92.7789,
-      upiId: "brahmaputrarelief@axisbank",
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=brahmaputrarelief@axisbank%26pn=Brahmaputra%20Relief%26cu=INR",
-      contactInfo: "Silchar / Barak Valley Desk: +91 94351 98765 | aid@brahmaputrarelief.org",
+      name: "SEEDS India (Sustainable Environment & Ecological Development Society)",
+      description: "National disaster resilience organization delivering emergency transitional shelters, WASH sanitation kits, and community early warning support across India.",
+      latitude: 28.5473,
+      longitude: 77.1945,
+      upiId: "seedsindia@icici",
+      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=seedsindia@icici%26pn=SEEDS%20India%20Relief%26cu=INR",
+      contactInfo: "RK Puram, New Delhi | +91 11 2617 4272 | info@seedsindia.org",
+      verified: true,
+    },
+    {
+      type: "ngo" as const,
+      name: "Doctors For You — Emergency Medical Relief",
+      description: "Pan-India medical NGO deploying trauma doctors, mobile clinics, oxygen concentrators, and essential medicines into disaster-hit zones.",
+      latitude: 19.0436,
+      longitude: 72.9092,
+      upiId: "doctorsforyou@sbi",
+      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=doctorsforyou@sbi%26pn=Doctors%20For%20You%26cu=INR",
+      contactInfo: "Chembur, Mumbai 400071 | +91 22 2520 5550 | info@doctorsforyou.org",
+      verified: true,
+    },
+    {
+      type: "ngo" as const,
+      name: "Khalsa Aid India — Disaster Kitchens & Rescue",
+      description: "Humanitarian relief network operating 24/7 langar kitchens, rescue boats, drinking water tankers, and medical aid across India.",
+      latitude: 30.3398,
+      longitude: 76.3869,
+      upiId: "khalsaaidindia@axisbank",
+      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=khalsaaidindia@axisbank%26pn=Khalsa%20Aid%20India%26cu=INR",
+      contactInfo: "Patiala Hub, Punjab 147001 | india@khalsaaid.org",
       verified: true,
     },
   ];

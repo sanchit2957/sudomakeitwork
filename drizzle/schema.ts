@@ -244,8 +244,16 @@ export const hospitals = mysqlTable(
   "hospitals",
   {
     id: int("id").autoincrement().primaryKey(),
+    ownerUserId: int("ownerUserId").references(() => users.id),
+    organizationName: varchar("organizationName", { length: 180 }),
+    branchName: varchar("branchName", { length: 180 }),
+    registrationId: varchar("registrationId", { length: 120 }),
+    isPrimaryBranch: boolean("isPrimaryBranch").default(true).notNull(),
     name: varchar("name", { length: 180 }).notNull(),
     address: varchar("address", { length: 360 }).notNull(),
+    city: varchar("city", { length: 120 }),
+    state: varchar("state", { length: 120 }),
+    pincode: varchar("pincode", { length: 16 }),
     contactPhone: varchar("contactPhone", { length: 32 }),
     specialty: varchar("specialty", { length: 180 }).default("Trauma & Emergency Care").notNull(),
     latitude: double("latitude").notNull(),
@@ -262,10 +270,12 @@ export const hospitals = mysqlTable(
     waterSupplyStatus: mysqlEnum("waterSupplyStatus", ["available", "limited", "critical", "unavailable"]).default("available").notNull(),
     powerBackupStatus: mysqlEnum("powerBackupStatus", ["available", "limited", "critical", "unavailable"]).default("available").notNull(),
     status: mysqlEnum("status", ["open", "limited", "critical", "closed"]).default("open").notNull(),
+    isSahayVerified: boolean("isSahayVerified").default(true).notNull(),
     updatedBy: int("updatedBy").references(() => users.id),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => [index("hospitals_status_idx").on(table.status)],
+  table => [index("hospitals_status_idx").on(table.status), index("hospitals_ownerUserId_idx").on(table.ownerUserId)],
 );
 
 export const hospitalRegistrationRequests = mysqlTable(

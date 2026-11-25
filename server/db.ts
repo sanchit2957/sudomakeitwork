@@ -551,8 +551,16 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
       await execDdl(`
         CREATE TABLE IF NOT EXISTS \`hospitals\` (
           \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`ownerUserId\` INT NULL,
+          \`organizationName\` VARCHAR(180) NULL,
+          \`branchName\` VARCHAR(180) NULL,
+          \`registrationId\` VARCHAR(120) NULL,
+          \`isPrimaryBranch\` BOOLEAN NOT NULL DEFAULT TRUE,
           \`name\` VARCHAR(180) NOT NULL,
           \`address\` VARCHAR(360) NOT NULL,
+          \`city\` VARCHAR(120) NULL,
+          \`state\` VARCHAR(120) NULL,
+          \`pincode\` VARCHAR(16) NULL,
           \`contactPhone\` VARCHAR(32) NULL,
           \`specialty\` VARCHAR(180) NOT NULL DEFAULT 'Trauma & Emergency Care',
           \`latitude\` DOUBLE NOT NULL,
@@ -569,15 +577,28 @@ export async function ensureDatabaseSchema(pool: mysql.Pool) {
           \`waterSupplyStatus\` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available',
           \`powerBackupStatus\` ENUM('available', 'limited', 'critical', 'unavailable') NOT NULL DEFAULT 'available',
           \`status\` ENUM('open', 'limited', 'critical', 'closed') NOT NULL DEFAULT 'open',
+          \`isSahayVerified\` BOOLEAN NOT NULL DEFAULT TRUE,
           \`updatedBy\` INT NULL,
+          \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
           \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          INDEX \`hospitals_status_idx\` (\`status\`)
+          INDEX \`hospitals_status_idx\` (\`status\`),
+          INDEX \`hospitals_ownerUserId_idx\` (\`ownerUserId\`)
         )
       `, "ensureSchema_createHospitals");
 
       try {
         const [hCols]: any = await withDbTimeout(conn.query("SHOW COLUMNS FROM `hospitals`"), 4000, "ensureSchema_showHCols");
         const hColNames = new Set((hCols || []).map((c: any) => c.Field));
+        if (!hColNames.has("ownerUserId")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `ownerUserId` INT NULL", "addCol_hospitals_ownerUserId");
+        if (!hColNames.has("organizationName")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `organizationName` VARCHAR(180) NULL", "addCol_hospitals_organizationName");
+        if (!hColNames.has("branchName")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `branchName` VARCHAR(180) NULL", "addCol_hospitals_branchName");
+        if (!hColNames.has("registrationId")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `registrationId` VARCHAR(120) NULL", "addCol_hospitals_registrationId");
+        if (!hColNames.has("isPrimaryBranch")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `isPrimaryBranch` BOOLEAN NOT NULL DEFAULT TRUE", "addCol_hospitals_isPrimaryBranch");
+        if (!hColNames.has("city")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `city` VARCHAR(120) NULL", "addCol_hospitals_city");
+        if (!hColNames.has("state")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `state` VARCHAR(120) NULL", "addCol_hospitals_state");
+        if (!hColNames.has("pincode")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `pincode` VARCHAR(16) NULL", "addCol_hospitals_pincode");
+        if (!hColNames.has("isSahayVerified")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `isSahayVerified` BOOLEAN NOT NULL DEFAULT TRUE", "addCol_hospitals_isSahayVerified");
+        if (!hColNames.has("createdAt")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP", "addCol_hospitals_createdAt");
         if (!hColNames.has("specialty")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `specialty` VARCHAR(180) NOT NULL DEFAULT 'Trauma & Emergency Care'", "addCol_hospitals_specialty");
         if (!hColNames.has("contactPhone")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `contactPhone` VARCHAR(32) NULL", "addCol_hospitals_contactPhone");
         if (!hColNames.has("totalEmergencyBeds")) await execDdl("ALTER TABLE `hospitals` ADD COLUMN `totalEmergencyBeds` INT NOT NULL DEFAULT 0", "addCol_hospitals_totalEmergencyBeds");
@@ -869,7 +890,7 @@ export const _memoryUsers: Map<string, any> = new Map([
     {
       id: 3,
       openId: "user-hospital",
-      name: "GMCH Emergency Desk",
+      name: "Hospital Operations Officer",
       email: "hospital@assamrescue.gov.in",
       password: defaultHospitalHash,
       role: "hospital",
@@ -1185,8 +1206,8 @@ export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat
             contactSharing: "yes",
             locationSharing: "yes",
             availability: "available",
-            lastLatitude: 26.1445,
-            lastLongitude: 91.7362,
+            lastLatitude: null,
+            lastLongitude: null,
             locationUpdatedAt: new Date(),
           }),
           4000,
@@ -1213,82 +1234,16 @@ export async function ensureRescuerProfile(userId: number, callSign = "NDRF Boat
       contactSharing: "yes",
       locationSharing: "yes",
       availability: "available",
-      lastLatitude: 26.1445,
-      lastLongitude: 91.7362,
+      lastLatitude: null,
+      lastLongitude: null,
     });
   } catch { }
 }
 
-export async function ensureHospitalStaffProfile(userId: number) {
-  const db = await getDb();
-  if (db) {
-    try {
-      const { hospitalStaffProfiles, hospitals } = await import("../drizzle/schema");
-      const existing = await withDbTimeout(
-        db.select().from(hospitalStaffProfiles).where(eq(hospitalStaffProfiles.userId, userId)).limit(1),
-        4000,
-        "ensureHospitalStaffProfile_check"
-      );
-      if (!existing.length) {
-        let hospitalList = await withDbTimeout(
-          db.select().from(hospitals).limit(1),
-          4000,
-          "ensureHospitalStaffProfile_listHosp"
-        );
-        let hospitalId: number;
-        if (!hospitalList.length) {
-          const [newHospital] = await withDbTimeout(
-            db.insert(hospitals).values({
-              name: "Gauhati Medical College & Hospital (GMCH)",
-              address: "Bhangagarh, Guwahati, Assam 781032",
-              contactPhone: "+91 361 2529457",
-              latitude: 26.1558,
-              longitude: 91.7645,
-              totalEmergencyBeds: 120,
-              availableEmergencyBeds: 34,
-              totalIcuBeds: 45,
-              availableIcuBeds: 12,
-              oxygenCylinderCount: 85,
-              bloodUnitCount: 140,
-              ambulanceCount: 14,
-              status: "open",
-            }),
-            4000,
-            "ensureHospitalStaffProfile_insertHosp"
-          );
-          hospitalId = newHospital.insertId;
-        } else {
-          hospitalId = hospitalList[0].id;
-        }
-
-        await withDbTimeout(
-          db.insert(hospitalStaffProfiles).values({
-            userId,
-            hospitalId,
-            designation: "Emergency Medical Coordinator",
-          }),
-          4000,
-          "ensureHospitalStaffProfile_insertStaff"
-        );
-      }
-      return;
-    } catch (error) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(`Database hospital staff profile failed: ${(error as Error)?.message || "Unknown database error"}`);
-      }
-    }
-  }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Authoritative database is unavailable.");
-  }
-  try {
-    const { registerMemoryHospitalStaffProfile } = await import("./rescue.db");
-    registerMemoryHospitalStaffProfile({
-      userId,
-      hospitalId: 1,
-      designation: "Emergency Medical Coordinator",
-    });
-  } catch { }
+export async function ensureHospitalStaffProfile(_userId: number) {
+  // Multi-tenant onboarding: do NOT bind new hospital officers to any legacy/default hospital.
+  // Officers start with 0 branches and register their own facilities self-service on /hospital.
+  return;
 }
 
 export const _memoryEmergencyContacts: Map<number, EmergencyContact> = new Map([

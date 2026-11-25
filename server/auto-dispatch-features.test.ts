@@ -235,21 +235,55 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
   });
 
   describe("4. Hospital Data & Rescuer-Hospital Handoff", () => {
+    beforeEach(() => {
+      _memoryHospitals.clear();
+      _memoryHospitals.set(1, {
+        id: 1,
+        ownerUserId: 3,
+        organizationName: "Apex Metro Hospital",
+        branchName: "Main Campus",
+        name: "Apex Metro Hospital — Main Campus",
+        address: "MG Road, Bengaluru, Karnataka 560001",
+        city: "Bengaluru",
+        state: "Karnataka",
+        pincode: "560001",
+        contactPhone: "+91 80 2222 1111",
+        specialty: "Trauma, Emergency & Critical Care",
+        latitude: 12.9716,
+        longitude: 77.5946,
+        totalEmergencyBeds: 120,
+        availableEmergencyBeds: 34,
+        totalIcuBeds: 45,
+        availableIcuBeds: 12,
+        oxygenCylinderCount: 85,
+        bloodUnitCount: 140,
+        ambulanceCount: 14,
+        foodSupplyStatus: "available",
+        medicineSupplyStatus: "available",
+        waterSupplyStatus: "available",
+        powerBackupStatus: "available",
+        status: "open",
+        isSahayVerified: true,
+        updatedBy: 1,
+        updatedAt: new Date(),
+      });
+    });
+
     it("returns all 6 hospital fields in listHospitals", async () => {
       const hospitals = await listHospitals();
       expect(hospitals.length).toBeGreaterThan(0);
 
-      const gmch = hospitals.find(h => h.name.includes("GMCH")) || hospitals[0];
-      expect(gmch.name).toBeDefined();
-      expect(gmch.address).toBeDefined();
-      expect(gmch.latitude).toBeDefined();
-      expect(gmch.longitude).toBeDefined();
-      expect(gmch.totalEmergencyBeds).toBeGreaterThan(0);
-      expect(gmch.availableEmergencyBeds).toBeDefined();
-      expect(gmch.totalIcuBeds).toBeGreaterThan(0);
-      expect(gmch.availableIcuBeds).toBeDefined();
-      expect(gmch.specialty).toBeDefined();
-      expect(gmch.contactPhone).toBeDefined();
+      const primary = hospitals[0];
+      expect(primary.name).toBeDefined();
+      expect(primary.address).toBeDefined();
+      expect(primary.latitude).toBeDefined();
+      expect(primary.longitude).toBeDefined();
+      expect(primary.totalEmergencyBeds).toBeGreaterThan(0);
+      expect(primary.availableEmergencyBeds).toBeDefined();
+      expect(primary.totalIcuBeds).toBeGreaterThan(0);
+      expect(primary.availableIcuBeds).toBeDefined();
+      expect(primary.specialty).toBeDefined();
+      expect(primary.contactPhone).toBeDefined();
     });
 
     it("assigns destination hospital to incident and records handoff event", async () => {
@@ -259,9 +293,9 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
         publicCode: "SOS-HOSP001",
         reporterId: 1,
         contactName: "Victim C",
-        locationLabel: "Dispur Field",
-        latitude: 26.14,
-        longitude: 91.77,
+        locationLabel: "MG Road Sector",
+        latitude: 12.9716,
+        longitude: 77.5946,
         emergencyType: "medical",
         requestCategory: "medical",
         helpNeeds: "Trauma case",
@@ -292,11 +326,11 @@ describe("Auto-Assignment, Hospital Panel, Live Tracking & Post-Rescue Check-in"
 
       const res = await setIncidentDestinationHospital(701, 1, 101);
       expect(res.success).toBe(true);
-      expect(res.hospital.name).toContain("Gauhati Medical College");
+      expect(res.hospital.name).toContain("Apex Metro Hospital");
 
       const inc = _memoryIncidents.get(701);
       expect(inc?.destinationHospitalId).toBe(1);
-      expect(inc?.destinationHospitalName).toContain("Gauhati Medical College");
+      expect(inc?.destinationHospitalName).toContain("Apex Metro Hospital");
     });
   });
 

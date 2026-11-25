@@ -54,8 +54,8 @@ export function calculateRiskScore(
  * Returns a consolidated snapshot of flood conditions and risk intelligence.
  */
 export async function getConsolidatedFloodConditions(
-  latitude: number = 26.1445,
-  longitude: number = 91.7362
+  latitude: number = 20.5937,
+  longitude: number = 78.9629
 ) {
   let activeZonesCount = 0;
   try {
@@ -101,7 +101,7 @@ export async function getConsolidatedFloodConditions(
     location: {
       latitude: weatherReport.location.latitude,
       longitude: weatherReport.location.longitude,
-      name: weatherReport.location.name || "Assam Emergency Sector",
+      name: weatherReport.location.name || "Pan-India Emergency Sector",
     },
     overallRisk,
     riskScore,
@@ -139,8 +139,8 @@ export async function getConsolidatedFloodConditions(
  * Evaluates current flood risk against historical alert state for duplicate suppression & escalation.
  */
 export async function getFloodAlertStatus(
-  latitude: number = 26.1445,
-  longitude: number = 91.7362
+  latitude: number = 20.5937,
+  longitude: number = 78.9629
 ) {
   const snapshot = await getConsolidatedFloodConditions(latitude, longitude);
   const locationKey = getLocationKey(latitude, longitude);
@@ -248,8 +248,8 @@ export function registerFloodRoutes(app: Express) {
   // GET /api/flood/conditions
   app.get("/api/flood/conditions", async (req: Request, res: Response) => {
     try {
-      const lat = req.query.latitude ? parseFloat(String(req.query.latitude)) : 26.1445;
-      const lng = req.query.longitude ? parseFloat(String(req.query.longitude)) : 91.7362;
+      const lat = req.query.latitude ? parseFloat(String(req.query.latitude)) : 20.5937;
+      const lng = req.query.longitude ? parseFloat(String(req.query.longitude)) : 78.9629;
 
       const result = await getConsolidatedFloodConditions(lat, lng);
       return res.json(result);
@@ -262,8 +262,8 @@ export function registerFloodRoutes(app: Express) {
   // GET /api/flood/alert-status
   app.get("/api/flood/alert-status", async (req: Request, res: Response) => {
     try {
-      const lat = req.query.latitude ? parseFloat(String(req.query.latitude)) : 26.1445;
-      const lng = req.query.longitude ? parseFloat(String(req.query.longitude)) : 91.7362;
+      const lat = req.query.latitude ? parseFloat(String(req.query.latitude)) : 20.5937;
+      const lng = req.query.longitude ? parseFloat(String(req.query.longitude)) : 78.9629;
 
       const result = await getFloodAlertStatus(lat, lng);
       return res.json(result);
@@ -280,8 +280,8 @@ export function registerFloodRoutes(app: Express) {
       const actualEventType = eventType ? String(eventType) : "flood_automation_event";
       const actualRiskLevel = riskLevel ? String(riskLevel) : "unknown";
 
-      const lat = typeof latitude === "number" ? latitude : 26.1445;
-      const lng = typeof longitude === "number" ? longitude : 91.7362;
+      const lat = typeof latitude === "number" ? latitude : 20.5937;
+      const lng = typeof longitude === "number" ? longitude : 78.9629;
       const locationKey = getLocationKey(lat, lng);
 
       await writeAudit(

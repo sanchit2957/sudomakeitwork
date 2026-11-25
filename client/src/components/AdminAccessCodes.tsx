@@ -225,7 +225,7 @@ export function AdminAccessCodes() {
                     type="text"
                     value={rescuerCustomCode}
                     onChange={(e) => setRescuerCustomCode(e.target.value)}
-                    placeholder="e.g. ASSAM-SDRF-2026"
+                    placeholder="e.g. SAHAY-RESC-2026"
                     className="h-10 rounded-xl font-mono text-xs font-bold"
                   />
                   <Button
@@ -347,7 +347,7 @@ export function AdminAccessCodes() {
                     type="text"
                     value={hospitalCustomCode}
                     onChange={(e) => setHospitalCustomCode(e.target.value)}
-                    placeholder="e.g. ASSAM-MED-2026"
+                    placeholder="e.g. SAHAY-HOSP-2026"
                     className="h-10 rounded-xl font-mono text-xs font-bold glass-card border-[#E2E8F0]/30"
                   />
                   <Button

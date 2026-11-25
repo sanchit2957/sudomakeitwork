@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { donationTargets, donations, DonationTarget, Donation } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { sdk } from "../_core/sdk";
+import { INDIA_CENTER } from "../../shared/india-locations";
 
 export const NO_PHONE_FALLBACK = "Contact number not listed — reach out via address";
 
@@ -28,15 +29,18 @@ export type NgoResult = {
   phone: string;
   latitude: number;
   longitude: number;
+  city?: string;
+  state?: string;
+  scope?: "national" | "regional";
   distanceKm?: number;
   distance?: string;
 };
 
 export function getSeedNgos(): NgoResult[] {
   const possiblePaths = [
-    path.resolve(process.cwd(), "server/data/assam_ngos.json"),
-    path.resolve(process.cwd(), "data/assam_ngos.json"),
-    new URL("../data/assam_ngos.json", import.meta.url).pathname,
+    path.resolve(process.cwd(), "server/data/indian_ngos.json"),
+    path.resolve(process.cwd(), "data/indian_ngos.json"),
+    new URL("../data/indian_ngos.json", import.meta.url).pathname,
   ];
 
   for (const filePath of possiblePaths) {
@@ -51,6 +55,9 @@ export function getSeedNgos(): NgoResult[] {
             phone: item.phone && String(item.phone).trim().length > 0 ? String(item.phone).trim() : NO_PHONE_FALLBACK,
             latitude: Number(item.latitude),
             longitude: Number(item.longitude),
+            city: item.city ? String(item.city).trim() : undefined,
+            state: item.state ? String(item.state).trim() : undefined,
+            scope: item.scope === "national" ? "national" : "regional",
           }));
         }
       }
@@ -59,42 +66,77 @@ export function getSeedNgos(): NgoResult[] {
     }
   }
 
-  // Built-in verified in-memory fallback
+  // Built-in Pan-India verified in-memory fallback
   return [
     {
-      name: "Indian Red Cross Society (Assam State Branch)",
-      address: "Red Cross Bhawan, Chandmari, Guwahati, Kamrup Metropolitan, Assam 781003",
-      phone: "+91 361 266 5115",
-      latitude: 26.1890,
-      longitude: 91.7760,
+      name: "Indian Red Cross Society (National HQ)",
+      address: "1 Red Cross Road, Sansad Marg, New Delhi, Delhi 110001",
+      phone: "+91 11 2371 6441",
+      latitude: 28.6219,
+      longitude: 77.2099,
+      city: "New Delhi",
+      state: "Delhi",
+      scope: "national",
     },
     {
-      name: "Goonj Assam Disaster Relief & Humanitarian Hub",
-      address: "Opposite Administrative Staff College, Khanapara, GS Road, Guwahati, Assam 781022",
-      phone: "+91 98640 54321",
-      latitude: 26.1265,
-      longitude: 91.8170,
+      name: "Goonj — National Disaster Relief & Rahat Hub",
+      address: "J-93, Sarita Vihar, New Delhi, Delhi 110076",
+      phone: "+91 11 4140 1216",
+      latitude: 28.5326,
+      longitude: 77.2721,
+      city: "New Delhi",
+      state: "Delhi",
+      scope: "national",
     },
     {
-      name: "Brahmaputra Foundation & Flood Relief Network",
-      address: "Tarapur Main Road, Silchar, Cachar, Assam 788003",
-      phone: "+91 94351 98765",
-      latitude: 24.8333,
-      longitude: 92.7789,
+      name: "SEEDS India (Disaster Resilience & Shelter Aid)",
+      address: "15A Institutional Area, Sector IV, R.K. Puram, New Delhi, Delhi 110022",
+      phone: "+91 11 2617 4272",
+      latitude: 28.5473,
+      longitude: 77.1945,
+      city: "New Delhi",
+      state: "Delhi",
+      scope: "national",
     },
     {
-      name: "Aaranyak (Community Relief & Conservation Wing)",
-      address: "13 Tayab Ali Byelane, Bishnu Rabha Path, Beltola, Guwahati, Assam 781028",
-      phone: "+91 361 223 0250",
-      latitude: 26.1368,
-      longitude: 91.7925,
+      name: "Rapid Response India",
+      address: "18/21, Perambur High Road, Jamalia, Chennai, Tamil Nadu 600012",
+      phone: "+91 44 2662 4444",
+      latitude: 13.1067,
+      longitude: 80.2449,
+      city: "Chennai",
+      state: "Tamil Nadu",
+      scope: "national",
     },
     {
-      name: "Snehalaya Child & Community Welfare Centre",
-      address: "Dhirenpara, Fatasil Ambari, Guwahati, Assam 781025",
-      phone: "+91 361 247 1850",
-      latitude: 26.1550,
-      longitude: 91.7240,
+      name: "Doctors For You — Emergency Medical Relief",
+      address: "Flat 401, Sahayog CHS, Chembur East, Mumbai, Maharashtra 400071",
+      phone: "+91 22 2520 5550",
+      latitude: 19.0436,
+      longitude: 72.9092,
+      city: "Mumbai",
+      state: "Maharashtra",
+      scope: "national",
+    },
+    {
+      name: "Khalsa Aid India — Humanitarian & Rescue Operations",
+      address: "Nabha Road, Patiala, Punjab 147001",
+      phone: "+91 175 230 0786",
+      latitude: 30.3398,
+      longitude: 76.3869,
+      city: "Patiala",
+      state: "Punjab",
+      scope: "national",
+    },
+    {
+      name: "Hemkunt Foundation — Disaster Oxygen & Rescue Relief",
+      address: "Sector 45, Gurugram, Haryana 122003",
+      phone: "+91 99906 91313",
+      latitude: 28.4451,
+      longitude: 77.0652,
+      city: "Gurugram",
+      state: "Haryana",
+      scope: "national",
     },
   ];
 }
@@ -111,7 +153,7 @@ export async function fetchLocationIqNgos(lat: number, lon: number): Promise<Ngo
   try {
     const url = `https://us1.locationiq.com/v1/nearby?key=${encodeURIComponent(apiKey)}&lat=${lat}&lon=${lon}&tag=ngo,social_facility,charity,community_centre&radius=50000&format=json`;
     const response = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "AssamRescuePlatform/1.0" },
+      headers: { Accept: "application/json", "User-Agent": "SahayEmergencyPlatform/2.0" },
       signal: AbortSignal.timeout(5000),
     });
 
@@ -127,7 +169,7 @@ export async function fetchLocationIqNgos(lat: number, lon: number): Promise<Ngo
 
     return data.map((item: any) => {
       const name = item.namedetails?.name || item.name || item.display_name?.split(",")?.[0] || "Community Relief NGO";
-      const address = item.display_name || item.address?.state || "Assam, India";
+      const address = item.display_name || item.address?.state || "India";
       const rawPhone = item.extratags?.phone || item.extratags?.["contact:phone"] || item.extratags?.telephone || "";
       const phone = rawPhone && String(rawPhone).trim().length > 0 ? String(rawPhone).trim() : NO_PHONE_FALLBACK;
 
@@ -137,6 +179,9 @@ export async function fetchLocationIqNgos(lat: number, lon: number): Promise<Ngo
         phone,
         latitude: parseFloat(item.lat),
         longitude: parseFloat(item.lon),
+        city: item.address?.city || item.address?.town || undefined,
+        state: item.address?.state || undefined,
+        scope: "regional",
       };
     });
   } catch (error) {
@@ -146,9 +191,13 @@ export async function fetchLocationIqNgos(lat: number, lon: number): Promise<Ngo
 }
 
 /**
- * Merges LocationIQ live results with verified seed dataset and sorts by distance.
+ * Merges LocationIQ live results with verified Pan-India NGO dataset and sorts by distance.
  */
-export async function getNearbyNgos(userLat: number, userLon: number): Promise<NgoResult[]> {
+export async function getNearbyNgos(
+  userLat: number,
+  userLon: number,
+  options?: { scope?: "national" | "regional" | "all" }
+): Promise<NgoResult[]> {
   const seedList = getSeedNgos();
   const liveList = await fetchLocationIqNgos(userLat, userLon);
 
@@ -161,7 +210,7 @@ export async function getNearbyNgos(userLat: number, userLon: number): Promise<N
     combinedMap.set(key, item);
   }
 
-  // Merge seed results (ensuring verified info is retained)
+  // Merge seed results (ensuring verified metadata like national scope is retained)
   for (const seed of seedList) {
     const key = seed.name.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!combinedMap.has(key)) {
@@ -169,8 +218,14 @@ export async function getNearbyNgos(userLat: number, userLon: number): Promise<N
     }
   }
 
+  const scopeFilter = options?.scope;
+  const filtered = Array.from(combinedMap.values()).filter(ngo => {
+    if (!scopeFilter || scopeFilter === "all") return true;
+    return (ngo.scope || "regional") === scopeFilter;
+  });
+
   // Calculate distance and format response
-  const results: NgoResult[] = Array.from(combinedMap.values()).map(ngo => {
+  const results: NgoResult[] = filtered.map(ngo => {
     const distanceKm = haversineDistanceKm(userLat, userLon, ngo.latitude, ngo.longitude);
     const distance = `${distanceKm.toFixed(1)} km away`;
     return {
@@ -179,6 +234,9 @@ export async function getNearbyNgos(userLat: number, userLon: number): Promise<N
       phone: ngo.phone || NO_PHONE_FALLBACK,
       latitude: ngo.latitude,
       longitude: ngo.longitude,
+      city: ngo.city,
+      state: ngo.state,
+      scope: ngo.scope || "regional",
       distanceKm: parseFloat(distanceKm.toFixed(2)),
       distance,
     };
@@ -192,73 +250,73 @@ export const initialDonationTargets: Omit<DonationTarget, "createdAt">[] = [
   {
     id: 1,
     type: "government",
-    name: "Assam State Disaster Management Authority (ASDMA)",
-    description: "Official Disaster Relief & Flood Mitigation Fund under the Government of Assam. Coordinates emergency distribution and post-flood rehabilitation.",
-    latitude: 26.1445,
-    longitude: 91.7362,
-    upiId: "asdmarelief@sbi",
-    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=asdmarelief@sbi%26pn=ASDMA%20Relief%20Fund%26cu=INR",
-    contactInfo: "State Emergency Operations Centre: 1070 / 1079 | Email: asdma-relief@assam.gov.in",
+    name: "National Disaster Response Fund (NDMA / PMNRF India)",
+    description: "Official National Disaster Relief & Emergency Assistance Fund supporting NDRF deployment, flood mitigation, and multi-state rehabilitation.",
+    latitude: 28.5706,
+    longitude: 77.2219,
+    upiId: "pmnrf@centralbank",
+    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=pmnrf@centralbank%26pn=PMNRF%20India%20Relief%26cu=INR",
+    contactInfo: "NDMA National Control Room: 1078 / 011-26701728 | controlroom@ndma.gov.in",
     verified: true,
   },
   {
     id: 2,
-    type: "government",
-    name: "Chief Minister's Relief Fund (CMRF) Assam",
-    description: "Official humanitarian and emergency relief assistance fund operated directly by the Government of Assam.",
-    latitude: 26.1433,
-    longitude: 91.7898,
-    upiId: "cmrfassam@sbi",
-    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=cmrfassam@sbi%26pn=Assam%20CMRF%26cu=INR",
-    contactInfo: "Secretariat Dispur: 0361-2237054 | cmrf@assam.gov.in",
+    type: "ngo",
+    name: "Indian Red Cross Society (National HQ)",
+    description: "Pan-India humanitarian network providing emergency medical kits, blood banks, water purification units, and family relief parcels.",
+    latitude: 28.6219,
+    longitude: 77.2099,
+    upiId: "ircsnhq@sbi",
+    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=ircsnhq@sbi%26pn=Indian%20Red%20Cross%20Society%26cu=INR",
+    contactInfo: "1 Red Cross Road, New Delhi 110001 | 011-23716441 | relief@indianredcross.org",
     verified: true,
   },
   {
     id: 3,
-    type: "government",
-    name: "District Disaster Management Authority (DDMA) Kamrup Metro",
-    description: "District level emergency response unit managing relief camps, drinking water tankers, and dry ration distribution in Kamrup Metro.",
-    latitude: 26.1865,
-    longitude: 91.7488,
-    upiId: "ddmakamrup@icici",
-    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=ddmakamrup@icici%26pn=DDMA%20Kamrup%20Metro%26cu=INR",
-    contactInfo: "DDMA Control Room: 0361-2733052 / 1077",
+    type: "ngo",
+    name: "Goonj — Rahat Flood & Disaster Relief",
+    description: "Leading nationwide NGO deploying essential family survival kits, clothing packages, dignity kits, and dry rations across India.",
+    latitude: 28.5326,
+    longitude: 77.2721,
+    upiId: "goonjrelief@hdfcbank",
+    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=goonjrelief@hdfcbank%26pn=Goonj%20Rahat%20Relief%26cu=INR",
+    contactInfo: "Sarita Vihar, New Delhi 110076 | 011-41401216 | mail@goonj.org",
     verified: true,
   },
   {
     id: 4,
     type: "ngo",
-    name: "Indian Red Cross Society (Assam State Branch)",
-    description: "Providing critical medical emergency kits, water purification units, hygiene packs, and cooked meals to marooned communities.",
-    latitude: 26.1890,
-    longitude: 91.7760,
-    upiId: "assamredcross@sbi",
-    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=assamredcross@sbi%26pn=Assam%20Red%20Cross%26cu=INR",
-    contactInfo: "Chandmari Office: +91 94350 12345 | info@assamredcross.org",
+    name: "SEEDS India (Disaster Resilience & Shelter Aid)",
+    description: "Pan-India disaster resilience organization delivering emergency shelters, WASH sanitation kits, and community response.",
+    latitude: 28.5473,
+    longitude: 77.1945,
+    upiId: "seedsindia@icici",
+    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=seedsindia@icici%26pn=SEEDS%20India%20Relief%26cu=INR",
+    contactInfo: "RK Puram, New Delhi | +91 11 2617 4272 | info@seedsindia.org",
     verified: true,
   },
   {
     id: 5,
     type: "ngo",
-    name: "Goonj Assam Relief & Rehabilitation",
-    description: "Leading nationwide NGO deploying essential family survival kits, clothing packages, dignity kits, and dry rations across flood-hit districts.",
-    latitude: 26.1265,
-    longitude: 91.8170,
-    upiId: "goonjassam@hdfcbank",
-    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=goonjassam@hdfcbank%26pn=Goonj%20Assam%26cu=INR",
-    contactInfo: "Khanapara Hub: +91 98640 54321 | assam@goonj.org",
+    name: "Doctors For You — Emergency Medical Relief",
+    description: "Pan-India medical relief NGO deploying trauma doctors, mobile clinics, oxygen concentrators, and essential medicines.",
+    latitude: 19.0436,
+    longitude: 72.9092,
+    upiId: "doctorsforyou@sbi",
+    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=doctorsforyou@sbi%26pn=Doctors%20For%20You%26cu=INR",
+    contactInfo: "Chembur, Mumbai 400071 | +91 22 2520 5550 | info@doctorsforyou.org",
     verified: true,
   },
   {
     id: 6,
     type: "ngo",
-    name: "Brahmaputra Flood Relief & Aid Network",
-    description: "Grassroots disaster foundation operating rescue boats, community kitchens, baby food supplies, and clothes collection centres.",
-    latitude: 24.8333,
-    longitude: 92.7789,
-    upiId: "brahmaputrarelief@axisbank",
-    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=brahmaputrarelief@axisbank%26pn=Brahmaputra%20Relief%26cu=INR",
-    contactInfo: "Silchar / Barak Valley Desk: +91 94351 98765 | aid@brahmaputrarelief.org",
+    name: "Khalsa Aid India — Disaster Kitchens & Rescue",
+    description: "Humanitarian foundation operating rescue boats, 24/7 community kitchens, drinking water tankers, and relief supply centres across India.",
+    latitude: 30.3398,
+    longitude: 76.3869,
+    upiId: "khalsaaidindia@axisbank",
+    qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=khalsaaidindia@axisbank%26pn=Khalsa%20Aid%20India%26cu=INR",
+    contactInfo: "Patiala Hub, Punjab 147001 | india@khalsaaid.org",
     verified: true,
   },
 ];
@@ -360,14 +418,16 @@ const handleNearbyNgos = async (req: Request, res: Response) => {
   try {
     const latParam = req.query.lat ?? req.query.latitude;
     const lonParam = req.query.lon ?? req.query.lng ?? req.query.longitude;
+    const scopeParam = typeof req.query.scope === "string" ? req.query.scope.toLowerCase() : undefined;
 
-    const lat = latParam !== undefined ? parseFloat(String(latParam)) : 26.1445;
-    const lon = lonParam !== undefined ? parseFloat(String(lonParam)) : 91.7362;
+    const lat = latParam !== undefined ? parseFloat(String(latParam)) : INDIA_CENTER.lat;
+    const lon = lonParam !== undefined ? parseFloat(String(lonParam)) : INDIA_CENTER.lng;
 
-    const validLat = !isNaN(lat) ? lat : 26.1445;
-    const validLon = !isNaN(lon) ? lon : 91.7362;
+    const validLat = !isNaN(lat) ? lat : INDIA_CENTER.lat;
+    const validLon = !isNaN(lon) ? lon : INDIA_CENTER.lng;
+    const scope = scopeParam === "national" || scopeParam === "regional" || scopeParam === "all" ? scopeParam : "all";
 
-    const nearbyNgos = await getNearbyNgos(validLat, validLon);
+    const nearbyNgos = await getNearbyNgos(validLat, validLon, { scope });
     res.json(nearbyNgos);
   } catch (error) {
     console.error("[Donations] Error resolving nearby NGOs:", error);

@@ -30,6 +30,10 @@ export type OperationalLayers = {
   hospitals: Array<{
     id: number;
     name: string;
+    organizationName?: string | null;
+    branchName?: string | null;
+    city?: string | null;
+    state?: string | null;
     address: string;
     contactPhone?: string | null;
     specialty?: string;
@@ -77,11 +81,17 @@ export default function OperationsMap({
   onPickLocation,
   className,
   compact = false,
+  focusCenter = null,
+  focusZoom,
+  highlightedHospitalId = null,
 }: {
   layers?: OperationalLayers;
   onPickLocation?: (point: Point) => void;
   className?: string;
   compact?: boolean;
+  focusCenter?: Point | null;
+  focusZoom?: number;
+  highlightedHospitalId?: number | null;
 }) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
@@ -124,9 +134,11 @@ export default function OperationsMap({
           if (!isMounted || !mapContainer.current) return;
 
           if (gMaps && gMaps.Map) {
+            const initialCenter = focusCenter ?? INDIA_CENTER;
+            const initialZoom = focusZoom ?? (focusCenter ? 13 : 5);
             const map = new gMaps.Map(mapContainer.current, {
-              center: { lat: INDIA_CENTER.lat, lng: INDIA_CENTER.lng },
-              zoom: compact ? 5 : 5,
+              center: { lat: initialCenter.lat, lng: initialCenter.lng },
+              zoom: initialZoom,
               mapTypeControl: true,
               fullscreenControl: true,
               zoomControl: true,
@@ -167,9 +179,11 @@ export default function OperationsMap({
         const L = (await import("leaflet")).default;
         if (!isMounted || !mapContainer.current) return;
 
+        const initialCenter = focusCenter ?? INDIA_CENTER;
+        const initialZoom = focusZoom ?? (focusCenter ? 13 : 5);
         const map = L.map(mapContainer.current, {
-          center: [INDIA_CENTER.lat, INDIA_CENTER.lng],
-          zoom: compact ? 5 : 5,
+          center: [initialCenter.lat, initialCenter.lng],
+          zoom: initialZoom,
           zoomControl: true,
           attributionControl: true,
         });
@@ -249,6 +263,24 @@ export default function OperationsMap({
       }
     };
   }, [compact]);
+
+  // Smoothly recenter map when focusCenter or focusZoom updates (e.g. branch switch or live GPS)
+  useEffect(() => {
+    if (!focusCenter || !Number.isFinite(focusCenter.lat) || !Number.isFinite(focusCenter.lng)) return;
+    const targetZoom = focusZoom ?? 13;
+    if (engine === "leaflet" && leafletMapRef.current) {
+      try {
+        leafletMapRef.current.flyTo([focusCenter.lat, focusCenter.lng], targetZoom, {
+          duration: 0.75,
+        });
+      } catch {
+        leafletMapRef.current.setView([focusCenter.lat, focusCenter.lng], targetZoom);
+      }
+    } else if (engine === "google" && googleMapRef.current) {
+      googleMapRef.current.panTo({ lat: focusCenter.lat, lng: focusCenter.lng });
+      googleMapRef.current.setZoom(targetZoom);
+    }
+  }, [engine, focusCenter?.lat, focusCenter?.lng, focusZoom]);
 
   // Render Operational Layers + Weather Risk Heatmap
   useEffect(() => {
@@ -599,29 +631,41 @@ export default function OperationsMap({
 
         // 4. Hospitals
         mapLayers.hospitals.forEach((hospital) => {
+          const isHighlighted = highlightedHospitalId != null && hospital.id === highlightedHospitalId;
           const icon = L.divIcon({
             className: "hospital-pin",
-            html: `<div style="background:#255c7d;color:#fff;border-radius:50%;width:28px;height:28px;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,0.3);font-size:13px;">🏥</div>`,
-            iconSize: [28, 28],
-            iconAnchor: [14, 14],
+            html: isHighlighted
+              ? `<div style="background:#2457FF;color:#fff;border-radius:50%;width:34px;height:34px;display:grid;place-items:center;border:3px solid #fff;box-shadow:0 0 0 4px rgba(36,87,255,0.35),0 6px 14px rgba(17,28,68,0.4);font-size:15px;">🏥</div>`
+              : `<div style="background:#255c7d;color:#fff;border-radius:50%;width:28px;height:28px;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,0.3);font-size:13px;">🏥</div>`,
+            iconSize: isHighlighted ? [34, 34] : [28, 28],
+            iconAnchor: isHighlighted ? [17, 17] : [14, 14],
           });
 
-          const marker = L.marker([hospital.latitude, hospital.longitude], { icon, title: hospital.name });
+          const marker = L.marker([hospital.latitude, hospital.longitude], {
+            icon,
+            title: hospital.name,
+            zIndexOffset: isHighlighted ? 800 : 0,
+          });
 
           const totalBeds = hospital.totalEmergencyBeds + hospital.totalIcuBeds;
           const availableBeds = hospital.availableEmergencyBeds + hospital.availableIcuBeds;
           const occupiedBeds = totalBeds - availableBeds;
           const specialty = hospital.specialty || "Emergency Care";
           const contact = hospital.contactPhone || "+91 112";
+          const displayTitle =
+            hospital.branchName && hospital.organizationName && hospital.branchName !== "Main Hospital"
+              ? `${hospital.organizationName} — ${hospital.branchName}`
+              : hospital.organizationName || hospital.name;
+          const locationText = [hospital.address, hospital.city, hospital.state].filter(Boolean).join(", ");
 
           marker.bindPopup(`
             <div style="font-family:Inter,system-ui,sans-serif;padding:6px;min-width:240px;max-width:280px;">
               <div style="display:flex;align-items:center;gap:6px;">
                 <span style="font-size:16px;">🏥</span>
-                <strong style="color:#1d5148;font-size:13px;font-weight:800;">${hospital.name}</strong>
+                <strong style="color:#111C44;font-size:13px;font-weight:800;">${displayTitle}</strong>
               </div>
-              <div style="margin-top:4px;font-size:11px;color:#555;line-height:1.4;">📍 ${hospital.address}</div>
-              <div style="margin-top:6px;padding:4px 6px;border-radius:6px;background:#f0f7f5;font-size:11px;color:#174e46;font-weight:600;">
+              <div style="margin-top:4px;font-size:11px;color:#555;line-height:1.4;">📍 ${locationText}</div>
+              <div style="margin-top:6px;padding:4px 6px;border-radius:6px;background:#eff6ff;font-size:11px;color:#1d4ed8;font-weight:600;">
                 🩺 <strong>Specialty:</strong> ${specialty}
               </div>
               <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px;">
@@ -637,7 +681,7 @@ export default function OperationsMap({
                 </div>
               </div>
               <div style="margin-top:6px;font-size:11px;font-weight:bold;color:#1d5148;">
-                📞 Contact: <a href="tel:${contact}" style="color:#0f766e;text-decoration:underline;">${contact}</a>
+                📞 Contact: <a href="tel:${contact}" style="color:#2457FF;text-decoration:underline;">${contact}</a>
               </div>
             </div>
           `);
@@ -715,6 +759,7 @@ export default function OperationsMap({
     mapLayers.hospitals,
     mapLayers.rescuers,
     mapLayers.floodZones,
+    highlightedHospitalId,
   ]);
 
   const riskCounts = weatherRiskQuery.data?.counts;

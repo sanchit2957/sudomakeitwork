@@ -12,6 +12,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { donationRouter } from "../routers/donations";
 import { registerN8nRoutes } from "../n8n";
+import { registerHospitalRoutes } from "../hospital";
 import { liveTrackingRouter } from "../tracking/liveStream";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -102,6 +103,9 @@ async function startServer() {
 
   // n8n webhook routes + offline SOS endpoint
   registerN8nRoutes(app);
+
+  // Multi-branch hospital & Pan-India nearby geo-discovery routes
+  registerHospitalRoutes(app);
 
   // Real-time SSE Live Tracking stream
   app.use(liveTrackingRouter);
