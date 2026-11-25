@@ -586,6 +586,13 @@ export const rescueRouter = router({
         if (input.bleBeaconId) {
           const existingByBle = await getIncidentByBleBeaconId(input.bleBeaconId);
           if (existingByBle) {
+            // Also ensure dispatch is advanced if it was pending
+            if (existingByBle.status === "pending" && !existingByBle.assignedRescuerId) {
+              const { advanceIncidentDispatch } = await import("../dispatch/dispatch");
+              void advanceIncidentDispatch(existingByBle.id, new Date()).catch(err => {
+                console.warn("[BLE Sync] Failed to advance dispatch on idempotent retry:", err);
+              });
+            }
             return {
               incidentId: existingByBle.id,
               publicCode: existingByBle.publicCode,
@@ -624,9 +631,10 @@ export const rescueRouter = router({
             console.warn("[VoiceNote] Storage upload notice, proceeding with incident creation:", storageErr);
           }
         }
+        const isBleIncident = Boolean(input.bleBeaconId);
         let incidentId = nextIncidentId();
         const now = new Date();
-        const triageDeadlineAt = new Date(now.getTime() + 10_000);
+        const triageDeadlineAt = isBleIncident ? now : new Date(now.getTime() + 10_000);
         const defaultCategory: "medical" | "rescue" | "emergency" = input.emergencyType === "medical" ? "medical" : input.emergencyType === "trapped" ? "rescue" : "emergency";
 
         const db = await database();
@@ -652,9 +660,11 @@ export const rescueRouter = router({
               voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
               status: "pending",
               bleBeaconId: input.bleBeaconId ?? null,
-              dispatchStatus: "triage_pending",
+              dispatchStatus: isBleIncident ? "matching" : "triage_pending",
               triageStartedAt: now,
               triageDeadlineAt,
+              triageSelectedAt: isBleIncident ? now : null,
+              matchingStartedAt: isBleIncident ? now : null,
               matchingAttempts: 0,
             });
             if (result && (result[0] as any)?.insertId) {
@@ -687,11 +697,11 @@ export const rescueRouter = router({
           voiceNoteDurationSeconds: voiceNote?.durationSeconds ?? null,
           status: "pending",
           bleBeaconId: input.bleBeaconId ?? null,
-          dispatchStatus: "triage_pending",
+          dispatchStatus: isBleIncident ? "matching" : "triage_pending",
           triageStartedAt: now,
           triageDeadlineAt,
-          triageSelectedAt: null,
-          matchingStartedAt: null,
+          triageSelectedAt: isBleIncident ? now : null,
+          matchingStartedAt: isBleIncident ? now : null,
           matchingAttempts: 0,
           escalatedToCommandAt: null,
           assignedRescuerId: null,
@@ -707,9 +717,19 @@ export const rescueRouter = router({
           ctx.user.id,
           "sos_created",
           "SOS received",
-          "Awaiting rapid classification and automated responder dispatch."
+          isBleIncident
+            ? "Offline BLE SOS synchronized. Immediate responder matching activated."
+            : "Awaiting rapid classification and automated responder dispatch."
         );
-        await writeAudit(ctx.user.id, "incident.create", "incident", incidentId, `Created ${publicCode} with 10s rapid triage`);
+        await writeAudit(
+          ctx.user.id,
+          "incident.create",
+          "incident",
+          incidentId,
+          isBleIncident
+            ? `Created ${publicCode} from offline BLE beacon ${input.bleBeaconId} with immediate matching`
+            : `Created ${publicCode} with 10s rapid triage`
+        );
         await emitIncidentAlerts(
           incidentId,
           publicCode,
@@ -718,6 +738,15 @@ export const rescueRouter = router({
           input.latitude,
           input.longitude
         );
+
+        if (isBleIncident) {
+          try {
+            const { advanceIncidentDispatch } = await import("../dispatch/dispatch");
+            await advanceIncidentDispatch(incidentId, now);
+          } catch (dispatchErr) {
+            console.warn("[BLE Sync] Immediate dispatch advance error:", dispatchErr);
+          }
+        }
 
         // Resolve reporter's primary emergency contact phone if available
         let reporterPhone: string | null = null;
@@ -2887,10 +2916,13 @@ export const rescueRouter = router({
       // A rescuer may receive an Accept/Decline popup ONLY when the SOS incident itself
       // was created AFTER the rescuer's current responder session began.
       // (incident.createdAt > responderSessionStartedAt)
+      // EXCEPTION: Incidents reconciled from offline BLE SOS (bleBeaconId present) are exempt
+      // because physical radio proximity and offline distress supercede web session timing.
       const sessionStartedAt = getRescuerSessionStartedAt(ctx.user);
       const incidentCreatedAt = new Date(offerData.incident.createdAt).getTime();
+      const isBleIncident = Boolean((offerData.incident as any).bleBeaconId);
 
-      if (sessionStartedAt > 0 && incidentCreatedAt <= sessionStartedAt) {
+      if (!isBleIncident && sessionStartedAt > 0 && incidentCreatedAt <= sessionStartedAt) {
         return { hasOffer: false, offer: null, incident: null };
       }
       return {
@@ -2916,6 +2948,7 @@ export const rescueRouter = router({
           notes: offerData.incident.notes,
           voiceNoteUrl: (offerData.incident as any).voiceNoteUrl || null,
           voiceNoteDurationSeconds: (offerData.incident as any).voiceNoteDurationSeconds || null,
+          bleBeaconId: (offerData.incident as any).bleBeaconId || null,
           createdAt: offerData.incident.createdAt,
         },
       };
@@ -3006,12 +3039,23 @@ export const rescueRouter = router({
             message: "Offline BLE mission successfully reconciled and assigned.",
           };
         } catch (assignErr: any) {
-          // If someone else raced and took it
+          const errMsg = assignErr?.message || "";
+          const isTrueConflict =
+            errMsg.includes("already been assigned") ||
+            errMsg.includes("not found");
+          if (isTrueConflict) {
+            return {
+              status: "conflict" as const,
+              incidentId: incident.id,
+              publicCode: incident.publicCode,
+              message: errMsg || "Assignment conflict.",
+            };
+          }
           return {
-            status: "conflict" as const,
+            status: "retryable_error" as const,
             incidentId: incident.id,
             publicCode: incident.publicCode,
-            message: assignErr.message || "Assignment conflict.",
+            message: errMsg || "Temporary assignment error. Will retry.",
           };
         }
       }),

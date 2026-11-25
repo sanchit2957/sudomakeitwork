@@ -9,8 +9,10 @@ import { VictimNavigation } from "@/components/VictimNavigation";
 import { AssignedRescuerCard, IncidentChat, PostRescueCheckInCard } from "@/components/TrackIncidentComponents";
 export { AssignedRescuerCard, IncidentChat, PostRescueCheckInCard } from "@/components/TrackIncidentComponents";
 import { useLiveRescuerStream } from "@/hooks/useLiveRescuerStream";
+import { pendingSosCount, flushOfflineSos } from "@/lib/offlineSos";
+import { clearSosVoiceNote } from "@/lib/sosVoiceNote";
 import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, MapPin, Radio, ShieldCheck, Siren } from "lucide-react";
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
 export default function UserTrackFlow() {
@@ -18,11 +20,52 @@ export default function UserTrackFlow() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const codeFromPath = new URLSearchParams(window.location.search).get("code")?.toUpperCase() || "";
-  const publicCode = codeFromPath || getLatestSos();
+  const [trackedCode, setTrackedCode] = useState<string>(codeFromPath || getLatestSos());
+  const publicCode = codeFromPath || trackedCode || getLatestSos();
 
   useEffect(() => {
     if (publicCode) rememberLatestSos(publicCode);
   }, [publicCode]);
+
+  // Offline SOS outbox flush on reconnect
+  const createSos = trpc.rescue.emergency.create.useMutation();
+  useEffect(() => {
+    let active = true;
+    const flushOutbox = async () => {
+      if (!navigator.onLine) return;
+      try {
+        const count = await pendingSosCount();
+        if (count > 0 && active) {
+          const result = await flushOfflineSos((payload: any) => createSos.mutateAsync(payload));
+          if (result.delivered.length > 0 && active) {
+            clearSosVoiceNote();
+            const newCode = result.delivered[0];
+            rememberLatestSos(newCode);
+            setTrackedCode(newCode);
+            if (typeof window !== "undefined" && window.history?.replaceState) {
+              window.history.replaceState({}, "", `/track?code=${newCode}`);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[UserTrackFlow] Offline SOS outbox flush notice:", err);
+      }
+    };
+
+    void flushOutbox();
+    const onlineHandler = () => void flushOutbox();
+    const visibilityHandler = () => {
+      if (document.visibilityState === "visible") void flushOutbox();
+    };
+
+    window.addEventListener("online", onlineHandler);
+    document.addEventListener("visibilitychange", visibilityHandler);
+    return () => {
+      active = false;
+      window.removeEventListener("online", onlineHandler);
+      document.removeEventListener("visibilitychange", visibilityHandler);
+    };
+  }, []);
 
   const liveStream = useLiveRescuerStream(/^SOS-[A-Z0-9]{8}$/.test(publicCode) ? publicCode : null);
   const status = trpc.rescue.emergency.statusByCode.useQuery(

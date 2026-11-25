@@ -156,8 +156,9 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
 
   // 1. Check Triage Deadline
   if (incident.dispatchStatus === "triage_pending") {
-    if (incident.triageDeadlineAt && currentTime.getTime() >= new Date(incident.triageDeadlineAt).getTime()) {
-      // Triage window expired -> apply safe default
+    const isBleIncident = Boolean((incident as any).bleBeaconId);
+    if (isBleIncident || (incident.triageDeadlineAt && currentTime.getTime() >= new Date(incident.triageDeadlineAt).getTime())) {
+      // Triage window expired or BLE incident (no triage wait needed for offline-reconciled BLE SOS) -> apply safe default
       const defaultCategory = incident.requestCategory || "emergency";
       const db = await getDb();
       if (db) {
@@ -189,8 +190,24 @@ export async function advanceIncidentDispatch(incidentId: number, currentTime: D
         _memoryIncidents.set(incidentId, mem);
       }
 
-      await writeAudit(null, "triage_timeout", "incident", incidentId, `Triage deadline passed. Activated default ${defaultCategory}.`);
-      await addIncidentEvent(incidentId, null, "triage_timeout", "Triage timed out", "Automatic emergency response activated.");
+      await writeAudit(
+        null,
+        "triage_timeout",
+        "incident",
+        incidentId,
+        isBleIncident
+          ? `BLE SOS auto-advanced to matching with category ${defaultCategory}.`
+          : `Triage deadline passed. Activated default ${defaultCategory}.`
+      );
+      await addIncidentEvent(
+        incidentId,
+        null,
+        "triage_timeout",
+        isBleIncident ? "BLE SOS matching activated" : "Triage timed out",
+        isBleIncident
+          ? "Automatic responder dispatch activated for offline BLE beacon."
+          : "Automatic emergency response activated."
+      );
       incident.dispatchStatus = "matching";
       incident.requestCategory = defaultCategory;
     } else {

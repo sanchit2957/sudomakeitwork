@@ -3,7 +3,7 @@ const APP_SHELL = ["/", "/emergency", "/track", "/safety", "/more"];
 
 // ─── IndexedDB helpers (duplicated here because SW can't import from app bundle) ─
 
-const DB_NAME = "sahay-sos";
+const DB_NAME = "sudo-makeitwork-sos";
 const DB_VERSION = 1;
 const STORE_NAME = "outbox";
 

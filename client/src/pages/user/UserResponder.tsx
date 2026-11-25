@@ -198,6 +198,9 @@ function ResponderWorkspace() {
                 syncError: res.message,
               });
               toast.warning(`${t("BLE Beacon")} ${item.bleBeaconId}: ${res.message}`);
+            } else {
+              // res.status === "pending_victim_sync" or "retryable_error"
+              // Keep pending; will retry automatically when victim connects or next interval fires
             }
           } catch (err: any) {
             console.warn("[UserResponder] BLE acceptance sync attempt notice:", err?.message);
@@ -211,12 +214,21 @@ function ResponderWorkspace() {
     void syncOfflineAcceptances();
     const interval = setInterval(syncOfflineAcceptances, 10_000);
     const onlineHandler = () => void syncOfflineAcceptances();
+    const bleChangeHandler = () => void syncOfflineAcceptances();
+    const visibilityHandler = () => {
+      if (document.visibilityState === "visible") void syncOfflineAcceptances();
+    };
+
     window.addEventListener("online", onlineHandler);
+    window.addEventListener("sudo-ble-acceptance-changed", bleChangeHandler);
+    document.addEventListener("visibilitychange", visibilityHandler);
 
     return () => {
       active = false;
       clearInterval(interval);
       window.removeEventListener("online", onlineHandler);
+      window.removeEventListener("sudo-ble-acceptance-changed", bleChangeHandler);
+      document.removeEventListener("visibilitychange", visibilityHandler);
     };
   }, [user?.id, t]);
 
