@@ -60,6 +60,20 @@ export function DesktopOnlyGate({
   const isDesktop = useIsDesktop();
   const [, setLocation] = useLocation();
   const { logout } = useAuth();
+  const [bypassed, setBypassed] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(`sahay_bypass_gate_${portalType}`) === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const handleUnlockCompact = () => {
+    try {
+      sessionStorage.setItem(`sahay_bypass_gate_${portalType}`, "true");
+    } catch {}
+    setBypassed(true);
+  };
 
   const handleGoToCitizen = () => {
     try {
@@ -84,6 +98,7 @@ export function DesktopOnlyGate({
     }
     try {
       sessionStorage.removeItem("sahay_allow_citizen_home");
+      sessionStorage.removeItem(`sahay_bypass_gate_${portalType}`);
     } catch { }
     const loginDest =
       portalType === "admin"
@@ -94,7 +109,7 @@ export function DesktopOnlyGate({
     setLocation(loginDest);
   };
 
-  if (isDesktop && children) {
+  if ((isDesktop || bypassed) && children) {
     return <>{children}</>;
   }
 
@@ -189,6 +204,15 @@ export function DesktopOnlyGate({
 
         {/* Navigation Action Buttons */}
         <div className="mt-6 flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={handleUnlockCompact}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-xs font-bold text-[#F8F1E4] transition hover:bg-white/15 active:scale-[0.98] cursor-pointer"
+          >
+            <Monitor className="h-4 w-4 text-[#D8E3FF]" />
+            Continue in compact view (Multi-tab mode)
+          </button>
+
           <button
             type="button"
             onClick={handleGoToCitizen}

@@ -42,6 +42,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 async function startServer() {
   const app = express();
+  // Enable reverse-proxy trust for production deployments (Render, Cloudflare, AWS, Heroku)
+  app.set("trust proxy", 1);
   const server = createServer(app);
 
   // Enable gzip/deflate compression for massive bandwidth & buffer reduction

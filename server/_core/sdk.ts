@@ -341,6 +341,11 @@ class SDKServer {
       }
     }
 
+    // 3. Fallback to query parameter (for SSE / EventSource where headers cannot be set)
+    if (!sessionToken && typeof (req as any).query?.token === "string" && (req as any).query.token.trim()) {
+      sessionToken = (req as any).query.token.trim();
+    }
+
     const session = await this.verifySession(sessionToken);
 
     if (!session) {

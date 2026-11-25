@@ -162,6 +162,7 @@ export default function UserLogin() {
         email: email.trim(),
         password: password.trim(),
         role: "user",
+        portal: "citizen",
       });
       setSuccessMessage("Signed in successfully! Redirecting…");
       const targetRole = res?.user?.role || "user";

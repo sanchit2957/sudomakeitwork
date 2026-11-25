@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { getApiUrl } from "@/lib/apiConfig";
+import { getApiUrl, isNativeApp } from "@/lib/apiConfig";
 import {
   type PortalId,
+  getNativePortalToken,
   isPortalStreamConnected,
   setPortalStreamConnected,
   subscribePortalStreamStatus,
@@ -91,6 +92,12 @@ function openManagedStream(stream: ManagedStream) {
   const params = new URLSearchParams({ portal: stream.portal });
   if (stream.trackingCode) {
     params.set("code", stream.trackingCode);
+  }
+  if (isNativeApp()) {
+    const nativeToken = getNativePortalToken(stream.portal);
+    if (nativeToken) {
+      params.set("token", nativeToken);
+    }
   }
   const streamUrl = getApiUrl(`/api/realtime/stream?${params.toString()}`);
   updateManagedStatus(stream, "connecting");

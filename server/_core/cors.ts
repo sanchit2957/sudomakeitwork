@@ -28,16 +28,13 @@ export function getAuthorizedOrigins(): Set<string> {
     "https://localhost",
     "http://localhost",
     "android-app://gov.in.assamrescue.app",
+    // Local / loopback origins (supported in both development & local production preview mode)
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://10.0.2.2:3000",
   ]);
-
-  // Local development origins
-  if (process.env.NODE_ENV !== "production") {
-    list.add("http://localhost:3000");
-    list.add("http://localhost:5173");
-    list.add("http://127.0.0.1:3000");
-    list.add("http://127.0.0.1:5173");
-    list.add("http://10.0.2.2:3000");
-  }
 
   // Explicit environment configuration
   if (process.env.ALLOWED_ORIGINS) {
@@ -62,6 +59,11 @@ export function getAuthorizedOrigins(): Set<string> {
     if (norm) list.add(norm);
   }
 
+  if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+    const norm = normalizeOrigin(`https://${process.env.RENDER_EXTERNAL_HOSTNAME}`);
+    if (norm) list.add(norm);
+  }
+
   return list;
 }
 
@@ -83,15 +85,13 @@ export function isOriginAllowed(origin?: string | null): boolean {
     return true;
   }
 
-  // In non-production, permit localhost with any dynamic port
-  if (process.env.NODE_ENV !== "production") {
-    try {
-      const parsed = new URL(normalized);
-      if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-        return true;
-      }
-    } catch {}
-  }
+  // Permit localhost with any dynamic port
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+      return true;
+    }
+  } catch {}
 
   return false;
 }

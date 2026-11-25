@@ -218,7 +218,7 @@ export const appRouter = router({
         if (!input.email || !input.password) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Email and password are required." });
         }
-        
+
         const emailInput = input.email.trim().toLowerCase();
         const explicitRole = input.role
           ? (input.role === "medical" ? "hospital" : input.role)
@@ -537,7 +537,7 @@ export const appRouter = router({
                 reason: input.reason || "Provisioned by administrator",
               })
             );
-          } catch {}
+          } catch { }
         }
         if (dbUser) {
           broadcastPortalEvent({
@@ -641,7 +641,8 @@ export const appRouter = router({
         const effectivePortal = input?.portal ?? ctx.portal ?? sdk.resolveRequestPortal(ctx.req);
         const cookieName = getPortalCookieName(effectivePortal, COOKIE_NAME);
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.clearCookie(cookieName, { ...cookieOptions, maxAge: -1 });
+        const { maxAge: _unused, ...clearOptions } = cookieOptions as any;
+        ctx.res.clearCookie(cookieName, clearOptions);
         return { success: true, portal: effectivePortal ?? null };
       }),
   }),

@@ -75,7 +75,7 @@ type HospitalRecord = {
   medicineSupplyStatus: SupplyStatus;
   waterSupplyStatus: SupplyStatus;
   powerBackupStatus: SupplyStatus;
-  status: "open" | "limited" | "critical" | "closed";
+  status: "open" | "limited" | "critical" | "closed" | "OPEN" | "LIMITED" | "FULL" | "CLOSED" | string;
   updatedAt: Date | string;
 };
 
@@ -461,18 +461,16 @@ export function HospitalStaffDashboard({
                   <button
                     type="button"
                     onClick={() => setIncludeAllBranches(false)}
-                    className={`rounded-lg px-2.5 py-1 transition ${
-                      !includeAllBranches ? "bg-[#2457FF] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`rounded-lg px-2.5 py-1 transition ${!includeAllBranches ? "bg-[#2457FF] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     Active Branch Only
                   </button>
                   <button
                     type="button"
                     onClick={() => setIncludeAllBranches(true)}
-                    className={`rounded-lg px-2.5 py-1 transition ${
-                      includeAllBranches ? "bg-[#2457FF] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`rounded-lg px-2.5 py-1 transition ${includeAllBranches ? "bg-[#2457FF] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     All My Branches
                   </button>
@@ -892,11 +890,10 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-        active
-          ? "bg-[#1D4ED8] text-white shadow-md"
-          : "bg-white/10 text-[#F8FAFC]/80 hover:bg-white/20 hover:text-white"
-      }`}
+      className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${active
+        ? "bg-[#1D4ED8] text-white shadow-md"
+        : "bg-white/10 text-[#F8FAFC]/80 hover:bg-white/20 hover:text-white"
+        }`}
     >
       <Icon className="h-4 w-4" />
       <span>{label}</span>

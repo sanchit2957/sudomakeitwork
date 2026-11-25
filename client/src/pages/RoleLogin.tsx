@@ -102,6 +102,7 @@ export function RoleLogin({ role }: { role: PortalRole }) {
         email: email.trim(),
         password,
         role: role,
+        portal: role === "rescuer" ? "rescuer" : "hospital",
         governmentCode: governmentCode.trim(),
       });
       const userRole = result.user?.role;

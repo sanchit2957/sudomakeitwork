@@ -47,6 +47,7 @@ export default function AdminLogin() {
         email: email.trim(),
         password: password,
         role: "admin",
+        portal: "admin",
       });
 
       const role = res.user?.role;

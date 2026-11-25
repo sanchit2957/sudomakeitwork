@@ -12,7 +12,7 @@ export function isNativeApp(): boolean {
     if (window.location.protocol === "capacitor:" || window.location.protocol === "ionic:") return true;
     // Android WebView User Agent check fallback
     if (navigator.userAgent.includes("wv") || navigator.userAgent.includes("Capacitor")) return true;
-  } catch {}
+  } catch { }
   return false;
 }
 
@@ -50,8 +50,15 @@ export function getApiBaseUrl(): string {
     return DEFAULT_PRODUCTION_API_URL;
   }
 
-  // 3. In web browser environment, always use relative URLs so requests reach the current host/port cleanly
+  // 3. In web browser environment: use relative URL if unified origin; use VITE_API_URL if hosted cross-origin
   if (typeof window !== "undefined") {
+    const envUrl = import.meta.env.VITE_API_URL;
+    if (typeof envUrl === "string" && envUrl.trim().length > 0) {
+      const trimmed = envUrl.trim().replace(/\/+$/, "");
+      if (trimmed !== window.location.origin) {
+        return trimmed;
+      }
+    }
     return "";
   }
 
