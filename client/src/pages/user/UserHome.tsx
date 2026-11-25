@@ -179,14 +179,37 @@ export default function UserHome() {
       .sort((a, b) => a.distanceKm - b.distanceKm);
   }, [position, resourcesQuery.data?.shelters]);
 
+  const sendOfflineQueuedPayload = async (payload: any) => {
+    if (user) {
+      try {
+        return await createSos.mutateAsync(payload);
+      } catch (err: any) {
+        if (err?.data?.code !== "UNAUTHORIZED") {
+          throw err;
+        }
+      }
+    }
+    const response = await fetch("/api/sos/offline", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Offline SOS sync failed (${response.status})`);
+    }
+    return (await response.json()) as { publicCode: string };
+  };
+
   const triggerFlush = async () => {
     if (isSyncing) return;
     setIsSyncing(true);
     try {
-      const result = await flushOfflineSos(payload => createSos.mutateAsync(payload));
+      const result = await flushOfflineSos(payload => sendOfflineQueuedPayload(payload));
       refreshPending();
       if (result.delivered.length > 0) {
         clearSosVoiceNote();
+        void stopBleSosBeacon({ clearId: true });
+        setBleActive(false);
         setRapidStatus("idle");
         setRapidNotice(t("Offline SOS successfully dispatched to State Command Centre!"));
         redirectAfterRapidSos(result.delivered[0], setLocation);
@@ -199,13 +222,29 @@ export default function UserHome() {
   };
 
   useEffect(() => {
-    if (!online || !user) return;
+    if (!online) return;
+    if (!user && pendingCount === 0) return;
     void triggerFlush();
-  }, [online, user?.id]);
+  }, [online, user?.id, pendingCount]);
 
   const startRapidSos = () => {
-    if (authLoading) return;
-    if (!user) { startLogin(); return; }
+    const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+    if (online && !isOffline && authLoading) return;
+    if (online && !isOffline && !user) { startLogin(); return; }
+
+    const getOrCreateGuestKey = () => {
+      try {
+        const existing = localStorage.getItem("sudo-makeitwork-guest-key");
+        if (existing) return existing;
+        const created = typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID().replaceAll("-", "")
+          : `guest-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+        localStorage.setItem("sudo-makeitwork-guest-key", created);
+        return created;
+      } catch {
+        return `guest-${Date.now().toString(36)}`;
+      }
+    };
 
     const submitSosWithCoords = async (latitude: number | undefined, longitude: number | undefined, label: string) => {
       const hasCoords = latitude != null && longitude != null && isValidBleCoordinate(latitude, longitude);
@@ -215,7 +254,7 @@ export default function UserHome() {
       }
       const voiceNote = readSosVoiceNote();
       const payload = {
-        contactName: user.name || undefined,
+        contactName: user?.name || undefined,
         locationLabel: label,
         latitude: hasCoords ? latitude : 0,
         longitude: hasCoords ? longitude : 0,
@@ -245,13 +284,18 @@ export default function UserHome() {
         bleBeaconId,
       };
 
-      if (!navigator.onLine) {
-        const guestKey = localStorage.getItem("sudo-makeitwork-guest-key") || crypto.randomUUID().replaceAll("-", "");
-        localStorage.setItem("sudo-makeitwork-guest-key", guestKey);
+      const queueOfflineNow = async (noticeText: string) => {
+        const guestKey = getOrCreateGuestKey();
         await queueOfflineSos({ ...sosPayloadWithBle, guestKey });
         refreshPending();
         setRapidStatus("queued");
-        setRapidNotice(t("SOS saved in device database (IndexedDB) & BLE Beacon active. Will auto-dispatch when network returns."));
+        setRapidNotice(noticeText);
+      };
+
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await queueOfflineNow(
+          t("SOS saved in device database (IndexedDB) & BLE Beacon active. Will auto-dispatch when network returns.")
+        );
         return;
       }
 
@@ -267,18 +311,19 @@ export default function UserHome() {
           triageDeadlineAt: (created as any).triageDeadlineAt,
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "";
-        const isNetworkFail = !navigator.onLine || /fetch|network|failed to fetch|timeout|abort|econnrefused/i.test(message);
+        const message = error instanceof Error ? error.message : String(error ?? "");
+        const isSafeInputMessage = /^(Voice notes|Evidence|Locations|Available beds)/.test(message);
+        const isNetworkFail =
+          (typeof navigator !== "undefined" && !navigator.onLine) ||
+          /fetch|network|load failed|networkerror|timeout|abort|econnrefused|enotfound|err_internet|unable to transform response|unexpected token|502|503|504/i.test(message) ||
+          (!isSafeInputMessage && error instanceof TypeError);
+
         if (isNetworkFail) {
-          const guestKey = localStorage.getItem("sudo-makeitwork-guest-key") || crypto.randomUUID().replaceAll("-", "");
-          localStorage.setItem("sudo-makeitwork-guest-key", guestKey);
-          await queueOfflineSos({ ...sosPayloadWithBle, guestKey });
-          refreshPending();
-          setRapidStatus("queued");
-          setRapidNotice(t("Network dropped. SOS is safely preserved in device database (IndexedDB) and auto-syncing."));
+          await queueOfflineNow(
+            t("Network dropped. SOS is safely preserved in device database (IndexedDB) and auto-syncing.")
+          );
           return;
         }
-        const isSafeInputMessage = /^(Voice notes|Evidence|Locations|Available beds)/.test(message);
         setRapidStatus("error");
         setRapidNotice(isSafeInputMessage ? t(message) : t("SOS could not be sent. Check connection and try again."));
       }
@@ -291,6 +336,13 @@ export default function UserHome() {
       void submitSosWithCoords(manualLocation.lat, manualLocation.lng, manualLocation.name);
     } else if (position) {
       void submitSosWithCoords(position.latitude, position.longitude, t("GPS location captured from this phone"));
+    } else if (isOffline) {
+      const lastKnown = getLastKnownCoordinates();
+      if (lastKnown) {
+        void submitSosWithCoords(lastKnown.latitude, lastKnown.longitude, t("Last known device location"));
+      } else {
+        void submitSosWithCoords(undefined, undefined, t("Location unavailable (No GPS fix on phone)"));
+      }
     } else {
       void getCurrentCoordinates({ enableHighAccuracy: true, timeout: 6000 })
         .then((res) => {
@@ -438,7 +490,7 @@ export default function UserHome() {
                 <div className="liquid-bezel">
                   <button
                     onClick={startRapidSos}
-                    disabled={authLoading || rapidStatus === "locating" || rapidStatus === "sending"}
+                    disabled={(online && authLoading) || rapidStatus === "locating" || rapidStatus === "sending"}
                     aria-label={t("Send SOS")}
                     className="sahay-sos-btn"
                   >
@@ -456,7 +508,7 @@ export default function UserHome() {
                           ? t("Getting location")
                           : rapidStatus === "sending"
                             ? t("Sending SOS")
-                            : user
+                            : (user || !online)
                               ? t("Tap for immediate help")
                               : t("Sign in to activate")}
                       </span>
