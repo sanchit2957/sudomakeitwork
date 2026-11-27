@@ -111,7 +111,7 @@ class SafeErrorBoundary extends React.Component<{ children: React.ReactNode }, {
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-  componentDidCatch() {}
+  componentDidCatch() { }
   render() {
     if (this.state.hasError) return null;
     return this.props.children;
@@ -244,9 +244,9 @@ export function MapView({
         if (!isMounted || !mapContainer.current) return;
 
         if (leafletMarkerRef.current) {
-        leafletMarkerRef.current = null;
-      }
-      if (leafletMapRef.current) {
+          leafletMarkerRef.current = null;
+        }
+        if (leafletMapRef.current) {
           leafletMapRef.current.remove();
           leafletMapRef.current = null;
         }
