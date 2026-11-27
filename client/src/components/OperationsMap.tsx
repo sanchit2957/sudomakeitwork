@@ -265,8 +265,17 @@ export default function OperationsMap({
   }, [compact]);
 
   // Smoothly recenter map when focusCenter or focusZoom updates (e.g. branch switch or live GPS)
+  const lastFocusCenterRef = useRef<Point | null>(null);
+
   useEffect(() => {
     if (!focusCenter || !Number.isFinite(focusCenter.lat) || !Number.isFinite(focusCenter.lng)) return;
+
+    const last = lastFocusCenterRef.current;
+    if (last && Math.hypot(focusCenter.lat - last.lat, focusCenter.lng - last.lng) < 0.00005) {
+      return; // Filter out micro-jitter
+    }
+    lastFocusCenterRef.current = { lat: focusCenter.lat, lng: focusCenter.lng };
+
     const targetZoom = focusZoom ?? 13;
     if (engine === "leaflet" && leafletMapRef.current) {
       try {

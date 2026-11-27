@@ -67,7 +67,9 @@ export type MapShelter = {
 interface MapViewProps {
   className?: string;
   initialCenter?: { lat: number; lng: number };
+  center?: { lat: number; lng: number };
   initialZoom?: number;
+  zoom?: number;
   showWeatherHeatmap?: boolean;
   hospitals?: MapHospital[];
   shelters?: MapShelter[];
@@ -145,7 +147,9 @@ function WeatherHeatmapConsumer({ onPoints }: { onPoints: (points: any[]) => voi
 export function MapView({
   className,
   initialCenter = { lat: 20.5937, lng: 78.9629 },
+  center,
   initialZoom = 5,
+  zoom,
   showWeatherHeatmap = true,
   hospitals,
   shelters,
@@ -158,13 +162,18 @@ export function MapView({
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
+  const leafletMarkerRef = useRef<any>(null);
   const leafletWeatherLayerRef = useRef<any>(null);
   const googleMapRef = useRef<google.maps.Map | null>(null);
   const googleMarkerRef = useRef<any>(null);
   const googleWeatherCirclesRef = useRef<any[]>([]);
+  const lastMovedCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [mapEngine, setMapEngine] = useState<"google" | "leaflet" | "none">("none");
   const [weatherPoints, setWeatherPoints] = useState<any[]>([]);
+
+  const activeCenter = center || initialCenter;
+  const activeZoom = zoom || initialZoom;
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -234,7 +243,10 @@ export function MapView({
         const L = (await import("leaflet")).default;
         if (!isMounted || !mapContainer.current) return;
 
-        if (leafletMapRef.current) {
+        if (leafletMarkerRef.current) {
+        leafletMarkerRef.current = null;
+      }
+      if (leafletMapRef.current) {
           leafletMapRef.current.remove();
           leafletMapRef.current = null;
         }
@@ -266,7 +278,8 @@ export function MapView({
           iconAnchor: [15, 30],
         });
 
-        const marker = L.marker([initialCenter.lat, initialCenter.lng], { icon: customPin, zIndexOffset: 1000 }).addTo(lMap);
+        const marker = L.marker([activeCenter.lat, activeCenter.lng], { icon: customPin, zIndexOffset: 1000 }).addTo(lMap);
+        leafletMarkerRef.current = marker;
 
         if (onPickLocation) {
           lMap.on("click", (e: any) => {
@@ -317,6 +330,9 @@ export function MapView({
       googleWeatherCirclesRef.current.forEach((c) => c?.setMap?.(null));
       googleWeatherCirclesRef.current = [];
       googleMapRef.current = null;
+      if (leafletMarkerRef.current) {
+        leafletMarkerRef.current = null;
+      }
       if (leafletMapRef.current) {
         leafletMapRef.current.remove();
         leafletMapRef.current = null;
@@ -457,18 +473,75 @@ export function MapView({
     }
   }, [mapEngine, hospitals, shelters]);
 
+  // Smooth reactive center/zoom tracking without tearing down the map
   useEffect(() => {
-    if (googleMapRef.current) {
-      googleMapRef.current.setCenter({ lat: initialCenter.lat, lng: initialCenter.lng });
-      googleMapRef.current.setZoom(initialZoom);
-      if (googleMarkerRef.current) {
-        googleMarkerRef.current.setPosition({ lat: initialCenter.lat, lng: initialCenter.lng });
+    if (!activeCenter || !Number.isFinite(activeCenter.lat) || !Number.isFinite(activeCenter.lng)) return;
+
+    const last = lastMovedCenterRef.current;
+    const distanceThreshold = 0.00005; // ~5 meters to prevent jitter
+    const hasMoved = !last || Math.hypot(activeCenter.lat - last.lat, activeCenter.lng - last.lng) > distanceThreshold;
+
+    if (mapEngine === "leaflet" && leafletMapRef.current) {
+      if (leafletMarkerRef.current) {
+        leafletMarkerRef.current.setLatLng([activeCenter.lat, activeCenter.lng]);
+      }
+      if (hasMoved) {
+        lastMovedCenterRef.current = { lat: activeCenter.lat, lng: activeCenter.lng };
+        try {
+          leafletMapRef.current.flyTo([activeCenter.lat, activeCenter.lng], activeZoom, {
+            duration: 0.75,
+          });
+        } catch {
+          leafletMapRef.current.setView([activeCenter.lat, activeCenter.lng], activeZoom);
+        }
+      }
+    } else if (mapEngine === "google" && googleMapRef.current) {
+      if (googleMarkerRef.current?.setPosition) {
+        googleMarkerRef.current.setPosition({ lat: activeCenter.lat, lng: activeCenter.lng });
+      }
+      if (hasMoved) {
+        lastMovedCenterRef.current = { lat: activeCenter.lat, lng: activeCenter.lng };
+        if (typeof googleMapRef.current.setCenter === "function") {
+          googleMapRef.current.setCenter({ lat: activeCenter.lat, lng: activeCenter.lng });
+        } else if (typeof googleMapRef.current.panTo === "function") {
+          googleMapRef.current.panTo({ lat: activeCenter.lat, lng: activeCenter.lng });
+        }
+        if (activeZoom && typeof googleMapRef.current.setZoom === "function") {
+          googleMapRef.current.setZoom(activeZoom);
+        }
       }
     }
-    if (leafletMapRef.current) {
-      leafletMapRef.current.setView([initialCenter.lat, initialCenter.lng], initialZoom);
+  }, [mapEngine, activeCenter?.lat, activeCenter?.lng, activeZoom]);
+
+  const handleRecenterClick = () => {
+    if (activeCenter && Number.isFinite(activeCenter.lat) && Number.isFinite(activeCenter.lng)) {
+      if (mapEngine === "leaflet" && leafletMapRef.current) {
+        if (leafletMarkerRef.current) {
+          leafletMarkerRef.current.setLatLng([activeCenter.lat, activeCenter.lng]);
+        }
+        try {
+          leafletMapRef.current.flyTo([activeCenter.lat, activeCenter.lng], activeZoom, {
+            duration: 0.75,
+          });
+        } catch {
+          leafletMapRef.current.setView([activeCenter.lat, activeCenter.lng], activeZoom);
+        }
+      } else if (mapEngine === "google" && googleMapRef.current) {
+        if (googleMarkerRef.current?.setPosition) {
+          googleMarkerRef.current.setPosition({ lat: activeCenter.lat, lng: activeCenter.lng });
+        }
+        if (typeof googleMapRef.current.panTo === "function") {
+          googleMapRef.current.panTo({ lat: activeCenter.lat, lng: activeCenter.lng });
+        } else if (typeof googleMapRef.current.setCenter === "function") {
+          googleMapRef.current.setCenter({ lat: activeCenter.lat, lng: activeCenter.lng });
+        }
+        if (activeZoom && typeof googleMapRef.current.setZoom === "function") {
+          googleMapRef.current.setZoom(activeZoom);
+        }
+      }
     }
-  }, [initialCenter.lat, initialCenter.lng, initialZoom]);
+    onRecenter?.();
+  };
 
   return (
     <div
@@ -485,7 +558,7 @@ export function MapView({
       {onRecenter && (
         <button
           type="button"
-          onClick={onRecenter}
+          onClick={handleRecenterClick}
           disabled={recenterLoading}
           aria-label="Recenter to my location"
           title="Recenter to my location"

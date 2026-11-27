@@ -60,7 +60,7 @@ export function rememberLocationPermission(granted = true, coords?: CoordinateRe
   }
 }
 
-export function ensureLocationPermissionCookie(defaultCoords: CoordinateResult = DEFAULT_FALLBACK_COORDINATES) {
+export function ensureLocationPermissionCookie(defaultCoords?: CoordinateResult) {
   if (typeof window === "undefined") return;
   try {
     const current = getCookie(LOCATION_PERMISSION_COOKIE);
@@ -117,11 +117,6 @@ export function getLastKnownCoordinates(): CoordinateResult | null {
         }
       }
     } catch {}
-
-    if (hasLocationPermissionGranted()) {
-      _lastKnownCoords = DEFAULT_FALLBACK_COORDINATES;
-      return DEFAULT_FALLBACK_COORDINATES;
-    }
   }
   return null;
 }

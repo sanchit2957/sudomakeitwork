@@ -207,9 +207,11 @@ export default function UserHome() {
     setManualLocation(null);
     setIsGpsActive(true);
     setIsLocating(true);
-    setLocationStatus("finding");
+    if (!position) {
+      setLocationStatus("finding");
+    }
     try {
-      const res = await getCurrentCoordinates({ enableHighAccuracy: true, timeout: 6000 });
+      const res = await getCurrentCoordinates({ enableHighAccuracy: true, timeout: 6000, fallbackToCached: false });
       setPosition({ latitude: res.latitude, longitude: res.longitude });
       setLocationStatus("ready");
     } catch (err) {
@@ -1052,35 +1054,23 @@ function LocationPreview({
 }) {
   const { t } = useLanguage();
   const center = point ? { lat: point.latitude, lng: point.longitude } : INDIA_CENTER;
-  const zoom = point ? 14 : 5;
-  const pointKey = point ? `${point.latitude.toFixed(4)}-${point.longitude.toFixed(4)}` : "india-overview";
+  const zoom = point ? 15 : 5;
 
   return (
     <section className="glass-panel overflow-hidden p-3.5 h-full flex flex-col justify-between">
       <div className="relative overflow-hidden rounded-2xl">
         <MapView
-          key={pointKey}
           className="h-64 sm:h-72 lg:h-[340px] xl:h-[380px] w-full"
           initialCenter={center}
+          center={center}
           initialZoom={zoom}
+          zoom={zoom}
           showWeatherHeatmap={true}
           hospitals={hospitals}
           shelters={shelters}
           onRecenter={onRecenter}
           recenterLoading={recenterLoading}
           onPickLocation={onPickLocation}
-          onLeafletReady={async (lMap) => {
-            if (point) {
-              const L = (await import("leaflet")).default;
-              const icon = L.divIcon({
-                className: "loc-pin",
-                html: `<div style="background:#DC2626;color:#fff;border-radius:50%;width:24px;height:24px;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,0.3);font-size:12px;">📍</div>`,
-                iconSize: [24, 24],
-                iconAnchor: [12, 24],
-              });
-              L.marker([point.latitude, point.longitude], { icon, zIndexOffset: 1000 }).addTo(lMap);
-            }
-          }}
         />
         <div className="pointer-events-none absolute left-3 top-3 rounded-lg glass-pill px-2.5 py-1 text-xs font-black shadow-sm text-[#0F172A] dark:text-[#F8FAFC]">
           {t("Map preview")}
